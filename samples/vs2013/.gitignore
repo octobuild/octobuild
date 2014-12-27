@@ -1,0 +1,4 @@
+*.cpp.i
+*.cpp.o
+*.h.i
+*.h.pch
