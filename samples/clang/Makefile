@@ -16,4 +16,4 @@ sample.cpp.i: sample.cpp sample.h.pch
 	clang -x c++ -E -frewrite-includes -include-pch sample.h.pch sample.cpp -o sample.cpp.i
 
 sample.cpp.o: sample.cpp.i
-	clang -x c++ -c -include-pch sample.h.pch sample.cpp.i -o sample.cpp.o
+	clang -x c++ -c -include-pch sample.h.pch -Xclang -fno-validate-pch sample.cpp.i -o sample.cpp.o
