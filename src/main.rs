@@ -1,8 +1,9 @@
 use std::os;
 
 fn main() {
+	println!("XGConsole:");
 	for arg in parse_command_line(os::args()).iter() {
-		println!("{}", arg);
+		println!("  {}", arg);
 	}
 }
 

@@ -4,6 +4,9 @@ name = "octobuild"
 version = "0.0.1"
 authors = [ "Artem V. Navrotskiy <bozaro@users.noreply.github.com>" ]
 
+[dependencies.xml-rs]
+version = "*"
+
 [[bin]]
 
-name = "octobuild"
+name = "xgconsole"
