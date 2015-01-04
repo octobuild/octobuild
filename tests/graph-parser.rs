@@ -16,7 +16,7 @@ fn indent(size: uint) -> String {
 
 #[test]
 fn sample() {
-	let file = File::open(&Path::new("tests/graph-parser.xml")).unwrap();
+	let file = File::open(&Path::new("graph-parser.xml")).unwrap();
 	let reader = BufferedReader::new(file);
 
 	let mut parser = EventReader::new(reader);
