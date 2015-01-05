@@ -24,30 +24,24 @@ fn parse_command_line(args: Vec<String>) -> Vec<String> {
 	result
 }
 
-enum OptionalString {
-Value(String),
-Missing,
-}
-
-impl fmt::Show for OptionalString {
-fn fmt(& self, f: &mut fmt::Formatter) -> fmt::Result {
-	match self {
-			&OptionalString::Value(ref v) => {
-			write!(f, "{}", v)
-		}
-			&OptionalString::Missing => {
-			write!(f, "missing")
-		}
-		}
-}
-}
-
 struct XgTask {
-id: OptionalString,
-title: OptionalString,
-tool: OptionalString,
-working_dir: OptionalString,
+id: Option<String>,
+title: Option<String>,
+tool: Option<String>,
+working_dir: Option<String>,
 depends_on: Vec<String>,
+}
+
+impl XgTask {
+fn new() -> XgTask {
+	XgTask {
+	id: None,
+	title: None,
+	tool: None,
+	working_dir: None,
+	depends_on: vec![],
+	}
+}
 }
 
 impl fmt::Show for XgTask {
@@ -57,9 +51,19 @@ fn fmt(& self, f: &mut fmt::Formatter) -> fmt::Result {
 }
 
 struct XgTool {
-id: OptionalString,
-path: OptionalString,
-params: OptionalString,
+id: Option<String>,
+path: Option<String>,
+params: Option<String>,
+}
+
+impl XgTool {
+fn new() -> XgTool {
+	XgTool {
+	id: None,
+	path: None,
+	params: None,
+	}
+}
 }
 
 impl fmt::Show for XgTool {
@@ -77,7 +81,7 @@ fn sample() {
 	let mut tools:Vec<XgTool> = vec![];
 	for e in parser.events() {
 		match e {
-				XmlEvent::StartElement {name, attributes, namespace} => {
+				XmlEvent::StartElement {name, attributes, ..} => {
 				match name.local_name.as_slice() {
 						"Task" =>
 						{
@@ -90,7 +94,7 @@ fn sample() {
 						_ => {}
 					}
 			}
-				XmlEvent::EndElement{name} => {
+				XmlEvent::EndElement{..} => {
 			}
 				_ => {
 			}
@@ -99,31 +103,25 @@ fn sample() {
 }
 
 fn xg_parse_task (attributes: &Vec<xml::attribute::OwnedAttribute>)->XgTask {
-	let mut task = XgTask {
-	id: OptionalString::Missing,
-	title: OptionalString::Missing,
-	tool: OptionalString::Missing,
-	working_dir: OptionalString::Missing,
-	depends_on: vec![],
-	};
+	let mut task = XgTask::new();
 	for attr in attributes.iter() {
 		match attr.name.local_name.as_slice()
 			{
 				"Name" =>
 				{
-						task.id = OptionalString::Value(attr.value.to_string());
+						task.id = Some(attr.value.to_string());
 				}
 				"Caption" =>
 				{
-						task.title = OptionalString::Value(attr.value.to_string());
+						task.title = Some(attr.value.to_string());
 				}
 				"Tool" =>
 				{
-						task.tool = OptionalString::Value(attr.value.to_string());
+						task.tool = Some(attr.value.to_string());
 				}
 				"WorkingDir" =>
 				{
-						task.working_dir = OptionalString::Value(attr.value.to_string());
+						task.working_dir = Some(attr.value.to_string());
 				}
 				"DependsOn" =>
 				{
@@ -139,25 +137,21 @@ fn xg_parse_task (attributes: &Vec<xml::attribute::OwnedAttribute>)->XgTask {
 	task
 }
 fn xg_parse_tool (attributes: &Vec<xml::attribute::OwnedAttribute>)->XgTool {
-	let mut tool = XgTool {
-	id: OptionalString::Missing,
-	path: OptionalString::Missing,
-	params: OptionalString::Missing,
-	};
+	let mut tool = XgTool::new();
 	for attr in attributes.iter() {
 		match attr.name.local_name.as_slice()
 			{
 				"Name" =>
 				{
-						tool.id = OptionalString::Value(attr.value.to_string());
+						tool.id = Some(attr.value.to_string());
 				}
 				"Path" =>
 				{
-						tool.path = OptionalString::Value(attr.value.to_string());
+						tool.path = Some(attr.value.to_string());
 				}
 				"Params" =>
 				{
-						tool.params = OptionalString::Value(attr.value.to_string());
+						tool.params = Some(attr.value.to_string());
 				}
 				_ =>
 				{
