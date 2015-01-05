@@ -4,6 +4,7 @@ use std::os;
 
 use std::io::{File, BufferedReader};
 use std::fmt;
+use std::collections::HashMap;
 
 use xml::reader::EventReader;
 use xml::reader::events::XmlEvent;
@@ -25,23 +26,11 @@ fn parse_command_line(args: Vec<String>) -> Vec<String> {
 }
 
 struct XgTask {
-id: Option<String>,
+id: String,
 title: Option<String>,
-tool: Option<String>,
-working_dir: Option<String>,
+tool: String,
+working_dir: String,
 depends_on: Vec<String>,
-}
-
-impl XgTask {
-fn new() -> XgTask {
-	XgTask {
-	id: None,
-	title: None,
-	tool: None,
-	working_dir: None,
-	depends_on: vec![],
-	}
-}
 }
 
 impl fmt::Show for XgTask {
@@ -51,19 +40,9 @@ fn fmt(& self, f: &mut fmt::Formatter) -> fmt::Result {
 }
 
 struct XgTool {
-id: Option<String>,
-path: Option<String>,
-params: Option<String>,
-}
-
-impl XgTool {
-fn new() -> XgTool {
-	XgTool {
-	id: None,
-	path: None,
-	params: None,
-	}
-}
+id: String,
+path: String,
+params: String,
 }
 
 impl fmt::Show for XgTool {
@@ -78,18 +57,36 @@ fn sample() {
 
 	let mut parser = EventReader::new(reader);
 	let mut tasks:Vec<XgTask> = vec![];
-	let mut tools:Vec<XgTool> = vec![];
+	let mut tools:HashMap<String, XgTool> = HashMap::new();
 	for e in parser.events() {
 		match e {
 				XmlEvent::StartElement {name, attributes, ..} => {
 				match name.local_name.as_slice() {
 						"Task" =>
 						{
-								tasks.push(xg_parse_task(&attributes));
+							match xg_parse_task(&attributes) {
+									Ok(task) =>
+									{
+											tasks.push(task);
+									}
+									Err(msg) =>
+									{
+										panic!(msg);
+									}
+								};
 						}
 						"Tool" =>
 						{
-								tools.push(xg_parse_tool(&attributes));
+							match xg_parse_tool(&attributes) {
+									Ok(tool) =>
+									{
+											tools.insert(tool.id.to_string(), tool);
+									}
+									Err(msg) =>
+									{
+										panic!(msg);
+									}
+								};
 						}
 						_ => {}
 					}
@@ -102,61 +99,77 @@ fn sample() {
 	}
 }
 
-fn xg_parse_task (attributes: &Vec<xml::attribute::OwnedAttribute>)->XgTask {
-	let mut task = XgTask::new();
+fn map_attributes (attributes: &Vec<xml::attribute::OwnedAttribute>) -> HashMap< String, String> {
+	let mut attrs: HashMap<String, String> = HashMap::new();
 	for attr in attributes.iter() {
-		match attr.name.local_name.as_slice()
-			{
-				"Name" =>
-				{
-						task.id = Some(attr.value.to_string());
-				}
-				"Caption" =>
-				{
-						task.title = Some(attr.value.to_string());
-				}
-				"Tool" =>
-				{
-						task.tool = Some(attr.value.to_string());
-				}
-				"WorkingDir" =>
-				{
-						task.working_dir = Some(attr.value.to_string());
-				}
-				"DependsOn" =>
-				{
-					for item in attr.value.split_str(";").collect::<Vec<&str>>().iter() {
-							task.depends_on.push(item.to_string());
-					}
-				}
-				_ =>
-				{
-				}
-			}
+			attrs.insert(attr.name.local_name.clone(), attr.value.clone());
 	}
-	task
+	attrs
 }
-fn xg_parse_tool (attributes: &Vec<xml::attribute::OwnedAttribute>)->XgTool {
-	let mut tool = XgTool::new();
-	for attr in attributes.iter() {
-		match attr.name.local_name.as_slice()
+
+fn xg_parse_task (attributes: & Vec<xml::attribute::OwnedAttribute>)->Result<XgTask, String> {
+	let mut attrs = map_attributes(attributes);
+	// Name
+	let id: String;
+	match attrs.remove("Name") {
+			Some(v) => {id = v;}
+			_ => {return Err("Invalid task data: attribute @Name not found.".to_string());}
+		}
+	// Tool
+	let tool: String;
+	match attrs.remove("Tool") {
+			Some(v) => {tool = v;}
+			_ => {return Err("Invalid task data: attribute @Tool not found.".to_string());}
+		}
+	// WorkingDir
+	let working_dir: String;
+	match attrs.remove("WorkingDir") {
+			Some(v) => {working_dir = v;}
+			_ => {return Err("Invalid task data: attribute @WorkingDir not found.".to_string());}
+		}
+	// DependsOn
+	let mut depends_on : Vec<String> = vec![];
+	match attrs.remove("DependsOn") {
+			Some(v) =>
 			{
-				"Name" =>
-				{
-						tool.id = Some(attr.value.to_string());
-				}
-				"Path" =>
-				{
-						tool.path = Some(attr.value.to_string());
-				}
-				"Params" =>
-				{
-						tool.params = Some(attr.value.to_string());
-				}
-				_ =>
-				{
+				for item in v.split_str(";").collect::<Vec<&str>>().iter() {
+						depends_on.push(item.to_string())
 				}
 			}
-	}
-	tool
+			_ =>
+			{
+			}
+		};
+
+		Ok(XgTask {
+	id: id.to_string(),
+	title: attrs.remove("Caption"),
+	tool: tool,
+	working_dir: working_dir,
+	depends_on: depends_on,
+	})
+}
+fn xg_parse_tool (attributes: &Vec<xml::attribute::OwnedAttribute>)->Result<XgTool, String> {
+	let mut attrs = map_attributes(attributes);
+	// Name
+	let id: String;
+	match attrs.remove("Name") {
+			Some(v) => {id = v;}
+			_ => {return Err("Invalid task data: attribute @Name not found.".to_string());}
+		}
+	// Path
+	let path: String;
+	match attrs.remove("Path") {
+			Some(v) => {path = v;}
+			_ => {return Err("Invalid task data: attribute @Name not found.".to_string());}
+		}
+
+	Ok(XgTool {
+	id: id,
+	path: path,
+	params: match attrs.remove("Params") {
+			Some(v) => {v}
+			_ => {"".to_string()}
+		},
+	})
 }
