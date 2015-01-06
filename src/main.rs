@@ -5,6 +5,8 @@ use std::os;
 use std::io::{File, BufferedReader};
 use std::fmt;
 use std::collections::HashMap;
+use std::sync::{Arc, Mutex};
+use std::thread::Thread;
 
 use xml::reader::EventReader;
 use xml::reader::events::XmlEvent;
@@ -15,6 +17,37 @@ fn main() {
 		println!("  {}", arg);
 	}
 	sample();
+
+
+	let (tx_result, rx_result): (Sender<String>, Receiver<String>) = channel();
+	{
+		let (tx_task, rx_task): (Sender<String>, Receiver<String>) = channel();
+		let mutex_rx_task = Arc::new(Mutex::new(rx_task));
+
+		for cpu_id in range(0, std::os::num_cpus()) {
+			let local_rx_task = mutex_rx_task.clone();
+					Thread::spawn(move || {
+					loop {
+						let message: String;
+						{
+							match local_rx_task.lock().recv_opt() {
+									Ok(v) => {message = v;}
+									Err(_) => {break;}
+								}
+						}
+						println!("{}: {}", cpu_id, message);
+					}
+					println!("{}: done", cpu_id);
+				}).detach();
+		}
+		let local_tx_task = tx_task;
+		for task_id in range (0i, 20i) {
+				local_tx_task.send(format!("Task {}", task_id));
+		}
+	}
+
+	let message = rx_result.recv();
+	println!("B: {}", message);
 }
 
 fn parse_command_line(args: Vec<String>) -> Vec<String> {
