@@ -7,6 +7,8 @@ use std::fmt;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use std::thread::Thread;
+use std::io::timer::sleep;
+use std::time::duration::Duration;
 
 use xml::reader::EventReader;
 use xml::reader::events::XmlEvent;
@@ -26,6 +28,7 @@ fn main() {
 
 		for cpu_id in range(0, std::os::num_cpus()) {
 			let local_rx_task = mutex_rx_task.clone();
+			let local_tx_result = tx_result .clone();
 					Thread::spawn(move || {
 					loop {
 						let message: String;
@@ -36,18 +39,22 @@ fn main() {
 								}
 						}
 						println!("{}: {}", cpu_id, message);
+						sleep( Duration::milliseconds(100));
+						local_tx_result.send(format!("Done {}", message));
 					}
 					println!("{}: done", cpu_id);
 				}).detach();
 		}
 		let local_tx_task = tx_task;
-		for task_id in range (0i, 20i) {
+		let free_tx_result = tx_result;
+		for task_id in range (0i, 50i) {
 				local_tx_task.send(format!("Task {}", task_id));
 		}
 	}
-
-	let message = rx_result.recv();
-	println!("B: {}", message);
+	for message in rx_result.iter() {
+		println!("B: {}", message);
+	}
+	println!("done");
 }
 
 fn parse_command_line(args: Vec<String>) -> Vec<String> {
