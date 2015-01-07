@@ -20,41 +20,43 @@ fn main() {
 	}
 	sample();
 
-
 	let (tx_result, rx_result): (Sender<String>, Receiver<String>) = channel();
-	{
-		let (tx_task, rx_task): (Sender<String>, Receiver<String>) = channel();
-		let mutex_rx_task = Arc::new(Mutex::new(rx_task));
+	let (tx_task, rx_task): (Sender<String>, Receiver<String>) = channel();
+	let mutex_rx_task = Arc::new(Mutex::new(rx_task));
 
-		for cpu_id in range(0, std::os::num_cpus()) {
-			let local_rx_task = mutex_rx_task.clone();
-			let local_tx_result = tx_result .clone();
-					Thread::spawn(move || {
-					loop {
-						let message: String;
-						{
-							match local_rx_task.lock().recv_opt() {
-									Ok(v) => {message = v;}
-									Err(_) => {break;}
-								}
-						}
-						println!("{}: {}", cpu_id, message);
-						sleep( Duration::milliseconds(100));
-						local_tx_result.send(format!("Done {}", message));
+	for cpu_id in range(0, std::os::num_cpus()) {
+		let local_rx_task = mutex_rx_task.clone();
+		let local_tx_result = tx_result .clone();
+				Thread::spawn(move || {
+				loop {
+					let message: String;
+					{
+						match local_rx_task.lock().recv_opt() {
+								Ok(v) => {message = v;}
+								Err(_) => {break;}
+							}
 					}
-					println!("{}: done", cpu_id);
-				}).detach();
-		}
-		let local_tx_task = tx_task;
-		let free_tx_result = tx_result;
-		for task_id in range (0i, 50i) {
-				local_tx_task.send(format!("Task {}", task_id));
-		}
+					println!("{}: {}", cpu_id, message);
+					sleep(Duration::milliseconds(100));
+					local_tx_result.send(format!("Done {}", message));
+				}
+				println!("{}: done", cpu_id);
+			}).detach();
 	}
+	free(tx_result);
+
+	for task_id in range (0i, 50i) {
+			tx_task.send(format!("Task {}", task_id));
+	}
+	free(tx_task);
+
 	for message in rx_result.iter() {
 		println!("B: {}", message);
 	}
 	println!("done");
+}
+
+fn free<T>(_:T) {
 }
 
 fn parse_command_line(args: Vec<String>) -> Vec<String> {
