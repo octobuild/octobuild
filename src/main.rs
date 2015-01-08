@@ -1,4 +1,5 @@
 extern crate xml;
+extern crate rustc;
 
 use std::os;
 
@@ -10,6 +11,8 @@ use std::thread::Thread;
 use std::io::timer::sleep;
 use std::time::duration::Duration;
 
+use rustc::middle::graph::{NodeIndex, Graph};
+
 use xml::reader::EventReader;
 use xml::reader::events::XmlEvent;
 
@@ -18,7 +21,7 @@ fn main() {
 	for arg in parse_command_line(os::args()).iter() {
 		println!("  {}", arg);
 	}
-	sample();
+	xg_parse();
 
 	let (tx_result, rx_result): (Sender<String>, Receiver<String>) = channel();
 	let (tx_task, rx_task): (Sender<String>, Receiver<String>) = channel();
@@ -67,8 +70,12 @@ fn parse_command_line(args: Vec<String>) -> Vec<String> {
 	result
 }
 
+struct BuildTask {
+working_dir: String,
+}
+
 struct XgTask {
-id: String,
+id: Option<String>,
 title: Option<String>,
 tool: String,
 working_dir: String,
@@ -93,7 +100,7 @@ fn fmt(& self, f: &mut fmt::Formatter) -> fmt::Result {
 }
 }
 
-fn sample() {
+fn xg_parse() -> Graph<BuildTask, ()> {
 	let file = File::open(&Path::new("tests/graph-parser.xml")).unwrap();
 	let reader = BufferedReader::new(file);
 
@@ -139,6 +146,34 @@ fn sample() {
 			}
 			}
 	}
+	xg_parse_create_graph(&tasks)
+}
+
+fn xg_parse_create_graph(tasks:&Vec<XgTask>) -> Graph<BuildTask, ()> {
+	let mut graph: Graph<BuildTask, ()> = Graph::new();
+	let mut nodes: Vec<NodeIndex> = vec![];
+	let mut task_refs: HashMap<&str, NodeIndex> = HashMap::new();
+	for task in tasks.iter() {
+		let node = graph.add_node(BuildTask {
+		working_dir : task.working_dir.clone(),
+		});
+		match task.id {
+				Some(ref v) => {
+					task_refs.insert(v.as_slice(), node);
+			}
+				_ => {}
+			}
+		nodes.push(node);
+	}
+	for idx in range(0, nodes.len()) {
+		let ref task = tasks[idx];
+		let ref node = nodes[idx];
+		for id in task.depends_on.iter() {
+			let dep_node = task_refs.get(id.as_slice());
+			graph.add_edge(*node, *dep_node.unwrap(), ());
+		}
+	}
+	graph
 }
 
 fn map_attributes (attributes: &Vec<xml::attribute::OwnedAttribute>) -> HashMap< String, String> {
@@ -151,12 +186,6 @@ fn map_attributes (attributes: &Vec<xml::attribute::OwnedAttribute>) -> HashMap<
 
 fn xg_parse_task (attributes: & Vec<xml::attribute::OwnedAttribute>)->Result<XgTask, String> {
 	let mut attrs = map_attributes(attributes);
-	// Name
-	let id: String;
-	match attrs.remove("Name") {
-			Some(v) => {id = v;}
-			_ => {return Err("Invalid task data: attribute @Name not found.".to_string());}
-		}
 	// Tool
 	let tool: String;
 	match attrs.remove("Tool") {
@@ -184,7 +213,7 @@ fn xg_parse_task (attributes: & Vec<xml::attribute::OwnedAttribute>)->Result<XgT
 		};
 
 		Ok(XgTask {
-	id: id.to_string(),
+	id: attrs.remove("Name"),
 	title: attrs.remove("Caption"),
 	tool: tool,
 	working_dir: working_dir,
