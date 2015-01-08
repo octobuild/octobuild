@@ -50,13 +50,14 @@ fn main() {
 		let local_tx_result = tx_result .clone();
 				Thread::spawn(move || {
 				loop {
+					let message: TaskMessage;
 					match local_rx_task.lock().recv_opt() {
-							Ok(message) => {
-							println!("{}: {}", cpu_id, message);
-							local_tx_result.send(execute_task(message));
+							Ok(v) => {message = v;
 						}
 							Err(_) => {break;}
 						}
+					println!("{}: {}", cpu_id, message);
+					local_tx_result.send(execute_task(message));
 				}
 			}).detach();
 	}
@@ -109,7 +110,7 @@ fn validate_graph(graph: Graph<BuildTask, ()>) -> Result<Graph<BuildTask, ()>, S
 }
 
 fn execute_task(message: TaskMessage) -> ResultMessage {
-	println!("{} {} {}", message.task.working_dir, message.task.exec, message.task.args);
+	println!("{}", message.task.title);
 	let output = match Command::new(message.task.exec)
 	.args(message.task.args.as_slice())
 	.cwd(&Path::new(&message.task.working_dir))
