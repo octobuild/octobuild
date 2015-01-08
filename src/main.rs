@@ -100,7 +100,7 @@ fn fmt(& self, f: &mut fmt::Formatter) -> fmt::Result {
 }
 }
 
-fn xg_parse() -> Graph<BuildTask, ()> {
+fn xg_parse() -> Result<Graph<BuildTask, ()>, String> {
 	let file = File::open(&Path::new("tests/graph-parser.xml")).unwrap();
 	let reader = BufferedReader::new(file);
 
@@ -149,7 +149,7 @@ fn xg_parse() -> Graph<BuildTask, ()> {
 	xg_parse_create_graph(&tasks)
 }
 
-fn xg_parse_create_graph(tasks:&Vec<XgTask>) -> Graph<BuildTask, ()> {
+fn xg_parse_create_graph(tasks:&Vec<XgTask>) -> Result<Graph<BuildTask, ()>, String> {
 	let mut graph: Graph<BuildTask, ()> = Graph::new();
 	let mut nodes: Vec<NodeIndex> = vec![];
 	let mut task_refs: HashMap<&str, NodeIndex> = HashMap::new();
@@ -170,10 +170,18 @@ fn xg_parse_create_graph(tasks:&Vec<XgTask>) -> Graph<BuildTask, ()> {
 		let ref node = nodes[idx];
 		for id in task.depends_on.iter() {
 			let dep_node = task_refs.get(id.as_slice());
+			match dep_node {
+					Some(v) => {
+						graph.add_edge(*node, *v, ());
+				}
+					_ => {
+					return Err(format!("Can't find task for dependency with id: {}", id));
+				}
+				}
 			graph.add_edge(*node, *dep_node.unwrap(), ());
 		}
 	}
-	graph
+	Ok(graph)
 }
 
 fn map_attributes (attributes: &Vec<xml::attribute::OwnedAttribute>) -> HashMap< String, String> {
