@@ -23,7 +23,7 @@ task: BuildTask
 
 impl fmt::Show for TaskMessage {
 fn fmt(& self, f: &mut fmt::Formatter) -> fmt::Result {
-	write!(f, "index={}", self .index)
+	write!(f, "index={}, title={}", self .index, self .task.title)
 }
 }
 
@@ -63,7 +63,6 @@ fn main() {
 							Err(_) => {break;}
 						}
 				}
-				println!("{}: done", cpu_id);
 			}).detach();
 	}
 
@@ -89,11 +88,10 @@ fn execute_graph(graph: &Graph<BuildTask, ()>, tx_task: Sender<TaskMessage>, rx_
 			false
 		});
 		if !has_edges {
-			println!("{}", index);
 				tx_task.send(TaskMessage{
 			index: index,
 			task: node.data.clone(),
-			});
+			})  ;
 		}
 			completed.push(false);
 		true
@@ -105,7 +103,6 @@ fn execute_graph(graph: &Graph<BuildTask, ()>, tx_task: Sender<TaskMessage>, rx_
 			graph.each_incoming_edge(message.index, |_:EdgeIndex, edge:&Edge<()>| -> bool {
 			let source = edge.source();
 			if !completed[source.node_id()] {
-				println!("X: {}", source);
 				let mut ready = true;
 					graph.each_outgoing_edge(source, |_:EdgeIndex, deps:&Edge<()>| -> bool {
 					if !completed[deps.target().node_id()]{
@@ -120,7 +117,6 @@ fn execute_graph(graph: &Graph<BuildTask, ()>, tx_task: Sender<TaskMessage>, rx_
 					index: source,
 					task: graph.node(source).data.clone(),
 					})  ;
-						println!("R: {}", source);
 				}
 			}
 			true
@@ -142,12 +138,18 @@ fn parse_command_line(args: Vec<String>) -> Vec<String> {
 }
 
 struct BuildTask {
+title: String,
+exec: String,
+args: Vec<String>,
 working_dir: String,
 }
 
 impl Clone for BuildTask {
 fn clone(& self) -> BuildTask {
 	BuildTask {
+	title: self.title.clone(),
+	exec: self.exec.clone(),
+	args: self.args.clone(),
 	working_dir: self .working_dir.clone(),
 	}
 }
@@ -169,13 +171,14 @@ fn fmt(& self, f: &mut fmt::Formatter) -> fmt::Result {
 
 struct XgTool {
 id: String,
-path: String,
-params: String,
+exec: String,
+args: String,
+output: Option<String>,
 }
 
 impl fmt::Show for XgTool {
 fn fmt(& self, f: &mut fmt::Formatter) -> fmt::Result {
-	write!(f, "id={}, path={}", self .id, self .path)
+	write!(f, "id={}, exec={}", self .id, self .exec)
 }
 }
 
@@ -225,24 +228,42 @@ fn xg_parse(path: &Path) -> Result<Graph<BuildTask, ()>, String> {
 			}
 			}
 	}
-	xg_parse_create_graph(&tasks)
+	xg_parse_create_graph(&tasks, &tools)
 }
 
-fn xg_parse_create_graph(tasks:&Vec<XgTask>) -> Result<Graph<BuildTask, ()>, String> {
+fn xg_parse_create_graph(tasks:&Vec<XgTask>, tools:&HashMap<String, XgTool>) -> Result<Graph<BuildTask, ()>, String> {
 	let mut graph: Graph<BuildTask, ()> = Graph::new();
 	let mut nodes: Vec<NodeIndex> = vec![];
 	let mut task_refs: HashMap<&str, NodeIndex> = HashMap::new();
 	for task in tasks.iter() {
-		let node = graph.add_node(BuildTask {
-		working_dir : task.working_dir.clone(),
-		});
-		match task.id {
-				Some(ref v) => {
-					task_refs.insert(v.as_slice(), node);
+		match tools.get(task.tool.as_slice()){
+				Some(tool) => {
+				let node = graph.add_node(BuildTask {
+				title: match task.title {
+						Some(ref v) => {v.clone()}
+						_ => {
+						match tool.output {
+								Some(ref v) => {v.clone()}
+								_ => "".to_string()
+							}
+					}
+					},
+				exec: tool.exec.clone(),
+				args: cmd_parse(tool.args.as_slice()),
+				working_dir : task.working_dir.clone(),
+				});
+				match task.id {
+						Some(ref v) => {
+							task_refs.insert(v.as_slice(), node);
+					}
+						_ => {}
+					}
+				nodes.push(node);
 			}
-				_ => {}
+				_ => {
+				return Err(format!("Can't find tool with id: {}", task.tool));
 			}
-		nodes.push(node);
+			}
 	}
 	for idx in range(0, nodes.len()) {
 		let ref task = tasks[idx];
@@ -306,6 +327,7 @@ fn xg_parse_task (attributes: & Vec<xml::attribute::OwnedAttribute>)->Result<XgT
 	depends_on: depends_on,
 	})
 }
+
 fn xg_parse_tool (attributes: &Vec<xml::attribute::OwnedAttribute>)->Result<XgTool, String> {
 	let mut attrs = map_attributes(attributes);
 	// Name
@@ -315,16 +337,17 @@ fn xg_parse_tool (attributes: &Vec<xml::attribute::OwnedAttribute>)->Result<XgTo
 			_ => {return Err("Invalid task data: attribute @Name not found.".to_string());}
 		}
 	// Path
-	let path: String;
+	let exec: String;
 	match attrs.remove("Path") {
-			Some(v) => {path = v;}
+			Some(v) => {exec = v;}
 			_ => {return Err("Invalid task data: attribute @Name not found.".to_string());}
 		}
 
 	Ok(XgTool {
 	id: id,
-	path: path,
-	params: match attrs.remove("Params") {
+	exec: exec,
+	output: attrs.remove("OutputPrefix"),
+	args: match attrs.remove("Params") {
 			Some(v) => {v}
 			_ => {"".to_string()}
 		},
@@ -351,6 +374,7 @@ fn cmd_parse(cmd: &str) -> Vec<String> {
 						' ' | '\t' => {
 						if quote {
 								arg.push(c);
+								data = true;
 						} else if data {
 								args.push(arg);
 								arg = "".to_string();
@@ -403,6 +427,7 @@ fn test_cmd_parse_4() {
 fn test_cmd_parse_5() {
 	assert_eq!(cmd_parse("a\\\\\\\"b c d"), ["a\\\"b", "c", "d"]);
 }
+
 #[test]
 fn test_cmd_parse_6() {
 	assert_eq!(cmd_parse("a\\\\\\\\\"b c\" d e"), ["a\\\\b c", "d", "e"]);
