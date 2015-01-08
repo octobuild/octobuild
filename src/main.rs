@@ -11,10 +11,31 @@ use std::thread::Thread;
 use std::io::timer::sleep;
 use std::time::duration::Duration;
 
-use rustc::middle::graph::{NodeIndex, Graph};
+use rustc::middle::graph::{Graph, NodeIndex, Node, EdgeIndex, Edge};
 
 use xml::reader::EventReader;
 use xml::reader::events::XmlEvent;
+
+struct TaskMessage {
+index: NodeIndex,
+task: BuildTask
+}
+
+impl fmt::Show for TaskMessage {
+fn fmt(& self, f: &mut fmt::Formatter) -> fmt::Result {
+	write!(f, "index={}", self .index)
+}
+}
+
+struct ResultMessage {
+index: NodeIndex
+}
+
+impl fmt::Show for ResultMessage {
+fn fmt(& self, f: &mut fmt::Formatter) -> fmt::Result {
+	write!(f, "index={}", self .index)
+}
+}
 
 fn main() {
 	println!("XGConsole:");
@@ -22,48 +43,94 @@ fn main() {
 		println!("  {}", arg);
 	}
 
-	let mut path = Path::new(&os::args()[0]).dir_path();
-	path.push("../tests/graph-parser.xml");
-	println!("Example path: {}", path.display());
-	xg_parse(&path);
+	let (tx_result, rx_result): (Sender<ResultMessage>, Receiver<ResultMessage>) = channel();
+	let (tx_task, rx_task): (Sender<TaskMessage>, Receiver<TaskMessage>) = channel();
 
-	let (tx_result, rx_result): (Sender<String>, Receiver<String>) = channel();
-	let (tx_task, rx_task): (Sender<String>, Receiver<String>) = channel();
 	let mutex_rx_task = Arc::new(Mutex::new(rx_task));
-
 	for cpu_id in range(0, std::os::num_cpus()) {
 		let local_rx_task = mutex_rx_task.clone();
 		let local_tx_result = tx_result .clone();
 				Thread::spawn(move || {
 				loop {
-					let message: String;
-					{
-						match local_rx_task.lock().recv_opt() {
-								Ok(v) => {message = v;}
-								Err(_) => {break;}
-							}
-					}
-					println!("{}: {}", cpu_id, message);
-					sleep(Duration::milliseconds(100));
-					local_tx_result.send(format!("Done {}", message));
+					match local_rx_task.lock().recv_opt() {
+							Ok(message) => {
+							println!("{}: {}", cpu_id, message);
+								sleep(Duration::milliseconds(100));
+								local_tx_result.send(ResultMessage{
+							index: message.index,
+							});
+						}
+							Err(_) => {break;}
+						}
 				}
 				println!("{}: done", cpu_id);
 			}).detach();
 	}
-	free(tx_result);
 
-	for task_id in range (0i, 50i) {
-			tx_task.send(format!("Task {}", task_id));
-	}
-	free(tx_task);
+	let mut path = Path::new(&os::args()[0]).dir_path();
+	path.push("../tests/graph-parser.xml");
+	println!("Example path: {}", path.display());
+	match xg_parse(&path) {
+			Ok(graph) => {
+				execute_graph(&graph, tx_task, rx_result);
+		}
+			Err(msg) =>{panic! (msg);}
+		}
 
-	for message in rx_result.iter() {
-		println!("B: {}", message);
-	}
 	println!("done");
 }
 
-fn free<T>(_:T) {
+fn execute_graph(graph: &Graph<BuildTask, ()>, tx_task: Sender<TaskMessage>, rx_result: Receiver<ResultMessage>) {
+	let mut completed:Vec<bool> = vec![];
+		graph. each_node(|index: NodeIndex, node:&Node<BuildTask>|->bool {
+		let mut has_edges = false;
+			graph.each_outgoing_edge(index, |_:EdgeIndex, _:&Edge<()>| -> bool {
+			has_edges = true;
+			false
+		});
+		if !has_edges {
+			println!("{}", index);
+				tx_task.send(TaskMessage{
+			index: index,
+			task: node.data.clone(),
+			});
+		}
+			completed.push(false);
+		true
+	});
+	let mut count:uint = 0;
+	for message in rx_result.iter() {
+		assert!(!completed[message.index.node_id()]);
+		completed[message.index.node_id()] = true;
+			graph.each_incoming_edge(message.index, |_:EdgeIndex, edge:&Edge<()>| -> bool {
+			let source = edge.source();
+			if !completed[source.node_id()] {
+				println!("X: {}", source);
+				let mut ready = true;
+					graph.each_outgoing_edge(source, |_:EdgeIndex, deps:&Edge<()>| -> bool {
+					if !completed[deps.target().node_id()]{
+						ready = false;
+						false
+					} else {
+						true
+					}
+				});
+				if ready {
+						tx_task.send(TaskMessage{
+					index: source,
+					task: graph.node(source).data.clone(),
+					})  ;
+						println!("R: {}", source);
+				}
+			}
+			true
+		});
+		println!("R: {}", message);
+		count += 1;
+		if count ==completed.len() {
+			break;
+		}
+	}
 }
 
 fn parse_command_line(args: Vec<String>) -> Vec<String> {
@@ -76,6 +143,14 @@ fn parse_command_line(args: Vec<String>) -> Vec<String> {
 
 struct BuildTask {
 working_dir: String,
+}
+
+impl Clone for BuildTask {
+fn clone(& self) -> BuildTask {
+	BuildTask {
+	working_dir: self .working_dir.clone(),
+	}
+}
 }
 
 struct XgTask {
