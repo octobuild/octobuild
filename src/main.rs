@@ -79,6 +79,34 @@ fn main() {
 	println!("done");
 }
 
+fn validate_graph(graph: Graph<BuildTask, ()>) -> Result<Graph<BuildTask, ()>, String> {
+	let mut completed:Vec<bool> = vec![];
+	let mut queue:Vec<NodeIndex> = vec![];
+		graph. each_node(|index: NodeIndex, node:&Node<BuildTask>|->bool {
+			completed.push(false);
+			queue.push(index);
+			true
+	});
+	let mut count:uint = 0;
+	let mut i:uint = 0;
+	while i < queue.len() {
+		let index = queue[i];
+		if (!completed[index.node_id()]) && (is_ready(&graph, &completed, &index)) {
+			completed[index.node_id()] = true;
+				graph.each_incoming_edge(index, |_:EdgeIndex, edge:&Edge<()>| -> bool {
+					queue.push(edge.source());
+					true
+			});
+			count += 1;
+			if count ==completed.len() {
+				return Ok(graph);
+			}
+		}
+		i = i + 1;
+	}
+	return Err("Found cycles in build dependencies.".to_string());
+}
+
 fn execute_graph(graph: &Graph<BuildTask, ()>, tx_task: Sender<TaskMessage>, rx_result: Receiver<ResultMessage>) {
 	let mut completed:Vec<bool> = vec![];
 		graph. each_node(|index: NodeIndex, node:&Node<BuildTask>|->bool {
@@ -103,16 +131,7 @@ fn execute_graph(graph: &Graph<BuildTask, ()>, tx_task: Sender<TaskMessage>, rx_
 			graph.each_incoming_edge(message.index, |_:EdgeIndex, edge:&Edge<()>| -> bool {
 			let source = edge.source();
 			if !completed[source.node_id()] {
-				let mut ready = true;
-					graph.each_outgoing_edge(source, |_:EdgeIndex, deps:&Edge<()>| -> bool {
-					if !completed[deps.target().node_id()]{
-						ready = false;
-						false
-					} else {
-						true
-					}
-				});
-				if ready {
+				if is_ready(graph, &completed, &source) {
 						tx_task.send(TaskMessage{
 					index: source,
 					task: graph.node(source).data.clone(),
@@ -127,6 +146,19 @@ fn execute_graph(graph: &Graph<BuildTask, ()>, tx_task: Sender<TaskMessage>, rx_
 			break;
 		}
 	}
+}
+
+fn is_ready(graph: &Graph<BuildTask, ()>, completed: &Vec<bool>, source: &NodeIndex) -> bool {
+	let mut ready = true;
+		graph.each_outgoing_edge(*source, |_:EdgeIndex, deps:&Edge<()>| -> bool {
+		if !completed[deps.target().node_id()]{
+			ready = false;
+			false
+		} else {
+			true
+		}
+	});
+	ready
 }
 
 fn parse_command_line(args: Vec<String>) -> Vec<String> {
@@ -280,7 +312,7 @@ fn xg_parse_create_graph(tasks:&Vec<XgTask>, tools:&HashMap<String, XgTool>) -> 
 				}
 		}
 	}
-	Ok(graph)
+	validate_graph(graph)
 }
 
 fn map_attributes (attributes: &Vec<xml::attribute::OwnedAttribute>) -> HashMap< String, String> {
