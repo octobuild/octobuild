@@ -21,7 +21,11 @@ fn main() {
 	for arg in parse_command_line(os::args()).iter() {
 		println!("  {}", arg);
 	}
-	xg_parse();
+
+	let mut path = Path::new(&os::args()[0]).dir_path();
+	path.push("../tests/graph-parser.xml");
+	println!("Example path: {}", path.display());
+	xg_parse(&path);
 
 	let (tx_result, rx_result): (Sender<String>, Receiver<String>) = channel();
 	let (tx_task, rx_task): (Sender<String>, Receiver<String>) = channel();
@@ -100,8 +104,8 @@ fn fmt(& self, f: &mut fmt::Formatter) -> fmt::Result {
 }
 }
 
-fn xg_parse() -> Result<Graph<BuildTask, ()>, String> {
-	let file = File::open(&Path::new("tests/graph-parser.xml")).unwrap();
+fn xg_parse(path: &Path) -> Result<Graph<BuildTask, ()>, String> {
+	let file = File::open(path).unwrap();
 	let reader = BufferedReader::new(file);
 
 	let mut parser = EventReader::new(reader);
@@ -178,7 +182,6 @@ fn xg_parse_create_graph(tasks:&Vec<XgTask>) -> Result<Graph<BuildTask, ()>, Str
 					return Err(format!("Can't find task for dependency with id: {}", id));
 				}
 				}
-			graph.add_edge(*node, *dep_node.unwrap(), ());
 		}
 	}
 	Ok(graph)
