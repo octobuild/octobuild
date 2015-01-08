@@ -3,13 +3,11 @@ extern crate rustc;
 
 use std::os;
 
-use std::io::{File, BufferedReader};
+use std::io::{Command, File, BufferedReader};
 use std::fmt;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use std::thread::Thread;
-use std::io::timer::sleep;
-use std::time::duration::Duration;
 
 use rustc::middle::graph::{Graph, NodeIndex, Node, EdgeIndex, Edge};
 
@@ -55,10 +53,7 @@ fn main() {
 					match local_rx_task.lock().recv_opt() {
 							Ok(message) => {
 							println!("{}: {}", cpu_id, message);
-								sleep(Duration::milliseconds(100));
-								local_tx_result.send(ResultMessage{
-							index: message.index,
-							});
+							local_tx_result.send(execute_task(message));
 						}
 							Err(_) => {break;}
 						}
@@ -66,8 +61,14 @@ fn main() {
 			}).detach();
 	}
 
-	let mut path = Path::new(&os::args()[0]).dir_path();
-	path.push("../tests/graph-parser.xml");
+	let args = os::args();
+	let mut path;
+	if args.len() <= 1 {
+				path = Path::new(&args[0]).dir_path();
+				path.push("../tests/graph-parser.xml");
+	} else {
+			path =Path::new(&args[1]);
+	}
 	println!("Example path: {}", path.display());
 	match xg_parse(&path) {
 			Ok(graph) => {
@@ -82,7 +83,7 @@ fn main() {
 fn validate_graph(graph: Graph<BuildTask, ()>) -> Result<Graph<BuildTask, ()>, String> {
 	let mut completed:Vec<bool> = vec![];
 	let mut queue:Vec<NodeIndex> = vec![];
-		graph. each_node(|index: NodeIndex, node:&Node<BuildTask>|->bool {
+		graph. each_node(|index: NodeIndex, _:&Node<BuildTask>|->bool {
 			completed.push(false);
 			queue.push(index);
 			true
@@ -105,6 +106,21 @@ fn validate_graph(graph: Graph<BuildTask, ()>) -> Result<Graph<BuildTask, ()>, S
 		i = i + 1;
 	}
 	return Err("Found cycles in build dependencies.".to_string());
+}
+
+fn execute_task(message: TaskMessage) -> ResultMessage {
+	println!("{} {} {}", message.task.working_dir, message.task.exec, message.task.args);
+	let output = match Command::new(message.task.exec)
+	.args(message.task.args.as_slice())
+	.cwd(&Path::new(&message.task.working_dir))
+	.output(){
+			Ok(output) => output,
+			Err(e) => panic!("failed to execute process: {}", e),
+		};
+	println!("status: {}", output.status);
+	ResultMessage {
+	index: message.index,
+	}
 }
 
 fn execute_graph(graph: &Graph<BuildTask, ()>, tx_task: Sender<TaskMessage>, rx_result: Receiver<ResultMessage>) {
@@ -393,39 +409,44 @@ fn cmd_parse(cmd: &str) -> Vec<String> {
 	let mut quote = false;
 	let mut data = false;
 	for c in cmd.chars() {
-		match escape {
-				true => {
-				if data {
-						arg.push(c);
+		match c {
+				' ' | '\t' => {
+				if escape {
+						arg.push('\\');
 						escape = false;
+				}
+				if quote {
+						arg.push(c);
+						data = true;
+				} else if data {
+						args.push(arg);
+						arg = "".to_string();
 						data = false;
 				}
 			}
-				false => {
-				match c {
-						' ' | '\t' => {
-						if quote {
-								arg.push(c);
-								data = true;
-						} else if data {
-								args.push(arg);
-								arg = "".to_string();
-								data = false;
-						}
-					}
-						'\\' => {
-						escape = true;
-						data = true;
-					}
-						'"' => {
-						quote = !quote;
-						data = true;
-					}
-						_ => {
-							arg.push(c);
-							data = true;
-					}
-					}
+				'\\' => {
+				if escape {
+						arg.push(c);
+				}
+				data = true;
+				escape = !escape;
+			}
+				'"' => {
+				if escape {
+						arg.push(c);
+						escape = false;
+				} else {
+					quote = !quote;
+				}
+				data = true;
+			}
+				_ => {
+				if escape {
+						arg.push('\\');
+						escape = false;
+				}
+				arg.push(c);
+				data = true;
 			}
 			}
 	}
@@ -463,4 +484,9 @@ fn test_cmd_parse_5() {
 #[test]
 fn test_cmd_parse_6() {
 	assert_eq!(cmd_parse("a\\\\\\\\\"b c\" d e"), ["a\\\\b c", "d", "e"]);
+}
+
+#[test]
+fn test_cmd_parse_7() {
+	assert_eq!(cmd_parse("C:\\Windows\\System32 d e"), ["C:\\Windows\\System32", "d", "e"]);
 }
