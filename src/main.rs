@@ -330,3 +330,80 @@ fn xg_parse_tool (attributes: &Vec<xml::attribute::OwnedAttribute>)->Result<XgTo
 		},
 	})
 }
+
+fn cmd_parse(cmd: &str) -> Vec<String> {
+	let mut args: Vec<String> = vec![];
+	let mut arg: String = "".to_string();
+	let mut escape = false;
+	let mut quote = false;
+	let mut data = false;
+	for c in cmd.chars() {
+		match escape {
+				true => {
+				if data {
+						arg.push(c);
+						escape = false;
+						data = false;
+				}
+			}
+				false => {
+				match c {
+						' ' | '\t' => {
+						if quote {
+								arg.push(c);
+						} else if data {
+								args.push(arg);
+								arg = "".to_string();
+								data = false;
+						}
+					}
+						'\\' => {
+						escape = true;
+						data = true;
+					}
+						'"' => {
+						quote = !quote;
+						data = true;
+					}
+						_ => {
+							arg.push(c);
+							data = true;
+					}
+					}
+			}
+			}
+	}
+	if data {
+			args.push(arg);
+	}
+	return args;
+}
+
+#[test]
+fn test_cmd_parse_1() {
+	assert_eq!(cmd_parse("\"abc\" d e"), ["abc", "d", "e"]);
+}
+
+#[test]
+fn test_cmd_parse_2() {
+	assert_eq!(cmd_parse(" \"abc\" d e "), ["abc", "d", "e"]);
+}
+
+#[test]
+fn test_cmd_parse_3() {
+	assert_eq!(cmd_parse("\"\" \"abc\" d e \"\""), ["", "abc", "d", "e", ""]);
+}
+
+#[test]
+fn test_cmd_parse_4() {
+	assert_eq!(cmd_parse("a\\\\\\\\b d\"e f\"g h"), ["a\\\\b", "de fg", "h"]);
+}
+
+#[test]
+fn test_cmd_parse_5() {
+	assert_eq!(cmd_parse("a\\\\\\\"b c d"), ["a\\\"b", "c", "d"]);
+}
+#[test]
+fn test_cmd_parse_6() {
+	assert_eq!(cmd_parse("a\\\\\\\\\"b c\" d e"), ["a\\\\b c", "d", "e"]);
+}
