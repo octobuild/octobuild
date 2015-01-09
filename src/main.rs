@@ -4,6 +4,7 @@ extern crate rustc;
 use std::os;
 
 use std::io::{Command, File, BufferedReader};
+use std::io::process::ProcessExit;
 use std::fmt;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
@@ -26,12 +27,23 @@ fn fmt(& self, f: &mut fmt::Formatter) -> fmt::Result {
 }
 
 struct ResultMessage {
-index: NodeIndex
+index: NodeIndex,
+result: Result<BuildResult, String>
 }
 
 impl fmt::Show for ResultMessage {
 fn fmt(& self, f: &mut fmt::Formatter) -> fmt::Result {
-	write!(f, "index={}", self .index)
+	write!(f, "index={}, result={}", self .index, self .result)
+}
+}
+
+struct BuildResult {
+exit_code: ProcessExit,
+}
+
+impl fmt::Show for BuildResult {
+fn fmt(& self, f: &mut fmt::Formatter) -> fmt::Result {
+	write!(f, "exit_code={}", self .exit_code)
 }
 }
 
@@ -111,17 +123,23 @@ fn validate_graph(graph: Graph<BuildTask, ()>) -> Result<Graph<BuildTask, ()>, S
 
 fn execute_task(message: TaskMessage) -> ResultMessage {
 	println!("{}", message.task.title);
-	let output = match Command::new(message.task.exec)
+	match Command::new(message.task.exec)
 	.args(message.task.args.as_slice())
 	.cwd(&Path::new(&message.task.working_dir))
 	.output(){
-			Ok(output) => output,
-			Err(e) => panic!("failed to execute process: {}", e),
-		};
-	println!("status: {}", output.status);
-	ResultMessage {
-	index: message.index,
-	}
+			Ok(output) => {
+			ResultMessage {
+			index: message.index,
+			result: Ok(BuildResult {
+			exit_code: output.status
+			})
+			}}
+			Err(e) => {
+			ResultMessage {
+			index: message.index,
+			result: Err(format!("Failed to start process: {}", e))}
+		}
+		}
 }
 
 fn execute_graph(graph: &Graph<BuildTask, ()>, tx_task: Sender<TaskMessage>, rx_result: Receiver<ResultMessage>) {
@@ -251,7 +269,7 @@ fn xg_parse(path: &Path) -> Result<Graph<BuildTask, ()>, String> {
 									}
 									Err(msg) =>
 									{
-										panic!(msg);
+										return Err(msg);
 									}
 								};
 						}
@@ -264,7 +282,7 @@ fn xg_parse(path: &Path) -> Result<Graph<BuildTask, ()>, String> {
 									}
 									Err(msg) =>
 									{
-										panic!(msg);
+										return Err(msg);
 									}
 								};
 						}
