@@ -66,13 +66,16 @@ fn main() {
 					match local_rx_task.lock().recv_opt() {
 							Ok(v) => {message = v;
 						}
-							Err(_) => {break;}
+							Err(_) => {
+							break;
+						}
 						}
 					println!("{}: {}", cpu_id, message);
 					local_tx_result.send(execute_task(message));
 				}
 			}).detach();
 	}
+	free(tx_result);
 
 	let args = os::args();
 	let mut path;
@@ -123,11 +126,14 @@ fn validate_graph(graph: Graph<BuildTask, ()>) -> Result<Graph<BuildTask, ()>, S
 
 fn execute_task(message: TaskMessage) -> ResultMessage {
 	println!("{}", message.task.title);
+	println!("{} {} {}", message.task.working_dir, message.task.exec, message.task.args);
 	match Command::new(message.task.exec)
 	.args(message.task.args.as_slice())
 	.cwd(&Path::new(&message.task.working_dir))
 	.output(){
 			Ok(output) => {
+			println!("stdout: {}", String::from_utf8_lossy(output.output.as_slice()));
+			println!("stderr: {}", String::from_utf8_lossy(output.error.as_slice()));
 			ResultMessage {
 			index: message.index,
 			result: Ok(BuildResult {
@@ -162,25 +168,43 @@ fn execute_graph(graph: &Graph<BuildTask, ()>, tx_task: Sender<TaskMessage>, rx_
 	let mut count:uint = 0;
 	for message in rx_result.iter() {
 		assert!(!completed[message.index.node_id()]);
-		completed[message.index.node_id()] = true;
-			graph.each_incoming_edge(message.index, |_:EdgeIndex, edge:&Edge<()>| -> bool {
-			let source = edge.source();
-			if !completed[source.node_id()] {
-				if is_ready(graph, &completed, &source) {
-						tx_task.send(TaskMessage{
-					index: source,
-					task: graph.node(source).data.clone(),
-					})  ;
-				}
-			}
-			true
-		});
 		println!("R: {}", message);
+		match message.result {
+				Ok (result) => {
+				if !result.exit_code.success() {
+					break;
+				}
+				completed[message.index.node_id()] = true;
+					graph.each_incoming_edge(message.index, |_:EdgeIndex, edge:&Edge<()>| -> bool {
+					let source = edge.source();
+					if !completed[source.node_id()] {
+						if is_ready(graph, &completed, &source) {
+								tx_task.send(TaskMessage{
+							index: source,
+							task: graph.node(source).data.clone(),
+							})  ;
+						}
+					}
+					true
+				});
+			}
+				Err (e) => {
+				println!("{}", e);
+				break;
+			}
+			}
 		count += 1;
 		if count ==completed.len() {
 			break;
 		}
 	}
+		free(tx_task);
+
+	for message in rx_result.iter() {
+	}
+}
+
+fn free<T>(_:T) {
 }
 
 fn is_ready(graph: &Graph<BuildTask, ()>, completed: &Vec<bool>, source: &NodeIndex) -> bool {
