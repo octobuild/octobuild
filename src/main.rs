@@ -88,7 +88,7 @@ fn main() {
 	println!("Example path: {}", path.display());
 	match xg_parse(&path) {
 			Ok(graph) => {
-				execute_graph(&graph, tx_task, rx_result);
+				execute_graph(&graph, tx_task, mutex_rx_task, rx_result);
 		}
 			Err(msg) =>{panic! (msg);}
 		}
@@ -126,9 +126,10 @@ fn validate_graph(graph: Graph<BuildTask, ()>) -> Result<Graph<BuildTask, ()>, S
 
 fn execute_task(message: TaskMessage) -> ResultMessage {
 	println!("{}", message.task.title);
-	println!("{} {} {}", message.task.working_dir, message.task.exec, message.task.args);
+
+	let args = cmd_expand_args(&message.task.args, |name:&str|->Option<String>{os::getenv(name)});
 	match Command::new(message.task.exec)
-	.args(message.task.args.as_slice())
+	.args( args.as_slice())
 	.cwd(&Path::new(&message.task.working_dir))
 	.output(){
 			Ok(output) => {
@@ -148,7 +149,7 @@ fn execute_task(message: TaskMessage) -> ResultMessage {
 		}
 }
 
-fn execute_graph(graph: &Graph<BuildTask, ()>, tx_task: Sender<TaskMessage>, rx_result: Receiver<ResultMessage>) {
+fn execute_graph(graph: &Graph<BuildTask, ()>, tx_task: Sender<TaskMessage>, rx_task: Arc<Mutex<Receiver<TaskMessage>>>, rx_result: Receiver<ResultMessage>) {
 	let mut completed:Vec<bool> = vec![];
 		graph. each_node(|index: NodeIndex, node:&Node<BuildTask>|->bool {
 		let mut has_edges = false;
@@ -168,7 +169,8 @@ fn execute_graph(graph: &Graph<BuildTask, ()>, tx_task: Sender<TaskMessage>, rx_
 	let mut count:uint = 0;
 	for message in rx_result.iter() {
 		assert!(!completed[message.index.node_id()]);
-		println!("R: {}", message);
+		count += 1;
+		println!("R {}/{}: {}", count, completed.len(), message);
 		match message.result {
 				Ok (result) => {
 				if !result.exit_code.success() {
@@ -193,14 +195,21 @@ fn execute_graph(graph: &Graph<BuildTask, ()>, tx_task: Sender<TaskMessage>, rx_
 				break;
 			}
 			}
-		count += 1;
-		if count ==completed.len() {
+		if count == completed.len() {
 			break;
 		}
 	}
+	// No more tasks.
 		free(tx_task);
-
-	for message in rx_result.iter() {
+	// Cleanup task list.
+	match rx_task.lock() {
+			queue => {
+			for _ in queue.iter() {
+			}
+		}
+		}
+	// Wait for in progress task completion.
+	for _ in rx_result.iter() {
 	}
 }
 
@@ -497,6 +506,60 @@ fn cmd_parse(cmd: &str) -> Vec<String> {
 			args.push(arg);
 	}
 	return args;
+}
+
+fn cmd_expand_arg(arg: &str, resolver:|&str|->Option<String>) -> String {
+	let mut result = "".to_string();
+	let mut suffix = arg;
+	loop {
+		match suffix.find_str("$(") {
+				Some(begin) => {
+				match suffix.slice_from(begin).find_str(")") {
+						Some(end) => {
+						let name = suffix.slice(begin+2, begin + end);
+						match resolver(name) {
+								Some(ref value) => {
+										result = result + suffix.slice_to(begin) + value.as_slice();
+							}
+								None => {
+									result = result + suffix.slice_to(begin + end + 1);
+							}
+							}
+						suffix = suffix.slice_from(begin + end + 1);
+					}
+						None => {
+						result = result+suffix;
+						break;
+					}
+					}
+			}
+				None => {
+				result = result+ suffix;
+				break;
+			}
+			}
+	}
+	result
+}
+
+fn cmd_expand_args(args: &Vec<String>, resolver:|&str|->Option<String>) -> Vec<String> {
+	let mut result:Vec<String> = vec![];
+	for arg in args.iter() {
+			result.push(cmd_expand_arg(arg.as_slice(), |name:&str|->Option<String>{resolver(name)}));
+	}
+	result
+}
+
+#[test]
+fn test_cmd_parse_vars() {
+	assert_eq!(cmd_expand_arg("A$(test)$(inner)$(none)B", |name:&str|->Option<String>{
+	match name {
+	"test" => {Some("foo".to_string())}
+	"inner" => {Some("$(bar)".to_string())}
+	"none" => {None}
+	_ => {assert!(false, format!("Unexpected value: {}", name));None}
+	}
+	}), "Afoo$(bar)$(none)B");
 }
 
 #[test]
