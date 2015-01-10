@@ -8,6 +8,7 @@ use std::io::process::ProcessExit;
 use std::fmt;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
+use std::sync::mpsc::{channel, Sender, Receiver};
 use std::thread::Thread;
 
 use rustc::middle::graph::{Graph, NodeIndex, Node, EdgeIndex, Edge};
@@ -22,7 +23,7 @@ task: BuildTask
 
 impl fmt::Show for TaskMessage {
 fn fmt(& self, f: &mut fmt::Formatter) -> fmt::Result {
-	write!(f, "index={}, title={}", self .index, self .task.title)
+	write!(f, "index={:?}, title={}", self .index, self .task.title)
 }
 }
 
@@ -33,7 +34,7 @@ result: Result<BuildResult, String>
 
 impl fmt::Show for ResultMessage {
 fn fmt(& self, f: &mut fmt::Formatter) -> fmt::Result {
-	write!(f, "index={}, result={}", self .index, self .result)
+	write!(f, "index={:?}, result={:?}", self .index, self .result)
 }
 }
 
@@ -60,20 +61,20 @@ fn main() {
 	for cpu_id in range(0, std::os::num_cpus()) {
 		let local_rx_task = mutex_rx_task.clone();
 		let local_tx_result = tx_result .clone();
-				Thread::spawn(move || {
-				loop {
-					let message: TaskMessage;
-					match local_rx_task.lock().recv_opt() {
-							Ok(v) => {message = v;
-						}
-							Err(_) => {
-							break;
-						}
-						}
-					println!("{}: {}", cpu_id, message);
-					local_tx_result.send(execute_task(message));
-				}
-			}).detach();
+			Thread::spawn(move || {
+			loop {
+				let message: TaskMessage;
+				match local_rx_task.lock().unwrap().recv() {
+						Ok(v) => {message = v;
+					}
+						Err(_) => {
+						break;
+					}
+					}
+				println!("{}: {:?}", cpu_id, message);
+				local_tx_result.send(execute_task(message));
+			}
+		});
 	}
 	free(tx_result);
 
@@ -104,8 +105,8 @@ fn validate_graph(graph: Graph<BuildTask, ()>) -> Result<Graph<BuildTask, ()>, S
 			queue.push(index);
 			true
 	});
-	let mut count:uint = 0;
-	let mut i:uint = 0;
+	let mut count:usize = 0;
+	let mut i:usize = 0;
 	while i < queue.len() {
 		let index = queue[i];
 		if (!completed[index.node_id()]) && (is_ready(&graph, &completed, &index)) {
@@ -127,9 +128,9 @@ fn validate_graph(graph: Graph<BuildTask, ()>) -> Result<Graph<BuildTask, ()>, S
 fn execute_task(message: TaskMessage) -> ResultMessage {
 	println!("{}", message.task.title);
 
-	let args = cmd_expand_args(&message.task.args, |name:&str|->Option<String>{os::getenv(name)});
+	let args = cmd_expand_args(&message.task.args, &|name:&str|->Option<String>{os::getenv(name)});
 	match Command::new(message.task.exec)
-	.args( args.as_slice())
+	.args(args.as_slice())
 	.cwd(&Path::new(&message.task.working_dir))
 	.output(){
 			Ok(output) => {
@@ -166,11 +167,11 @@ fn execute_graph(graph: &Graph<BuildTask, ()>, tx_task: Sender<TaskMessage>, rx_
 			completed.push(false);
 		true
 	});
-	let mut count:uint = 0;
+	let mut count:usize = 0;
 	for message in rx_result.iter() {
 		assert!(!completed[message.index.node_id()]);
 		count += 1;
-		println!("R {}/{}: {}", count, completed.len(), message);
+		println!("R {}/{}: {:?}", count, completed.len(), message);
 		match message.result {
 				Ok (result) => {
 				if !result.exit_code.success() {
@@ -265,7 +266,7 @@ depends_on: Vec<String>,
 
 impl fmt::Show for XgTask {
 fn fmt(& self, f: &mut fmt::Formatter) -> fmt::Result {
-	write!(f, "id={}, title={}, tool={}, working_dir={}, depends_on={}", self .id, self .title, self .tool, self .working_dir, self .depends_on)
+	write!(f, "id={:?}, title={:?}, tool={}, working_dir={}, depends_on={:?}", self .id, self .title, self .tool, self .working_dir, self .depends_on)
 }
 }
 
@@ -508,7 +509,7 @@ fn cmd_parse(cmd: &str) -> Vec<String> {
 	return args;
 }
 
-fn cmd_expand_arg(arg: &str, resolver:|&str|->Option<String>) -> String {
+fn cmd_expand_arg<F: Fn(&str) -> Option<String>>(arg: &str, resolver: &F) -> String {
 	let mut result = "".to_string();
 	let mut suffix = arg;
 	loop {
@@ -542,10 +543,10 @@ fn cmd_expand_arg(arg: &str, resolver:|&str|->Option<String>) -> String {
 	result
 }
 
-fn cmd_expand_args(args: &Vec<String>, resolver:|&str|->Option<String>) -> Vec<String> {
+fn cmd_expand_args<F: Fn(&str) -> Option<String>>(args: &Vec<String>, resolver: &F) -> Vec<String> {
 	let mut result:Vec<String> = vec![];
 	for arg in args.iter() {
-			result.push(cmd_expand_arg(arg.as_slice(), |name:&str|->Option<String>{resolver(name)}));
+			result.push(cmd_expand_arg(arg.as_slice(), resolver));
 	}
 	result
 }
