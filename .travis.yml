@@ -1,4 +1,3 @@
-octobuild
-=========
+language: rust
 
-Simple distributed compile system for C++
+sudo: false
