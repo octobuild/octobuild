@@ -1,21 +1,18 @@
 #![allow(unstable)]
 extern crate octobuild;
-extern crate xml;
 
+use octobuild::common::{BuildTask};
 use octobuild::wincmd;
+use octobuild::xg;
 use octobuild::graph::{Graph, NodeIndex, Node, EdgeIndex, Edge};
 
 use std::os;
 
 use std::io::{Command, File, BufferedReader};
 use std::io::process::ProcessExit;
-use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use std::sync::mpsc::{channel, Sender, Receiver};
 use std::thread::Thread;
-
-use xml::reader::EventReader;
-use xml::reader::events::XmlEvent;
 
 #[derive(Show)]
 struct TaskMessage {
@@ -73,9 +70,19 @@ fn main() {
 			path =Path::new(&args[1]);
 	}
 	println!("Example path: {}", path.display());
-	match xg_parse(&path) {
-			Ok(graph) => {
-				execute_graph(&graph, tx_task, mutex_rx_task, rx_result);
+	match File::open(&path) {
+			Ok(file) => {
+			match xg::parser::parse(BufferedReader::new(file)) {
+					Ok(graph) => {
+					match validate_graph(graph) {
+							Ok(graph) => {
+								execute_graph(&graph, tx_task, mutex_rx_task, rx_result);
+						}
+							Err(msg) =>{panic! (msg);}
+						}
+				}
+					Err(msg) =>{panic! (msg);}
+				}
 		}
 			Err(msg) =>{panic! (msg);}
 		}
@@ -222,202 +229,4 @@ fn parse_command_line(args: Vec<String>) -> Vec<String> {
 			result.push(arg.clone());
 	}
 	result
-}
-
-#[derive(Show)]
-#[derive(Clone)]
-struct BuildTask {
-title: String,
-exec: String,
-args: Vec<String>,
-working_dir: String,
-}
-
-#[derive(Show)]
-struct XgTask {
-id: Option<String>,
-title: Option<String>,
-tool: String,
-working_dir: String,
-depends_on: Vec<String>,
-}
-
-#[derive(Show)]
-struct XgTool {
-id: String,
-exec: String,
-args: String,
-output: Option<String>,
-}
-
-fn xg_parse(path: &Path) -> Result<Graph<BuildTask, ()>, String> {
-	let file = File::open(path).unwrap();
-	let reader = BufferedReader::new(file);
-
-	let mut parser = EventReader::new(reader);
-	let mut tasks:Vec<XgTask> = vec![];
-	let mut tools:HashMap<String, XgTool> = HashMap::new();
-	for e in parser.events() {
-		match e {
-				XmlEvent::StartElement {name, attributes, ..} => {
-				match name.local_name.as_slice() {
-						"Task" =>
-						{
-							match xg_parse_task(&attributes) {
-									Ok(task) =>
-									{
-											tasks.push(task);
-									}
-									Err(msg) =>
-									{
-										return Err(msg);
-									}
-								};
-						}
-						"Tool" =>
-						{
-							match xg_parse_tool(&attributes) {
-									Ok(tool) =>
-									{
-											tools.insert(tool.id.to_string(), tool);
-									}
-									Err(msg) =>
-									{
-										return Err(msg);
-									}
-								};
-						}
-						_ => {}
-					}
-			}
-				XmlEvent::EndElement{..} => {
-			}
-				_ => {
-			}
-			}
-	}
-	xg_parse_create_graph(&tasks, &tools)
-}
-
-fn xg_parse_create_graph(tasks:&Vec<XgTask>, tools:&HashMap<String, XgTool>) -> Result<Graph<BuildTask, ()>, String> {
-	let mut graph: Graph<BuildTask, ()> = Graph::new();
-	let mut nodes: Vec<NodeIndex> = vec![];
-	let mut task_refs: HashMap<&str, NodeIndex> = HashMap::new();
-	for task in tasks.iter() {
-		match tools.get(task.tool.as_slice()){
-				Some(tool) => {
-				let node = graph.add_node(BuildTask {
-				title: match task.title {
-						Some(ref v) => {v.clone()}
-						_ => {
-						match tool.output {
-								Some(ref v) => {v.clone()}
-								_ => "".to_string()
-							}
-					}
-					},
-				exec: tool.exec.clone(),
-				args: wincmd::parse(tool.args.as_slice()),
-				working_dir : task.working_dir.clone(),
-				});
-				match task.id {
-						Some(ref v) => {
-							task_refs.insert(v.as_slice(), node);
-					}
-						_ => {}
-					}
-				nodes.push(node);
-			}
-				_ => {
-				return Err(format!("Can't find tool with id: {}", task.tool));
-			}
-			}
-	}
-	for idx in range(0, nodes.len()) {
-		let ref task = tasks[idx];
-		let ref node = nodes[idx];
-		for id in task.depends_on.iter() {
-			let dep_node = task_refs.get(id.as_slice());
-			match dep_node {
-					Some(v) => {
-						graph.add_edge(*node, *v, ());
-				}
-					_ => {
-					return Err(format!("Can't find task for dependency with id: {}", id));
-				}
-				}
-		}
-	}
-	validate_graph(graph)
-}
-
-fn map_attributes (attributes: &Vec<xml::attribute::OwnedAttribute>) -> HashMap< String, String> {
-	let mut attrs: HashMap<String, String> = HashMap::new();
-	for attr in attributes.iter() {
-			attrs.insert(attr.name.local_name.clone(), attr.value.clone());
-	}
-	attrs
-}
-
-fn xg_parse_task (attributes: & Vec<xml::attribute::OwnedAttribute>)->Result<XgTask, String> {
-	let mut attrs = map_attributes(attributes);
-	// Tool
-	let tool: String;
-	match attrs.remove("Tool") {
-			Some(v) => {tool = v;}
-			_ => {return Err("Invalid task data: attribute @Tool not found.".to_string());}
-		}
-	// WorkingDir
-	let working_dir: String;
-	match attrs.remove("WorkingDir") {
-			Some(v) => {working_dir = v;}
-			_ => {return Err("Invalid task data: attribute @WorkingDir not found.".to_string());}
-		}
-	// DependsOn
-	let mut depends_on : Vec<String> = vec![];
-	match attrs.remove("DependsOn") {
-			Some(v) =>
-			{
-				for item in v.split_str(";").collect::<Vec<&str>>().iter() {
-						depends_on.push(item.to_string())
-				}
-			}
-			_ =>
-			{
-			}
-		};
-
-		Ok(XgTask {
-	id: attrs.remove("Name"),
-	title: attrs.remove("Caption"),
-	tool: tool,
-	working_dir: working_dir,
-	depends_on: depends_on,
-	})
-}
-
-fn xg_parse_tool (attributes: &Vec<xml::attribute::OwnedAttribute>)->Result<XgTool, String> {
-	let mut attrs = map_attributes(attributes);
-	// Name
-	let id: String;
-	match attrs.remove("Name") {
-			Some(v) => {id = v;}
-			_ => {return Err("Invalid task data: attribute @Name not found.".to_string());}
-		}
-	// Path
-	let exec: String;
-	match attrs.remove("Path") {
-			Some(v) => {exec = v;}
-			_ => {return Err("Invalid task data: attribute @Name not found.".to_string());}
-		}
-
-	Ok(XgTool {
-	id: id,
-	exec: exec,
-	output: attrs.remove("OutputPrefix"),
-	args: match attrs.remove("Params") {
-			Some(v) => {v}
-			_ => {"".to_string()}
-		},
-	})
 }
