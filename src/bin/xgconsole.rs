@@ -1,7 +1,8 @@
-#![allow(unstable)]
-
+extern crate octobuild;
 extern crate xml;
 extern crate rustc;
+
+use octobuild::wincmd;
 
 use std::os;
 
@@ -114,7 +115,7 @@ fn validate_graph(graph: Graph<BuildTask, ()>) -> Result<Graph<BuildTask, ()>, S
 fn execute_task(message: TaskMessage) -> ResultMessage {
 	println!("{}", message.task.title);
 
-	let args = cmd_expand_args(&message.task.args, &|name:&str|->Option<String>{os::getenv(name)});
+	let args = wincmd::expand_args(&message.task.args, &|name:&str|->Option<String>{os::getenv(name)});
 	match Command::new(message.task.exec)
 	.args(args.as_slice())
 	.cwd(&Path::new(&message.task.working_dir))
@@ -317,7 +318,7 @@ fn xg_parse_create_graph(tasks:&Vec<XgTask>, tools:&HashMap<String, XgTool>) -> 
 					}
 					},
 				exec: tool.exec.clone(),
-				args: cmd_parse(tool.args.as_slice()),
+				args: wincmd::parse(tool.args.as_slice()),
 				working_dir : task.working_dir.clone(),
 				});
 				match task.id {
@@ -420,147 +421,4 @@ fn xg_parse_tool (attributes: &Vec<xml::attribute::OwnedAttribute>)->Result<XgTo
 			_ => {"".to_string()}
 		},
 	})
-}
-
-fn cmd_parse(cmd: &str) -> Vec<String> {
-	let mut args: Vec<String> = vec![];
-	let mut arg: String = "".to_string();
-	let mut escape = false;
-	let mut quote = false;
-	let mut data = false;
-	for c in cmd.chars() {
-		match c {
-				' ' | '\t' => {
-				if escape {
-						arg.push('\\');
-						escape = false;
-				}
-				if quote {
-						arg.push(c);
-						data = true;
-				} else if data {
-						args.push(arg);
-						arg = "".to_string();
-						data = false;
-				}
-			}
-				'\\' => {
-				if escape {
-						arg.push(c);
-				}
-				data = true;
-				escape = !escape;
-			}
-				'"' => {
-				if escape {
-						arg.push(c);
-						escape = false;
-				} else {
-					quote = !quote;
-				}
-				data = true;
-			}
-				_ => {
-				if escape {
-						arg.push('\\');
-						escape = false;
-				}
-				arg.push(c);
-				data = true;
-			}
-			}
-	}
-	if data {
-			args.push(arg);
-	}
-	return args;
-}
-
-fn cmd_expand_arg<F: Fn(&str) -> Option<String>>(arg: &str, resolver: &F) -> String {
-	let mut result = "".to_string();
-	let mut suffix = arg;
-	loop {
-		match suffix.find_str("$(") {
-				Some(begin) => {
-				match suffix.slice_from(begin).find_str(")") {
-						Some(end) => {
-						let name = suffix.slice(begin+2, begin + end);
-						match resolver(name) {
-								Some(ref value) => {
-										result = result + suffix.slice_to(begin) + value.as_slice();
-							}
-								None => {
-									result = result + suffix.slice_to(begin + end + 1);
-							}
-							}
-						suffix = suffix.slice_from(begin + end + 1);
-					}
-						None => {
-						result = result+suffix;
-						break;
-					}
-					}
-			}
-				None => {
-				result = result+ suffix;
-				break;
-			}
-			}
-	}
-	result
-}
-
-fn cmd_expand_args<F: Fn(&str) -> Option<String>>(args: &Vec<String>, resolver: &F) -> Vec<String> {
-	let mut result:Vec<String> = vec![];
-	for arg in args.iter() {
-			result.push(cmd_expand_arg(arg.as_slice(), resolver));
-	}
-	result
-}
-
-#[test]
-fn test_cmd_parse_vars() {
-	assert_eq!(cmd_expand_arg("A$(test)$(inner)$(none)B", &|name:&str|->Option<String>{
-	match name {
-	"test" => {Some("foo".to_string())}
-	"inner" => {Some("$(bar)".to_string())}
-	"none" => {None}
-	_ => {assert!(false, format!("Unexpected value: {}", name));None}
-	}
-	}), "Afoo$(bar)$(none)B");
-}
-
-#[test]
-fn test_cmd_parse_1() {
-	assert_eq!(cmd_parse("\"abc\" d e"), ["abc", "d", "e"]);
-}
-
-#[test]
-fn test_cmd_parse_2() {
-	assert_eq!(cmd_parse(" \"abc\" d e "), ["abc", "d", "e"]);
-}
-
-#[test]
-fn test_cmd_parse_3() {
-	assert_eq!(cmd_parse("\"\" \"abc\" d e \"\""), ["", "abc", "d", "e", ""]);
-}
-
-#[test]
-fn test_cmd_parse_4() {
-	assert_eq!(cmd_parse("a\\\\\\\\b d\"e f\"g h"), ["a\\\\b", "de fg", "h"]);
-}
-
-#[test]
-fn test_cmd_parse_5() {
-	assert_eq!(cmd_parse("a\\\\\\\"b c d"), ["a\\\"b", "c", "d"]);
-}
-
-#[test]
-fn test_cmd_parse_6() {
-	assert_eq!(cmd_parse("a\\\\\\\\\"b c\" d e"), ["a\\\\b c", "d", "e"]);
-}
-
-#[test]
-fn test_cmd_parse_7() {
-	assert_eq!(cmd_parse("C:\\Windows\\System32 d e"), ["C:\\Windows\\System32", "d", "e"]);
 }
