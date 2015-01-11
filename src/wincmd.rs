@@ -3,16 +3,14 @@
 pub fn parse(cmd: &str) -> Vec<String> {
 	let mut args: Vec<String> = vec![];
 	let mut arg: String = "".to_string();
-	let mut escape = false;
+	let mut slash: usize = 0;
 	let mut quote = false;
 	let mut data = false;
 	for c in cmd.chars() {
 		match c {
 			' ' | '\t' => {
-				if escape {
-					arg.push('\\');
-					escape = false;
-				}
+				arg = add_slashes(arg, if quote && ((slash % 2) == 0) {slash / 2} else {slash});
+				slash = 0;
 				if quote {
 					arg.push(c);
 					data = true;
@@ -23,35 +21,40 @@ pub fn parse(cmd: &str) -> Vec<String> {
 				}
 			}
 			'\\' => {
-				if escape {
-					arg.push(c);
-				}
-				escape = !escape;
+				slash = slash + 1;
 				data = true;
 			}
 			'"' => {
-				if escape {
-					arg.push(c);
-					escape = false;
-				} else {
+				arg = add_slashes(arg, slash / 2);
+				if (slash & 2) == 0 {
 					quote = !quote;
+				} else {
+					arg.push(c);
 				}
+				slash = 0;
 				data = true;
 			}
 			_ => {
-				if escape {
-					arg.push('\\');
-					escape = false;
-				}
+				arg = add_slashes(arg, if quote && ((slash & 2) == 0) {slash / 2} else {slash});
+				slash = 0;
 				arg.push(c);
 				data = true;
 			}
 		}
 	}
+	arg = add_slashes(arg, if quote && ((slash % 2) == 0) {slash / 2} else {slash});
+	slash = 0;
 	if data {
 		args.push(arg);
 	}
 	return args;
+}
+
+fn add_slashes(mut line: String, count: usize) -> String {
+	for i in range(0, count) {
+		line.push('\\');
+	}
+	line
 }
 
 pub fn expand_arg<F: Fn(&str) -> Option<String>>(arg: &str, resolver: &F) -> String {
@@ -134,7 +137,7 @@ fn test_parse_3() {
 
 #[test]
 fn test_parse_4() {
-	assert_eq!(parse("a\\\\\\\\b d\"e f\"g h"), ["a\\\\b", "de fg", "h"]);
+	assert_eq!(parse("a\\\\b d\"e f\"g h"), ["a\\\\b", "de fg", "h"]);
 }
 
 #[test]

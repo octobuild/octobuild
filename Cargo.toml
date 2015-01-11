@@ -5,6 +5,3 @@ authors = [ "Artem V. Navrotskiy <bozaro@users.noreply.github.com>" ]
 
 [dependencies.xml-rs]
 version = "*"
-
-[[bin]]
-name = "xgconsole"
