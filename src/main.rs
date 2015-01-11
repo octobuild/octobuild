@@ -553,7 +553,7 @@ fn cmd_expand_args<F: Fn(&str) -> Option<String>>(args: &Vec<String>, resolver: 
 
 #[test]
 fn test_cmd_parse_vars() {
-	assert_eq!(cmd_expand_arg("A$(test)$(inner)$(none)B", |name:&str|->Option<String>{
+	assert_eq!(cmd_expand_arg("A$(test)$(inner)$(none)B", &|name:&str|->Option<String>{
 	match name {
 	"test" => {Some("foo".to_string())}
 	"inner" => {Some("$(bar)".to_string())}
