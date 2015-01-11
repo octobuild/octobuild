@@ -1,3 +1,5 @@
+#![allow(unstable)]
+
 extern crate xml;
 extern crate rustc;
 
@@ -5,7 +7,6 @@ use std::os;
 
 use std::io::{Command, File, BufferedReader};
 use std::io::process::ProcessExit;
-use std::fmt;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use std::sync::mpsc::{channel, Sender, Receiver};
@@ -16,36 +17,21 @@ use rustc::middle::graph::{Graph, NodeIndex, Node, EdgeIndex, Edge};
 use xml::reader::EventReader;
 use xml::reader::events::XmlEvent;
 
+#[derive(Show)]
 struct TaskMessage {
 index: NodeIndex,
 task: BuildTask
 }
 
-impl fmt::Show for TaskMessage {
-fn fmt(& self, f: &mut fmt::Formatter) -> fmt::Result {
-	write!(f, "index={:?}, title={}", self .index, self .task.title)
-}
-}
-
+#[derive(Show)]
 struct ResultMessage {
 index: NodeIndex,
 result: Result<BuildResult, String>
 }
 
-impl fmt::Show for ResultMessage {
-fn fmt(& self, f: &mut fmt::Formatter) -> fmt::Result {
-	write!(f, "index={:?}, result={:?}", self .index, self .result)
-}
-}
-
+#[derive(Show)]
 struct BuildResult {
 exit_code: ProcessExit,
-}
-
-impl fmt::Show for BuildResult {
-fn fmt(& self, f: &mut fmt::Formatter) -> fmt::Result {
-	write!(f, "exit_code={}", self .exit_code)
-}
 }
 
 fn main() {
@@ -238,6 +224,8 @@ fn parse_command_line(args: Vec<String>) -> Vec<String> {
 	result
 }
 
+#[derive(Show)]
+#[derive(Clone)]
 struct BuildTask {
 title: String,
 exec: String,
@@ -245,17 +233,7 @@ args: Vec<String>,
 working_dir: String,
 }
 
-impl Clone for BuildTask {
-fn clone(& self) -> BuildTask {
-	BuildTask {
-	title: self.title.clone(),
-	exec: self.exec.clone(),
-	args: self.args.clone(),
-	working_dir: self .working_dir.clone(),
-	}
-}
-}
-
+#[derive(Show)]
 struct XgTask {
 id: Option<String>,
 title: Option<String>,
@@ -264,23 +242,12 @@ working_dir: String,
 depends_on: Vec<String>,
 }
 
-impl fmt::Show for XgTask {
-fn fmt(& self, f: &mut fmt::Formatter) -> fmt::Result {
-	write!(f, "id={:?}, title={:?}, tool={}, working_dir={}, depends_on={:?}", self .id, self .title, self .tool, self .working_dir, self .depends_on)
-}
-}
-
+#[derive(Show)]
 struct XgTool {
 id: String,
 exec: String,
 args: String,
 output: Option<String>,
-}
-
-impl fmt::Show for XgTool {
-fn fmt(& self, f: &mut fmt::Formatter) -> fmt::Result {
-	write!(f, "id={}, exec={}", self .id, self .exec)
-}
 }
 
 fn xg_parse(path: &Path) -> Result<Graph<BuildTask, ()>, String> {
