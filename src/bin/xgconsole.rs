@@ -1,8 +1,9 @@
+#![allow(unstable)]
 extern crate octobuild;
 extern crate xml;
-extern crate rustc;
 
 use octobuild::wincmd;
+use octobuild::graph::{Graph, NodeIndex, Node, EdgeIndex, Edge};
 
 use std::os;
 
@@ -12,8 +13,6 @@ use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use std::sync::mpsc::{channel, Sender, Receiver};
 use std::thread::Thread;
-
-use rustc::middle::graph::{Graph, NodeIndex, Node, EdgeIndex, Edge};
 
 use xml::reader::EventReader;
 use xml::reader::events::XmlEvent;
