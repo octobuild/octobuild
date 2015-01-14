@@ -103,8 +103,8 @@ fn create_threads<R: Send, T: Send, Worker:Fn(T) -> R + Send, Factory:Fn(usize) 
 }
 
 fn validate_graph(graph: Graph<BuildTask, ()>) -> Result<Graph<BuildTask, ()>, String> {
-	let mut completed:Vec<bool> = vec![];
-	let mut queue:Vec<NodeIndex> = vec![];
+	let mut completed:Vec<bool> = Vec::new();
+	let mut queue:Vec<NodeIndex> = Vec::new();
 		graph. each_node(|index: NodeIndex, _:&Node<BuildTask>|->bool {
 			completed.push(false);
 			queue.push(index);
@@ -156,7 +156,7 @@ fn execute_task(message: TaskMessage) -> ResultMessage {
 }
 
 fn execute_graph(graph: &Graph<BuildTask, ()>, tx_task: Sender<TaskMessage>, rx_task: Arc<Mutex<Receiver<TaskMessage>>>, rx_result: Receiver<ResultMessage>) {
-	let mut completed:Vec<bool> = vec![];
+	let mut completed:Vec<bool> = Vec::new();
 		graph. each_node(|index: NodeIndex, node:&Node<BuildTask>|->bool {
 		let mut has_edges = false;
 			graph.each_outgoing_edge(index, |_:EdgeIndex, _:&Edge<()>| -> bool {
