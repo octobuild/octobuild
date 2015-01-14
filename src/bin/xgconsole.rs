@@ -33,7 +33,7 @@ exit_code: ProcessExit,
 
 fn main() {
 	println!("XGConsole:");
-	for arg in parse_command_line(os::args()).iter() {
+	for arg in os::args().iter() {
 		println!("  {}", arg);
 	}
 
@@ -233,12 +233,4 @@ fn is_ready(graph: &Graph<BuildTask, ()>, completed: &Vec<bool>, source: &NodeIn
 		}
 	});
 	ready
-}
-
-fn parse_command_line(args: Vec<String>) -> Vec<String> {
-	let mut result: Vec<String> = Vec::new();
-	for arg in args.slice(1, args.len()).iter() {
-			result.push(arg.clone());
-	}
-	result
 }
