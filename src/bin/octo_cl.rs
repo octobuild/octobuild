@@ -12,6 +12,10 @@ use std::slice::{Iter};
 enum Scope {
 // Preprocessing argument
 Preprocessor,
+// Compiler argument
+Compiler,
+// Preprocessor & compiler argument
+Shared,
 // Unknown argument - local build only
 Ignore,
 }
@@ -71,35 +75,59 @@ fn parse_argument(iter: &mut  Iter<String>) -> Option<Arg> {
 	match iter.next() {
 			Some(arg) => {
 				Some(
-					if is_param(arg) {
-						match arg[1..].as_slice() {
-								"c" => {
-								Arg::Flag{scope: Scope::Ignore, flag:"c".to_string()}
+					if has_param_prefix(arg) {
+						let flag = arg[1..].as_slice();
+						match is_spaceable_param(flag) {
+								Some((prefix, scope)) => {
+								if flag == prefix {
+									match iter.next() {
+											Some(value) if !has_param_prefix(value) => {
+											Arg::Param{scope: scope, flag:prefix.to_string(), value:value.to_string()}
+										}
+											_ => {
+											Arg::Unknown{arg:arg.to_string()}
+										}
+										}
+								} else {
+									Arg::Param{scope: scope, flag:prefix.to_string(), value:flag[prefix.len()..].to_string()}
+								}
 							}
-								"D" => {
-								match iter.next() {
-										Some(value) if !is_param(value) => {
-										Arg::Param{scope: Scope::Preprocessor, flag:"D".to_string(), value:value.to_string()}
+								None => {
+								match flag {
+										"c" | "nologo" => {
+										Arg::Flag{scope: Scope::Ignore, flag:flag.to_string()}
+									}
+										s if s.starts_with("O") => {
+										Arg::Flag{scope: Scope::Compiler, flag:flag.to_string()}
+									}
+										s if s.starts_with("G") => {
+										Arg::Flag{scope: Scope::Compiler, flag:flag.to_string()}
+									}
+										s if s.starts_with("RTC") => {
+										Arg::Flag{scope: Scope::Compiler, flag:flag.to_string()}
+									}
+										s if s.starts_with("Z") => {
+										Arg::Flag{scope: Scope::Compiler, flag:flag.to_string()}
+									}
+										s if s.starts_with("MD") => {
+										Arg::Flag{scope: Scope::Compiler, flag:flag.to_string()}
+									}
+										s if s.starts_with("MT") => {
+										Arg::Flag{scope: Scope::Compiler, flag:flag.to_string()}
+									}
+										s if s.starts_with("Fo") => {
+										Arg::Output{kind:OutputKind::Object, flag:"Fo".to_string(), file:s[2..].to_string()}
+									}
+										s if s.starts_with("Fp") => {
+										Arg::Input{kind:InputKind::Precompiled, flag:"Fp".to_string(), file:s[2..].to_string()}
+									}
+										s if s.starts_with("Yu") => {
+										Arg::Input{kind:InputKind::Marker, flag:"Yu".to_string(), file:s[2..].to_string()}
 									}
 										_ => {
 										Arg::Unknown{arg:arg.to_string()}
 									}
 									}
-							}
-								s if s.starts_with("D") => {
-								Arg::Param{scope: Scope::Preprocessor, flag:"D".to_string(), value:s[1..].to_string()}
-							}
-								s if s.starts_with("Fo") => {
-								Arg::Output{kind:OutputKind::Object, flag:"Fo".to_string(), file:s[2..].to_string()}
-							}
-								s if s.starts_with("Fp") => {
-								Arg::Input{kind:InputKind::Precompiled, flag:"Fp".to_string(), file:s[2..].to_string()}
-							}
-								s if s.starts_with("Yu") => {
-								Arg::Input{kind:InputKind::Marker, flag:"Yu".to_string(), file:s[2..].to_string()}
-							}
-								_ => {
-								Arg::Unknown{arg:arg.to_string()}
 							}
 							}
 					} else {
@@ -112,7 +140,21 @@ fn parse_argument(iter: &mut  Iter<String>) -> Option<Arg> {
 		}
 }
 
-fn is_param(arg: &String) -> bool {
+fn is_spaceable_param(flag: &str) -> Option<(&str, Scope)> {
+	for prefix in ["I", "D"].iter() {
+		if flag.starts_with(*prefix) {
+			return Some((*prefix, Scope::Preprocessor));
+		}
+	}
+	for prefix in ["W", "wd", "we", "wo", "w"].iter() {
+		if flag.starts_with(*prefix) {
+			return Some((*prefix, Scope::Shared));
+		}
+	}
+	None
+}
+
+fn has_param_prefix(arg: &String) -> bool {
 			arg.starts_with("/") || arg.starts_with("-")
 }
 
