@@ -97,6 +97,12 @@ fn parse_argument(iter: &mut  Iter<String>) -> Option<Arg> {
 										"c" | "nologo" => {
 										Arg::Flag{scope: Scope::Ignore, flag:flag.to_string()}
 									}
+										"bigobj" => {
+										Arg::Flag{scope: Scope::Compiler, flag:flag.to_string()}
+									}
+										s if s.starts_with("T") => {
+										Arg::Flag{scope: Scope::Ignore, flag:flag.to_string()}
+									}
 										s if s.starts_with("O") => {
 										Arg::Flag{scope: Scope::Compiler, flag:flag.to_string()}
 									}
@@ -114,6 +120,15 @@ fn parse_argument(iter: &mut  Iter<String>) -> Option<Arg> {
 									}
 										s if s.starts_with("MT") => {
 										Arg::Flag{scope: Scope::Compiler, flag:flag.to_string()}
+									}
+										s if s.starts_with("EH") => {
+										Arg::Flag{scope: Scope::Compiler, flag:flag.to_string()}
+									}
+										s if s.starts_with("fp:") => {
+										Arg::Flag{scope: Scope::Compiler, flag:flag.to_string()}
+									}
+										s if s.starts_with("errorReport:") => {
+										Arg::Flag{scope: Scope::Shared, flag:flag.to_string()}
 									}
 										s if s.starts_with("Fo") => {
 										Arg::Output{kind:OutputKind::Object, flag:"Fo".to_string(), file:s[2..].to_string()}
@@ -148,7 +163,7 @@ fn is_spaceable_param(flag: &str) -> Option<(&str, Scope)> {
 	}
 	for prefix in ["W", "wd", "we", "wo", "w"].iter() {
 		if flag.starts_with(*prefix) {
-			return Some((*prefix, Scope::Shared));
+			return Some((*prefix, Scope::Compiler));
 		}
 	}
 	None
