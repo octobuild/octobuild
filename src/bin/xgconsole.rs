@@ -41,9 +41,9 @@ fn main() {
 	let (tx_task, rx_task): (Sender<TaskMessage>, Receiver<TaskMessage>) = channel();
 
 	let mutex_rx_task = create_threads(rx_task, tx_result, std::os::num_cpus(), |worker_id:usize| {
-		move |message:TaskMessage| -> ResultMessage {
-			println!("{}: {:?}", worker_id, message.task.title);
-			execute_task(message)
+		move |task:TaskMessage| -> ResultMessage {
+			println!("{}: {:?}", worker_id, task.task.title);
+			execute_task(task)
 		}
 	});
 

@@ -43,21 +43,20 @@ enum Arg {
 Flag{scope:Scope, flag: String},
 Param{scope:Scope, flag: String, value: String},
 Input{kind:InputKind, flag: String, file: String},
-Output{kind:OutputKind, flag: String, file: String},
-Unknown {arg:String}
+Output{kind:OutputKind, flag: String, file: String}
 }
 
 struct CompilationTask {
-	// Parsed arguments.
-	args: Vec<Arg>,
-	// Source language.
-	language: String,
-	// Input source file name.
-	source: String,
-	// Input precompiled header file name.
-	precompiled: String,
-	// Output object file name.
-	output: String,
+// Parsed arguments.
+args: Vec<Arg>,
+// Source language.
+language: String,
+// Input source file name.
+source: String,
+// Input precompiled header file name.
+precompiled: String,
+// Output object file name.
+output: String,
 }
 
 fn main() {
@@ -66,10 +65,14 @@ fn main() {
 		println!("  {}", arg);
 	}
 	println!("Arguments (parsed):");
-	let parsed_args = parse_arguments(&os::args()[1..]);
-	for arg in parsed_args.iter(){
-		println!("  {:?}", arg);
-	}
+	match parse_arguments(&os::args()[1..]) {
+			Ok(parsed_args) => {
+			for arg in parsed_args.iter(){
+				println!("  {:?}", arg);
+			}
+		}
+			Err(e) => {println!("{}", e);}
+		}
 
 	match Command::new("cl.exe")
 	.args(os::args()[1..].as_slice())
@@ -79,28 +82,35 @@ fn main() {
 			println!("stderr: {}", String::from_utf8_lossy(output.error.as_slice()));
 		}
 			Err(e) => {
-				panic!("{}", e);
-			}
+			panic!("{}", e);
+		}
 		}
 }
 
-fn parse_arguments(args: &[String]) -> Vec<Arg> {
+fn parse_arguments(args: &[String]) -> Result<Vec<Arg>, String> {
 	let mut result: Vec<Arg> = Vec::new();
+	let mut errors: Vec<String> = Vec::new();
 	let mut iter = args.iter();
 	loop {
 		match parse_argument(&mut iter) {
-				Some(arg) => {
-					result.push(arg);
+				Some(parse_result) => {
+				match (parse_result) {
+						Ok(arg) => {result.push(arg);}
+						Err(e) => {errors.push(e);}
+					}
 			}
 				None => {
 				break;
 			}
 			}
 	}
-	result
+	if errors.len() > 0 {
+		return Err(format!("Found unknown command line arguments: {:?}", errors))
+	}
+	Ok(result)
 }
 
-fn parse_argument(iter: &mut  Iter<String>) -> Option<Arg> {
+fn parse_argument(iter: &mut  Iter<String>) -> Option<Result<Arg, String>> {
 	match iter.next() {
 			Some(arg) => {
 				Some(
@@ -111,71 +121,71 @@ fn parse_argument(iter: &mut  Iter<String>) -> Option<Arg> {
 								if flag == prefix {
 									match iter.next() {
 											Some(value) if !has_param_prefix(value) => {
-											Arg::Param{scope: scope, flag:prefix.to_string(), value:value.to_string()}
+												Ok(Arg::Param{scope: scope, flag:prefix.to_string(), value:value.to_string()})
 										}
 											_ => {
-											Arg::Unknown{arg:arg.to_string()}
+												Err(arg.to_string())
 										}
 										}
 								} else {
-									Arg::Param{scope: scope, flag:prefix.to_string(), value:flag[prefix.len()..].to_string()}
+										Ok(Arg::Param{scope: scope, flag:prefix.to_string(), value:flag[prefix.len()..].to_string()})
 								}
 							}
 								None => {
 								match flag {
 										"c" | "nologo" => {
-										Arg::Flag{scope: Scope::Ignore, flag:flag.to_string()}
+											Ok(Arg::Flag{scope: Scope::Ignore, flag:flag.to_string()})
 									}
 										"bigobj" => {
-										Arg::Flag{scope: Scope::Compiler, flag:flag.to_string()}
+											Ok(Arg::Flag{scope: Scope::Compiler, flag:flag.to_string()})
 									}
 										s if s.starts_with("T") => {
-										Arg::Flag{scope: Scope::Ignore, flag:flag.to_string()}
+											Ok(Arg::Flag{scope: Scope::Ignore, flag:flag.to_string()})
 									}
 										s if s.starts_with("O") => {
-										Arg::Flag{scope: Scope::Compiler, flag:flag.to_string()}
+											Ok(Arg::Flag{scope: Scope::Compiler, flag:flag.to_string()})
 									}
 										s if s.starts_with("G") => {
-										Arg::Flag{scope: Scope::Compiler, flag:flag.to_string()}
+											Ok(Arg::Flag{scope: Scope::Compiler, flag:flag.to_string()})
 									}
 										s if s.starts_with("RTC") => {
-										Arg::Flag{scope: Scope::Compiler, flag:flag.to_string()}
+											Ok(Arg::Flag{scope: Scope::Compiler, flag:flag.to_string()})
 									}
 										s if s.starts_with("Z") => {
-										Arg::Flag{scope: Scope::Compiler, flag:flag.to_string()}
+											Ok(Arg::Flag{scope: Scope::Compiler, flag:flag.to_string()})
 									}
 										s if s.starts_with("MD") => {
-										Arg::Flag{scope: Scope::Compiler, flag:flag.to_string()}
+											Ok(Arg::Flag{scope: Scope::Compiler, flag:flag.to_string()})
 									}
 										s if s.starts_with("MT") => {
-										Arg::Flag{scope: Scope::Compiler, flag:flag.to_string()}
+											Ok(Arg::Flag{scope: Scope::Compiler, flag:flag.to_string()})
 									}
 										s if s.starts_with("EH") => {
-										Arg::Flag{scope: Scope::Compiler, flag:flag.to_string()}
+											Ok(Arg::Flag{scope: Scope::Compiler, flag:flag.to_string()})
 									}
 										s if s.starts_with("fp:") => {
-										Arg::Flag{scope: Scope::Compiler, flag:flag.to_string()}
+											Ok(Arg::Flag{scope: Scope::Compiler, flag:flag.to_string()})
 									}
 										s if s.starts_with("errorReport:") => {
-										Arg::Flag{scope: Scope::Shared, flag:flag.to_string()}
+											Ok(Arg::Flag{scope: Scope::Shared, flag:flag.to_string()})
 									}
 										s if s.starts_with("Fo") => {
-										Arg::Output{kind:OutputKind::Object, flag:"Fo".to_string(), file:s[2..].to_string()}
+											Ok(Arg::Output{kind:OutputKind::Object, flag:"Fo".to_string(), file:s[2..].to_string()})
 									}
 										s if s.starts_with("Fp") => {
-										Arg::Input{kind:InputKind::Precompiled, flag:"Fp".to_string(), file:s[2..].to_string()}
+											Ok(Arg::Input{kind:InputKind::Precompiled, flag:"Fp".to_string(), file:s[2..].to_string()})
 									}
 										s if s.starts_with("Yu") => {
-										Arg::Input{kind:InputKind::Marker, flag:"Yu".to_string(), file:s[2..].to_string()}
+											Ok(Arg::Input{kind:InputKind::Marker, flag:"Yu".to_string(), file:s[2..].to_string()})
 									}
 										_ => {
-										Arg::Unknown{arg:arg.to_string()}
+											Err(arg.to_string())
 									}
 									}
 							}
 							}
 					} else {
-						Arg::Input{kind:InputKind::Source, flag:String::new(), file:arg.to_string()}
+							Ok(Arg::Input{kind:InputKind::Source, flag:String::new(), file:arg.to_string()})
 					})
 		}
 			None => {
