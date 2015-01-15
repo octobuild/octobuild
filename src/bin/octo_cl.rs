@@ -1,10 +1,13 @@
 #![allow(unstable)]
 extern crate octobuild;
+extern crate log;
 
 use octobuild::wincmd;
 
 use std::os;
 use std::slice::{Iter};
+
+use std::io::{Command, File, BufferedReader};
 
 // Scope of command line argument.
 #[derive(Show)]
@@ -44,15 +47,41 @@ Output{kind:OutputKind, flag: String, file: String},
 Unknown {arg:String}
 }
 
+struct CompilationTask {
+	// Parsed arguments.
+	args: Vec<Arg>,
+	// Source language.
+	language: String,
+	// Input source file name.
+	source: String,
+	// Input precompiled header file name.
+	precompiled: String,
+	// Output object file name.
+	output: String,
+}
+
 fn main() {
 	println!("Arguments (raw):");
 	for arg in os::args()[1..].iter() {
 		println!("  {}", arg);
 	}
 	println!("Arguments (parsed):");
-	for arg in parse_arguments(&os::args()[1..]).iter(){
+	let parsed_args = parse_arguments(&os::args()[1..]);
+	for arg in parsed_args.iter(){
 		println!("  {:?}", arg);
 	}
+
+	match Command::new("cl.exe")
+	.args(os::args()[1..].as_slice())
+	.output(){
+			Ok(output) => {
+			println!("stdout: {}", String::from_utf8_lossy(output.output.as_slice()));
+			println!("stderr: {}", String::from_utf8_lossy(output.error.as_slice()));
+		}
+			Err(e) => {
+				panic!("{}", e);
+			}
+		}
 }
 
 fn parse_arguments(args: &[String]) -> Vec<Arg> {
