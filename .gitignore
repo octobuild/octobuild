@@ -7,6 +7,7 @@
 *.so
 *.rlib
 *.dll
+*.pch
 
 # Executables
 *.exe
