@@ -3,6 +3,7 @@ extern crate octobuild;
 extern crate log;
 
 use octobuild::wincmd;
+use std::ascii::AsciiExt;
 
 use std::os;
 use std::slice::{Iter};
@@ -46,17 +47,18 @@ Input{kind:InputKind, flag: String, file: String},
 Output{kind:OutputKind, flag: String, file: String}
 }
 
+#[derive(Show)]
 struct CompilationTask {
 // Parsed arguments.
 args: Vec<Arg>,
 // Source language.
 language: String,
 // Input source file name.
-source: String,
+source: Path,
 // Input precompiled header file name.
-precompiled: String,
+precompiled: Option<Path>,
 // Output object file name.
-output: String,
+output: Path,
 }
 
 fn main() {
@@ -73,6 +75,7 @@ fn main() {
 		}
 			Err(e) => {println!("{}", e);}
 		}
+	println!("Parsed task: {:?}", parse_compilation_task(&os::args()[1..]));
 
 	match Command::new("cl.exe")
 	.args(os::args()[1..].as_slice())
@@ -85,6 +88,116 @@ fn main() {
 			panic!("{}", e);
 		}
 		}
+}
+
+fn parse_compilation_task(args: &[String]) -> Result<CompilationTask, String> {
+	match parse_arguments(args) {
+			Ok(parsed_args) => {
+			// Source file name.
+			let source;
+			match filter(&parsed_args, |arg:&Arg|->Option<Path>{
+				match *arg {
+						Arg::Input{ref kind, ref file, ..} if *kind == InputKind::Source => {Some(Path::new(file))}
+						_ => {None}
+					}
+			}).as_slice() {
+					[] => {
+					return Err(format!("Can't find source file path."));
+				}
+					[ref v] => {
+						source = v.clone();
+				}
+					v => {
+					return Err(format!("Found too many source files: {:?}", v));
+				}
+				};
+			// Precompiled header file name.
+			let precompiled;
+			match filter(&parsed_args, |arg:&Arg|->Option<Path>{
+				match *arg {
+						Arg::Input{ref kind, ref file, ..} if *kind == InputKind::Precompiled => {Some(Path::new(file))}
+						_ => {None}
+					}
+			}).as_slice() {
+					[] => {
+					precompiled=None;
+				}
+					[ref v] => {
+						precompiled=Some(v.clone());
+				}
+					v => {
+					return Err(format!("Found too many precompiled header files: {:?}", v));
+				}
+				};
+			// Output object file name.
+			let output;
+			match filter(&parsed_args, |arg:&Arg|->Option<Path>{
+				match *arg {
+						Arg::Output{ref kind, ref file, ..} if *kind == OutputKind::Object => {Some(Path::new(file))}
+						_ => {None}
+					}
+			}).as_slice() {
+					[] => {
+						output = source.with_extension("obj");
+				}
+					[ref v] => {
+						output = v.clone();
+				}
+					v => {
+					return Err(format!("Found too many output object files: {:?}", v));
+				}
+				};
+			// Language
+			let language: String;
+			match filter(&parsed_args, |arg:&Arg|->Option<String>{
+				match arg {
+						&Arg::Param{ref flag, ref value, ..} if *flag == "T" => {Some(value.clone())}
+						_ => {None}
+					}
+			}).as_slice() {
+					[]  => {
+					match source.extension_str() {
+							Some(e) if e.eq_ignore_ascii_case("cpp") => {language = "P".to_string();}
+							Some(e) if e.eq_ignore_ascii_case("c") => {language = "C".to_string();}
+							_ => {
+							return Err(format!("Can't detect file language by extension: {:?}", source));
+						}
+						}
+				}
+					[ref v] => {
+					match v.as_slice() {
+							"P" | "C" => {language = v.clone();}
+							_ => {return Err(format!("Unknown source language type: {}", v));}
+						}
+				}
+					v => {
+					return Err(format!("Found too many output object files: {:?}", v));
+				}
+				};
+
+				Ok(CompilationTask{
+			args: parsed_args,
+			language: language,
+			source: source,
+			precompiled:precompiled,
+			output:output,
+			})
+		}
+			Err(e) => {Err(e)}
+		}
+}
+
+fn filter<T, R, F:Fn(&T) -> Option<R>>(args: &Vec<T>, filter:F) -> Vec<R> {
+	let mut result: Vec<R> = Vec::new();
+	for arg in args.iter() {
+		match filter(arg) {
+				Some(v) => {
+					result.push(v);
+			}
+				None => {}
+			}
+	}
+	result
 }
 
 fn parse_arguments(args: &[String]) -> Result<Vec<Arg>, String> {
