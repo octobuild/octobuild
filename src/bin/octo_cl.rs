@@ -215,7 +215,7 @@ fn has_param_prefix(arg: &String) -> bool {
 #[test]
 fn test_parse_argument() {
 	assert_eq!(
-	parse_arguments(&wincmd::parse("/c /Yusample.h /Fpsample.h.pch /Fosample.cpp.o /DTEST /D TEST2 sample.cpp")[]),
+	parse_arguments(&wincmd::parse("/c /Yusample.h /Fpsample.h.pch /Fosample.cpp.o /DTEST /D TEST2 sample.cpp")[]).unwrap(),
 	[
 	Arg::Flag { scope: Scope::Ignore, flag: "c".to_string()},
 	Arg::Input { kind: InputKind::Marker, flag: "Yu".to_string(), file: "sample.h".to_string()},
