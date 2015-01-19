@@ -36,6 +36,7 @@ Precompiled,
 #[derive(PartialEq)]
 enum OutputKind {
 Object,
+Precompiled,
 }
 
 #[derive(Show)]
@@ -54,27 +55,16 @@ args: Vec<Arg>,
 // Source language.
 language: String,
 // Input source file name.
-source: Path,
+inputSource: Path,
 // Input precompiled header file name.
-precompiled: Option<Path>,
+inputPrecompiled: Option<Path>,
 // Output object file name.
-output: Path,
+outputObject: Path,
+// Output precompiled header file name.
+outputPrecompiled: Option<Path>,
 }
 
 fn main() {
-	println!("Arguments (raw):");
-	for arg in os::args()[1..].iter() {
-		println!("  {}", arg);
-	}
-	println!("Arguments (parsed):");
-	match parse_arguments(&os::args()[1..]) {
-			Ok(parsed_args) => {
-			for arg in parsed_args.iter(){
-				println!("  {:?}", arg);
-			}
-		}
-			Err(e) => {println!("{}", e);}
-		}
 	println!("Parsed task: {:?}", parse_compilation_task(&os::args()[1..]));
 
 	match Command::new("cl.exe")
@@ -94,7 +84,7 @@ fn parse_compilation_task(args: &[String]) -> Result<CompilationTask, String> {
 	match parse_arguments(args) {
 			Ok(parsed_args) => {
 			// Source file name.
-			let source;
+			let inputSource;
 			match filter(&parsed_args, |arg:&Arg|->Option<Path>{
 				match *arg {
 						Arg::Input{ref kind, ref file, ..} if *kind == InputKind::Source => {Some(Path::new(file))}
@@ -105,14 +95,14 @@ fn parse_compilation_task(args: &[String]) -> Result<CompilationTask, String> {
 					return Err(format!("Can't find source file path."));
 				}
 					[ref v] => {
-						source = v.clone();
+							inputSource = v.clone();
 				}
 					v => {
 					return Err(format!("Found too many source files: {:?}", v));
 				}
 				};
 			// Precompiled header file name.
-			let precompiled;
+			let inputPrecompiled;
 			match filter(&parsed_args, |arg:&Arg|->Option<Path>{
 				match *arg {
 						Arg::Input{ref kind, ref file, ..} if *kind == InputKind::Precompiled => {Some(Path::new(file))}
@@ -120,17 +110,35 @@ fn parse_compilation_task(args: &[String]) -> Result<CompilationTask, String> {
 					}
 			}).as_slice() {
 					[] => {
-					precompiled=None;
+					inputPrecompiled=None;
 				}
 					[ref v] => {
-						precompiled=Some(v.clone());
+					inputPrecompiled=Some(v.clone());
 				}
 					v => {
 					return Err(format!("Found too many precompiled header files: {:?}", v));
 				}
 				};
+			// Precompiled header file name.
+			let outputPrecompiled;
+			match filter(&parsed_args, |arg:&Arg|->Option<Path>{
+				match *arg {
+						Arg::Output{ref kind, ref file, ..} if *kind == OutputKind::Precompiled => {Some(Path::new(file))}
+						_ => {None}
+					}
+			}).as_slice() {
+					[] => {
+					outputPrecompiled=None;
+				}
+					[ref v] => {
+					outputPrecompiled=Some(v.clone());
+				}
+					v => {
+					return Err(format!("Found too many precompiled header output files: {:?}", v));
+				}
+				};
 			// Output object file name.
-			let output;
+			let outputObject;
 			match filter(&parsed_args, |arg:&Arg|->Option<Path>{
 				match *arg {
 						Arg::Output{ref kind, ref file, ..} if *kind == OutputKind::Object => {Some(Path::new(file))}
@@ -138,10 +146,10 @@ fn parse_compilation_task(args: &[String]) -> Result<CompilationTask, String> {
 					}
 			}).as_slice() {
 					[] => {
-						output = source.with_extension("obj");
+						outputObject = inputSource.with_extension("obj");
 				}
 					[ref v] => {
-						output = v.clone();
+						outputObject = v.clone();
 				}
 					v => {
 					return Err(format!("Found too many output object files: {:?}", v));
@@ -156,11 +164,11 @@ fn parse_compilation_task(args: &[String]) -> Result<CompilationTask, String> {
 					}
 			}).as_slice() {
 					[]  => {
-					match source.extension_str() {
+					match inputSource.extension_str() {
 							Some(e) if e.eq_ignore_ascii_case("cpp") => {language = "P".to_string();}
 							Some(e) if e.eq_ignore_ascii_case("c") => {language = "C".to_string();}
 							_ => {
-							return Err(format!("Can't detect file language by extension: {:?}", source));
+							return Err(format!("Can't detect file language by extension: {:?}", inputSource));
 						}
 						}
 				}
@@ -178,9 +186,10 @@ fn parse_compilation_task(args: &[String]) -> Result<CompilationTask, String> {
 				Ok(CompilationTask{
 			args: parsed_args,
 			language: language,
-			source: source,
-			precompiled:precompiled,
-			output:output,
+			inputSource: inputSource,
+			inputPrecompiled: inputPrecompiled,
+			outputObject: outputObject,
+			outputPrecompiled: outputPrecompiled,
 			})
 		}
 			Err(e) => {Err(e)}
@@ -287,6 +296,9 @@ fn parse_argument(iter: &mut  Iter<String>) -> Option<Result<Arg, String>> {
 									}
 										s if s.starts_with("Fp") => {
 											Ok(Arg::Input{kind:InputKind::Precompiled, flag:"Fp".to_string(), file:s[2..].to_string()})
+									}
+										s if s.starts_with("Yc") => {
+											Ok(Arg::Output{kind:OutputKind::Precompiled, flag:"Yc".to_string(), file:s[2..].to_string()})
 									}
 										s if s.starts_with("Yu") => {
 											Ok(Arg::Input{kind:InputKind::Marker, flag:"Yu".to_string(), file:s[2..].to_string()})
