@@ -1,4 +1,8 @@
 #![allow(unstable)]
+#![feature(plugin)]
+#[plugin]
+extern crate peg_syntax_ext;
+
 extern crate octobuild;
 extern crate log;
 
@@ -9,6 +13,8 @@ use std::os;
 use std::slice::{Iter};
 
 use std::io::{Command, File, BufferedReader};
+
+use preprocessed::expression;
 
 // Scope of command line argument.
 #[derive(Show)]
@@ -203,7 +209,7 @@ fn parse_compilation_task(args: &[String]) -> Result<CompilationTask, String> {
 					[ref v] => {
 					match v.as_slice() {
 							"P" | "C" => {language = v.clone();}
-							_ => {return Err(format!("Unknown source language type: {}", v));}
+							_ => { return Err(format!("Unknown source language type: {}", v));}
 						}
 				}
 					v => {
@@ -245,14 +251,8 @@ fn preprocess(task: &CompilationTask) {
 			}
 	});
 	args.push("/T".to_string() + task.language.as_slice());
-	match &task.inputPrecompiled {
-			&Some(ref path) => {args.push("/Fp".to_string() + path.display().to_string().as_slice());}
-			&None => {}
-		}
+	args.push("/E".to_string());
 	args.push(task.inputSource.display().to_string());
-
-	args.push("/P".to_string());
-	args.push("/Fi".to_string() + task.inputSource.display().to_string().as_slice() + ".i");
 
 	println!("Preprocess");
 	println!(" - args: {:?}", args);
@@ -260,13 +260,24 @@ fn preprocess(task: &CompilationTask) {
 	.args(args.as_slice())
 	.output(){
 			Ok(output) => {
-			println!("stdout: {}", String::from_utf8_lossy(output.output.as_slice()));
+			println!("stdout: {}", String::from_utf8_lossy(match task.markerPrecompiled {
+			Some(ref marker) => {filter_precompiled(output.output.as_slice(), marker.as_slice())}
+			None => {output.output}
+			}.as_slice()));
 			println!("stderr: {}", String::from_utf8_lossy(output.error.as_slice()));
 		}
 			Err(e) => {
 			panic!("{}", e);
 		}
 		}
+}
+
+fn filter_precompiled(input: &[u8], marker: &str) -> Vec<u8> {
+	let mut result: Vec<u8> = Vec::new();
+	for c in input.iter() {
+			result.push(c.clone());
+	}
+	return result;
 }
 
 fn compile(task: &CompilationTask) {
@@ -288,25 +299,21 @@ fn compile(task: &CompilationTask) {
 				&Arg::Output{..} => {None}
 			}
 	});
-		args.push("/T".to_string() + task.language.as_slice());
+	args.push("/T".to_string() + task.language.as_slice());
 	match &task.inputPrecompiled {
 			&Some(ref path) => {args.push("/Fp".to_string() + path.display().to_string().as_slice());}
 			&None => {}
 		}
-		args.push(task.inputSource.display().to_string() + ".i");
+	args.push(task.inputSource.display().to_string() + ".i");
 
-		args.push("/c".to_string());
-		args.push("/Fo".to_string() + task.outputObject.display().to_string().as_slice());
+	args.push("/c".to_string());
+	args.push("/Fo".to_string() + task.outputObject.display().to_string().as_slice());
 	match &task.inputPrecompiled {
 			&Some(ref path) => {args.push("/Fp".to_string() + path.display().to_string().as_slice());}
 			&None => {}
 		}
 	match &task.outputPrecompiled {
 			&Some(ref path) => {args.push("/Yc".to_string() + path.display().to_string().as_slice());}
-			&None => {}
-		}
-	match &task.markerPrecompiled {
-			&Some(ref marker) => {args.push("/Yu".to_string() + marker.as_slice());}
 			&None => {}
 		}
 
@@ -496,3 +503,39 @@ fn test_compile_no_header()   {
 fn test_compile_with_header() {
 		wincmd::parse("/c /Yusample.h /Fpsample.h.pch /Fosample.cpp.o sample.cpp");
 }
+
+#[test]
+fn test_expression() {
+	assert_eq!(expression("1+1"), Ok(2));
+	assert_eq!(expression("5*5"), Ok(25));
+	assert_eq!(expression("222+3333"), Ok(3555));
+	assert_eq!(expression("2+3*4"), Ok(14));
+	assert_eq!(expression("(2+2)*3"), Ok(12));
+	assert!(expression("(22+)+1").is_err());
+	assert!(expression("1++1").is_err());
+	assert!(expression("3)+1").is_err());
+}
+
+#[test]
+fn test_filter_precompiled() {
+	assert_eq!(String::from_utf8_lossy(filter_precompiled(
+	r#"#line 1 "sample.cpp"
+	#line 1 "e:\\work\\octobuild\\test_cl\\sample.h"
+	#pragma once
+	#line 2 "sample.cpp"
+
+	int main(int argc, char **argv) {
+		return 0;
+	}
+	"#.as_bytes(), "sample.h").as_slice()), r#"#line 1 "sample.cpp"
+#line 1 "e:\\work\\octobuild\\test_cl\\sample.h"
+#pragma hdrstop
+#line 2 "sample.cpp"
+
+int main(int argc, char **argv) {
+	return 0;
+}
+"#);
+}
+
+peg_file! preprocessed("preprocessed.rustpeg");
