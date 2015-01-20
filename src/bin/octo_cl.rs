@@ -77,7 +77,7 @@ fn main() {
 			_ => {}
 		}
 
-	match Command::new("cl.exe")
+	/*match Command::new("cl.exe")
 	.args(os::args()[1..].as_slice())
 	.output(){
 			Ok(output) => {
@@ -87,7 +87,7 @@ fn main() {
 			Err(e) => {
 			panic!("{}", e);
 		}
-		}
+		}*/
 }
 
 fn parse_compilation_task(args: &[String]) -> Result<CompilationTask, String> {
@@ -244,21 +244,29 @@ fn preprocess(task: &CompilationTask) {
 				&Arg::Output{..} => {None}
 			}
 	});
-		args.push("/T".to_string() + task.language.as_slice());
+	args.push("/T".to_string() + task.language.as_slice());
 	match &task.inputPrecompiled {
 			&Some(ref path) => {args.push("/Fp".to_string() + path.display().to_string().as_slice());}
 			&None => {}
 		}
-		args.push(task.inputSource.display().to_string());
+	args.push(task.inputSource.display().to_string());
 
-		args.push("/P".to_string());
-		args.push("/Fi".to_string() + task.inputSource.display().to_string().as_slice() + ".i");
+	args.push("/P".to_string());
+	args.push("/Fi".to_string() + task.inputSource.display().to_string().as_slice() + ".i");
 
 	println!("Preprocess");
 	println!(" - args: {:?}", args);
-				Command::new("cl.exe")
-			.args(args.as_slice())
-		.output();
+	match Command::new("cl.exe")
+	.args(args.as_slice())
+	.output(){
+			Ok(output) => {
+			println!("stdout: {}", String::from_utf8_lossy(output.output.as_slice()));
+			println!("stderr: {}", String::from_utf8_lossy(output.error.as_slice()));
+		}
+			Err(e) => {
+			panic!("{}", e);
+		}
+		}
 }
 
 fn compile(task: &CompilationTask) {
@@ -287,7 +295,7 @@ fn compile(task: &CompilationTask) {
 		}
 		args.push(task.inputSource.display().to_string() + ".i");
 
-		args.push("/P".to_string());
+		args.push("/c".to_string());
 		args.push("/Fo".to_string() + task.outputObject.display().to_string().as_slice());
 	match &task.inputPrecompiled {
 			&Some(ref path) => {args.push("/Fp".to_string() + path.display().to_string().as_slice());}
@@ -302,11 +310,19 @@ fn compile(task: &CompilationTask) {
 			&None => {}
 		}
 
-	println!("Preprocess");
+	println!("Compile");
 	println!(" - args: {:?}", args);
-				Command::new("cl.exe")
-			.args(args.as_slice())
-		.output();
+	match Command::new("cl.exe")
+	.args(args.as_slice())
+	.output(){
+			Ok(output) => {
+			println!("stdout: {}", String::from_utf8_lossy(output.output.as_slice()));
+			println!("stderr: {}", String::from_utf8_lossy(output.error.as_slice()));
+		}
+			Err(e) => {
+			panic!("{}", e);
+		}
+		}
 }
 
 fn filter<T, R, F:Fn(&T) -> Option<R>>(args: &Vec<T>, filter:F) -> Vec<R> {
