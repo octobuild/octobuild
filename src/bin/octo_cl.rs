@@ -62,6 +62,8 @@ inputPrecompiled: Option<Path>,
 outputObject: Path,
 // Output precompiled header file name.
 outputPrecompiled: Option<Path>,
+// Marker for precompiled header.
+markerPrecompiled: Option<String>,
 }
 
 fn main() {
@@ -70,6 +72,7 @@ fn main() {
 	match result {
 			Ok(task) => {
 				preprocess(&task);
+				compile(&task);
 		}
 			_ => {}
 		}
@@ -124,6 +127,24 @@ fn parse_compilation_task(args: &[String]) -> Result<CompilationTask, String> {
 				}
 					v => {
 					return Err(format!("Found too many precompiled header files: {:?}", v));
+				}
+				};
+			// Precompiled header marker name.
+			let markerPrecompiled;
+			match filter(&parsed_args, |arg:&Arg|->Option<String>{
+				match *arg {
+						Arg::Input{ref kind, ref file, ..} if *kind == InputKind::Marker => {Some(file.clone())}
+						_ => {None}
+					}
+			}).as_slice() {
+					[] => {
+					markerPrecompiled=None;
+				}
+					[ref v] => {
+						markerPrecompiled=Some(v.clone());
+				}
+					v => {
+					return Err(format!("Found too many precompiled header markers: {:?}", v));
 				}
 				};
 			// Precompiled header file name.
@@ -197,6 +218,7 @@ fn parse_compilation_task(args: &[String]) -> Result<CompilationTask, String> {
 			inputPrecompiled: inputPrecompiled,
 			outputObject: outputObject,
 			outputPrecompiled: outputPrecompiled,
+			markerPrecompiled: markerPrecompiled,
 			})
 		}
 			Err(e) => {Err(e)}
@@ -222,21 +244,69 @@ fn preprocess(task: &CompilationTask) {
 				&Arg::Output{..} => {None}
 			}
 	});
-	args.push("/T".to_string() + task.language.as_slice());
+		args.push("/T".to_string() + task.language.as_slice());
 	match &task.inputPrecompiled {
 			&Some(ref path) => {args.push("/Fp".to_string() + path.display().to_string().as_slice());}
 			&None => {}
 		}
-	args.push(task.inputSource.display().to_string());
+		args.push(task.inputSource.display().to_string());
 
-	args.push("/P".to_string());
-	args.push("/Fi".to_string() + task.inputSource.display().to_string().as_slice() + ".i");
+		args.push("/P".to_string());
+		args.push("/Fi".to_string() + task.inputSource.display().to_string().as_slice() + ".i");
 
 	println!("Preprocess");
 	println!(" - args: {:?}", args);
-	Command::new("cl.exe")
-	.args(args.as_slice())
-	.output();
+				Command::new("cl.exe")
+			.args(args.as_slice())
+		.output();
+}
+
+fn compile(task: &CompilationTask) {
+	let mut args = filter(&task.args, |arg:&Arg|->Option<String> {
+		match arg {
+				&Arg::Flag{ref scope, ref flag} => {
+				match scope {
+						&Scope::Preprocessor | &Scope::Compiler | &Scope::Shared => {Some("/".to_string() + flag.as_slice())}
+						&Scope::Ignore => {None}
+					}
+			}
+				&Arg::Param{ref scope, ref  flag, ref value} => {
+				match scope {
+						&Scope::Preprocessor | &Scope::Compiler | &Scope::Shared => {Some("/".to_string() + flag.as_slice() + value.as_slice())}
+						&Scope::Ignore => {None}
+					}
+			}
+				&Arg::Input{..} => {None}
+				&Arg::Output{..} => {None}
+			}
+	});
+		args.push("/T".to_string() + task.language.as_slice());
+	match &task.inputPrecompiled {
+			&Some(ref path) => {args.push("/Fp".to_string() + path.display().to_string().as_slice());}
+			&None => {}
+		}
+		args.push(task.inputSource.display().to_string() + ".i");
+
+		args.push("/P".to_string());
+		args.push("/Fo".to_string() + task.outputObject.display().to_string().as_slice());
+	match &task.inputPrecompiled {
+			&Some(ref path) => {args.push("/Fp".to_string() + path.display().to_string().as_slice());}
+			&None => {}
+		}
+	match &task.outputPrecompiled {
+			&Some(ref path) => {args.push("/Yc".to_string() + path.display().to_string().as_slice());}
+			&None => {}
+		}
+	match &task.markerPrecompiled {
+			&Some(ref marker) => {args.push("/Yu".to_string() + marker.as_slice());}
+			&None => {}
+		}
+
+	println!("Preprocess");
+	println!(" - args: {:?}", args);
+				Command::new("cl.exe")
+			.args(args.as_slice())
+		.output();
 }
 
 fn filter<T, R, F:Fn(&T) -> Option<R>>(args: &Vec<T>, filter:F) -> Vec<R> {

@@ -3,6 +3,7 @@ all: sample.cpp.o sample.obj
 clean:
 	del *.h.pch
 	del *.cpp.o
+	del *.obj
 
 sample.h.pch: sample.h
 	octo_cl /c /DTEST /Ycsample.h /Fpsample.h.pch /Foprecompiled.cpp.o precompiled.cpp
