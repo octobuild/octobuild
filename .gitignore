@@ -4,6 +4,7 @@
 
 # Compiled files
 *.o
+*.obj
 *.so
 *.rlib
 *.dll
