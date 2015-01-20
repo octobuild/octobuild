@@ -35,7 +35,7 @@ pub fn parse(cmd: &str) -> Vec<String> {
 				data = true;
 			}
 			_ => {
-				arg = add_slashes(arg, if quote && ((slash & 2) == 0) {slash / 2} else {slash});
+				arg = add_slashes(arg, if quote && ((slash % 2) == 0) {slash / 2} else {slash});
 				slash = 0;
 				arg.push(c);
 				data = true;
@@ -153,4 +153,9 @@ fn test_parse_6() {
 #[test]
 fn test_parse_7() {
 	assert_eq!(parse("C:\\Windows\\System32 d e"), ["C:\\Windows\\System32", "d", "e"]);
+}
+
+#[test]
+fn test_parse_8() {
+	assert_eq!(parse("/TEST\"C:\\Windows\\System32\" d e"), ["/TESTC:\\Windows\\System32", "d", "e"]);
 }
