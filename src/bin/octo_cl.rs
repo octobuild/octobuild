@@ -1,8 +1,4 @@
 #![allow(unstable)]
-#![feature(plugin)]
-#[plugin]
-extern crate peg_syntax_ext;
-
 extern crate octobuild;
 extern crate log;
 
@@ -13,8 +9,6 @@ use std::os;
 use std::slice::{Iter};
 
 use std::io::{Command, File, BufferedReader};
-
-use preprocessed::expression;
 
 // Scope of command line argument.
 #[derive(Show)]
@@ -261,7 +255,7 @@ fn preprocess(task: &CompilationTask) {
 	.output(){
 			Ok(output) => {
 			println!("stdout: {}", String::from_utf8_lossy(match task.markerPrecompiled {
-			Some(ref marker) => {filter_precompiled(output.output.as_slice(), marker.as_slice())}
+			Some(ref marker) => {filter_precompiled(output.output.as_slice(), marker.as_slice(), task.outputPrecompiled.is_some())}
 			None => {output.output}
 			}.as_slice()));
 			println!("stderr: {}", String::from_utf8_lossy(output.error.as_slice()));
@@ -272,12 +266,103 @@ fn preprocess(task: &CompilationTask) {
 		}
 }
 
-fn filter_precompiled(input: &[u8], marker: &str) -> Vec<u8> {
+const TAB: u8 = '\t' as u8;
+const LN: u8 = '\n' as u8;
+const LR: u8 = '\r' as u8;
+const SPACE: u8 = ' ' as u8;
+const SHARP: u8 = '#' as u8;
+
+fn filter_precompiled(input: &[u8], marker: &str, keep_headers: bool) -> Vec<u8> {
 	let mut result: Vec<u8> = Vec::new();
-	for c in input.iter() {
-			result.push(c.clone());
+	let mut lineBegin = true;
+	let mut skipHeader: bool = !keep_headers;
+	let mut iter: Iter<u8> = input.iter();
+	loop {
+		match iter.next() {
+				Some(c) => {
+				if (!skipHeader) {
+						result.push(c.clone());
+				}
+				match *c {
+						LN | LR => {lineBegin = true;}
+						TAB | SPACE => {}
+						SHARP => {
+						let directive = read_directive(&mut iter);
+						println! ("Directive: {:?}", directive);
+						match directive {
+								Directive::Unknown(v) => {if (!skipHeader) {result.push_all(v.as_slice());}}
+							}
+						lineBegin = false;
+					}
+						_ => {lineBegin = false;}
+					}
+			}
+				None => {
+				break;
+			}
+			}
 	}
 	return result;
+}
+
+#[derive(Show)]
+enum Directive {
+Unknown(Vec<u8>)
+}
+
+
+fn read_directive(iter: &mut Iter<u8>) -> Directive {
+	let mut unknown: Vec<u8> = Vec::new();
+	match skip_spaces(iter, &mut unknown) {
+			Some(c) => {
+			let (next, token) = read_token(&c, iter, &mut unknown);
+			println!("XXX: {:?}", token);
+		}
+			None => {
+		}
+		}
+	Directive::Unknown(unknown)
+}
+
+fn skip_spaces(iter: &mut Iter<u8>, unknown: &mut Vec<u8>) -> Option<u8> {
+	loop {
+		match iter.next() {
+				Some(c) => {
+					unknown.push(*c);
+					match c {
+							&LN | &LR => {return None;}
+							&TAB | &SPACE => {}
+							_ => {return Some(*c);}
+						}
+			}
+				None => {
+				return None;
+			}
+			}
+	}
+}
+
+fn read_token(first: &u8, iter: &mut Iter<u8>, unknown: &mut Vec<u8>) -> (Option<u8>, Vec<u8>) {
+	let mut token: Vec<u8> = Vec::new();
+	token.push(*first);
+	loop {
+		match iter.next() {
+				Some(c) => {
+					unknown.push(*c);
+					if ((*c >= ('a' as u8)) && (*c <= ('z' as u8))) ||
+					((*c >= ('A' as u8)) && (*c <= ('Z' as u8))) ||
+					((*c >= ('0' as u8)) && (*c <= ('9' as u8))) {
+							token.push(*c);
+					} else {
+						return (Some(*c), token);
+					}
+			}
+				None => {
+				return (None, token);
+			}
+			}
+
+	}
 }
 
 fn compile(task: &CompilationTask) {
@@ -505,29 +590,19 @@ fn test_compile_with_header() {
 }
 
 #[test]
-fn test_expression() {
-	assert_eq!(expression("1+1"), Ok(2));
-	assert_eq!(expression("5*5"), Ok(25));
-	assert_eq!(expression("222+3333"), Ok(3555));
-	assert_eq!(expression("2+3*4"), Ok(14));
-	assert_eq!(expression("(2+2)*3"), Ok(12));
-	assert!(expression("(22+)+1").is_err());
-	assert!(expression("1++1").is_err());
-	assert!(expression("3)+1").is_err());
+fn test_filter_precompiled_keep() {
+	let filtered = filter_precompiled(r#"#line 1 "sample.cpp"
+#line 1 "e:\\work\\octobuild\\test_cl\\sample.h"
+# pragma once
+#line 2 "sample.cpp"
+
+int main(int argc, char **argv) {
+	return 0;
 }
-
-#[test]
-fn test_filter_precompiled() {
-	assert_eq!(String::from_utf8_lossy(filter_precompiled(
-	r#"#line 1 "sample.cpp"
-	#line 1 "e:\\work\\octobuild\\test_cl\\sample.h"
-	#pragma once
-	#line 2 "sample.cpp"
-
-	int main(int argc, char **argv) {
-		return 0;
-	}
-	"#.as_bytes(), "sample.h").as_slice()), r#"#line 1 "sample.cpp"
+"#.as_bytes(), "sample.h", true);
+	let result = String::from_utf8_lossy(filtered.as_slice());
+	println!("{}", result);
+	assert_eq!(result.as_slice(), r#"#line 1 "sample.cpp"
 #line 1 "e:\\work\\octobuild\\test_cl\\sample.h"
 #pragma hdrstop
 #line 2 "sample.cpp"
@@ -538,4 +613,48 @@ int main(int argc, char **argv) {
 "#);
 }
 
-peg_file! preprocessed("preprocessed.rustpeg");
+#[test]
+fn test_filter_precompiled_remove() {
+	let filtered = filter_precompiled(r#"#line 1 "sample.cpp"
+#line 1 "e:\\work\\octobuild\\test_cl\\sample.h"
+# pragma once
+#line 2 "sample.cpp"
+
+int main(int argc, char **argv) {
+	return 0;
+}
+"#.as_bytes(), "sample.h", false);
+	let result = String::from_utf8_lossy(filtered.as_slice());
+	println!("{}", result);
+	assert_eq!(result.as_slice(), r#"#pragma hdrstop
+#line 2 "sample.cpp"
+
+int main(int argc, char **argv) {
+	return 0;
+}
+"#);
+}
+
+#[test]
+fn test_filter_precompiled_hdrstop() {
+	let filtered = filter_precompiled(r#"#line 1 "sample.cpp"
+#line 1 "e:\\work\\octobuild\\test_cl\\sample.h"
+# pragma  hdrstop
+# pragma once
+#line 2 "sample.cpp"
+
+int main(int argc, char **argv) {
+	return 0;
+}
+"#.as_bytes(), "sample.h", false);
+	let result = String::from_utf8_lossy(filtered.as_slice());
+	println!("{}", result);
+	assert_eq!(result.as_slice(), r#"# pragma  hdrstop
+# pragma once
+#line 2 "sample.cpp"
+
+int main(int argc, char **argv) {
+	return 0;
+}
+"#);
+}
