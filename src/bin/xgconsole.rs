@@ -206,7 +206,7 @@ fn execute_graph(graph: &Graph<BuildTask, ()>, tx_task: Sender<TaskMessage>, rx_
 		}
 	}
 	// No more tasks.
-		free(tx_task);
+	free(tx_task);
 	// Cleanup task list.
 	match rx_task.lock() {
 			queue => {

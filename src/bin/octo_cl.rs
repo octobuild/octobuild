@@ -56,15 +56,15 @@ args: Vec<Arg>,
 // Source language.
 language: String,
 // Input source file name.
-inputSource: Path,
+input_source: Path,
 // Input precompiled header file name.
-inputPrecompiled: Option<Path>,
+input_precompiled: Option<Path>,
 // Output object file name.
-outputObject: Path,
+output_object: Path,
 // Output precompiled header file name.
-outputPrecompiled: Option<Path>,
+output_precompiled: Option<Path>,
 // Marker for precompiled header.
-markerPrecompiled: Option<String>,
+marker_precompiled: Option<String>,
 }
 
 fn main() {
@@ -95,7 +95,7 @@ fn parse_compilation_task(args: &[String]) -> Result<CompilationTask, String> {
 	match parse_arguments(args) {
 			Ok(parsed_args) => {
 			// Source file name.
-			let inputSource;
+			let input_source;
 			match filter(&parsed_args, |arg:&Arg|->Option<Path>{
 				match *arg {
 						Arg::Input{ref kind, ref file, ..} if *kind == InputKind::Source => {Some(Path::new(file))}
@@ -106,14 +106,14 @@ fn parse_compilation_task(args: &[String]) -> Result<CompilationTask, String> {
 					return Err(format!("Can't find source file path."));
 				}
 					[ref v] => {
-						inputSource = v.clone();
+						input_source = v.clone();
 				}
 					v => {
 					return Err(format!("Found too many source files: {:?}", v));
 				}
 				};
 			// Precompiled header file name.
-			let inputPrecompiled;
+			let input_precompiled;
 			match filter(&parsed_args, |arg:&Arg|->Option<Path>{
 				match *arg {
 						Arg::Input{ref kind, ref file, ..} if *kind == InputKind::Precompiled => {Some(Path::new(file))}
@@ -121,17 +121,17 @@ fn parse_compilation_task(args: &[String]) -> Result<CompilationTask, String> {
 					}
 			}).as_slice() {
 					[] => {
-					inputPrecompiled=None;
+					input_precompiled=None;
 				}
 					[ref v] => {
-						inputPrecompiled=Some(v.clone());
+						input_precompiled=Some(v.clone());
 				}
 					v => {
 					return Err(format!("Found too many precompiled header files: {:?}", v));
 				}
 				};
 			// Precompiled header marker name.
-			let markerPrecompiled;
+			let marker_precompiled;
 			match filter(&parsed_args, |arg:&Arg|->Option<String>{
 				match *arg {
 						Arg::Input{ref kind, ref file, ..} if *kind == InputKind::Marker => {Some(file.clone())}
@@ -139,17 +139,17 @@ fn parse_compilation_task(args: &[String]) -> Result<CompilationTask, String> {
 					}
 			}).as_slice() {
 					[] => {
-					markerPrecompiled=None;
+					marker_precompiled=None;
 				}
 					[ref v] => {
-						markerPrecompiled=Some(v.clone());
+						marker_precompiled=Some(v.clone());
 				}
 					v => {
 					return Err(format!("Found too many precompiled header markers: {:?}", v));
 				}
 				};
 			// Precompiled header file name.
-			let outputPrecompiled;
+			let output_precompiled;
 			match filter(&parsed_args, |arg:&Arg|->Option<Path>{
 				match *arg {
 						Arg::Output{ref kind, ref file, ..} if *kind == OutputKind::Precompiled => {Some(Path::new(file))}
@@ -157,17 +157,17 @@ fn parse_compilation_task(args: &[String]) -> Result<CompilationTask, String> {
 					}
 			}).as_slice() {
 					[] => {
-					outputPrecompiled=None;
+					output_precompiled=None;
 				}
 					[ref v] => {
-						outputPrecompiled=Some(v.clone());
+						output_precompiled=Some(v.clone());
 				}
 					v => {
 					return Err(format!("Found too many precompiled header output files: {:?}", v));
 				}
 				};
 			// Output object file name.
-			let outputObject;
+			let output_object;
 			match filter(&parsed_args, |arg:&Arg|->Option<Path>{
 				match *arg {
 						Arg::Output{ref kind, ref file, ..} if *kind == OutputKind::Object => {Some(Path::new(file))}
@@ -175,10 +175,10 @@ fn parse_compilation_task(args: &[String]) -> Result<CompilationTask, String> {
 					}
 			}).as_slice() {
 					[] => {
-						outputObject = inputSource.with_extension("obj");
+						output_object = input_source.with_extension("obj");
 				}
 					[ref v] => {
-						outputObject = v.clone();
+						output_object = v.clone();
 				}
 					v => {
 					return Err(format!("Found too many output object files: {:?}", v));
@@ -193,11 +193,11 @@ fn parse_compilation_task(args: &[String]) -> Result<CompilationTask, String> {
 					}
 			}).as_slice() {
 					[]  => {
-					match inputSource.extension_str() {
+					match input_source.extension_str() {
 							Some(e) if e.eq_ignore_ascii_case("cpp") => {language = "P".to_string();}
 							Some(e) if e.eq_ignore_ascii_case("c") => {language = "C".to_string();}
 							_ => {
-							return Err(format!("Can't detect file language by extension: {:?}", inputSource));
+							return Err(format!("Can't detect file language by extension: {:?}", input_source));
 						}
 						}
 				}
@@ -215,11 +215,11 @@ fn parse_compilation_task(args: &[String]) -> Result<CompilationTask, String> {
 				Ok(CompilationTask{
 			args: parsed_args,
 			language: language,
-			inputSource: inputSource,
-			inputPrecompiled: inputPrecompiled,
-			outputObject: outputObject,
-			outputPrecompiled: outputPrecompiled,
-			markerPrecompiled: markerPrecompiled,
+			input_source: input_source,
+			input_precompiled: input_precompiled,
+			output_object: output_object,
+			output_precompiled: output_precompiled,
+			marker_precompiled: marker_precompiled,
 			})
 		}
 			Err(e) => {Err(e)}
@@ -247,7 +247,7 @@ fn preprocess(task: &CompilationTask) {
 	});
 	args.push("/T".to_string() + task.language.as_slice());
 	args.push("/E".to_string());
-	args.push(task.inputSource.display().to_string());
+	args.push(task.input_source.display().to_string());
 
 	println!("Preprocess");
 	println!(" - args: {:?}", args);
@@ -255,8 +255,8 @@ fn preprocess(task: &CompilationTask) {
 	.args(args.as_slice())
 	.output(){
 			Ok(output) => {
-			println!("stdout: {}", String::from_utf8_lossy(match task.inputPrecompiled {
-			Some(_) => {filter_precompiled(output.output.as_slice(), &task.markerPrecompiled, task.outputPrecompiled.is_some())}
+			println!("stdout: {}", String::from_utf8_lossy(match task.input_precompiled {
+			Some(_) => {filter_precompiled(output.output.as_slice(), &task.marker_precompiled, task.output_precompiled.is_some()).unwrap()}
 			None => {output.output}
 			}.as_slice()));
 			println!("stderr: {}", String::from_utf8_lossy(output.error.as_slice()));
@@ -273,46 +273,43 @@ const LR: u8 = '\r' as u8;
 const SPACE: u8 = ' ' as u8;
 const SHARP: u8 = '#' as u8;
 
-fn filter_precompiled(input: &[u8], marker: &Option<String>, keep_headers: bool) -> Vec<u8> {
+fn filter_precompiled(input: &[u8], marker: &Option<String>, keep_headers: bool) -> Result<Vec<u8>, String> {
 	let mut result: Vec<u8> = Vec::new();
-	let mut lineBegin = true;
-	let mut skipHeader: bool = !keep_headers;
+	let mut line_begin = true;
 	let mut iter: Iter<u8> = input.iter();
 	// Entry file.
-	let mut entryFile: Option<String> = None;
-	let mut headerFound: bool = false;
+	let mut entry_file: Option<String> = None;
+	let mut header_found: bool = false;
 	loop {
 		match iter.next() {
 				Some(c) => {
 				match *c {
 						LN | LR => {
 							result.push(*c);
-							lineBegin = true;
+							line_begin = true;
 					}
 						TAB | SPACE => {
-						if (!skipHeader) {
+						if keep_headers {
 								result.push(*c);
 						}
 					}
-						SHARP => {
+						SHARP if line_begin => {
 						let directive = read_directive(&mut iter);
 						match directive {
-								Directive::Line(raw, line, file) => {
+								Directive::Line(raw, _, file) => {
 
-								entryFile = match entryFile {
+								entry_file = match entry_file {
 										Some(path) => {
-										if headerFound && (path  == file) {
-											println! ("FOUND");
-											result.push_all("#pragma hdrstop\n".as_bytes());
-											result.push(*c);
-											result.push_all(raw.as_slice());
-											break;
+										if header_found && (path  == file) {
+												result.push_all("#pragma hdrstop\n".as_bytes());
+												result.push(*c);
+												result.push_all(raw.as_slice());
+												break;
 										}
 										match *marker {
 												Some(ref markerFile) => {
-												if (Path::new(file).ends_with_path(&Path::new(markerFile.as_slice()))) {
-													headerFound = true;
-													println! ("HEADER");
+												if Path::new(file).ends_with_path(&Path::new(markerFile.as_slice())) {
+													header_found = true;
 												}
 											}
 												None => {}
@@ -336,13 +333,13 @@ fn filter_precompiled(input: &[u8], marker: &Option<String>, keep_headers: bool)
 									result.push_all(raw.as_slice());
 							}
 							}
-						lineBegin = false;
 					}
 						_ => {
-						if (!skipHeader) {
+						if keep_headers {
 								result.push(*c);
 						}
-						lineBegin = false;}
+						line_begin = false;
+					}
 					}
 			}
 				None => {
@@ -360,7 +357,12 @@ fn filter_precompiled(input: &[u8], marker: &Option<String>, keep_headers: bool)
 			}
 			}
 	}
-	return result;
+	match marker {
+			&Some(ref path) if !header_found => {
+			return Err(format!("Can't find marker in preprocessed file: {}", path));
+		}
+			_ => {Ok(result)}
+		}
 }
 
 #[derive(Show)]
@@ -474,7 +476,7 @@ fn read_token(first: Option<u8>, iter: &mut Iter<u8>, unknown: &mut Vec<u8>) -> 
 				match iter.next() {
 						Some(c) if quote => {
 							unknown.push(*c);
-							if (escape) {
+							if escape {
 								if *c == ('n' as u8) {
 										token.push('\n' as u8);
 								} else if *c == ('r' as u8) {
@@ -485,9 +487,9 @@ fn read_token(first: Option<u8>, iter: &mut Iter<u8>, unknown: &mut Vec<u8>) -> 
 										token.push(*c);
 								}
 								escape = false;
-							} else if (*c == ('\\' as u8)) {
+							} else if *c == ('\\' as u8) {
 								escape = true;
-							} else if (*c == ('"' as u8)) {
+							} else if *c == ('"' as u8) {
 								return (match iter.next() {
 										Some(n) => {
 											unknown.push(*n);
@@ -542,19 +544,19 @@ fn compile(task: &CompilationTask) {
 			}
 	});
 	args.push("/T".to_string() + task.language.as_slice());
-	match &task.inputPrecompiled {
+	match &task.input_precompiled {
 			&Some(ref path) => {args.push("/Fp".to_string() + path.display().to_string().as_slice());}
 			&None => {}
 		}
-	args.push(task.inputSource.display().to_string() + ".i");
+	args.push(task.input_source.display().to_string() + ".i");
 
 	args.push("/c".to_string());
-	args.push("/Fo".to_string() + task.outputObject.display().to_string().as_slice());
-	match &task.inputPrecompiled {
+	args.push("/Fo".to_string() + task.output_object.display().to_string().as_slice());
+	match &task.input_precompiled {
 			&Some(ref path) => {args.push("/Fp".to_string() + path.display().to_string().as_slice());}
 			&None => {}
 		}
-	match &task.outputPrecompiled {
+	match &task.output_precompiled {
 			&Some(ref path) => {args.push("/Yc".to_string() + path.display().to_string().as_slice());}
 			&None => {}
 		}
@@ -594,7 +596,7 @@ fn parse_arguments(args: &[String]) -> Result<Vec<Arg>, String> {
 	loop {
 		match parse_argument(&mut iter) {
 				Some(parse_result) => {
-				match (parse_result) {
+				match parse_result {
 						Ok(arg) => {result.push(arg);}
 						Err(e) => {errors.push(e);}
 					}
@@ -758,8 +760,7 @@ int main(int argc, char **argv) {
 	return 0;
 }
 "#.as_bytes(), &Some("sample header.h".to_string()), true);
-	let result = String::from_utf8_lossy(filtered.as_slice());
-	assert_eq!(result.as_slice(), r#"#line 1 "sample.cpp"
+	assert_eq!(String::from_utf8_lossy(filtered.unwrap().as_slice()), r#"#line 1 "sample.cpp"
 #line 1 "e:\\work\\octobuild\\test_cl\\sample header.h"
 # pragma once
 void hello();
@@ -785,8 +786,7 @@ int main(int argc, char **argv) {
 	return 0;
 }
 "#.as_bytes(), &Some("sample header.h".to_string()), false);
-	let result = String::from_utf8_lossy(filtered.as_slice());
-	assert_eq!(result.as_slice(), r#"#line 1 "sample.cpp"
+	assert_eq!(String::from_utf8_lossy(filtered.unwrap().as_slice()), r#"#line 1 "sample.cpp"
 #line 1 "e:\\work\\octobuild\\test_cl\\sample header.h"
 # pragma once
 
@@ -814,8 +814,7 @@ int main(int argc, char **argv) {
 	return 0;
 }
 "#.as_bytes(), &None, false);
-	let result = String::from_utf8_lossy(filtered.as_slice());
-	assert_eq!(result.as_slice(), r#"#line 1 "sample.cpp"
+	assert_eq!(String::from_utf8_lossy(filtered.unwrap().as_slice()), r#"#line 1 "sample.cpp"
 #line 1 "e:\\work\\octobuild\\test_cl\\sample header.h"
 
 # pragma  hdrstop

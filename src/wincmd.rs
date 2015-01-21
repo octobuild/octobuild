@@ -43,7 +43,6 @@ pub fn parse(cmd: &str) -> Vec<String> {
 		}
 	}
 	arg = add_slashes(arg, if quote && ((slash % 2) == 0) {slash / 2} else {slash});
-	slash = 0;
 	if data {
 		args.push(arg);
 	}
@@ -51,7 +50,7 @@ pub fn parse(cmd: &str) -> Vec<String> {
 }
 
 fn add_slashes(mut line: String, count: usize) -> String {
-	for i in range(0, count) {
+	for _ in range(0, count) {
 		line.push('\\');
 	}
 	line
