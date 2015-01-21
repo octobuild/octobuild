@@ -751,7 +751,7 @@ fn test_compile_with_header() {
 #[test]
 fn test_filter_precompiled_keep() {
 	let filtered = filter_precompiled(r#"#line 1 "sample.cpp"
-#line 1 "e:\\work\\octobuild\\test_cl\\sample header.h"
+#line 1 "e:/work/octobuild/test_cl/sample header.h"
 # pragma once
 void hello();
 #line 2 "sample.cpp"
@@ -761,7 +761,7 @@ int main(int argc, char **argv) {
 }
 "#.as_bytes(), &Some("sample header.h".to_string()), true);
 	assert_eq!(String::from_utf8_lossy(filtered.unwrap().as_slice()), r#"#line 1 "sample.cpp"
-#line 1 "e:\\work\\octobuild\\test_cl\\sample header.h"
+#line 1 "e:/work/octobuild/test_cl/sample header.h"
 # pragma once
 void hello();
 #pragma hdrstop
@@ -776,7 +776,7 @@ int main(int argc, char **argv) {
 #[test]
 fn test_filter_precompiled_remove() {
 	let filtered = filter_precompiled(r#"#line 1 "sample.cpp"
-#line 1 "e:\\work\\octobuild\\test_cl\\sample header.h"
+#line 1 "e:/work/octobuild/test_cl/sample header.h"
 # pragma once
 void hello1();
 void hello2();
@@ -787,7 +787,7 @@ int main(int argc, char **argv) {
 }
 "#.as_bytes(), &Some("sample header.h".to_string()), false);
 	assert_eq!(String::from_utf8_lossy(filtered.unwrap().as_slice()), r#"#line 1 "sample.cpp"
-#line 1 "e:\\work\\octobuild\\test_cl\\sample header.h"
+#line 1 "e:/work/octobuild/test_cl/sample header.h"
 # pragma once
 
 
@@ -803,7 +803,7 @@ int main(int argc, char **argv) {
 #[test]
 fn test_filter_precompiled_hdrstop() {
 	let filtered = filter_precompiled(r#"#line 1 "sample.cpp"
- #line 1 "e:\\work\\octobuild\\test_cl\\sample header.h"
+ #line 1 "e:/work/octobuild/test_cl/sample header.h"
 void hello();
 # pragma  hdrstop
 void data();
@@ -815,7 +815,7 @@ int main(int argc, char **argv) {
 }
 "#.as_bytes(), &None, false);
 	assert_eq!(String::from_utf8_lossy(filtered.unwrap().as_slice()), r#"#line 1 "sample.cpp"
-#line 1 "e:\\work\\octobuild\\test_cl\\sample header.h"
+#line 1 "e:/work/octobuild/test_cl/sample header.h"
 
 # pragma  hdrstop
 void data();
