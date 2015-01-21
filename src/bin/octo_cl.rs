@@ -11,7 +11,7 @@ use std::os;
 use std::slice::{Iter};
 
 use std::io::fs;
-use std::io::{Command, File, Open, Write, TempDir};
+use std::io::{Command, File};
 
 // Scope of command line argument.
 #[derive(Show)]
@@ -40,7 +40,6 @@ Precompiled,
 enum OutputKind {
 Object,
 Marker,
-Precompiled,
 }
 
 #[derive(Show)]
@@ -84,12 +83,7 @@ fn main() {
 			Ok(task) => {
 				match preprocess(&task) {
 					Ok(result) => {
-						let path = Path::new(task.input_source.display().to_string()+".i");
-						match File::create(&path).write(result.content.as_slice()) {
-							Ok(()) => {fs::unlink(&path);}
-							Err(e) => {fs::unlink(&path); panic!(e);}
-						}
-						compile(&task);
+						compile(&task, result);
 					}
 					Err(e) => {
 							panic!(e);
@@ -568,7 +562,7 @@ fn read_token(first: Option<u8>, iter: &mut Iter<u8>, unknown: &mut Vec<u8>) -> 
 		}
 }
 
-fn compile(task: &CompilationTask) {
+fn compile(task: &CompilationTask, preprocessed: PreprocessResult) {
 	let mut args = filter(&task.args, |arg:&Arg|->Option<String> {
 		match arg {
 				&Arg::Flag{ref scope, ref flag} => {
@@ -595,7 +589,14 @@ fn compile(task: &CompilationTask) {
 			}
 			&None => {}
 		}
-	args.push(task.input_source.display().to_string() + ".i");
+
+	// Input file path.
+	let input_temp = Path::new(task.input_source.display().to_string()+".i");
+	match File::create(&input_temp).write(preprocessed.content.as_slice()) {
+	Ok(()) => {}
+	Err(e) => {panic!(e);}
+	}
+	args.push(input_temp.display().to_string());
 
 	args.push("/c".to_string());
 	args.push("/Fo".to_string() + task.output_object.display().to_string().as_slice());
@@ -624,6 +625,8 @@ fn compile(task: &CompilationTask) {
 			panic!("{}", e);
 		}
 		}
+
+	fs::unlink(&input_temp);
 }
 
 fn filter<T, R, F:Fn(&T) -> Option<R>>(args: &Vec<T>, filter:F) -> Vec<R> {
