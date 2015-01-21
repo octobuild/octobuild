@@ -275,12 +275,6 @@ fn preprocess(task: &CompilationTask) {
 		}
 }
 
-const TAB: u8 = '\t' as u8;
-const LN: u8 = '\n' as u8;
-const LR: u8 = '\r' as u8;
-const SPACE: u8 = ' ' as u8;
-const SHARP: u8 = '#' as u8;
-
 fn filter_precompiled(input: &[u8], marker: &Option<String>, keep_headers: bool) -> Result<Vec<u8>, String> {
 	let mut result: Vec<u8> = Vec::new();
 	let mut line_begin = true;
@@ -292,24 +286,24 @@ fn filter_precompiled(input: &[u8], marker: &Option<String>, keep_headers: bool)
 		match iter.next() {
 				Some(c) => {
 				match *c {
-						LN | LR => {
+						b'\n' | b'\r' => {
 							result.push(*c);
 							line_begin = true;
 					}
-						TAB | SPACE => {
+						b'\t' | b' ' => {
 						if keep_headers {
 								result.push(*c);
 						}
 					}
-						SHARP if line_begin => {
+						b'#' if line_begin => {
 						let directive = read_directive(&mut iter);
 						match directive {
-								Directive::Line(raw, _, file) => {
+								Directive::Line(raw, file) => {
 
 								entry_file = match entry_file {
 										Some(path) => {
 										if header_found && (path  == file) {
-												result.push_all("#pragma hdrstop\n".as_bytes());
+												result.push_all(b"#pragma hdrstop\n");
 												result.push(*c);
 												result.push_all(raw.as_slice());
 												break;
@@ -375,8 +369,8 @@ fn filter_precompiled(input: &[u8], marker: &Option<String>, keep_headers: bool)
 
 #[derive(Show)]
 enum Directive {
-// raw, line, file
-Line(Vec<u8>, String, String),
+// raw, file
+Line(Vec<u8>, String),
 // raw
 HdrStop(Vec<u8>),
 // raw
@@ -387,10 +381,10 @@ fn read_directive(iter: &mut Iter<u8>) -> Directive {
 	let mut unknown: Vec<u8> = Vec::new();
 	let (next, token) = read_token(None, iter, &mut unknown);
 	match token.as_slice() {
-			"line" => {
+			b"line" => {
 				read_directive_line(next, iter, unknown)
 		}
-			"pragma" => {
+			b"pragma" => {
 				read_directive_pragma(next, iter, unknown)
 		}
 			_ => {
@@ -404,14 +398,14 @@ fn read_directive_line(first: Option<u8>, iter: &mut Iter<u8>, mut unknown: Vec<
 	let (next1, line) = read_token(first, iter, &mut unknown);
 	let (next2, file) = read_token(next1, iter, &mut unknown);
 	skip_line(next2, iter, &mut unknown);
-	Directive::Line(unknown, line, file)
+	Directive::Line(unknown, String::from_utf8_lossy(file.as_slice()).to_string())
 }
 
 fn read_directive_pragma(first: Option<u8>, iter: &mut Iter<u8>, mut unknown: Vec<u8>) -> Directive {
 	let (next, token) = read_token(first, iter, &mut unknown);
 	skip_line(next, iter, &mut unknown);
 	match token.as_slice() {
-			"hdrstop" => {Directive::HdrStop(unknown)}
+			b"hdrstop" => {Directive::HdrStop(unknown)}
 			_ => {Directive::Unknown(unknown)}
 		}
 }
@@ -420,8 +414,8 @@ fn skip_spaces(first: Option<u8>, iter: &mut Iter<u8>, unknown: &mut Vec<u8>) ->
 	match first {
 			Some(c) => {
 			match c {
-					LN | LR => {return None;}
-					TAB | SPACE => {}
+					b'\n' | b'\r' => {return None;}
+					b'\t' | b' ' => {}
 					_ => {return first;}
 				}
 		}
@@ -432,8 +426,8 @@ fn skip_spaces(first: Option<u8>, iter: &mut Iter<u8>, unknown: &mut Vec<u8>) ->
 				Some(c) => {
 					unknown.push(*c);
 					match c {
-							&LN | &LR => {return None;}
-							&TAB | &SPACE => {}
+							&b'\n' | &b'\r' => {return None;}
+							&b'\t' | &b' ' => {}
 							_ => {return Some(*c);}
 						}
 			}
@@ -448,7 +442,7 @@ fn skip_line(first: Option<u8>, iter: &mut Iter<u8>, unknown: &mut Vec<u8>) {
 	match first {
 			Some(c) => {
 			match c {
-					LN | LR => {return;}
+					b'\n' | b'\r' => {return;}
 					_ => {}
 				}
 		}
@@ -459,7 +453,7 @@ fn skip_line(first: Option<u8>, iter: &mut Iter<u8>, unknown: &mut Vec<u8>) {
 				Some(c) => {
 					unknown.push(*c);
 					match c {
-							&LN | &LR => {return;}
+							&b'\n' | &b'\r' => {return;}
 							_ => {}
 						}
 			}
@@ -468,13 +462,13 @@ fn skip_line(first: Option<u8>, iter: &mut Iter<u8>, unknown: &mut Vec<u8>) {
 	}
 }
 
-fn read_token(first: Option<u8>, iter: &mut Iter<u8>, unknown: &mut Vec<u8>) -> (Option<u8>, String) {
+fn read_token(first: Option<u8>, iter: &mut Iter<u8>, unknown: &mut Vec<u8>) -> (Option<u8>, Vec<u8>) {
 	match skip_spaces(first, iter, unknown) {
 			Some(first_char) => {
 			let mut token: Vec<u8> = Vec::new();
 			let mut escape = false;
 			let quote: bool;
-			if first_char == '"' as u8 {
+			if first_char == b'"' {
 				quote = true;
 			} else {
 					token.push(first_char);
@@ -485,26 +479,23 @@ fn read_token(first: Option<u8>, iter: &mut Iter<u8>, unknown: &mut Vec<u8>) -> 
 						Some(c) if quote => {
 							unknown.push(*c);
 							if escape {
-								if *c == ('n' as u8) {
-										token.push('\n' as u8);
-								} else if *c == ('r' as u8) {
-										token.push('\r' as u8);
-								} else if *c == ('t' as u8) {
-										token.push('\t' as u8);
-								} else {
-										token.push(*c);
+								match *c {
+									b'n' => token.push(b'\n'),
+									b'r' => token.push(b'\r'),
+									b't' => token.push(b'\t'),
+									v => token.push(v)
 								}
 								escape = false;
 							} else if *c == ('\\' as u8) {
 								escape = true;
-							} else if *c == ('"' as u8) {
+							} else if *c == b'"' {
 								return (match iter.next() {
 										Some(n) => {
 											unknown.push(*n);
 											Some(*n)
 									}
 										None => {None}
-									}   , String::from_utf8_lossy(token.as_slice()).to_string());
+									}   , token);
 							} else {
 									token.push(*c);
 							}
@@ -516,18 +507,18 @@ fn read_token(first: Option<u8>, iter: &mut Iter<u8>, unknown: &mut Vec<u8>) -> 
 							((*c >= ('0' as u8)) && (*c <= ('9' as u8))) {
 									token.push(*c);
 							} else {
-								return (Some(*c), String::from_utf8_lossy(token.as_slice()).to_string());
+								return (Some(*c), token);
 							}
 					}
 						None => {
-						return (None, String::from_utf8_lossy(token.as_slice()).to_string());
+						return (None, token);
 					}
 					}
 
 			}
 		}
 			None => {
-			return (None, String::new());
+			return (None, Vec::new());
 		}
 		}
 }
@@ -758,7 +749,7 @@ fn test_compile_with_header() {
 
 #[test]
 fn test_filter_precompiled_keep() {
-	let filtered = filter_precompiled(r#"#line 1 "sample.cpp"
+	let filtered = filter_precompiled(br#"#line 1 "sample.cpp"
 #line 1 "e:/work/octobuild/test_cl/sample header.h"
 # pragma once
 void hello();
@@ -767,7 +758,7 @@ void hello();
 int main(int argc, char **argv) {
 	return 0;
 }
-"#.as_bytes(), &Some("sample header.h".to_string()), true);
+"#, &Some("sample header.h".to_string()), true);
 	assert_eq!(String::from_utf8_lossy(filtered.unwrap().as_slice()), r#"#line 1 "sample.cpp"
 #line 1 "e:/work/octobuild/test_cl/sample header.h"
 # pragma once
@@ -783,7 +774,7 @@ int main(int argc, char **argv) {
 
 #[test]
 fn test_filter_precompiled_remove() {
-	let filtered = filter_precompiled(r#"#line 1 "sample.cpp"
+	let filtered = filter_precompiled(br#"#line 1 "sample.cpp"
 #line 1 "e:/work/octobuild/test_cl/sample header.h"
 # pragma once
 void hello1();
@@ -793,7 +784,7 @@ void hello2();
 int main(int argc, char **argv) {
 	return 0;
 }
-"#.as_bytes(), &Some("sample header.h".to_string()), false);
+"#, &Some("sample header.h".to_string()), false);
 	assert_eq!(String::from_utf8_lossy(filtered.unwrap().as_slice()), r#"#line 1 "sample.cpp"
 #line 1 "e:/work/octobuild/test_cl/sample header.h"
 # pragma once
@@ -810,7 +801,7 @@ int main(int argc, char **argv) {
 
 #[test]
 fn test_filter_precompiled_hdrstop() {
-	let filtered = filter_precompiled(r#"#line 1 "sample.cpp"
+	let filtered = filter_precompiled(br#"#line 1 "sample.cpp"
  #line 1 "e:/work/octobuild/test_cl/sample header.h"
 void hello();
 # pragma  hdrstop
@@ -821,7 +812,7 @@ void data();
 int main(int argc, char **argv) {
 	return 0;
 }
-"#.as_bytes(), &None, false);
+"#, &None, false);
 	assert_eq!(String::from_utf8_lossy(filtered.unwrap().as_slice()), r#"#line 1 "sample.cpp"
 #line 1 "e:/work/octobuild/test_cl/sample header.h"
 
