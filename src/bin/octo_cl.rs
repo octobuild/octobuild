@@ -9,7 +9,7 @@ use std::str::StrExt;
 use std::os;
 use std::slice::{Iter};
 
-use std::io::{Command, File, BufferedReader};
+use std::io::{Command, File, BufferedReader, Open, Write};
 
 // Scope of command line argument.
 #[derive(Show)]
@@ -255,10 +255,18 @@ fn preprocess(task: &CompilationTask) {
 	.args(args.as_slice())
 	.output(){
 			Ok(output) => {
-			println!("stdout: {}", String::from_utf8_lossy(match task.input_precompiled {
-			Some(_) => {filter_precompiled(output.output.as_slice(), &task.marker_precompiled, task.output_precompiled.is_some()).unwrap()}
-			None => {output.output}
-			}.as_slice()));
+			match filter_precompiled(output.output.as_slice(), &task.marker_precompiled, task.output_precompiled.is_some()) {
+					Ok(output) => {
+					let file = match File::open_mode(&Path::new(task.input_source.display().to_string()+".i"), Open, Write) {
+							Ok(mut f) => {f.write(output.as_slice());}
+							Err(e) => {panic!("file error: {}", e);}
+						};
+				}
+					Err(e) => {
+					panic!("{}", e);
+				}
+				}
+
 			println!("stderr: {}", String::from_utf8_lossy(output.error.as_slice()));
 		}
 			Err(e) => {
