@@ -9,7 +9,7 @@ use std::str::StrExt;
 use std::os;
 use std::slice::{Iter};
 
-use std::io::{Command, File, BufferedReader, Open, Write};
+use std::io::{Command, File, Open, Write};
 
 // Scope of command line argument.
 #[derive(Show)]
@@ -257,7 +257,7 @@ fn preprocess(task: &CompilationTask) {
 			Ok(output) => {
 			match filter_precompiled(output.output.as_slice(), &task.marker_precompiled, task.output_precompiled.is_some()) {
 					Ok(output) => {
-					let file = match File::open_mode(&Path::new(task.input_source.display().to_string()+".i"), Open, Write) {
+					match File::open_mode(&Path::new(task.input_source.display().to_string()+".i"), Open, Write) {
 							Ok(mut f) => {f.write(output.as_slice());}
 							Err(e) => {panic!("file error: {}", e);}
 						};
@@ -309,8 +309,8 @@ fn filter_precompiled(input: &[u8], marker: &Option<String>, keep_headers: bool)
 												break;
 										}
 										match *marker {
-												Some(ref markerFile) => {
-												if Path::new(file).ends_with_path(&Path::new(markerFile.as_slice())) {
+												Some(ref path) => {
+												if Path::new(file).ends_with_path(&Path::new(path.as_slice())) {
 													header_found = true;
 												}
 											}
@@ -395,7 +395,9 @@ fn read_directive(iter: &mut Iter<u8>) -> Directive {
 }
 
 fn read_directive_line(first: Option<u8>, iter: &mut Iter<u8>, mut unknown: Vec<u8>) -> Directive {
-	let (next1, line) = read_token(first, iter, &mut unknown);
+	// Line number
+	let (next1, _) = read_token(first, iter, &mut unknown);
+	// File name
 	let (next2, file) = read_token(next1, iter, &mut unknown);
 	skip_line(next2, iter, &mut unknown);
 	Directive::Line(unknown, String::from_utf8_lossy(file.as_slice()).to_string())
