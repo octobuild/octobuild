@@ -1,6 +1,7 @@
 #![allow(unstable)]
 extern crate octobuild;
 extern crate log;
+extern crate "sha1-hasher" as sha1;
 
 use octobuild::wincmd;
 use std::ascii::AsciiExt;
@@ -257,6 +258,12 @@ fn preprocess(task: &CompilationTask) {
 			Ok(output) => {
 			match filter_precompiled(output.output.as_slice(), &task.marker_precompiled, task.output_precompiled.is_some()) {
 					Ok(output) => {
+					let mut hash = sha1::Sha1::new();
+					{
+							use std::hash::Writer;
+							hash.write(output.as_slice());
+					}
+					println!("Hash: {}", hash.hexdigest());
 					match File::open_mode(&Path::new(task.input_source.display().to_string()+".i"), Open, Write) {
 							Ok(mut f) => {f.write(output.as_slice());}
 							Err(e) => {panic!("file error: {}", e);}
@@ -457,7 +464,7 @@ fn skip_line(first: Option<u8>, iter: &mut Iter<u8>, unknown: &mut Vec<u8>) {
 					match c {
 							&b'\n' | &b'\r' => {return;}
 							_ => {}
-						}
+							}
 			}
 				None => {return;}
 			}
