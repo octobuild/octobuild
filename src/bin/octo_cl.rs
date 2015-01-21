@@ -11,7 +11,7 @@ use std::os;
 use std::slice::{Iter};
 
 use std::io::fs;
-use std::io::{Command, File};
+use std::io::{Command, File, IoError, IoErrorKind};
 
 // Scope of command line argument.
 #[derive(Show)]
@@ -264,7 +264,15 @@ fn preprocess(task: &CompilationTask) -> Result<PreprocessResult, String> {
 	args.push("/T".to_string() + task.language.as_slice());
 	args.push("/P".to_string());
 	args.push(task.input_source.display().to_string());
-	let args_hash = wincmd::join(&args);
+
+	// Hash data.
+	let mut hash = sha1::Sha1::new();
+	{
+		use std::hash::Writer;
+		hash.write(&[0]);
+		hash.write(wincmd::join(&args).as_bytes());
+	}
+
 	args.push("/Fi".to_string() + temp_file.display().to_string().as_slice());
 
 	println!("Preprocess");
@@ -279,11 +287,8 @@ fn preprocess(task: &CompilationTask) -> Result<PreprocessResult, String> {
 								Ok(content) => {
 								match filter_precompiled(content.as_slice(), &task.marker_precompiled, task.output_precompiled.is_some()) {
 										Ok(output) => {
-										let mut hash = sha1::Sha1::new();
 										{
 											use std::hash::Writer;
-											hash.write(args_hash.as_bytes());
-											hash.write(&[0]);
 											hash.write(output.as_slice());
 										}
 										println!("Hash: {}", hash.hexdigest());
@@ -590,6 +595,31 @@ fn compile(task: &CompilationTask, preprocessed: PreprocessResult) {
 			&None => {}
 		}
 
+	if task.output_precompiled.is_some() {
+		args.push("/Yc".to_string());
+	}
+
+	let cache_path: Path;
+	{
+		use std::hash::Writer;
+		let mut hash = sha1::Sha1::new();
+		hash.write(wincmd::join(&args).as_bytes());
+		hash.write(&[0]);
+		hash.write(preprocessed.hash.as_bytes());
+		cache_path = Path::new(".".to_string() + hash.hexdigest().as_slice());
+	}
+
+	match File::open(&cache_path) {
+		Ok(mut file) => {
+			if extract_cache(&mut file, &Some(task.output_object.clone())).is_ok() &&
+				extract_cache(&mut file, &task.output_precompiled).is_ok() {
+				return;
+			}
+		}
+		Err(e) => {
+		}
+	}
+
 	// Input file path.
 	let input_temp = Path::new(task.input_source.display().to_string()+".i");
 	match File::create(&input_temp).write(preprocessed.content.as_slice()) {
@@ -606,7 +636,6 @@ fn compile(task: &CompilationTask, preprocessed: PreprocessResult) {
 		}
 	match &task.output_precompiled {
 			&Some(ref path) => {
-				args.push("/Yc".to_string());
 				args.push("/Fp".to_string() + path.display().to_string().as_slice());
 			}
 			&None => {}
@@ -618,6 +647,15 @@ fn compile(task: &CompilationTask, preprocessed: PreprocessResult) {
 	.args(args.as_slice())
 	.output(){
 			Ok(output) => {
+
+			match File::create(&cache_path) {
+				Ok(mut file) => {
+					write_cache(&mut file, &Some(task.output_object.clone()));
+					write_cache(&mut file, &task.output_precompiled);
+				}
+				Err(e) => {}
+			}
+
 			println!("stdout: {}", String::from_utf8_lossy(output.output.as_slice()));
 			println!("stderr: {}", String::from_utf8_lossy(output.error.as_slice()));
 		}
@@ -627,6 +665,68 @@ fn compile(task: &CompilationTask, preprocessed: PreprocessResult) {
 		}
 
 	fs::unlink(&input_temp);
+}
+
+fn write_cache(cache: &mut File, source: &Option<Path>) {
+	match source {
+		&Some(ref path) => {
+			match File::open(path).read_to_end() {
+				Ok(content) => {
+					cache.write_u8(0);
+					cache.write_le_u32(content.len() as u32);
+					cache.write(content.as_slice());
+				}
+				Err(e) => {
+					cache.write_u8(2);
+				}
+			}
+		}
+		&None => {
+			cache.write_u8(1);
+		}
+	}
+}
+
+fn extract_cache(cache: &mut File, target: &Option<Path>) -> Result<(), IoError> {
+	match target {
+		&Some(ref path) => {
+			match cache.read_u8() {
+				Ok(mark) if mark == 0 => {
+					match cache.read_le_u32() {
+						Ok(size) => {
+							match cache.read_exact(size as usize) {
+								Ok(content) => {
+									match File::create(path).write(content.as_slice()) {
+										Ok(file) => Ok(()),
+										Err(e) => Err(e)
+									}
+								}
+								Err(e) => Err(e)
+							}
+						}
+						Err(e) => Err(e)
+					}
+				}
+				Ok(_) => Err(IoError {
+					kind: IoErrorKind::InvalidInput,
+					desc: "Unexpected file data",
+					detail: None
+				}),
+				Err(e) => Err(e)
+			}
+		}
+		&None => {
+			match cache.read_u8() {
+				Ok(mark) if mark == 1 => Ok(()),
+				Ok(_) => Err(IoError {
+					kind: IoErrorKind::InvalidInput,
+					desc: "Unexpected file data",
+					detail: None
+				}),
+				Err(e) => Err(e)
+			}
+		}
+	}
 }
 
 fn filter<T, R, F:Fn(&T) -> Option<R>>(args: &Vec<T>, filter:F) -> Vec<R> {
