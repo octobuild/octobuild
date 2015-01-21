@@ -49,6 +49,22 @@ pub fn parse(cmd: &str) -> Vec<String> {
 	return args;
 }
 
+pub fn join(args: &Vec<String>) -> String {
+	let mut result = String::new();
+	for arg in args.iter() {
+		if result.len() > 0 {
+			result = result + " ";
+		}
+		result = result + escape(arg.as_slice()).as_slice();
+	}
+	result
+}
+
+pub fn escape(arg: &str) -> String {
+	// todo: Доделать
+	arg.to_string()
+}
+
 fn add_slashes(mut line: String, count: usize) -> String {
 	for _ in range(0, count) {
 		line.push('\\');

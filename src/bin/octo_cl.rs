@@ -10,7 +10,8 @@ use std::str::StrExt;
 use std::os;
 use std::slice::{Iter};
 
-use std::io::{Command, File, Open, Write};
+use std::io::fs;
+use std::io::{Command, File, Open, Write, TempDir};
 
 // Scope of command line argument.
 #[derive(Show)]
@@ -38,6 +39,7 @@ Precompiled,
 #[derive(PartialEq)]
 enum OutputKind {
 Object,
+Marker,
 Precompiled,
 }
 
@@ -68,13 +70,31 @@ output_precompiled: Option<Path>,
 marker_precompiled: Option<String>,
 }
 
+struct PreprocessResult {
+// Hash
+hash: String,
+// Preprocessed file
+content: Vec<u8>,
+}
+
 fn main() {
 	let result = parse_compilation_task(&os::args()[1..]);
 	println!("Parsed task: {:?}", result);
 	match result {
 			Ok(task) => {
-				preprocess(&task);
-				compile(&task);
+				match preprocess(&task) {
+					Ok(result) => {
+						let path = Path::new(task.input_source.display().to_string()+".i");
+						match File::create(&path).write(result.content.as_slice()) {
+							Ok(()) => {fs::unlink(&path);}
+							Err(e) => {fs::unlink(&path); panic!(e);}
+						}
+						compile(&task);
+					}
+					Err(e) => {
+							panic!(e);
+					}
+					}
 		}
 			_ => {}
 		}
@@ -114,7 +134,7 @@ fn parse_compilation_task(args: &[String]) -> Result<CompilationTask, String> {
 				}
 				};
 			// Precompiled header file name.
-			let input_precompiled;
+			let precompiled_file;
 			match filter(&parsed_args, |arg:&Arg|->Option<Path>{
 				match *arg {
 						Arg::Input{ref kind, ref file, ..} if *kind == InputKind::Precompiled => {Some(Path::new(file))}
@@ -122,49 +142,47 @@ fn parse_compilation_task(args: &[String]) -> Result<CompilationTask, String> {
 					}
 			}).as_slice() {
 					[] => {
-					input_precompiled=None;
+					precompiled_file=None;
 				}
 					[ref v] => {
-						input_precompiled=Some(v.clone());
+							precompiled_file=Some(v.clone());
 				}
 					v => {
 					return Err(format!("Found too many precompiled header files: {:?}", v));
 				}
 				};
-			// Precompiled header marker name.
+			// Precompiled header file name.
 			let marker_precompiled;
-			match filter(&parsed_args, |arg:&Arg|->Option<String>{
+			let input_precompiled;
+			let output_precompiled;
+			match filter(&parsed_args, |arg:&Arg|->Option<(bool, String)>{
 				match *arg {
-						Arg::Input{ref kind, ref file, ..} if *kind == InputKind::Marker => {Some(file.clone())}
+						Arg::Input{ref kind, ref file, ..} if *kind == InputKind::Marker => {Some((true, file.clone()))}
+						Arg::Output{ref kind, ref file, ..} if *kind == OutputKind::Marker => {Some((false, file.clone()))}
 						_ => {None}
 					}
 			}).as_slice() {
 					[] => {
 					marker_precompiled=None;
+					input_precompiled=None;
+					output_precompiled=None;
 				}
-					[ref v] => {
-						marker_precompiled=Some(v.clone());
+					[(ref input, ref path)] => {
+						marker_precompiled=if path.len() > 0 {Some(path.clone())} else {None};
+						let precompiled_path = match precompiled_file {
+							Some(v) => v,
+							None => Path::new(path).with_extension(".pch")
+							};
+						if *input {
+							output_precompiled=None;
+							input_precompiled=Some(precompiled_path);
+						} else {
+							input_precompiled=None;
+							output_precompiled=Some(precompiled_path);
+						}
 				}
 					v => {
 					return Err(format!("Found too many precompiled header markers: {:?}", v));
-				}
-				};
-			// Precompiled header file name.
-			let output_precompiled;
-			match filter(&parsed_args, |arg:&Arg|->Option<Path>{
-				match *arg {
-						Arg::Output{ref kind, ref file, ..} if *kind == OutputKind::Precompiled => {Some(Path::new(file))}
-						_ => {None}
-					}
-			}).as_slice() {
-					[] => {
-					output_precompiled=None;
-				}
-					[ref v] => {
-						output_precompiled=Some(v.clone());
-				}
-					v => {
-					return Err(format!("Found too many precompiled header output files: {:?}", v));
 				}
 				};
 			// Output object file name.
@@ -227,7 +245,7 @@ fn parse_compilation_task(args: &[String]) -> Result<CompilationTask, String> {
 		}
 }
 
-fn preprocess(task: &CompilationTask) {
+fn preprocess(task: &CompilationTask) -> Result<PreprocessResult, String> {
 	let mut args = filter(&task.args, |arg:&Arg|->Option<String> {
 		match arg {
 				&Arg::Flag{ref scope, ref flag} => {
@@ -246,39 +264,57 @@ fn preprocess(task: &CompilationTask) {
 				&Arg::Output{..} => {None}
 			}
 	});
+
+	let temp_file = Path::new(task.input_source.display().to_string() + ".i~");
+	args.push("/nologo".to_string());
 	args.push("/T".to_string() + task.language.as_slice());
-	args.push("/E".to_string());
+	args.push("/P".to_string());
 	args.push(task.input_source.display().to_string());
+	let args_hash = wincmd::join(&args);
+	args.push("/Fi".to_string() + temp_file.display().to_string().as_slice());
 
 	println!("Preprocess");
-	println!(" - args: {:?}", args);
+	println!(" - args: {}", wincmd::join(&args));
 	match Command::new("cl.exe")
 	.args(args.as_slice())
 	.output(){
 			Ok(output) => {
-			match filter_precompiled(output.output.as_slice(), &task.marker_precompiled, task.output_precompiled.is_some()) {
-					Ok(output) => {
-					let mut hash = sha1::Sha1::new();
-					{
-							use std::hash::Writer;
-							hash.write(output.as_slice());
-					}
-					println!("Hash: {}", hash.hexdigest());
-					match File::open_mode(&Path::new(task.input_source.display().to_string()+".i"), Open, Write) {
-							Ok(mut f) => {f.write(output.as_slice());}
-							Err(e) => {panic!("file error: {}", e);}
-						};
-				}
-					Err(e) => {
-					panic!("{}", e);
-				}
-				}
-
 			println!("stderr: {}", String::from_utf8_lossy(output.error.as_slice()));
+			if output.status.success() {
+						let result = match File::open(&temp_file).read_to_end() {
+								Ok(content) => {
+								match filter_precompiled(content.as_slice(), &task.marker_precompiled, task.output_precompiled.is_some()) {
+										Ok(output) => {
+										let mut hash = sha1::Sha1::new();
+										{
+											use std::hash::Writer;
+											hash.write(args_hash.as_bytes());
+											hash.write(&[0]);
+											hash.write(output.as_slice());
+										}
+										println!("Hash: {}", hash.hexdigest());
+										Ok(PreprocessResult{
+										hash: hash.hexdigest(),
+										content: output
+										})
+									}
+										Err(e) => {
+											Err(e)
+									}
+									}
+							}
+								Err(e) => {
+									Err(e.to_string())
+							}
+							};
+						fs::unlink(&temp_file);
+					result
+				} else {
+					fs::unlink(&temp_file);
+					Err(format!("Preprocessing command with arguments failed: {:?}", args))
+			}
 		}
-			Err(e) => {
-			panic!("{}", e);
-		}
+			Err(e) => {Err(e.to_string())}
 		}
 }
 
@@ -553,7 +589,10 @@ fn compile(task: &CompilationTask) {
 	});
 	args.push("/T".to_string() + task.language.as_slice());
 	match &task.input_precompiled {
-			&Some(ref path) => {args.push("/Fp".to_string() + path.display().to_string().as_slice());}
+			&Some(ref path) => {
+				args.push("/Yu".to_string());
+				args.push("/Fp".to_string() + path.display().to_string().as_slice());
+			}
 			&None => {}
 		}
 	args.push(task.input_source.display().to_string() + ".i");
@@ -565,7 +604,10 @@ fn compile(task: &CompilationTask) {
 			&None => {}
 		}
 	match &task.output_precompiled {
-			&Some(ref path) => {args.push("/Yc".to_string() + path.display().to_string().as_slice());}
+			&Some(ref path) => {
+				args.push("/Yc".to_string());
+				args.push("/Fp".to_string() + path.display().to_string().as_slice());
+			}
 			&None => {}
 		}
 
@@ -643,10 +685,10 @@ fn parse_argument(iter: &mut  Iter<String>) -> Option<Result<Arg, String>> {
 							}
 								None => {
 								match flag {
-										"c" | "nologo" => {
+										"c" => {
 											Ok(Arg::Flag{scope: Scope::Ignore, flag:flag.to_string()})
 									}
-										"bigobj" => {
+										"bigobj" | "nologo" => {
 											Ok(Arg::Flag{scope: Scope::Compiler, flag:flag.to_string()})
 									}
 										s if s.starts_with("T") => {
@@ -686,7 +728,7 @@ fn parse_argument(iter: &mut  Iter<String>) -> Option<Result<Arg, String>> {
 											Ok(Arg::Input{kind:InputKind::Precompiled, flag:"Fp".to_string(), file:s[2..].to_string()})
 									}
 										s if s.starts_with("Yc") => {
-											Ok(Arg::Output{kind:OutputKind::Precompiled, flag:"Yc".to_string(), file:s[2..].to_string()})
+											Ok(Arg::Output{kind:OutputKind::Marker, flag:"Yc".to_string(), file:s[2..].to_string()})
 									}
 										s if s.starts_with("Yu") => {
 											Ok(Arg::Input{kind:InputKind::Marker, flag:"Yu".to_string(), file:s[2..].to_string()})
