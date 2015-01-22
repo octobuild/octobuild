@@ -23,6 +23,10 @@ impl VsCompiler {
 }
 
 impl Compiler for VsCompiler {
+	fn create_task(&self, args: &[String]) -> Result<CompilationTask, String> {
+		super::prepare::create_task(args)
+	}
+
 	fn preprocess(&self, task: &CompilationTask) -> Result<PreprocessResult, IoError> {
 		// Make parameters list for preprocessing.
 		let mut args = filter(&task.args, |arg:&Arg|->Option<String> {

@@ -67,6 +67,9 @@ pub struct PreprocessResult {
 }
 
 pub trait Compiler {
+	// Parse compiler arguments.
+	fn create_task(&self, args: &[String]) -> Result<CompilationTask, String>;
+
 	// Preprocessing source file.
 	fn preprocess(&self, task: &CompilationTask) -> Result<PreprocessResult, IoError>;
 }

@@ -12,5 +12,6 @@ pub mod xg {
 }
 pub mod vs {
 	pub mod compiler;
+	mod prepare;
 	mod postprocess;
 }
