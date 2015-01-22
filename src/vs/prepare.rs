@@ -3,6 +3,7 @@ use std::ascii::AsciiExt;
 
 use super::super::compiler::{Arg, CompilationTask, Scope, InputKind, OutputKind};
 use super::super::utils::filter;
+use super::super::wincmd;
 
 pub fn create_task(args: &[String]) -> Result<CompilationTask, String> {
 	match parse_arguments(args) {
@@ -216,4 +217,21 @@ fn is_spaceable_param(flag: &str) -> Option<(&str, Scope)> {
 
 fn has_param_prefix(arg: &String) -> bool {
 	arg.starts_with("/") || arg.starts_with("-")
+}
+
+
+#[test]
+fn test_parse_argument() {
+	assert_eq!(
+		parse_arguments(&wincmd::parse("/c /Yusample.h /Fpsample.h.pch /Fosample.cpp.o /DTEST /D TEST2 sample.cpp")[]).unwrap(),
+		[
+			Arg::Flag { scope: Scope::Ignore, flag: "c".to_string()},
+			Arg::Input { kind: InputKind::Marker, flag: "Yu".to_string(), file: "sample.h".to_string()},
+			Arg::Input { kind: InputKind::Precompiled, flag: "Fp".to_string(), file: "sample.h.pch".to_string()},
+			Arg::Output { kind: OutputKind::Object, flag: "Fo".to_string(), file: "sample.cpp.o".to_string()},
+			Arg::Param { scope: Scope::Preprocessor, flag: "D".to_string(), value: "TEST".to_string()},
+			Arg::Param { scope: Scope::Preprocessor, flag: "D".to_string(), value: "TEST2".to_string()},
+			Arg::Input { kind: InputKind::Source, flag: "".to_string(), file: "sample.cpp".to_string()}
+		]
+	)
 }
