@@ -4,13 +4,13 @@ extern crate log;
 extern crate "sha1-hasher" as sha1;
 
 use octobuild::wincmd;
+use octobuild::io::tempfile::TempFile;
 use std::ascii::AsciiExt;
 use std::str::StrExt;
 
 use std::os;
 use std::slice::{Iter};
 
-use std::io::fs;
 use std::io::{Command, File, IoError, IoErrorKind};
 
 // Scope of command line argument.
@@ -259,7 +259,7 @@ fn preprocess(task: &CompilationTask) -> Result<PreprocessResult, String> {
 			}
 	});
 
-	let temp_file = Path::new(task.input_source.display().to_string() + ".i~");
+	let temp_file = TempFile::wrap(Path::new(task.input_source.display().to_string() + ".i~"));
 	args.push("/nologo".to_string());
 	args.push("/T".to_string() + task.language.as_slice());
 	args.push("/P".to_string());
@@ -273,7 +273,7 @@ fn preprocess(task: &CompilationTask) -> Result<PreprocessResult, String> {
 		hash.write(wincmd::join(&args).as_bytes());
 	}
 
-	args.push("/Fi".to_string() + temp_file.display().to_string().as_slice());
+	args.push("/Fi".to_string() + temp_file.path().display().to_string().as_slice());
 
 	println!("Preprocess");
 	println!(" - args: {}", wincmd::join(&args));
@@ -283,7 +283,7 @@ fn preprocess(task: &CompilationTask) -> Result<PreprocessResult, String> {
 			Ok(output) => {
 			println!("stderr: {}", String::from_utf8_lossy(output.error.as_slice()));
 			if output.status.success() {
-						let result = match File::open(&temp_file).read_to_end() {
+						let result = match File::open(temp_file.path()).read_to_end() {
 								Ok(content) => {
 								match filter_precompiled(content.as_slice(), &task.marker_precompiled, task.output_precompiled.is_some()) {
 										Ok(output) => {
@@ -306,10 +306,8 @@ fn preprocess(task: &CompilationTask) -> Result<PreprocessResult, String> {
 									Err(e.to_string())
 							}
 							};
-						fs::unlink(&temp_file);
 					result
 				} else {
-					fs::unlink(&temp_file);
 					Err(format!("Preprocessing command with arguments failed: {:?}", args))
 			}
 		}
@@ -637,17 +635,17 @@ fn compile(task: &CompilationTask, preprocessed: PreprocessResult) {
 				return;
 			}
 		}
-		Err(e) => {
+		Err(_) => {
 		}
 	}
 
 	// Input file path.
-	let input_temp = Path::new(task.input_source.display().to_string()+".i");
-	match File::create(&input_temp).write(preprocessed.content.as_slice()) {
-	Ok(()) => {}
-	Err(e) => {panic!(e);}
+	let input_temp = TempFile::wrap(Path::new(task.input_source.display().to_string()+".i"));
+	match File::create(input_temp.path()).write(preprocessed.content.as_slice()) {
+		Ok(()) => {}
+		Err(e) => {panic!(e);}
 	}
-	args.push(input_temp.display().to_string());
+	args.push(input_temp.path().display().to_string());
 
 	args.push("/c".to_string());
 	args.push("/Fo".to_string() + task.output_object.display().to_string().as_slice());
@@ -684,29 +682,35 @@ fn compile(task: &CompilationTask, preprocessed: PreprocessResult) {
 			panic!("{}", e);
 		}
 		}
-
-	fs::unlink(&input_temp);
 }
 
 const VERSION: u8 = 1;
 const MAGIC: u32 = 0x1e457b89;
 
-fn write_cache(cache: &mut File, source: &Option<Path>) {
+fn write_cache(cache: &mut File, source: &Option<Path>) -> Result<(), IoError> {
 	match source {
 		&Some(ref path) => {
 			match File::open(path).read_to_end() {
 				Ok(content) => {
-					cache.write_u8(VERSION);
-					cache.write_le_u32(content.len() as u32);
-					cache.write(content.as_slice());
-					cache.write_le_u32(MAGIC);
+					match cache.write_u8(VERSION) {
+						Ok(_) => (),
+						Err(e) => return Err(e)
+					};
+					match cache.write_le_u32(content.len() as u32) {
+						Ok(_) => (),
+						Err(e) => return Err(e)
+					};
+					match cache.write(content.as_slice()) {
+						Ok(_) => (),
+						Err(e) => return Err(e)
+					};
+					cache.write_le_u32(MAGIC)
 				}
-				Err(e) => {
-					cache.write_u8(1);
-				}
+				Err(e) => Err(e)
 			}
 		}
 		&None => {
+			Ok(())
 		}
 	}
 }
@@ -748,7 +752,7 @@ fn extract_cache(cache: &mut File, target: &Option<Path>) -> Result<(), IoError>
 	};
 	// Write result.
 	match File::create(path).write(content.as_slice()) {
-		Ok(file) => Ok(()),
+		Ok(_) => Ok(()),
 		Err(e) => Err(e)
 	}
 }
@@ -963,12 +967,7 @@ int main(int argc, char **argv) {
 	return 0;
 }
 "#, &Some("sample header.h".to_string()), false);
-	assert_eq!(String::from_utf8_lossy(filtered.unwrap().as_slice()), r#"#line 1 "sample.cpp"
-#line 1 "e:/work/octobuild/test_cl/sample header.h"
-# pragma once
-
-
-#pragma hdrstop
+	assert_eq!(String::from_utf8_lossy(filtered.unwrap().as_slice()), r#"#pragma hdrstop
 #line 2 "sample.cpp"
 
 int main(int argc, char **argv) {
@@ -991,10 +990,7 @@ int main(int argc, char **argv) {
 	return 0;
 }
 "#, &None, false);
-	assert_eq!(String::from_utf8_lossy(filtered.unwrap().as_slice()), r#"#line 1 "sample.cpp"
-#line 1 "e:/work/octobuild/test_cl/sample header.h"
-
-# pragma  hdrstop
+	assert_eq!(String::from_utf8_lossy(filtered.unwrap().as_slice()), r#"# pragma  hdrstop
 void data();
 # pragma once
 #line 2 "sample.cpp"
