@@ -3,7 +3,6 @@ use std::ascii::AsciiExt;
 
 use super::super::compiler::{Arg, CompilationTask, Scope, InputKind, OutputKind};
 use super::super::utils::filter;
-use super::super::wincmd;
 
 pub fn create_task(args: &[String]) -> Result<CompilationTask, String> {
 	match parse_arguments(args) {
@@ -222,6 +221,8 @@ fn has_param_prefix(arg: &String) -> bool {
 
 #[test]
 fn test_parse_argument() {
+	use super::super::wincmd;
+
 	assert_eq!(
 		parse_arguments(&wincmd::parse("/c /Yusample.h /Fpsample.h.pch /Fosample.cpp.o /DTEST /D TEST2 sample.cpp")[]).unwrap(),
 		[

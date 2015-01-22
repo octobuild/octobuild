@@ -8,3 +8,6 @@ version = "*"
 
 [dependencies.sha1-hasher]
 version = "*"
+
+[dependencies]
+uuid = "*"

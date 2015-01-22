@@ -65,45 +65,41 @@ impl Compiler for VsCompiler {
 	
 		println!("Preprocess");
 		println!(" - args: {}", wincmd::join(&args));
-	  let mut command = Command::new("cl.exe");
-		command
+	  let output = try! (Command::new("cl.exe")
 			.args(args.as_slice())
-			.arg("/Fi".to_string() + temp_file.path().display().to_string().as_slice());
-		match command.output() {
-			Ok(output) => {
-				println!("stderr: {}", String::from_utf8_lossy(output.error.as_slice()));
-				if output.status.success() {
-					match File::open(temp_file.path()).read_to_end() {
-						Ok(content) => {
-							match	postprocess::filter_preprocessed(content.as_slice(), &task.marker_precompiled, task.output_precompiled.is_some()) {
-								Ok(output) => {
-									{
-										use std::hash::Writer;
-										hash.write(output.as_slice());
-									}
-									Ok(PreprocessResult{
-										hash: hash.hexdigest(),
-										content: output
-									})
-								}
-								Err(e) => Err(IoError {
-									kind: IoErrorKind::InvalidInput,
-									desc: "Can't parse preprocessed file",
-									detail: Some(e)
-								})
+			.arg("/Fi".to_string() + temp_file.path().display().to_string().as_slice())
+			.output());
+	
+		println!("stderr: {}", String::from_utf8_lossy(output.error.as_slice()));
+		if output.status.success() {
+			match File::open(temp_file.path()).read_to_end() {
+				Ok(content) => {
+					match	postprocess::filter_preprocessed(content.as_slice(), &task.marker_precompiled, task.output_precompiled.is_some()) {
+						Ok(output) => {
+							{
+								use std::hash::Writer;
+								hash.write(output.as_slice());
 							}
+							Ok(PreprocessResult{
+								hash: hash.hexdigest(),
+								content: output
+							})
 						}
-						Err(e) => Err(e)
+						Err(e) => Err(IoError {
+							kind: IoErrorKind::InvalidInput,
+							desc: "Can't parse preprocessed file",
+							detail: Some(e)
+						})
 					}
-				} else {
-					Err(IoError {
-						kind: IoErrorKind::IoUnavailable,
-						desc: "Invalid preprocessor exit code with parameters",
-						detail: Some(format!("{:?}", args))
-					})
 				}
+				Err(e) => Err(e)
 			}
-			Err(e) => Err(e)
+		} else {
+			Err(IoError {
+				kind: IoErrorKind::IoUnavailable,
+				desc: "Invalid preprocessor exit code with parameters",
+				detail: Some(format!("{:?}", args))
+			})
 		}
 	}
 }

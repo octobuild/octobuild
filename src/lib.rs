@@ -1,4 +1,5 @@
 #![allow(unstable)]
+pub mod cache;
 pub mod common;
 pub mod compiler;
 pub mod graph;
