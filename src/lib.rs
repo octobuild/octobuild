@@ -2,6 +2,7 @@
 pub mod common;
 pub mod compiler;
 pub mod graph;
+pub mod utils;
 pub mod wincmd;
 pub mod io {
 	pub mod tempfile;

@@ -7,13 +7,14 @@ use octobuild::wincmd;
 use octobuild::io::tempfile::TempFile;
 use octobuild::vs::compiler::VsCompiler;
 use octobuild::compiler::Compiler;
+use octobuild::utils::filter;
 use std::ascii::AsciiExt;
 use std::str::StrExt;
 
 use std::os;
 use std::slice::{Iter};
 
-use std::io::{Command, File, IoError, IoErrorKind};
+use std::io::{Command, File, IoError, IoErrorKind, TempDir};
 
 // Scope of command line argument.
 #[derive(Show)]
@@ -72,20 +73,24 @@ marker_precompiled: Option<String>,
 }
 
 struct PreprocessResult {
-// Hash
-hash: String,
-// Preprocessed file
-content: Vec<u8>,
+	// Hash
+	hash: String,
+	// Preprocessed file
+	content: Vec<u8>,
 }
 
 fn main() {
 	let result = parse_compilation_task(&os::args()[1..]);
+	let temp_dir = match TempDir::new("octobuild") {
+		Ok(result) => result,
+		Err(e) => {panic!(e);}
+	};
 	println!("Parsed task: {:?}", result);
 	match result {
 			Ok(task) => {
-				match preprocess(&task) {
+				match preprocess(&temp_dir, &task) {
 					Ok(result) => {
-						compile(&task, result);
+						compile(&temp_dir, &task, result);
 					}
 					Err(e) => {
 							panic!(e);
@@ -241,27 +246,29 @@ fn parse_compilation_task(args: &[String]) -> Result<CompilationTask, String> {
 		}
 }
 
-fn preprocess(task: &CompilationTask) -> Result<PreprocessResult, String> {
+fn preprocess(temp_dir: &TempDir, task: &CompilationTask) -> Result<PreprocessResult, String> {
+	// Make parameters list for preprocessing.
 	let mut args = filter(&task.args, |arg:&Arg|->Option<String> {
 		match arg {
-				&Arg::Flag{ref scope, ref flag} => {
+			&Arg::Flag{ref scope, ref flag} => {
 				match scope {
-						&Scope::Preprocessor | &Scope::Shared => {Some("/".to_string() + flag.as_slice())}
-						&Scope::Ignore | &Scope::Compiler => {None}
-					}
+					&Scope::Preprocessor | &Scope::Shared => Some("/".to_string() + flag.as_slice()),
+					&Scope::Ignore | &Scope::Compiler => None
+				}
 			}
-				&Arg::Param{ref scope, ref  flag, ref value} => {
+			&Arg::Param{ref scope, ref  flag, ref value} => {
 				match scope {
-						&Scope::Preprocessor | &Scope::Shared => {Some("/".to_string() + flag.as_slice() + value.as_slice())}
-						&Scope::Ignore | &Scope::Compiler => {None}
-					}
+					&Scope::Preprocessor | &Scope::Shared => Some("/".to_string() + flag.as_slice() + value.as_slice()),
+					&Scope::Ignore | &Scope::Compiler => None
+				}
 			}
-				&Arg::Input{..} => {None}
-				&Arg::Output{..} => {None}
-			}
+			&Arg::Input{..} => None,
+			&Arg::Output{..} => None,
+		}
 	});
 
-	let temp_file = TempFile::wrap(Path::new(task.input_source.display().to_string() + ".i~"));
+  // Add preprocessor paramters.
+	let temp_file = TempFile::new_in(temp_dir.path(), ".i");
 	args.push("/nologo".to_string());
 	args.push("/T".to_string() + task.language.as_slice());
 	args.push("/P".to_string());
@@ -319,7 +326,7 @@ fn preprocess(task: &CompilationTask) -> Result<PreprocessResult, String> {
 }
 
 
-fn compile(task: &CompilationTask, preprocessed: PreprocessResult) {
+fn compile(temp_dir: &TempDir, task: &CompilationTask, preprocessed: PreprocessResult) {
 	let mut args = filter(&task.args, |arg:&Arg|->Option<String> {
 		match arg {
 				&Arg::Flag{ref scope, ref flag} => {
@@ -388,7 +395,7 @@ fn compile(task: &CompilationTask, preprocessed: PreprocessResult) {
 	}
 
 	// Input file path.
-	let input_temp = TempFile::wrap(Path::new(task.input_source.display().to_string()+".i"));
+	let input_temp = TempFile::new_in(temp_dir.path(), ".i");
 	match File::create(input_temp.path()).write(preprocessed.content.as_slice()) {
 		Ok(()) => {}
 		Err(e) => {panic!(e);}
@@ -440,18 +447,9 @@ fn write_cache(cache: &mut File, source: &Option<Path>) -> Result<(), IoError> {
 		&Some(ref path) => {
 			match File::open(path).read_to_end() {
 				Ok(content) => {
-					match cache.write_u8(VERSION) {
-						Ok(_) => (),
-						Err(e) => return Err(e)
-					};
-					match cache.write_le_u32(content.len() as u32) {
-						Ok(_) => (),
-						Err(e) => return Err(e)
-					};
-					match cache.write(content.as_slice()) {
-						Ok(_) => (),
-						Err(e) => return Err(e)
-					};
+					try! (cache.write_u8(VERSION));
+					try! (cache.write_le_u32(content.len() as u32));
+					try! (cache.write(content.as_slice()));
 					cache.write_le_u32(MAGIC)
 				}
 				Err(e) => Err(e)
@@ -479,15 +477,9 @@ fn extract_cache(cache: &mut File, target: &Option<Path>) -> Result<(), IoError>
 		Err(e) => return Err(e)
 	};
 	// Read content.
-	let size = match cache.read_le_u32() {
-		Ok(size) => size,
-		Err(e) => return Err(e)
-	};
+	let size = try! (cache.read_le_u32());
 	// Read content.
-	let content = match cache.read_exact(size as usize) {
-		Ok(content) => content,
-		Err(e) => return Err(e)
-	};
+	let content = try! (cache.read_exact(size as usize));
 	// Check magic.
 	match cache.read_le_u32() {
 		Ok(mark) if mark == MAGIC => (),
@@ -503,19 +495,6 @@ fn extract_cache(cache: &mut File, target: &Option<Path>) -> Result<(), IoError>
 		Ok(_) => Ok(()),
 		Err(e) => Err(e)
 	}
-}
-
-fn filter<T, R, F:Fn(&T) -> Option<R>>(args: &Vec<T>, filter:F) -> Vec<R> {
-	let mut result: Vec<R> = Vec::new();
-	for arg in args.iter() {
-		match filter(arg) {
-				Some(v) => {
-					result.push(v);
-			}
-				None => {}
-			}
-	}
-	result
 }
 
 fn parse_arguments(args: &[String]) -> Result<Vec<Arg>, String> {

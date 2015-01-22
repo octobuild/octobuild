@@ -1,3 +1,5 @@
+extern crate uuid;
+
 use std::io::fs;
 use std::io::IoResult;
 
@@ -7,6 +9,11 @@ pub struct TempFile {
 }
 
 impl TempFile {
+	/// Create random file name in specified directory.
+	pub fn new_in(path: &Path, suffix: &str) -> TempFile {
+		TempFile::wrap(path.join(Path::new(uuid::Uuid::new_v4().to_string() + suffix)))
+	}
+
 	/// Wrap path to a temporary file. The file will be automatically
 	/// deleted once the returned wrapper is destroyed.
 	///
