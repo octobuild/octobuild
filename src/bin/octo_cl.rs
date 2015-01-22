@@ -7,6 +7,7 @@ use octobuild::wincmd;
 use octobuild::io::tempfile::TempFile;
 use octobuild::vs::compiler::VsCompiler;
 use octobuild::compiler::Compiler;
+use octobuild::compiler::{Arg, InputKind, OutputKind, Scope, CompilationTask, PreprocessResult};
 use octobuild::utils::filter;
 use std::ascii::AsciiExt;
 use std::str::StrExt;
@@ -16,68 +17,6 @@ use std::slice::{Iter};
 
 use std::io::{Command, File, IoError, IoErrorKind, TempDir};
 
-// Scope of command line argument.
-#[derive(Show)]
-#[derive(PartialEq)]
-enum Scope {
-// Preprocessing argument
-Preprocessor,
-// Compiler argument
-Compiler,
-// Preprocessor & compiler argument
-Shared,
-// Unknown argument - local build only
-Ignore,
-}
-
-#[derive(Show)]
-#[derive(PartialEq)]
-enum InputKind {
-Source,
-Marker,
-Precompiled,
-}
-
-#[derive(Show)]
-#[derive(PartialEq)]
-enum OutputKind {
-Object,
-Marker,
-}
-
-#[derive(Show)]
-#[derive(PartialEq)]
-enum Arg {
-Flag{scope:Scope, flag: String},
-Param{scope:Scope, flag: String, value: String},
-Input{kind:InputKind, flag: String, file: String},
-Output{kind:OutputKind, flag: String, file: String}
-}
-
-#[derive(Show)]
-struct CompilationTask {
-// Parsed arguments.
-args: Vec<Arg>,
-// Source language.
-language: String,
-// Input source file name.
-input_source: Path,
-// Input precompiled header file name.
-input_precompiled: Option<Path>,
-// Output object file name.
-output_object: Path,
-// Output precompiled header file name.
-output_precompiled: Option<Path>,
-// Marker for precompiled header.
-marker_precompiled: Option<String>,
-}
-
-struct PreprocessResult {
-	// Hash
-	hash: String,
-	// Preprocessed file
-	content: Vec<u8>,
-}
 
 fn main() {
 	let result = parse_compilation_task(&os::args()[1..]);
@@ -85,10 +24,11 @@ fn main() {
 		Ok(result) => result,
 		Err(e) => {panic!(e);}
 	};
+	let compiler = VsCompiler::new(temp_dir.path());
 	println!("Parsed task: {:?}", result);
 	match result {
 			Ok(task) => {
-				match preprocess(&temp_dir, &task) {
+				match compiler.preprocess(&task) {
 					Ok(result) => {
 						compile(&temp_dir, &task, result);
 					}
@@ -243,85 +183,6 @@ fn parse_compilation_task(args: &[String]) -> Result<CompilationTask, String> {
 			})
 		}
 			Err(e) => {Err(e)}
-		}
-}
-
-fn preprocess(temp_dir: &TempDir, task: &CompilationTask) -> Result<PreprocessResult, String> {
-	// Make parameters list for preprocessing.
-	let mut args = filter(&task.args, |arg:&Arg|->Option<String> {
-		match arg {
-			&Arg::Flag{ref scope, ref flag} => {
-				match scope {
-					&Scope::Preprocessor | &Scope::Shared => Some("/".to_string() + flag.as_slice()),
-					&Scope::Ignore | &Scope::Compiler => None
-				}
-			}
-			&Arg::Param{ref scope, ref  flag, ref value} => {
-				match scope {
-					&Scope::Preprocessor | &Scope::Shared => Some("/".to_string() + flag.as_slice() + value.as_slice()),
-					&Scope::Ignore | &Scope::Compiler => None
-				}
-			}
-			&Arg::Input{..} => None,
-			&Arg::Output{..} => None,
-		}
-	});
-
-  // Add preprocessor paramters.
-	let temp_file = TempFile::new_in(temp_dir.path(), ".i");
-	args.push("/nologo".to_string());
-	args.push("/T".to_string() + task.language.as_slice());
-	args.push("/P".to_string());
-	args.push(task.input_source.display().to_string());
-
-	// Hash data.
-	let mut hash = sha1::Sha1::new();
-	{
-		use std::hash::Writer;
-		hash.write(&[0]);
-		hash.write(wincmd::join(&args).as_bytes());
-	}
-
-	args.push("/Fi".to_string() + temp_file.path().display().to_string().as_slice());
-
-	let compiler:VsCompiler = Compiler::new();
-	println!("Preprocess");
-	println!(" - args: {}", wincmd::join(&args));
-	match Command::new("cl.exe")
-	.args(args.as_slice())
-	.output(){
-			Ok(output) => {
-			println!("stderr: {}", String::from_utf8_lossy(output.error.as_slice()));
-			if output.status.success() {
-						let result = match File::open(temp_file.path()).read_to_end() {
-								Ok(content) => {
-								match compiler.filter_preprocessed(content.as_slice(), &task.marker_precompiled, task.output_precompiled.is_some()) {
-										Ok(output) => {
-										{
-											use std::hash::Writer;
-											hash.write(output.as_slice());
-										}
-										println!("Hash: {}", hash.hexdigest());
-										Ok(PreprocessResult{
-										hash: hash.hexdigest(),
-										content: output
-										})
-									}
-										Err(e) => {
-											Err(e)
-									}
-									}
-							}
-								Err(e) => {
-									Err(e.to_string())
-							}
-							};
-					result
-				} else {
-					Err(format!("Preprocessing command with arguments failed: {:?}", args))
-			}
-		}
-			Err(e) => {Err(e.to_string())}
 		}
 }
 
