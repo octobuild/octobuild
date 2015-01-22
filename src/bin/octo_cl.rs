@@ -329,7 +329,9 @@ fn filter_precompiled(input: &[u8], marker: &Option<String>, keep_headers: bool)
 				Some(c) => {
 				match *c {
 						b'\n' | b'\r' => {
-							result.push(*c);
+							if keep_headers {
+								result.push(*c);
+							}
 							line_begin = true;
 					}
 						b'\t' | b' ' => {
@@ -364,8 +366,10 @@ fn filter_precompiled(input: &[u8], marker: &Option<String>, keep_headers: bool)
 											Some(file)
 									}
 									};
-									result.push(*c);
-									result.push_all(raw.as_slice());
+									if keep_headers {
+										result.push(*c);
+										result.push_all(raw.as_slice());
+									}
 							}
 								Directive::HdrStop(raw) => {
 									result.push(*c);
@@ -373,8 +377,10 @@ fn filter_precompiled(input: &[u8], marker: &Option<String>, keep_headers: bool)
 									break;
 							}
 								Directive::Unknown(raw) => {
-									result.push(*c);
-									result.push_all(raw.as_slice());
+									if keep_headers {
+										result.push(*c);
+										result.push_all(raw.as_slice());
+									}
 							}
 							}
 					}
@@ -606,6 +612,21 @@ fn compile(task: &CompilationTask, preprocessed: PreprocessResult) {
 		hash.write(wincmd::join(&args).as_bytes());
 		hash.write(&[0]);
 		hash.write(preprocessed.hash.as_bytes());
+		hash.write(&[0]);
+		match &task.input_precompiled {
+			&Some(ref path) => {
+				match File::open(path).read_to_end() {
+					Ok(content) => {
+						hash.write(content.as_slice());
+					}
+					Err(e) => {
+						return;
+					}
+				}
+			}
+			&None => {}
+		}
+
 		cache_path = Path::new(".".to_string() + hash.hexdigest().as_slice());
 	}
 
@@ -667,65 +688,68 @@ fn compile(task: &CompilationTask, preprocessed: PreprocessResult) {
 	fs::unlink(&input_temp);
 }
 
+const VERSION: u8 = 1;
+const MAGIC: u32 = 0x1e457b89;
+
 fn write_cache(cache: &mut File, source: &Option<Path>) {
 	match source {
 		&Some(ref path) => {
 			match File::open(path).read_to_end() {
 				Ok(content) => {
-					cache.write_u8(0);
+					cache.write_u8(VERSION);
 					cache.write_le_u32(content.len() as u32);
 					cache.write(content.as_slice());
+					cache.write_le_u32(MAGIC);
 				}
 				Err(e) => {
-					cache.write_u8(2);
+					cache.write_u8(1);
 				}
 			}
 		}
 		&None => {
-			cache.write_u8(1);
 		}
 	}
 }
 
 fn extract_cache(cache: &mut File, target: &Option<Path>) -> Result<(), IoError> {
-	match target {
-		&Some(ref path) => {
-			match cache.read_u8() {
-				Ok(mark) if mark == 0 => {
-					match cache.read_le_u32() {
-						Ok(size) => {
-							match cache.read_exact(size as usize) {
-								Ok(content) => {
-									match File::create(path).write(content.as_slice()) {
-										Ok(file) => Ok(()),
-										Err(e) => Err(e)
-									}
-								}
-								Err(e) => Err(e)
-							}
-						}
-						Err(e) => Err(e)
-					}
-				}
-				Ok(_) => Err(IoError {
-					kind: IoErrorKind::InvalidInput,
-					desc: "Unexpected file data",
-					detail: None
-				}),
-				Err(e) => Err(e)
-			}
-		}
-		&None => {
-			match cache.read_u8() {
-				Ok(mark) if mark == 1 => Ok(()),
-				Ok(_) => Err(IoError {
-					kind: IoErrorKind::InvalidInput,
-					desc: "Unexpected file data",
-					detail: None
-				}),
-				Err(e) => Err(e)
-			}
-		}
+	let path = match target {
+		&Some(ref path) => path,
+		&None => return Ok(())
+	};
+	// Check version.
+	match cache.read_u8() {
+		Ok(mark) if mark == VERSION => (),
+		Ok(_) => return Err(IoError {
+			kind: IoErrorKind::InvalidInput,
+			desc: "Unexpected file data",
+			detail: None
+		}),
+		Err(e) => return Err(e)
+	};
+	// Read content.
+	let size = match cache.read_le_u32() {
+		Ok(size) => size,
+		Err(e) => return Err(e)
+	};
+	// Read content.
+	let content = match cache.read_exact(size as usize) {
+		Ok(content) => content,
+		Err(e) => return Err(e)
+	};
+	// Check magic.
+	match cache.read_le_u32() {
+		Ok(mark) if mark == MAGIC => (),
+		Ok(_) => return Err(IoError {
+			kind: IoErrorKind::InvalidInput,
+			desc: "Unexpected file data",
+			detail: None
+		}),
+		Err(e) => return Err(e)
+	};
+	// Write result.
+	match File::create(path).write(content.as_slice()) {
+		Ok(file) => Ok(()),
+		Err(e) => Err(e)
 	}
 }
 
