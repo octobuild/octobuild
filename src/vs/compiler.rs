@@ -68,8 +68,6 @@ impl Compiler for VsCompiler {
 			hash.write(wincmd::join(&args).as_bytes());
 		}
 	
-		println!("Preprocess");
-		println!(" - args: {}", wincmd::join(&args));
 		let mut command = task.command.clone();
 		command
 			.args(args.as_slice())

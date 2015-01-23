@@ -35,7 +35,8 @@ pub fn filter_preprocessed(input: &[u8], marker: &Option<String>, keep_headers: 
 					b'#' if line_begin => {
 						let directive = read_directive(&mut iter);
 						match directive {
-							Directive::Line(raw, file) => {
+							Directive::Line(raw, raw_file) => {
+								let file = raw_file.replace("\\", "/");
 								entry_file = match entry_file {
 									Some(path) => {
 										if header_found && (path  == file) {
@@ -45,8 +46,9 @@ pub fn filter_preprocessed(input: &[u8], marker: &Option<String>, keep_headers: 
 											break;
 										}
 										match *marker {
-											Some(ref path) => {
-												if Path::new(file).ends_with_path(&Path::new(path.as_slice())) {
+											Some(ref raw_path) => {
+												let path = raw_path.replace("\\", "/");
+												if file == path || Path::new(file.as_slice()).ends_with_path(&Path::new(path.as_slice())) {
 													header_found = true;
 												}
 											}
@@ -313,6 +315,31 @@ int main(int argc, char **argv) {
 	assert_eq!(String::from_utf8_lossy(filtered.unwrap().as_slice()), r#"# pragma  hdrstop
 void data();
 # pragma once
+#line 2 "sample.cpp"
+
+int main(int argc, char **argv) {
+	return 0;
+}
+"#);
+}
+
+#[test]
+fn test_filter_precompiled_xxx() {
+	let filtered = filter_preprocessed(br#"#line 1 "sample.cpp"
+#line 1 "e:\\work\\octobuild\\test_cl\\sample header.h"
+# pragma once
+void hello();
+#line 2 "sample.cpp"
+
+int main(int argc, char **argv) {
+	return 0;
+}
+"#, &Some("e:\\work\\octobuild\\test_cl\\sample header.h".to_string()), true);
+	assert_eq!(String::from_utf8_lossy(filtered.unwrap().as_slice()), r#"#line 1 "sample.cpp"
+#line 1 "e:\\work\\octobuild\\test_cl\\sample header.h"
+# pragma once
+void hello();
+#pragma hdrstop
 #line 2 "sample.cpp"
 
 int main(int argc, char **argv) {
