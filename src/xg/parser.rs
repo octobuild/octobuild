@@ -29,7 +29,7 @@ struct XgTool {
 
 pub fn parse<B: Buffer>(reader: B) -> Result<Graph<BuildTask, ()>, String> {
 	let mut parser = EventReader::new(reader);
-	let mut tasks:Vec<XgTask> = vec![];
+	let mut tasks:Vec<XgTask> = Vec::new();
 	let mut tools:HashMap<String, XgTool> = HashMap::new();
 	for e in parser.events() {
 		match e {
@@ -69,7 +69,7 @@ pub fn parse<B: Buffer>(reader: B) -> Result<Graph<BuildTask, ()>, String> {
 
 fn parse_create_graph(tasks:&Vec<XgTask>, tools:&HashMap<String, XgTool>) -> Result<Graph<BuildTask, ()>, String> {
 	let mut graph: Graph<BuildTask, ()> = Graph::new();
-	let mut nodes: Vec<NodeIndex> = vec![];
+	let mut nodes: Vec<NodeIndex> = Vec::new();
 	let mut task_refs: HashMap<&str, NodeIndex> = HashMap::new();
 	for task in tasks.iter() {
 		match tools.get(task.tool.as_slice()){
@@ -80,7 +80,7 @@ fn parse_create_graph(tasks:&Vec<XgTask>, tools:&HashMap<String, XgTool>) -> Res
 						_ => {
 							match tool.output {
 								Some(ref v) => {v.clone()}
-								_ => "".to_string()
+								_ => String::new()
 							}
 						}
 					},
@@ -142,7 +142,7 @@ fn parse_task (attributes: & Vec<xml::attribute::OwnedAttribute>)->Result<XgTask
 		_ => {return Err("Invalid task data: attribute @WorkingDir not found.".to_string());}
 	}
 	// DependsOn
-	let mut depends_on : Vec<String> = vec![];
+	let mut depends_on : Vec<String> = Vec::new();
 	match attrs.remove("DependsOn") {
 		Some(v) => {
 			for item in v.split_str(";").collect::<Vec<&str>>().iter() {
@@ -183,7 +183,7 @@ fn parse_tool (attributes: &Vec<xml::attribute::OwnedAttribute>)->Result<XgTool,
 		output: attrs.remove("OutputPrefix"),
 		args: match attrs.remove("Params") {
 			Some(v) => {v}
-			_ => {"".to_string()}
+			_ => {String::new()}
 		},
 	})
 }

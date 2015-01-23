@@ -1,8 +1,8 @@
 // Parsing command line arguments from singe line.
 // See also: http://msdn.microsoft.com/en-us/library/17w5ykft.aspx
 pub fn parse(cmd: &str) -> Vec<String> {
-	let mut args: Vec<String> = vec![];
-	let mut arg: String = "".to_string();
+	let mut args: Vec<String> = Vec::new();
+	let mut arg: String = String::new();
 	let mut slash: usize = 0;
 	let mut quote = false;
 	let mut data = false;
@@ -16,7 +16,7 @@ pub fn parse(cmd: &str) -> Vec<String> {
 					data = true;
 				} else if data {
 					args.push(arg);
-					arg = "".to_string();
+					arg = String::new();
 					data = false;
 				}
 			}
@@ -35,7 +35,7 @@ pub fn parse(cmd: &str) -> Vec<String> {
 				data = true;
 			}
 			_ => {
-				arg = add_slashes(arg, if quote && ((slash & 2) == 0) {slash / 2} else {slash});
+				arg = add_slashes(arg, if quote && ((slash % 2) == 0) {slash / 2} else {slash});
 				slash = 0;
 				arg.push(c);
 				data = true;
@@ -43,22 +43,37 @@ pub fn parse(cmd: &str) -> Vec<String> {
 		}
 	}
 	arg = add_slashes(arg, if quote && ((slash % 2) == 0) {slash / 2} else {slash});
-	slash = 0;
 	if data {
 		args.push(arg);
 	}
 	return args;
 }
 
+pub fn join(args: &Vec<String>) -> String {
+	let mut result = String::new();
+	for arg in args.iter() {
+		if result.len() > 0 {
+			result = result + " ";
+		}
+		result = result + escape(arg.as_slice()).as_slice();
+	}
+	result
+}
+
+pub fn escape(arg: &str) -> String {
+	// todo: Доделать
+	arg.to_string()
+}
+
 fn add_slashes(mut line: String, count: usize) -> String {
-	for i in range(0, count) {
+	for _ in range(0, count) {
 		line.push('\\');
 	}
 	line
 }
 
 pub fn expand_arg<F: Fn(&str) -> Option<String>>(arg: &str, resolver: &F) -> String {
-	let mut result = "".to_string();
+	let mut result = String::new();
 	let mut suffix = arg;
 	loop {
 		match suffix.find_str("$(") {
@@ -92,7 +107,7 @@ pub fn expand_arg<F: Fn(&str) -> Option<String>>(arg: &str, resolver: &F) -> Str
 }
 
 pub fn expand_args<F: Fn(&str) -> Option<String>>(args: &Vec<String>, resolver: &F) -> Vec<String> {
-	let mut result:Vec<String> = vec![];
+	let mut result:Vec<String> = Vec::new();
 	for arg in args.iter() {
 		result.push(expand_arg(arg.as_slice(), resolver));
 	}
@@ -153,4 +168,9 @@ fn test_parse_6() {
 #[test]
 fn test_parse_7() {
 	assert_eq!(parse("C:\\Windows\\System32 d e"), ["C:\\Windows\\System32", "d", "e"]);
+}
+
+#[test]
+fn test_parse_8() {
+	assert_eq!(parse("/TEST\"C:\\Windows\\System32\" d e"), ["/TESTC:\\Windows\\System32", "d", "e"]);
 }

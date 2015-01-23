@@ -4,9 +4,12 @@
 
 # Compiled files
 *.o
+*.obj
 *.so
 *.rlib
 *.dll
+*.i
+*.pch
 
 # Executables
 *.exe

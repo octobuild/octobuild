@@ -5,11 +5,13 @@ use octobuild::common::{BuildTask};
 use octobuild::wincmd;
 use octobuild::xg;
 use octobuild::graph::{Graph, NodeIndex, Node, EdgeIndex, Edge};
+use octobuild::vs::compiler::VsCompiler;
+use octobuild::compiler::Compiler;
 
 use std::os;
 
-use std::io::{Command, File, BufferedReader};
-use std::io::process::ProcessExit;
+use std::io::{Command, File, BufferedReader, IoError, TempDir};
+use std::io::process::{ProcessExit, ProcessOutput};
 use std::sync::{Arc, Mutex};
 use std::sync::mpsc::{channel, Sender, Receiver};
 use std::thread::Thread;
@@ -32,8 +34,13 @@ exit_code: ProcessExit,
 }
 
 fn main() {
+	let temp_dir = match TempDir::new("octobuild") {
+		Ok(result) => result,
+		Err(e) => {panic!(e);}
+	};
+
 	println!("XGConsole:");
-	for arg in parse_command_line(os::args()).iter() {
+	for arg in os::args().iter() {
 		println!("  {}", arg);
 	}
 
@@ -41,19 +48,20 @@ fn main() {
 	let (tx_task, rx_task): (Sender<TaskMessage>, Receiver<TaskMessage>) = channel();
 
 	let mutex_rx_task = create_threads(rx_task, tx_result, std::os::num_cpus(), |worker_id:usize| {
+		let temp_path = temp_dir.path().clone();
 		move |task:TaskMessage| -> ResultMessage {
-			println!("{}: {:?}", worker_id, task);
-			execute_task(task)
+			println!("{}: {:?}", worker_id, task.task.title);
+			execute_task(&temp_path, task)
 		}
 	});
 
 	let args = os::args();
 	let mut path;
 	if args.len() <= 1 {
-				path = Path::new(&args[0]).dir_path();
-				path.push("../tests/graph-parser.xml");
+		path = Path::new(&args[0]).dir_path();
+		path.push("../tests/graph-parser.xml");
 	} else {
-			path =Path::new(&args[1]);
+		path = Path::new(&args[1]);
 	}
 	println!("Example path: {}", path.display());
 	match File::open(&path) {
@@ -103,8 +111,8 @@ fn create_threads<R: Send, T: Send, Worker:Fn(T) -> R + Send, Factory:Fn(usize) 
 }
 
 fn validate_graph(graph: Graph<BuildTask, ()>) -> Result<Graph<BuildTask, ()>, String> {
-	let mut completed:Vec<bool> = vec![];
-	let mut queue:Vec<NodeIndex> = vec![];
+	let mut completed:Vec<bool> = Vec::new();
+	let mut queue:Vec<NodeIndex> = Vec::new();
 		graph. each_node(|index: NodeIndex, _:&Node<BuildTask>|->bool {
 			completed.push(false);
 			queue.push(index);
@@ -130,33 +138,44 @@ fn validate_graph(graph: Graph<BuildTask, ()>) -> Result<Graph<BuildTask, ()>, S
 	return Err("Found cycles in build dependencies.".to_string());
 }
 
-fn execute_task(message: TaskMessage) -> ResultMessage {
+fn execute_task(temp_dir: &Path, message: TaskMessage) -> ResultMessage {
 	println!("{}", message.task.title);
 
 	let args = wincmd::expand_args(&message.task.args, &|name:&str|->Option<String>{os::getenv(name)});
-	match Command::new(message.task.exec)
-	.args(args.as_slice())
-	.cwd(&Path::new(&message.task.working_dir))
-	.output(){
-			Ok(output) => {
+	match execute_compiler(temp_dir, message.task.exec.as_slice(), &Path::new(&message.task.working_dir), args.as_slice()) {
+		Ok(output) => {
 			println!("stdout: {}", String::from_utf8_lossy(output.output.as_slice()));
 			println!("stderr: {}", String::from_utf8_lossy(output.error.as_slice()));
 			ResultMessage {
-			index: message.index,
-			result: Ok(BuildResult {
-			exit_code: output.status
+				index: message.index,
+				result: Ok(BuildResult {
+				exit_code: output.status
 			})
-			}}
-			Err(e) => {
+		}}
+		Err(e) => {
 			ResultMessage {
-			index: message.index,
-			result: Err(format!("Failed to start process: {}", e))}
+				index: message.index,
+				result: Err(format!("Failed to start process: {}", e))
+			}
 		}
-		}
+	}
+}
+
+fn execute_compiler(temp_dir: &Path, program: &str, cwd: &Path, args: &[String]) -> Result<ProcessOutput, IoError> {
+	let mut command = Command::new(program);
+	command.cwd(cwd);
+	if Path::new(program).ends_with_path(&Path::new("cl.exe")) {
+		let compiler = VsCompiler::new(temp_dir);
+		compiler.compile(&Command::new("cl.exe"), args)
+	} else {
+		command
+			.args(args.as_slice())
+			.output()
+	}
 }
 
 fn execute_graph(graph: &Graph<BuildTask, ()>, tx_task: Sender<TaskMessage>, rx_task: Arc<Mutex<Receiver<TaskMessage>>>, rx_result: Receiver<ResultMessage>) {
-	let mut completed:Vec<bool> = vec![];
+	let mut completed:Vec<bool> = Vec::new();
 		graph. each_node(|index: NodeIndex, node:&Node<BuildTask>|->bool {
 		let mut has_edges = false;
 			graph.each_outgoing_edge(index, |_:EdgeIndex, _:&Edge<()>| -> bool {
@@ -206,7 +225,7 @@ fn execute_graph(graph: &Graph<BuildTask, ()>, tx_task: Sender<TaskMessage>, rx_
 		}
 	}
 	// No more tasks.
-		free(tx_task);
+	free(tx_task);
 	// Cleanup task list.
 	match rx_task.lock() {
 			queue => {
@@ -233,12 +252,4 @@ fn is_ready(graph: &Graph<BuildTask, ()>, completed: &Vec<bool>, source: &NodeIn
 		}
 	});
 	ready
-}
-
-fn parse_command_line(args: Vec<String>) -> Vec<String> {
-	let mut result: Vec<String> = Vec::new();
-	for arg in args.slice(1, args.len()).iter() {
-			result.push(arg.clone());
-	}
-	result
 }
