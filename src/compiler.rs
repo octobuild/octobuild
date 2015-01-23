@@ -81,7 +81,7 @@ pub trait Compiler {
 	fn compile_step(&self, task: &CompilationTask, preprocessed: PreprocessResult) -> Result<ProcessOutput, IoError>;
 
   // Run preprocess and compile.
-	fn compile(&self, command: &Command, args: &[String]) -> Result<ProcessOutput, IoError> {
+	fn try_compile(&self, command: &Command, args: &[String]) -> Result<ProcessOutput, IoError> {
 		match self.create_task(command, args) {
 			Ok(task) => self.compile_step(&task, try! (self.preprocess_step(&task))),
 			Err(e) => Err(IoError {
@@ -89,6 +89,15 @@ pub trait Compiler {
 				desc: "Can't parse command line arguments",
 				detail: Some(e)
 			})
+		}
+	}
+
+  // Run preprocess and compile.
+	fn compile(&self, command: &Command, args: &[String]) -> Result<ProcessOutput, IoError> {
+		match self.try_compile(command, args) {
+			Ok(output) => Ok(output),
+			// todo: log error reason
+			Err(_) => command.clone().args(args).output()
 		}
 	}
 }
