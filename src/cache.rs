@@ -1,7 +1,9 @@
 extern crate "sha1-hasher" as sha1;
 extern crate compress;
 
-use std::io::{File, IoError, IoErrorKind, Reader, Writer};
+use std::os;
+use std::io::fs;
+use std::io::{File, IoError, IoErrorKind, Reader, Writer, USER_RWX};
 use std::io::process::{ProcessOutput, ProcessExit};
 
 const HEADER: &'static [u8] = b"OBCF\x00\x01";
@@ -13,14 +15,15 @@ pub struct Cache {
 
 impl Cache {
 	pub fn new() -> Self {
+		let cache_dir = os::homedir().unwrap().join_many(&[".octobuild", "cache"]);
 		Cache {
-			cache_dir: Path::new(".")
+			cache_dir: cache_dir
 		}
 	}
 
 	pub fn run_cached<F: Fn()->Result<ProcessOutput, IoError>>(&self, params: &str, inputs: &Vec<Path>, outputs: &Vec<Path>, worker: F) -> Result<ProcessOutput, IoError> {
 		let hash = try! (generate_hash(params, inputs));
-		let path = Path::new(".".to_string() + hash.as_slice());
+		let path = self.cache_dir.join(hash.slice(0, 2)).join(hash.slice(2, 4)).join(hash.slice_from(4));
 		println!("Cache file: {:?}", path);
 		// Try to read data from cache.
 		match read_cache(&path, outputs) {
@@ -55,6 +58,7 @@ fn write_cache(path: &Path, paths: &Vec<Path>, output: &ProcessOutput) -> Result
 	if !output.status.success() {
 		return Ok(());
 	}
+	try! (fs::mkdir_recursive(&path.dir_path(), USER_RWX));
 	let mut stream = compress::lz4::Encoder::new(try! (File::create(path)));
 	try! (stream.write(HEADER));
 	try! (stream.write_le_uint(paths.len()));
