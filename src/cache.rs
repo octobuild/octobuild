@@ -51,8 +51,7 @@ fn generate_hash(params: &str, inputs: &Vec<Path>) -> Result<String, IoError> {
 }
 
 fn write_cache(path: &Path, paths: &Vec<Path>) -> Result<(), IoError> {
-	let mut file = try! (File::create(path));
-	let mut stream = compress::lz4::Encoder::new(file);
+	let mut stream = compress::lz4::Encoder::new(try! (File::create(path)));
 	try! (stream.write(HEADER));
 	try! (stream.write_le_u16(paths.len() as u16));
 	for path in paths.iter() {
@@ -66,8 +65,7 @@ fn write_cache(path: &Path, paths: &Vec<Path>) -> Result<(), IoError> {
 }
 
 fn read_cache(path: &Path, paths: &Vec<Path>) -> Result<(), IoError> {
-	let mut file = try! (File::open(path));
-	let mut stream = compress::lz4::Decoder::new(file);
+	let mut stream = compress::lz4::Decoder::new(try! (File::open(path)));
 	if try! (stream.read_exact(HEADER.len())) != HEADER {
 		return Err(IoError {
 			kind: IoErrorKind::InvalidInput,

@@ -31,7 +31,7 @@ impl Compiler for VsCompiler {
 		super::prepare::create_task(args)
 	}
 
-	fn preprocess(&self, task: &CompilationTask) -> Result<PreprocessResult, IoError> {
+	fn preprocess_step(&self, task: &CompilationTask) -> Result<PreprocessResult, IoError> {
 		// Make parameters list for preprocessing.
 		let mut args = filter(&task.args, |arg:&Arg|->Option<String> {
 			match arg {
@@ -108,7 +108,7 @@ impl Compiler for VsCompiler {
 	}
 
 	// Compile preprocessed file.
-	fn compile(&self, task: &CompilationTask, preprocessed: PreprocessResult) -> Result<(), IoError> {
+	fn compile_step(&self, task: &CompilationTask, preprocessed: PreprocessResult) -> Result<(), IoError> {
 		let mut args = filter(&task.args, |arg:&Arg|->Option<String> {
 			match arg {
 				&Arg::Flag{ref scope, ref flag} => {
