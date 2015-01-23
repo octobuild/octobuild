@@ -11,6 +11,7 @@ use super::super::utils::hash_sha1;
 use super::super::io::tempfile::TempFile;
 
 use std::io::{Command, File, IoError, IoErrorKind};
+use std::io::process::ProcessOutput;
 
 pub struct VsCompiler {
 	cache: Cache,
@@ -108,7 +109,7 @@ impl Compiler for VsCompiler {
 	}
 
 	// Compile preprocessed file.
-	fn compile_step(&self, task: &CompilationTask, preprocessed: PreprocessResult) -> Result<(), IoError> {
+	fn compile_step(&self, task: &CompilationTask, preprocessed: PreprocessResult) -> Result<ProcessOutput, IoError> {
 		let mut args = filter(&task.args, |arg:&Arg|->Option<String> {
 			match arg {
 				&Arg::Flag{ref scope, ref flag} => {
@@ -153,7 +154,7 @@ impl Compiler for VsCompiler {
 		}
 	
 		let hash_params = hash_sha1(preprocessed.content.as_slice()) + wincmd::join(&args).as_slice();
-		self.cache.run_cached(hash_params.as_slice(), &inputs, &outputs, || -> Result<(), IoError> {
+		self.cache.run_cached(hash_params.as_slice(), &inputs, &outputs, || -> Result<ProcessOutput, IoError> {
 			// Input file path.
 			let input_temp = TempFile::new_in(&self.temp_dir, ".i");
 			try! (File::create(input_temp.path()).write(preprocessed.content.as_slice()));
@@ -171,12 +172,8 @@ impl Compiler for VsCompiler {
 			match &task.output_precompiled {
 				&Some(ref path) => {command.arg("/Fp".to_string() + path.display().to_string().as_slice());}
 				&None => {}
-			}
-		
-			let output = try! (command.output());
-			println!("stdout: {}", String::from_utf8_lossy(output.output.as_slice()));
-			println!("stderr: {}", String::from_utf8_lossy(output.error.as_slice()));
-			Ok(())
+			}		
+			command.output()
 		})
 	}
 }

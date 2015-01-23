@@ -1,5 +1,6 @@
 use std::io::IoError;
 use std::io::IoErrorKind;
+use std::io::process::ProcessOutput;
 
 // Scope of command line argument.
 #[derive(Copy)]
@@ -75,10 +76,10 @@ pub trait Compiler {
 	fn preprocess_step(&self, task: &CompilationTask) -> Result<PreprocessResult, IoError>;
 
 	// Compile preprocessed file.
-	fn compile_step(&self, task: &CompilationTask, preprocessed: PreprocessResult) -> Result<(), IoError>;
+	fn compile_step(&self, task: &CompilationTask, preprocessed: PreprocessResult) -> Result<ProcessOutput, IoError>;
 
   // Run preprocess and compile.
-	fn compile(&self, args: &[String]) -> Result<(), IoError> {
+	fn compile(&self, args: &[String]) -> Result<ProcessOutput, IoError> {
 		match self.create_task(args) {
 			Ok(task) => self.compile_step(&task, try! (self.preprocess_step(&task))),
 			Err(e) => Err(IoError {
