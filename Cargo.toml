@@ -9,5 +9,9 @@ version = "*"
 [dependencies.sha1-hasher]
 version = "*"
 
-[dependencies]
-uuid = "*"
+[dependencies.uuid]
+version = "*"
+
+[dependencies.compress]
+git = "https://github.com/alexcrichton/rust-compress.git"
+version = "*"

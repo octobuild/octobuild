@@ -72,4 +72,7 @@ pub trait Compiler {
 
 	// Preprocessing source file.
 	fn preprocess(&self, task: &CompilationTask) -> Result<PreprocessResult, IoError>;
+
+	// Compile preprocessed file.
+	fn compile(&self, task: &CompilationTask, preprocessed: PreprocessResult) -> Result<(), IoError>;
 }

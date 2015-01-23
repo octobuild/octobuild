@@ -1,8 +1,10 @@
 extern crate "sha1-hasher" as sha1;
+extern crate compress;
 
 use std::io::{File, IoError, IoErrorKind};
 
 const HEADER: &'static [u8] = b"OBCF\x00\x01";
+const FOOTER: &'static [u8] = b"END\x00";
 
 pub struct Cache {
 	cache_dir: Path
@@ -50,26 +52,30 @@ fn generate_hash(params: &str, inputs: &Vec<Path>) -> Result<String, IoError> {
 
 fn write_cache(path: &Path, paths: &Vec<Path>) -> Result<(), IoError> {
 	let mut file = try! (File::create(path));
-	try! (file.write(HEADER));
-	try! (file.write_le_u16(paths.len() as u16));
+	let mut stream = compress::lz4::Encoder::new(file);
+	try! (stream.write(HEADER));
+	try! (stream.write_le_u16(paths.len() as u16));
 	for path in paths.iter() {
 		let content = try! (File::open(path).read_to_end());
-		try! (file.write_le_u32(content.len() as u32));
-		try! (file.write(content.as_slice()));			
+		try! (stream.write_le_u32(content.len() as u32));
+		try! (stream.write(content.as_slice()));			
 	}
+	try! (stream.write(FOOTER));
+	try! (stream.flush());
 	Ok(())
 }
 
 fn read_cache(path: &Path, paths: &Vec<Path>) -> Result<(), IoError> {
 	let mut file = try! (File::open(path));
-	if try! (file.read_exact(HEADER.len())) != HEADER {
+	let mut stream = compress::lz4::Decoder::new(file);
+	if try! (stream.read_exact(HEADER.len())) != HEADER {
 		return Err(IoError {
 			kind: IoErrorKind::InvalidInput,
 			desc: "Invalid cache file header",
 			detail: Some(path.display().to_string())
 		})
 	}
-	if try! (file.read_le_u16()) as usize != paths.len() {
+	if try! (stream.read_le_u16()) as usize != paths.len() {
 		return Err(IoError {
 			kind: IoErrorKind::InvalidInput,
 			desc: "Unexpected count of packed cached files",
@@ -77,9 +83,16 @@ fn read_cache(path: &Path, paths: &Vec<Path>) -> Result<(), IoError> {
 		})
 	} 
 	for path in paths.iter() {
-		let size = try! (file.read_le_u32()) as usize;
-		let content = try! (file.read_exact(size));
+		let size = try! (stream.read_le_u32()) as usize;
+		let content = try! (stream.read_exact(size));
 		try! (File::create(path).write(content.as_slice()));		
+	}
+	if try! (stream.read_exact(FOOTER.len())) != FOOTER {
+		return Err(IoError {
+			kind: IoErrorKind::InvalidInput,
+			desc: "Invalid cache file footer",
+			detail: Some(path.display().to_string())
+		})
 	}
 	Ok(())
 }

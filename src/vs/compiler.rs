@@ -102,4 +102,9 @@ impl Compiler for VsCompiler {
 			})
 		}
 	}
+
+	// Compile preprocessed file.
+	fn compile(&self, task: &CompilationTask, preprocessed: PreprocessResult) -> Result<(), IoError> {
+		Ok(())
+	}
 }
