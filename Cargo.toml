@@ -11,7 +11,3 @@ version = "*"
 
 [dependencies.uuid]
 version = "*"
-
-[dependencies.compress]
-git = "https://github.com/alexcrichton/rust-compress.git"
-version = "*"

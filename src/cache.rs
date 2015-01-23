@@ -1,5 +1,4 @@
 extern crate "sha1-hasher" as sha1;
-extern crate compress;
 
 use std::os;
 use std::io::fs;
@@ -59,7 +58,7 @@ fn write_cache(path: &Path, paths: &Vec<Path>, output: &ProcessOutput) -> Result
 		return Ok(());
 	}
 	try! (fs::mkdir_recursive(&path.dir_path(), USER_RWX));
-	let mut stream = compress::lz4::Encoder::new(try! (File::create(path)));
+	let mut stream = try! (File::create(path));
 	try! (stream.write(HEADER));
 	try! (stream.write_le_uint(paths.len()));
 	for path in paths.iter() {
@@ -73,7 +72,7 @@ fn write_cache(path: &Path, paths: &Vec<Path>, output: &ProcessOutput) -> Result
 }
 
 fn read_cache(path: &Path, paths: &Vec<Path>) -> Result<ProcessOutput, IoError> {
-	let mut stream = compress::lz4::Decoder::new(try! (File::open(path)));
+	let mut stream = try! (File::open(path));
 	if try! (stream.read_exact(HEADER.len())) != HEADER {
 		return Err(IoError {
 			kind: IoErrorKind::InvalidInput,
