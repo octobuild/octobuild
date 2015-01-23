@@ -1,5 +1,6 @@
 use std::io::IoError;
 use std::io::IoErrorKind;
+use std::io::Command;
 use std::io::process::ProcessOutput;
 
 // Scope of command line argument.
@@ -43,8 +44,9 @@ pub enum Arg {
 	Output{kind:OutputKind, flag: String, file: String}
 }
 
-#[derive(Show)]
 pub struct CompilationTask {
+	// Original compiler executable.
+	pub command: Command,
 	// Parsed arguments.
 	pub args: Vec<Arg>,
 	// Source language.
@@ -70,7 +72,7 @@ pub struct PreprocessResult {
 
 pub trait Compiler {
 	// Parse compiler arguments.
-	fn create_task(&self, args: &[String]) -> Result<CompilationTask, String>;
+	fn create_task(&self, command: &Command, args: &[String]) -> Result<CompilationTask, String>;
 
 	// Preprocessing source file.
 	fn preprocess_step(&self, task: &CompilationTask) -> Result<PreprocessResult, IoError>;
@@ -79,8 +81,8 @@ pub trait Compiler {
 	fn compile_step(&self, task: &CompilationTask, preprocessed: PreprocessResult) -> Result<ProcessOutput, IoError>;
 
   // Run preprocess and compile.
-	fn compile(&self, args: &[String]) -> Result<ProcessOutput, IoError> {
-		match self.create_task(args) {
+	fn compile(&self, command: &Command, args: &[String]) -> Result<ProcessOutput, IoError> {
+		match self.create_task(command, args) {
 			Ok(task) => self.compile_step(&task, try! (self.preprocess_step(&task))),
 			Err(e) => Err(IoError {
 				kind: IoErrorKind::InvalidInput,

@@ -28,8 +28,8 @@ impl VsCompiler {
 }
 
 impl Compiler for VsCompiler {
-	fn create_task(&self, args: &[String]) -> Result<CompilationTask, String> {
-		super::prepare::create_task(args)
+	fn create_task(&self, command: &Command, args: &[String]) -> Result<CompilationTask, String> {
+		super::prepare::create_task(command, args)
 	}
 
 	fn preprocess_step(&self, task: &CompilationTask) -> Result<PreprocessResult, IoError> {
@@ -70,12 +70,11 @@ impl Compiler for VsCompiler {
 	
 		println!("Preprocess");
 		println!(" - args: {}", wincmd::join(&args));
-	  let output = try! (Command::new("cl.exe")
+		let mut command = task.command.clone();
+		command
 			.args(args.as_slice())
-			.arg("/Fi".to_string() + temp_file.path().display().to_string().as_slice())
-			.output());
-	
-		println!("stderr: {}", String::from_utf8_lossy(output.error.as_slice()));
+			.arg("/Fi".to_string() + temp_file.path().display().to_string().as_slice());
+	  let output = try! (command.output());
 		if output.status.success() {
 			match File::open(temp_file.path()).read_to_end() {
 				Ok(content) => {
@@ -159,7 +158,7 @@ impl Compiler for VsCompiler {
 			let input_temp = TempFile::new_in(&self.temp_dir, ".i");
 			try! (File::create(input_temp.path()).write(preprocessed.content.as_slice()));
 			// Run compiler.
-			let mut command = Command::new("cl.exe");
+			let mut command = task.command.clone();
 			command
 				.args(args.as_slice())
 				.arg(input_temp.path().display().to_string())

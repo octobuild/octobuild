@@ -1,10 +1,11 @@
 use std::slice::Iter;
+use std::io::Command;
 use std::ascii::AsciiExt;
 
 use super::super::compiler::{Arg, CompilationTask, Scope, InputKind, OutputKind};
 use super::super::utils::filter;
 
-pub fn create_task(args: &[String]) -> Result<CompilationTask, String> {
+pub fn create_task(command: &Command, args: &[String]) -> Result<CompilationTask, String> {
 	match parse_arguments(args) {
 		Ok(parsed_args) => {
 			// Source file name.
@@ -98,34 +99,35 @@ pub fn create_task(args: &[String]) -> Result<CompilationTask, String> {
 					_ => None
 				}
 			}).as_slice() {
-					[]  => {
-					match input_source.extension_str() {
-							Some(e) if e.eq_ignore_ascii_case("cpp") => {language = "P".to_string();}
-							Some(e) if e.eq_ignore_ascii_case("c") => {language = "C".to_string();}
-							_ => {
-							return Err(format!("Can't detect file language by extension: {:?}", input_source));
-						}
-						}
+				[]  => {
+				match input_source.extension_str() {
+						Some(e) if e.eq_ignore_ascii_case("cpp") => {language = "P".to_string();}
+						Some(e) if e.eq_ignore_ascii_case("c") => {language = "C".to_string();}
+						_ => {
+						return Err(format!("Can't detect file language by extension: {:?}", input_source));
+					}
 				}
-					[ref v] => {
-					match v.as_slice() {
-							"P" | "C" => {language = v.clone();}
-							_ => { return Err(format!("Unknown source language type: {}", v));}
-						}
+			}
+			[ref v] => {
+				match v.as_slice() {
+						"P" | "C" => {language = v.clone();}
+						_ => { return Err(format!("Unknown source language type: {}", v));}
+					}
 				}
-					v => {
+				v => {
 					return Err(format!("Found too many output object files: {:?}", v));
 				}
-				};
+			};
 
-				Ok(CompilationTask{
-			args: parsed_args,
-			language: language,
-			input_source: input_source,
-			input_precompiled: input_precompiled,
-			output_object: output_object,
-			output_precompiled: output_precompiled,
-			marker_precompiled: marker_precompiled,
+			Ok(CompilationTask{
+				command: command.clone(),
+				args: parsed_args,
+				language: language,
+				input_source: input_source,
+				input_precompiled: input_precompiled,
+				output_object: output_object,
+				output_precompiled: output_precompiled,
+				marker_precompiled: marker_precompiled,
 			})
 		}
 			Err(e) => {Err(e)}

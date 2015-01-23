@@ -13,11 +13,11 @@ fn main() {
 		Ok(result) => result,
 		Err(e) => {panic!(e);}
 	};
+	let mut command = Command::new("cl.exe");
 	let compiler = VsCompiler::new(temp_dir.path());
-	match compiler.compile(&os::args()[1..]) {
+	match compiler.compile(&command, &os::args()[1..]) {
 		Ok(_) => {Ok(())}
 		Err(e) => {
-			let mut command = Command::new("cl.exe");
 			command.args(os::args()[1..].as_slice());
 			match command.output() {
 				Ok(output) => {
