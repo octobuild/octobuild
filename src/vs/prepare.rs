@@ -9,40 +9,26 @@ pub fn create_task(command: &Command, args: &[String]) -> Result<CompilationTask
 	match parse_arguments(args) {
 		Ok(parsed_args) => {
 			// Source file name.
-			let input_source;
-			match filter(&parsed_args, |arg:&Arg|->Option<Path> {
+			let input_source = match filter(&parsed_args, |arg:&Arg|->Option<Path> {
 				match *arg {
 					Arg::Input{ref kind, ref file, ..} if *kind == InputKind::Source => {Some(Path::new(file))}
 					_ => {None}
 				}
 			}).as_slice() {
-				[] => {
-					return Err(format!("Can't find source file path."));
-				}
-				[ref v] => {
-					input_source = v.clone();
-				}
-				v => {
-					return Err(format!("Found too many source files: {:?}", v));
-				}
+				[] => {return Err(format!("Can't find source file path."));}
+				[ref v] => v.clone(),
+				v => {return Err(format!("Found too many source files: {:?}", v));}
 			};
 			// Precompiled header file name.
-			let precompiled_file;
-			match filter(&parsed_args, |arg:&Arg|->Option<Path>{
+			let precompiled_file = match filter(&parsed_args, |arg:&Arg|->Option<Path>{
 				match *arg {
 					Arg::Input{ref kind, ref file, ..} if *kind == InputKind::Precompiled => {Some(Path::new(file))}
 					_ => {None}
 				}
 			}).as_slice() {
-				[] => {
-					precompiled_file=None;
-				}
-				[ref v] => {
-					precompiled_file=Some(v.clone());
-				}
-				v => {
-					return Err(format!("Found too many precompiled header files: {:?}", v));
-				}
+				[] => None,
+				[ref v] => Some(v.clone()),
+				v => {return Err(format!("Found too many precompiled header files: {:?}", v));}
 			};
 			// Precompiled header file name.
 			let marker_precompiled;
@@ -191,6 +177,7 @@ fn parse_argument(iter: &mut  Iter<String>) -> Option<Result<Arg, String>> {
 							s if s.starts_with("Fp") => Ok(Arg::Input{kind:InputKind::Precompiled, flag:"Fp".to_string(), file:s[2..].to_string()}),
 							s if s.starts_with("Yc") => Ok(Arg::Output{kind:OutputKind::Marker, flag:"Yc".to_string(), file:s[2..].to_string()}),
 							s if s.starts_with("Yu") => Ok(Arg::Input{kind:InputKind::Marker, flag:"Yu".to_string(), file:s[2..].to_string()}),
+							s if s.starts_with("FI") => Ok(Arg::Param{scope: Scope::Preprocessor, flag:"FI".to_string(), value:s[2..].to_string()}),
 							_ => Err(arg.to_string())
 						}
 					}
