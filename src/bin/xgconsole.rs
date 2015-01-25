@@ -166,7 +166,7 @@ fn execute_compiler(temp_dir: &Path, program: &str, cwd: &Path, args: &[String])
 	command.cwd(cwd);
 	if Path::new(program).ends_with_path(&Path::new("cl.exe")) {
 		let compiler = VsCompiler::new(temp_dir);
-		compiler.compile(&Command::new("cl.exe"), args)
+		compiler.compile(&command, args)
 	} else {
 		command
 			.args(args.as_slice())

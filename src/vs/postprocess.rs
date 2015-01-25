@@ -85,7 +85,7 @@ pub fn filter_preprocessed(input: &[u8], marker: &Option<String>, keep_headers: 
 				}
 			}
 			None => {
-				break;
+				return Err("Can't find end of preprocessed data".to_string());
 			}
 		}
 	}
@@ -99,12 +99,7 @@ pub fn filter_preprocessed(input: &[u8], marker: &Option<String>, keep_headers: 
 			}
 		}
 	}
-	match marker {
-		&Some(ref path) if !header_found => {
-			return Err(format!("Can't find marker in preprocessed file: {}", path));
-		}
-		_ => Ok(result)
-	}
+	Ok(result)
 }
 
 fn read_directive(iter: &mut Iter<u8>) -> Directive {

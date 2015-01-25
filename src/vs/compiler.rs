@@ -72,27 +72,32 @@ impl Compiler for VsCompiler {
 		command
 			.args(args.as_slice())
 			.arg("/Fi".to_string() + temp_file.path().display().to_string().as_slice());
-	  let output = try! (command.output());
+		let output = try! (command.output());
 		if output.status.success() {
 			match File::open(temp_file.path()).read_to_end() {
 				Ok(content) => {
-					match	postprocess::filter_preprocessed(content.as_slice(), &task.marker_precompiled, task.output_precompiled.is_some()) {
-						Ok(output) => {
-							{
-								use std::hash::Writer;
-								hash.write(output.as_slice());
+					let output = if task.input_precompiled.is_some() || task.output_precompiled.is_some() {
+						match postprocess::filter_preprocessed(content.as_slice(), &task.marker_precompiled, task.output_precompiled.is_some()) {
+							Ok(output) => output,
+							Err(e) => {
+								return Err(IoError {
+									kind: IoErrorKind::InvalidInput,
+									desc: "Can't parse preprocessed file",
+									detail: Some(e)
+								});
 							}
-							Ok(PreprocessResult{
-								hash: hash.hexdigest(),
-								content: output
-							})
 						}
-						Err(e) => Err(IoError {
-							kind: IoErrorKind::InvalidInput,
-							desc: "Can't parse preprocessed file",
-							detail: Some(e)
-						})
+					} else {
+						content
+					};
+					{
+						use std::hash::Writer;
+						hash.write(output.as_slice());
 					}
+					Ok(PreprocessResult{
+						hash: hash.hexdigest(),
+						content: output
+					})
 				}
 				Err(e) => Err(e)
 			}
@@ -111,14 +116,14 @@ impl Compiler for VsCompiler {
 			match arg {
 				&Arg::Flag{ref scope, ref flag} => {
 					match scope {
-						&Scope::Preprocessor | &Scope::Compiler | &Scope::Shared => Some("/".to_string() + flag.as_slice()),
-						&Scope::Ignore => None
+						&Scope::Compiler | &Scope::Shared => Some("/".to_string() + flag.as_slice()),
+						&Scope::Ignore | &Scope::Preprocessor => None
 					}
 				}
 				&Arg::Param{ref scope, ref  flag, ref value} => {
 					match scope {
-						&Scope::Preprocessor | &Scope::Compiler | &Scope::Shared => Some("/".to_string() + flag.as_slice() + value.as_slice()),
-						&Scope::Ignore => None
+						&Scope::Compiler | &Scope::Shared => Some("/".to_string() + flag.as_slice() + value.as_slice()),
+						&Scope::Ignore | &Scope::Preprocessor => None
 					}
 				}
 				&Arg::Input{..} => None,
