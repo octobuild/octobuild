@@ -7,6 +7,7 @@ use std::io::process::{ProcessOutput, ProcessExit};
 
 const HEADER: &'static [u8] = b"OBCF\x00\x01";
 const FOOTER: &'static [u8] = b"END\x00";
+const DEFAULT_BUF_SIZE: usize = 1024 * 64;
 
 pub struct Cache {
 	cache_dir: Path
@@ -46,8 +47,17 @@ fn generate_hash(params: &str, inputs: &Vec<Path>) -> Result<String, IoError> {
 	hash.write(&[0]);
 	// inputs
 	for input in inputs.iter() {
-		let content = try! (File::open(input).read_to_end());
-		hash.write(content.as_slice());
+		let mut file = try! (File::open(input));
+		let mut buf: [u8; DEFAULT_BUF_SIZE] = [0; DEFAULT_BUF_SIZE];
+		loop {
+			match file.read(&mut buf) {
+				Ok(size) => {
+					hash.write(&buf.as_slice()[0..size]);
+				}
+				Err(ref e) if e.kind == IoErrorKind::EndOfFile => break,
+				Err(e) => return Err(e)
+			}
+		}
 		hash.write(&[0]);
 	}
 	Ok(hash.hexdigest())
