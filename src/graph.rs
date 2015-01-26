@@ -30,7 +30,7 @@
 //! the field `next_edge`). Each of those fields is an array that should
 //! be indexed by the direction (see the type `Direction`).
 
-use std::fmt::{Formatter, Error, Show};
+use std::fmt::{Formatter, Error, Debug};
 use std::collections::BitvSet;
 use std::usize;
 
@@ -51,7 +51,7 @@ pub struct Edge<E> {
     pub data: E,
 }
 
-impl<E: Show> Show for Edge<E> {
+impl<E: Debug> Debug for Edge<E> {
     fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
         write!(f, "Edge {{ next_edge: [{:?}, {:?}], source: {:?}, target: {:?}, data: {:?} }}",
                self.next_edge[0], self.next_edge[1], self.source,
@@ -59,18 +59,18 @@ impl<E: Show> Show for Edge<E> {
     }
 }
 
-#[derive(Clone, Copy, PartialEq, Show)]
+#[derive(Clone, Copy, PartialEq, Debug)]
 pub struct NodeIndex(pub usize);
 #[allow(non_upper_case_globals)]
 pub const InvalidNodeIndex: NodeIndex = NodeIndex(usize::MAX);
 
-#[derive(Copy, PartialEq, Show)]
+#[derive(Copy, PartialEq, Debug)]
 pub struct EdgeIndex(pub usize);
 #[allow(non_upper_case_globals)]
 pub const InvalidEdgeIndex: EdgeIndex = EdgeIndex(usize::MAX);
 
 // Use a private field here to guarantee no more instances are created:
-#[derive(Copy, Show)]
+#[derive(Copy, Debug)]
 pub struct Direction { repr: usize }
 #[allow(non_upper_case_globals)]
 pub const Outgoing: Direction = Direction { repr: 0 };
@@ -351,7 +351,7 @@ impl<E> Edge<E> {
 #[cfg(test)]
 mod test {
     use graph::*;
-    use std::fmt::Show;
+    use std::fmt::Debug;
 
     type TestNode = Node<&'static str>;
     type TestEdge = Edge<&'static str>;
@@ -406,7 +406,7 @@ mod test {
         });
     }
 
-    fn test_adjacent_edges<N:PartialEq+Show,E:PartialEq+Show>(graph: &Graph<N,E>,
+    fn test_adjacent_edges<N:PartialEq+Debug,E:PartialEq+Debug>(graph: &Graph<N,E>,
                                       start_index: NodeIndex,
                                       start_data: N,
                                       expected_incoming: &[(E,N)],
