@@ -1,7 +1,8 @@
 #![allow(unstable)]
 extern crate octobuild;
 
-use octobuild::common::{BuildTask};
+use octobuild::common::BuildTask;
+use octobuild::cache::Cache;
 use octobuild::wincmd;
 use octobuild::xg;
 use octobuild::graph::{Graph, NodeIndex, Node, EdgeIndex, Edge};
@@ -46,12 +47,14 @@ fn main() {
 
 	let (tx_result, rx_result): (Sender<ResultMessage>, Receiver<ResultMessage>) = channel();
 	let (tx_task, rx_task): (Sender<TaskMessage>, Receiver<TaskMessage>) = channel();
+	let cache = Cache::new();
 
 	let mutex_rx_task = create_threads(rx_task, tx_result, std::os::num_cpus(), |worker_id:usize| {
 		let temp_path = temp_dir.path().clone();
+		let temp_cache = cache.clone();
 		move |task:TaskMessage| -> ResultMessage {
 			println!("{}: {:?}", worker_id, task.task.title);
-			execute_task(&temp_path, task)
+			execute_task(&temp_cache, &temp_path, task)
 		}
 	});
 
@@ -87,26 +90,23 @@ fn main() {
 fn create_threads<R: Send, T: Send, Worker:Fn(T) -> R + Send, Factory:Fn(usize) -> Worker>(rx_task: Receiver<T>, tx_result: Sender<R>, num_cpus: usize, factory: Factory) ->  Arc<Mutex<Receiver<T>>> {
 	let mutex_rx_task = Arc::new(Mutex::new(rx_task));
 	for cpu_id in range(0, num_cpus) {
-    		let local_rx_task = mutex_rx_task.clone();
-    		let local_tx_result = tx_result.clone();
-				let worker = factory(cpu_id);
-    			Thread::spawn(move || {
-    			loop {
-    				let task: T;
-    				match local_rx_task.lock().unwrap().recv() {
-    						Ok(v) => {task = v;
-    					}
-    						Err(_) => {
-    						break;
-    					}
-    					}
-    				match local_tx_result.send(worker(task)) {
-						Ok(_) => {}
-						Err(_) => {break;}
-					}
+	 		let local_rx_task = mutex_rx_task.clone();
+			let local_tx_result = tx_result.clone();
+		let worker = factory(cpu_id);
+		Thread::spawn(move || {
+			loop {
+				let task: T;
+				match local_rx_task.lock().unwrap().recv() {
+					Ok(v) => {task = v;}
+					Err(_) => {break;}
 				}
-    		});
-    	}
+				match local_tx_result.send(worker(task)) {
+					Ok(_) => {}
+					Err(_) => {break;}
+				}
+			}
+		});
+	}
 	mutex_rx_task
 }
 
@@ -138,11 +138,11 @@ fn validate_graph(graph: Graph<BuildTask, ()>) -> Result<Graph<BuildTask, ()>, S
 	return Err("Found cycles in build dependencies.".to_string());
 }
 
-fn execute_task(temp_dir: &Path, message: TaskMessage) -> ResultMessage {
+fn execute_task(cache: &Cache, temp_dir: &Path, message: TaskMessage) -> ResultMessage {
 	println!("{}", message.task.title);
 
 	let args = wincmd::expand_args(&message.task.args, &|name:&str|->Option<String>{os::getenv(name)});
-	match execute_compiler(temp_dir, message.task.exec.as_slice(), &Path::new(&message.task.working_dir), args.as_slice()) {
+	match execute_compiler(cache, temp_dir, message.task.exec.as_slice(), &Path::new(&message.task.working_dir), args.as_slice()) {
 		Ok(output) => {
 			println!("stdout: {}", String::from_utf8_lossy(output.output.as_slice()));
 			println!("stderr: {}", String::from_utf8_lossy(output.error.as_slice()));
@@ -161,7 +161,7 @@ fn execute_task(temp_dir: &Path, message: TaskMessage) -> ResultMessage {
 	}
 }
 
-fn execute_compiler(temp_dir: &Path, program: &str, cwd: &Path, args: &[String]) -> Result<ProcessOutput, IoError> {
+fn execute_compiler(cache: &Cache, temp_dir: &Path, program: &str, cwd: &Path, args: &[String]) -> Result<ProcessOutput, IoError> {
 	let mut command = Command::new(program);
 	command.cwd(cwd);
 	if Path::new(program).ends_with_path(&Path::new("cl.exe")) {

@@ -4,12 +4,23 @@ use std::os;
 use std::io::fs;
 use std::io::{File, IoError, IoErrorKind, Reader, Writer, USER_RWX};
 use std::io::process::{ProcessOutput, ProcessExit};
+use std::sync::{Arc, Mutex};
+use std::collections::HashMap;
+use std::collections::hash_map::Entry;
 
 const HEADER: &'static [u8] = b"OBCF\x00\x01";
 const FOOTER: &'static [u8] = b"END\x00";
 const DEFAULT_BUF_SIZE: usize = 1024 * 64;
 
+struct FileHash {
+	hash: String,
+	size: u64,
+	modified: u64,
+}
+
+#[derive(Clone)]
 pub struct Cache {
+	file_sha1: Arc<Mutex<HashMap<Path, Arc<Mutex<Option<FileHash>>>>>>,
 	cache_dir: Path
 }
 
@@ -17,12 +28,13 @@ impl Cache {
 	pub fn new() -> Self {
 		let cache_dir = os::homedir().unwrap().join_many(&[".octobuild", "cache"]);
 		Cache {
+			file_sha1: Arc::new(Mutex::new(HashMap::new())),
 			cache_dir: cache_dir
 		}
 	}
 
 	pub fn run_cached<F: Fn()->Result<ProcessOutput, IoError>>(&self, params: &str, inputs: &Vec<Path>, outputs: &Vec<Path>, worker: F) -> Result<ProcessOutput, IoError> {
-		let hash = try! (generate_hash(params, inputs));
+		let hash = try! (self.generate_hash(params, inputs));
 		let path = self.cache_dir.join(hash.slice(0, 2)).join(hash.slice(2, 4)).join(hash.slice_from(4));
 		println!("Cache file: {:?}", path);
 		// Try to read data from cache.
@@ -35,30 +47,91 @@ impl Cache {
 		try !(write_cache(&path, outputs, &output));
 		Ok(output)
 	}
+
+	fn generate_hash(&self, params: &str, inputs: &Vec<Path>) -> Result<String, IoError> {
+		use std::hash::Writer;
+
+		let mut hash = sha1::Sha1::new();
+		// str
+		hash.write(params.as_bytes());
+		hash.write(&[0]);
+		// inputs
+		for input in inputs.iter() {
+			let file_hash = try! (self.get_file_hash(input));
+			hash.write(file_hash.as_bytes());
+		}
+		Ok(hash.hexdigest())
+	}
+
+	pub fn get_file_hash(&self, path: &Path) -> Result<String, IoError> {
+		// Get/create lock for file entry.
+		let hash_lock = match self.file_sha1.lock() {
+			Ok(mut map) => {
+				match map.entry(path.clone()) {
+					Entry::Occupied(entry) => entry.get().clone(),
+					Entry::Vacant(entry) => {
+						let holder = Arc::new(Mutex::new(None));
+						entry.insert(holder.clone());
+						holder
+					}
+				}
+			}
+			Err(e) => {
+				return Err(IoError {
+					kind: IoErrorKind::OtherIoError,
+					desc: "Mutex error",
+					detail: Some(e.to_string())
+				})
+			}
+		};
+		// Get file hash.
+		match hash_lock.lock() {
+			Ok(mut hash_entry) => {
+				// Validate entry, if exists.
+				match *hash_entry {
+					Some(ref value) => {
+						let stat = try! (fs::stat(path));
+						if value.size == stat.size && value.modified == stat.modified {
+							return Ok(value.hash.clone());
+						}
+					}
+					None => {}
+				}
+				// Calculate hash value.
+				let old_stat = try! (fs::stat(path));
+				let hash = try! (generate_file_hash(path));
+				let new_stat = try! (fs::stat(path));
+				if old_stat.modified == new_stat.modified && old_stat.size == new_stat.size {
+					*hash_entry = Some(FileHash {
+						hash: hash.clone(),
+						size: new_stat.size,
+						modified: new_stat.modified,
+					});
+				}
+				Ok(hash)
+			}
+			Err(e) => Err(IoError {
+				kind: IoErrorKind::OtherIoError,
+				desc: "Mutex error",
+				detail: Some(e.to_string())
+			})
+		}
+	}
 }
 
-// @todo: Need more safe data writing (size before data).
-fn generate_hash(params: &str, inputs: &Vec<Path>) -> Result<String, IoError> {
+fn generate_file_hash(path: &Path) -> Result<String, IoError> {
 	use std::hash::Writer;
-
 	let mut hash = sha1::Sha1::new();
-	// str
-	hash.write(params.as_bytes());
-	hash.write(&[0]);
-	// inputs
-	for input in inputs.iter() {
-		let mut file = try! (File::open(input));
-		let mut buf: [u8; DEFAULT_BUF_SIZE] = [0; DEFAULT_BUF_SIZE];
-		loop {
-			match file.read(&mut buf) {
-				Ok(size) => {
-					hash.write(&buf.as_slice()[0..size]);
-				}
-				Err(ref e) if e.kind == IoErrorKind::EndOfFile => break,
-				Err(e) => return Err(e)
+	let mut file = try! (File::open(path));
+	let mut buf: [u8; DEFAULT_BUF_SIZE] = [0; DEFAULT_BUF_SIZE];
+	loop {
+		match file.read(&mut buf) {
+			Ok(size) => {
+				hash.write(&buf.as_slice()[0..size]);
 			}
+			Err(ref e) if e.kind == IoErrorKind::EndOfFile => break,
+			Err(e) => return Err(e)
 		}
-		hash.write(&[0]);
 	}
 	Ok(hash.hexdigest())
 }
