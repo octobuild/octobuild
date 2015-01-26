@@ -144,9 +144,20 @@ fn write_cache(path: &Path, paths: &Vec<Path>, output: &ProcessOutput) -> Result
 	let mut stream = try! (File::create(path));
 	try! (stream.write(HEADER));
 	try! (stream.write_le_uint(paths.len()));
+	let mut buf: [u8; DEFAULT_BUF_SIZE] = [0; DEFAULT_BUF_SIZE];
 	for path in paths.iter() {
-		let content = try! (File::open(path).read_to_end());
-		try! (write_blob(&mut stream, content.as_slice()));	
+		let mut file = try! (File::open(path));
+		loop {
+			match file.read(&mut buf) {
+				Ok(size) => {
+					stream.write_le_uint(size);
+					stream.write(&buf.as_slice()[0..size]);
+				}
+				Err(ref e) if e.kind == IoErrorKind::EndOfFile => break,
+				Err(e) => return Err(e)
+			}
+		}
+		stream.write_le_uint(0);
 	}
 	try! (write_output(&mut stream, output));
 	try! (stream.write(FOOTER));
@@ -171,8 +182,13 @@ fn read_cache(path: &Path, paths: &Vec<Path>) -> Result<ProcessOutput, IoError> 
 		})
 	} 
 	for path in paths.iter() {
-		let content = try! (read_blob(&mut stream));
-		try! (File::create(path).write(content.as_slice()));		
+		let mut file = try! (File::create(path));
+		loop {
+			let size = try! (stream.read_le_uint());
+			if size == 0 {break;}
+			let block = try! (stream.read_exact(size));
+			try! (file.write(block.as_slice()));
+		}
 	}
 	let output = try! (read_output(&mut stream));
 	if try! (stream.read_exact(FOOTER.len())) != FOOTER {
