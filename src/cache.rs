@@ -25,7 +25,10 @@ pub struct Cache {
 
 impl Cache {
 	pub fn new() -> Self {
-		let cache_dir = os::homedir().unwrap().join_many(&[".octobuild", "cache"]);
+		let cache_dir = match os::getenv("OCTOBUILD_CACHE") {
+			Some(value) => Path::new(value),
+			None => os::homedir().unwrap().join_many(&[".octobuild", "cache"])
+		};
 		Cache {
 			file_hash: Arc::new(Mutex::new(HashMap::new())),
 			cache_dir: cache_dir
