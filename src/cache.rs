@@ -36,7 +36,6 @@ impl Cache {
 	pub fn run_cached<F: Fn()->Result<ProcessOutput, IoError>>(&self, params: &str, inputs: &Vec<Path>, outputs: &Vec<Path>, worker: F) -> Result<ProcessOutput, IoError> {
 		let hash = try! (self.generate_hash(params, inputs));
 		let path = self.cache_dir.join(hash.slice(0, 2)).join(hash.slice(2, 4)).join(hash.slice_from(4));
-		println!("Cache file: {:?}", path);
 		// Try to read data from cache.
 		match read_cache(&path, outputs) {
 			Ok(output) => {return Ok(output)}
@@ -69,11 +68,7 @@ impl Cache {
 			Ok(mut map) => {
 				match map.entry(path.clone()) {
 					Entry::Occupied(entry) => entry.get().clone(),
-					Entry::Vacant(entry) => {
-						let holder = Arc::new(Mutex::new(None));
-						entry.insert(holder.clone());
-						holder
-					}
+					Entry::Vacant(entry) => entry.insert(Arc::new(Mutex::new(None))).clone()
 				}
 			}
 			Err(e) => {
@@ -98,16 +93,13 @@ impl Cache {
 					None => {}
 				}
 				// Calculate hash value.
-				let old_stat = try! (fs::stat(path));
+				let stat = try! (fs::stat(path));
 				let hash = try! (generate_file_hash(path));
-				let new_stat = try! (fs::stat(path));
-				if old_stat.modified == new_stat.modified && old_stat.size == new_stat.size {
-					*hash_entry = Some(FileHash {
-						hash: hash.clone(),
-						size: new_stat.size,
-						modified: new_stat.modified,
-					});
-				}
+				*hash_entry = Some(FileHash {
+					hash: hash.clone(),
+					size: stat.size,
+					modified: stat.modified,
+				});
 				Ok(hash)
 			}
 			Err(e) => Err(IoError {
@@ -150,18 +142,17 @@ fn write_cache(path: &Path, paths: &Vec<Path>, output: &ProcessOutput) -> Result
 		loop {
 			match file.read(&mut buf) {
 				Ok(size) => {
-					stream.write_le_uint(size);
-					stream.write(&buf.as_slice()[0..size]);
+					try! (stream.write_le_uint(size));
+					try! (stream.write(&buf.as_slice()[0..size]));
 				}
 				Err(ref e) if e.kind == IoErrorKind::EndOfFile => break,
 				Err(e) => return Err(e)
 			}
 		}
-		stream.write_le_uint(0);
+		try! (stream.write_le_uint(0));
 	}
 	try! (write_output(&mut stream, output));
 	try! (stream.write(FOOTER));
-	try! (stream.flush());
 	Ok(())
 }
 
