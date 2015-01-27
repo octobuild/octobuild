@@ -78,18 +78,18 @@ pub fn expand_arg<F: Fn(&str) -> Option<String>>(arg: &str, resolver: &F) -> Str
 	loop {
 		match suffix.find_str("$(") {
 			Some(begin) => {
-				match suffix.slice_from(begin).find_str(")") {
+				match suffix[begin..].find_str(")") {
 					Some(end) => {
-						let name = suffix.slice(begin+2, begin + end);
+						let name = &suffix[begin + 2..begin + end];
 						match resolver(name) {
 							Some(ref value) => {
-								result = result + suffix.slice_to(begin) + value.as_slice();
+								result = result + &suffix[..begin] + value.as_slice();
 							}
 							None => {
-								result = result + suffix.slice_to(begin + end + 1);
+								result = result + &suffix[..begin + end + 1];
 							}
 						}
-						suffix = suffix.slice_from(begin + end + 1);
+						suffix = &suffix[begin + end + 1..];
 					}
 					None => {
 						result = result+suffix;
