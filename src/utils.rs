@@ -1,4 +1,4 @@
-extern crate "sha1-hasher" as sha1;
+use std::hash::SipHasher;
 
 pub fn filter<T, R, F:Fn(&T) -> Option<R>>(args: &Vec<T>, filter:F) -> Vec<R> {
 	let mut result: Vec<R> = Vec::new();
@@ -13,10 +13,10 @@ pub fn filter<T, R, F:Fn(&T) -> Option<R>>(args: &Vec<T>, filter:F) -> Vec<R> {
 	result
 }
 
-pub fn hash_sha1(data: &[u8]) -> String {
+pub fn hash_text(data: &[u8]) -> String {
 	use std::hash::Writer;
 
-	let mut hash = sha1::Sha1::new();
+	let mut hash = SipHasher::new();
 	hash.write(data);
-	hash.hexdigest()
+	format!("{:016x}", hash.result())
 }

@@ -1,5 +1,3 @@
-extern crate "sha1-hasher" as sha1;
-
 pub use super::super::compiler::Compiler;
 pub use super::super::compiler::{Arg, CompilationTask, PreprocessResult, Scope};
 
@@ -7,11 +5,12 @@ use super::super::cache::Cache;
 use super::postprocess;
 use super::super::wincmd;
 use super::super::utils::filter;
-use super::super::utils::hash_sha1;
+use super::super::utils::hash_text;
 use super::super::io::tempfile::TempFile;
 
 use std::io::{Command, File, IoError, IoErrorKind};
 use std::io::process::ProcessOutput;
+use std::hash::SipHasher;
 
 pub struct VsCompiler {
 	cache: Cache,
@@ -61,7 +60,7 @@ impl Compiler for VsCompiler {
 		args.push(task.input_source.display().to_string());
 	
 		// Hash data.
-		let mut hash = sha1::Sha1::new();
+		let mut hash = SipHasher::new();
 		{
 			use std::hash::Writer;
 			hash.write(&[0]);
@@ -95,7 +94,7 @@ impl Compiler for VsCompiler {
 						hash.write(output.as_slice());
 					}
 					Ok(PreprocessResult{
-						hash: hash.hexdigest(),
+						hash: format!("{:016x}", hash.result()),
 						content: output
 					})
 				}
@@ -155,7 +154,7 @@ impl Compiler for VsCompiler {
 			&None => {}
 		}
 	
-		let hash_params = hash_sha1(preprocessed.content.as_slice()) + wincmd::join(&args).as_slice();
+		let hash_params = hash_text(preprocessed.content.as_slice()) + wincmd::join(&args).as_slice();
 		self.cache.run_cached(hash_params.as_slice(), &inputs, &outputs, || -> Result<ProcessOutput, IoError> {
 			// Input file path.
 			let input_temp = TempFile::new_in(&self.temp_dir, ".i");

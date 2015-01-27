@@ -1,5 +1,3 @@
-extern crate "sha1-hasher" as sha1;
-
 use std::os;
 use std::io::fs;
 use std::io::{File, IoError, IoErrorKind, Reader, Writer, USER_RWX};
@@ -7,6 +5,7 @@ use std::io::process::{ProcessOutput, ProcessExit};
 use std::sync::{Arc, Mutex};
 use std::collections::HashMap;
 use std::collections::hash_map::Entry;
+use std::hash::SipHasher;
 
 const HEADER: &'static [u8] = b"OBCF\x00\x01";
 const FOOTER: &'static [u8] = b"END\x00";
@@ -20,7 +19,7 @@ struct FileHash {
 
 #[derive(Clone)]
 pub struct Cache {
-	file_sha1: Arc<Mutex<HashMap<Path, Arc<Mutex<Option<FileHash>>>>>>,
+	file_hash: Arc<Mutex<HashMap<Path, Arc<Mutex<Option<FileHash>>>>>>,
 	cache_dir: Path
 }
 
@@ -28,7 +27,7 @@ impl Cache {
 	pub fn new() -> Self {
 		let cache_dir = os::homedir().unwrap().join_many(&[".octobuild", "cache"]);
 		Cache {
-			file_sha1: Arc::new(Mutex::new(HashMap::new())),
+			file_hash: Arc::new(Mutex::new(HashMap::new())),
 			cache_dir: cache_dir
 		}
 	}
@@ -50,7 +49,7 @@ impl Cache {
 	fn generate_hash(&self, params: &str, inputs: &Vec<Path>) -> Result<String, IoError> {
 		use std::hash::Writer;
 
-		let mut hash = sha1::Sha1::new();
+		let mut hash = SipHasher::new();
 		// str
 		hash.write(params.as_bytes());
 		hash.write(&[0]);
@@ -59,12 +58,12 @@ impl Cache {
 			let file_hash = try! (self.get_file_hash(input));
 			hash.write(file_hash.as_bytes());
 		}
-		Ok(hash.hexdigest())
+		Ok(format!("{:016x}", hash.result()))
 	}
 
 	pub fn get_file_hash(&self, path: &Path) -> Result<String, IoError> {
 		// Get/create lock for file entry.
-		let hash_lock = match self.file_sha1.lock() {
+		let hash_lock = match self.file_hash.lock() {
 			Ok(mut map) => {
 				match map.entry(path.clone()) {
 					Entry::Occupied(entry) => entry.get().clone(),
@@ -113,7 +112,7 @@ impl Cache {
 
 fn generate_file_hash(path: &Path) -> Result<String, IoError> {
 	use std::hash::Writer;
-	let mut hash = sha1::Sha1::new();
+	let mut hash = SipHasher::new();
 	let mut file = try! (File::open(path));
 	let mut buf: [u8; DEFAULT_BUF_SIZE] = [0; DEFAULT_BUF_SIZE];
 	loop {
@@ -125,7 +124,7 @@ fn generate_file_hash(path: &Path) -> Result<String, IoError> {
 			Err(e) => return Err(e)
 		}
 	}
-	Ok(hash.hexdigest())
+	Ok(format!("{:016x}", hash.result()))
 }
 
 fn write_cache(path: &Path, paths: &Vec<Path>, output: &ProcessOutput) -> Result<(), IoError> {

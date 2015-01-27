@@ -6,8 +6,5 @@ authors = [ "Artem V. Navrotskiy <bozaro@users.noreply.github.com>" ]
 [dependencies.xml-rs]
 version = "*"
 
-[dependencies.sha1-hasher]
-version = "*"
-
 [dependencies.uuid]
 version = "*"
