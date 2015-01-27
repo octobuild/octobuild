@@ -19,9 +19,9 @@ pub struct VsCompiler {
 }
 
 impl VsCompiler {
-	pub fn new(temp_dir: &Path) -> Self {
+	pub fn new(cache: &Cache, temp_dir: &Path) -> Self {
 		VsCompiler {
-			cache: Cache::new(),
+			cache: cache.clone(),
 			temp_dir: temp_dir.clone()
 		}
 	}

@@ -165,7 +165,7 @@ fn execute_compiler(cache: &Cache, temp_dir: &Path, program: &str, cwd: &Path, a
 	let mut command = Command::new(program);
 	command.cwd(cwd);
 	if Path::new(program).ends_with_path(&Path::new("cl.exe")) {
-		let compiler = VsCompiler::new(temp_dir);
+		let compiler = VsCompiler::new(cache, temp_dir);
 		compiler.compile(&command, args)
 	} else {
 		command
