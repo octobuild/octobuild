@@ -218,9 +218,24 @@ fn skip_line(first: Option<u8>, reader: &mut Reader, raw: &mut Vec<u8>) -> Resul
 	}
 }
 
-#[test]
-fn test_filter_precompiled_keep() {
-	let filtered = filter_preprocessed(br#"#line 1 "sample.cpp"
+#[cfg(test)]
+mod test {
+	use std::io::MemReader;
+
+	fn check_filter(original: &str, expected: &str, marker: Option<String>, keep_headers: bool) {
+		let mut writer: Vec<u8> = Vec::new();
+		let mut stream: Vec<u8> = Vec::new();
+		stream.push_all(original.as_bytes());
+		match super::filter_preprocessed(&mut MemReader::new(stream), &mut writer, &marker, keep_headers) {
+			Ok(_) => {assert_eq! (String::from_utf8_lossy(writer.as_slice()), expected)}
+			Err(e) => {panic! (e);}
+		}
+	}
+
+	#[test]
+	fn test_filter_precompiled_keep() {
+		check_filter(
+r#"#line 1 "sample.cpp"
 #line 1 "e:/work/octobuild/test_cl/sample header.h"
 # pragma once
 void hello();
@@ -229,8 +244,8 @@ void hello();
 int main(int argc, char **argv) {
 	return 0;
 }
-"#, &Some("sample header.h".to_string()), true);
-	assert_eq!(String::from_utf8_lossy(filtered.unwrap().as_slice()), r#"#line 1 "sample.cpp"
+"#,
+r#"#line 1 "sample.cpp"
 #line 1 "e:/work/octobuild/test_cl/sample header.h"
 # pragma once
 void hello();
@@ -240,12 +255,13 @@ void hello();
 int main(int argc, char **argv) {
 	return 0;
 }
-"#);
-}
+"#, Some("sample header.h".to_string()), true)
+	}
 
-#[test]
-fn test_filter_precompiled_remove() {
-	let filtered = filter_preprocessed(br#"#line 1 "sample.cpp"
+	#[test]
+	fn test_filter_precompiled_remove() {
+		check_filter(
+r#"#line 1 "sample.cpp"
 #line 1 "e:/work/octobuild/test_cl/sample header.h"
 # pragma once
 void hello1();
@@ -255,19 +271,20 @@ void hello2();
 int main(int argc, char **argv) {
 	return 0;
 }
-"#, &Some("sample header.h".to_string()), false);
-	assert_eq!(String::from_utf8_lossy(filtered.unwrap().as_slice()), r#"#pragma hdrstop
+"#, 
+r#"#pragma hdrstop
 #line 2 "sample.cpp"
 
 int main(int argc, char **argv) {
 	return 0;
 }
-"#);
-}
+"#, Some("sample header.h".to_string()), false);
+	}
 
-#[test]
-fn test_filter_precompiled_hdrstop() {
-	let filtered = filter_preprocessed(br#"#line 1 "sample.cpp"
+	#[test]
+	fn test_filter_precompiled_hdrstop() {
+		check_filter(
+r#"#line 1 "sample.cpp"
  #line 1 "e:/work/octobuild/test_cl/sample header.h"
 void hello();
 # pragma  hdrstop
@@ -278,8 +295,8 @@ void data();
 int main(int argc, char **argv) {
 	return 0;
 }
-"#, &None, false);
-	assert_eq!(String::from_utf8_lossy(filtered.unwrap().as_slice()), r#"# pragma  hdrstop
+"#,
+r#"# pragma  hdrstop
 void data();
 # pragma once
 #line 2 "sample.cpp"
@@ -287,12 +304,13 @@ void data();
 int main(int argc, char **argv) {
 	return 0;
 }
-"#);
-}
+"#, None, false);
+	}
 
-#[test]
-fn test_filter_precompiled_xxx() {
-	let filtered = filter_preprocessed(br#"#line 1 "sample.cpp"
+	#[test]
+	fn test_filter_precompiled_winpath() {
+		check_filter(
+r#"#line 1 "sample.cpp"
 #line 1 "e:\\work\\octobuild\\test_cl\\sample header.h"
 # pragma once
 void hello();
@@ -301,8 +319,8 @@ void hello();
 int main(int argc, char **argv) {
 	return 0;
 }
-"#, &Some("e:\\work\\octobuild\\test_cl\\sample header.h".to_string()), true);
-	assert_eq!(String::from_utf8_lossy(filtered.unwrap().as_slice()), r#"#line 1 "sample.cpp"
+"#,
+r#"#line 1 "sample.cpp"
 #line 1 "e:\\work\\octobuild\\test_cl\\sample header.h"
 # pragma once
 void hello();
@@ -312,5 +330,6 @@ void hello();
 int main(int argc, char **argv) {
 	return 0;
 }
-"#);
+"#, Some("e:\\work\\octobuild\\test_cl\\sample header.h".to_string()), true);
+	}
 }
