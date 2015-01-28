@@ -80,7 +80,7 @@ pub trait Compiler {
 	// Compile preprocessed file.
 	fn compile_step(&self, task: &CompilationTask, preprocessed: PreprocessResult) -> Result<ProcessOutput, IoError>;
 
-  // Run preprocess and compile.
+	// Run preprocess and compile.
 	fn try_compile(&self, command: &Command, args: &[String]) -> Result<ProcessOutput, IoError> {
 		match self.create_task(command, args) {
 			Ok(task) => self.compile_step(&task, try! (self.preprocess_step(&task))),
@@ -92,7 +92,7 @@ pub trait Compiler {
 		}
 	}
 
-  // Run preprocess and compile.
+	// Run preprocess and compile.
 	fn compile(&self, command: &Command, args: &[String]) -> Result<ProcessOutput, IoError> {
 		match self.try_compile(command, args) {
 			Ok(output) => Ok(output),

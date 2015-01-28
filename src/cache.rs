@@ -7,9 +7,11 @@ use std::collections::HashMap;
 use std::collections::hash_map::Entry;
 use std::hash::SipHasher;
 
+use super::utils::hash_write_stream;
+use super::utils::DEFAULT_BUF_SIZE;
+
 const HEADER: &'static [u8] = b"OBCF\x00\x01";
 const FOOTER: &'static [u8] = b"END\x00";
-const DEFAULT_BUF_SIZE: usize = 1024 * 64;
 
 struct FileHash {
 	hash: String,
@@ -114,19 +116,9 @@ impl Cache {
 }
 
 fn generate_file_hash(path: &Path) -> Result<String, IoError> {
-	use std::hash::Writer;
 	let mut hash = SipHasher::new();
 	let mut file = try! (File::open(path));
-	let mut buf: [u8; DEFAULT_BUF_SIZE] = [0; DEFAULT_BUF_SIZE];
-	loop {
-		match file.read(&mut buf) {
-			Ok(size) => {
-				hash.write(&buf.as_slice()[0..size]);
-			}
-			Err(ref e) if e.kind == IoErrorKind::EndOfFile => break,
-			Err(e) => return Err(e)
-		}
-	}
+	try! (hash_write_stream(&mut hash, &mut file));
 	Ok(format!("{:016x}", hash.result()))
 }
 

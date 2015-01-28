@@ -1,4 +1,6 @@
-use std::slice::Iter;
+use std::io::{Reader, Writer, IoError, IoErrorKind};
+
+use super::super::utils::DEFAULT_BUF_SIZE;
 
 #[derive(Show)]
 enum Directive {
@@ -10,113 +12,103 @@ enum Directive {
 	Unknown(Vec<u8>)
 }
 
-pub fn filter_preprocessed(input: &[u8], marker: &Option<String>, keep_headers: bool) -> Result<Vec<u8>, String> {
-	let mut result: Vec<u8> = Vec::new();
+pub fn filter_preprocessed(reader: &mut Reader, writer: &mut Writer, marker: &Option<String>, keep_headers: bool) -> Result<(), IoError> {
 	let mut line_begin = true;
-	let mut iter = input.iter();
 	// Entry file.
 	let mut entry_file: Option<String> = None;
 	let mut header_found: bool = false;
 	loop {
-		match iter.next() {
-			Some(c) => {
-				match *c {
-					b'\n' | b'\r' => {
-						if keep_headers {
-							result.push(*c);
-						}
-						line_begin = true;
-					}
-					b'\t' | b' ' => {
-						if keep_headers {
-							result.push(*c);
-						}
-					}
-					b'#' if line_begin => {
-						let directive = read_directive(&mut iter);
-						match directive {
-							Directive::Line(raw, raw_file) => {
-								let file = raw_file.replace("\\", "/");
-								entry_file = match entry_file {
-									Some(path) => {
-										if header_found && (path  == file) {
-											result.push_all(b"#pragma hdrstop\n");
-											result.push(*c);
-											result.push_all(raw.as_slice());
-											break;
+		let c = try! (reader.read_u8());
+		match c {
+			b'\n' | b'\r' => {
+				if keep_headers {
+					try! (writer.write_u8(c));
+				}
+				line_begin = true;
+			}
+			b'\t' | b' ' => {
+				if keep_headers {
+					try! (writer.write_u8(c));
+				}
+			}
+			b'#' if line_begin => {
+				let directive = try! (read_directive(c, reader));
+				match directive {
+					Directive::Line(raw, raw_file) => {
+						let file = raw_file.replace("\\", "/");
+						entry_file = match entry_file {
+							Some(path) => {
+								if header_found && (path  == file) {
+									try! (writer.write(b"#pragma hdrstop\n"));
+									try! (writer.write(raw.as_slice()));
+									break;
+								}
+								match *marker {
+									Some(ref raw_path) => {
+										let path = raw_path.replace("\\", "/");
+										if file == path || Path::new(file.as_slice()).ends_with_path(&Path::new(path.as_slice())) {
+											header_found = true;
 										}
-										match *marker {
-											Some(ref raw_path) => {
-												let path = raw_path.replace("\\", "/");
-												if file == path || Path::new(file.as_slice()).ends_with_path(&Path::new(path.as_slice())) {
-													header_found = true;
-												}
-											}
-											None => {}
-										}
-										Some(path)
 									}
-									None => Some(file)
-								};
-								if keep_headers {
-									result.push(*c);
-									result.push_all(raw.as_slice());
+									None => {}
 								}
+								Some(path)
 							}
-							Directive::HdrStop(raw) => {
-								result.push(*c);
-								result.push_all(raw.as_slice());
-								break;
-							}
-							Directive::Unknown(raw) => {
-								if keep_headers {
-									result.push(*c);
-									result.push_all(raw.as_slice());
-								}
-							}
+							None => Some(file)
+						};
+						if keep_headers {
+							try! (writer.write(raw.as_slice()));
 						}
 					}
-					_ => {
+					Directive::HdrStop(raw) => {
+						try! (writer.write(raw.as_slice()));
+						break;
+					}
+					Directive::Unknown(raw) => {
 						if keep_headers {
-							result.push(*c);
+							try! (writer.write(raw.as_slice()));
 						}
-						line_begin = false;
 					}
 				}
 			}
-			None => {
-				return Err("Can't find end of preprocessed data".to_string());
-			}
-		}
-	}
-	loop {
-		match iter.next() {
-			Some(c) => {
-				result.push(c.clone());
-			}
 			_ => {
-				break;
+				if keep_headers {
+					try! (writer.write_u8(c));
+				}
+				line_begin = false;
 			}
 		}
 	}
-	Ok(result)
+	// Copy end of stream.
+	let mut buf: [u8; DEFAULT_BUF_SIZE] = [0; DEFAULT_BUF_SIZE];
+	loop {
+		match reader.read(&mut buf) {
+			Ok(size) => {
+				try! (writer.write(&buf.as_slice()[0..size]));
+			}
+			Err(ref e) if e.kind == IoErrorKind::EndOfFile => break,
+			Err(e) => return Err(e)
+		}
+	}
+	Ok(())
 }
 
-fn read_directive(iter: &mut Iter<u8>) -> Directive {
-	let mut unknown: Vec<u8> = Vec::new();
-	let (next, token) = read_token(None, iter, &mut unknown);
+fn read_directive(first: u8, reader: &mut Reader) -> Result<Directive, IoError> {
+	let mut raw: Vec<u8> = Vec::new();
+	raw.push(first);
+	let (next, token) = try! (read_token(None, reader, &mut raw));
 	match token.as_slice() {
-		b"line" => read_directive_line(next, iter, unknown),
-		b"pragma" => read_directive_pragma(next, iter, unknown),
+		b"line" => read_directive_line(next, reader, raw),
+		b"pragma" => read_directive_pragma(next, reader, raw),
 		_ => {
-			skip_line(next, iter, &mut unknown);
-			Directive::Unknown(unknown)
+			try! (skip_line(next, reader, &mut raw));
+			Ok(Directive::Unknown(raw))
 		}
 	}
 }
 
-fn read_token(first: Option<u8>, iter: &mut Iter<u8>, unknown: &mut Vec<u8>) -> (Option<u8>, Vec<u8>) {
-	match skip_spaces(first, iter, unknown) {
+fn read_token(first: Option<u8>, reader: &mut Reader, raw: &mut Vec<u8>) -> Result<(Option<u8>, Vec<u8>), IoError> {
+	match try! (skip_spaces(first, reader, raw)) {
 		Some(first_char) => {
 			let mut token: Vec<u8> = Vec::new();
 			let mut escape = false;
@@ -128,120 +120,100 @@ fn read_token(first: Option<u8>, iter: &mut Iter<u8>, unknown: &mut Vec<u8>) -> 
 				quote = false;
 			}
 			loop {
-				match iter.next() {
-					Some(c) if quote => {
-						unknown.push(*c);
-						if escape {
-							match *c {
-								b'n' => token.push(b'\n'),
-								b'r' => token.push(b'\r'),
-								b't' => token.push(b'\t'),
-								v => token.push(v)
-							}
-							escape = false;
-						} else if *c == ('\\' as u8) {
-							escape = true;
-						} else if *c == b'"' {
-							return (match iter.next() {
-								Some(n) => {
-									unknown.push(*n);
-									Some(*n)
-								}
-								None => None
-							}, token);
-						} else {
-							token.push(*c);
+				let c = try! (reader.read_u8());
+				raw.push(c);
+				if quote {
+					if escape {
+						match c {
+							b'n' => token.push(b'\n'),
+							b'r' => token.push(b'\r'),
+							b't' => token.push(b'\t'),
+							v => token.push(v)
 						}
+						escape = false;
+					} else if c == ('\\' as u8) {
+						escape = true;
+					} else if c == b'"' {
+						let n = try! (reader.read_u8());
+						raw.push(n);
+						return Ok((Some(n), token));
+					} else {
+						token.push(c);
 					}
-					Some(c) => {
-						unknown.push(*c);
-						match *c {
-							b'a' ... b'z' | b'A' ... b'Z' | b'0' ... b'9' => {
-								token.push(*c);
-							}
-							_ => {
-								return (Some(*c), token);
-							}
+				} else {
+					match c {
+						b'a' ... b'z' | b'A' ... b'Z' | b'0' ... b'9' => {
+							token.push(c);
 						}
-					}
-					None => {
-						return (None, token);
+						_ => {
+							return Ok((Some(c), token));
+						}
 					}
 				}
 			}
 		}
 		None => {
-			return (None, Vec::new());
+			return Ok((None, Vec::new()));
 		}
 	}
 }
 
-fn read_directive_line(first: Option<u8>, iter: &mut Iter<u8>, mut unknown: Vec<u8>) -> Directive {
+fn read_directive_line(first: Option<u8>, reader: &mut Reader, mut raw: Vec<u8>) -> Result<Directive, IoError> {
 	// Line number
-	let (next1, _) = read_token(first, iter, &mut unknown);
+	let (next1, _) = try! (read_token(first, reader, &mut raw));
 	// File name
-	let (next2, file) = read_token(next1, iter, &mut unknown);
-	skip_line(next2, iter, &mut unknown);
-	Directive::Line(unknown, String::from_utf8_lossy(file.as_slice()).to_string())
+	let (next2, file) = try! (read_token(next1, reader, &mut raw));
+	try! (skip_line(next2, reader, &mut raw));
+	Ok(Directive::Line(raw, String::from_utf8_lossy(file.as_slice()).to_string()))
 }
 
-fn read_directive_pragma(first: Option<u8>, iter: &mut Iter<u8>, mut unknown: Vec<u8>) -> Directive {
-	let (next, token) = read_token(first, iter, &mut unknown);
-	skip_line(next, iter, &mut unknown);
+fn read_directive_pragma(first: Option<u8>, reader: &mut Reader, mut raw: Vec<u8>) -> Result<Directive, IoError> {
+	let (next, token) = try! (read_token(first, reader, &mut raw));
+	try! (skip_line(next, reader, &mut raw));
 	match token.as_slice() {
-		b"hdrstop" => Directive::HdrStop(unknown),
-		_ => Directive::Unknown(unknown)
+		b"hdrstop" => Ok(Directive::HdrStop(raw)),
+		_ => Ok(Directive::Unknown(raw))
 	}
 }
 
-fn skip_spaces(first: Option<u8>, iter: &mut Iter<u8>, unknown: &mut Vec<u8>) -> Option<u8> {
+fn skip_spaces(first: Option<u8>, reader: &mut Reader, raw: &mut Vec<u8>) -> Result<Option<u8>, IoError> {
 	match first {
 		Some(c) => {
 			match c {
-				b'\n' | b'\r' => {return None;}
+				b'\n' | b'\r' => {return Ok(None);}
 				b'\t' | b' ' => {}
-				_ => {return first;}
+				_ => {return Ok(first);}
 			}
 		}
 		_ => {}
 	}
 	loop {
-		match iter.next() {
-			Some(c) => {
-				unknown.push(*c);
-				match c {
-					&b'\n' | &b'\r' => {return None;}
-					&b'\t' | &b' ' => {}
-					_ => {return Some(*c);}
-				}
-			}
-			None => {
-				return None;
-			}
+		let c = try! (reader.read_u8());
+		try! (raw.write_u8(c));
+		match c {
+			b'\n' | b'\r' => {return Ok(None);}
+			b'\t' | b' ' => {}
+			_ => {return Ok(Some(c));}
 		}
 	}
 }
 
-fn skip_line(first: Option<u8>, iter: &mut Iter<u8>, unknown: &mut Vec<u8>) {
+fn skip_line(first: Option<u8>, reader: &mut Reader, raw: &mut Vec<u8>) -> Result<(), IoError> {
 	match first {
 		Some(c) => {
 			match c {
-				b'\n' | b'\r' => {return;}
+				b'\n' | b'\r' => {return Ok(());}
 				_ => {}
 			}
 		}
 		_ => {}
 	}
 	loop {
-		match iter.next() {
-			Some(c) => {
-				unknown.push(*c);
-				match c {
-					&b'\n' | &b'\r' => {return;}
-					_ => {}
-				}
-			}
-			None => {return;}
+		let c = try! (reader.read_u8());
+		try! (raw.write_u8(c));
+		match c {
+			b'\n' | b'\r' => {return Ok(());}
+			_ => {}
 		}
 	}
 }

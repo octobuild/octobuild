@@ -8,7 +8,7 @@ use super::super::utils::filter;
 use super::super::utils::hash_text;
 use super::super::io::tempfile::TempFile;
 
-use std::io::{Command, File, IoError, IoErrorKind};
+use std::io::{Command, File, IoError, IoErrorKind, MemReader};
 use std::io::process::ProcessOutput;
 use std::hash::SipHasher;
 
@@ -52,7 +52,7 @@ impl Compiler for VsCompiler {
 			}
 		});
 	
-	  // Add preprocessor paramters.
+		// Add preprocessor paramters.
 		let temp_file = TempFile::new_in(&self.temp_dir, ".i");
 		args.push("/nologo".to_string());
 		args.push("/T".to_string() + task.language.as_slice());
@@ -73,29 +73,23 @@ impl Compiler for VsCompiler {
 			.arg("/Fi".to_string() + temp_file.path().display().to_string().as_slice());
 		let output = try! (command.output());
 		if output.status.success() {
-			match File::open(temp_file.path()).read_to_end() {
-				Ok(content) => {
-					let output = if task.input_precompiled.is_some() || task.output_precompiled.is_some() {
-						match postprocess::filter_preprocessed(content.as_slice(), &task.marker_precompiled, task.output_precompiled.is_some()) {
-							Ok(output) => output,
-							Err(e) => {
-								return Err(IoError {
-									kind: IoErrorKind::InvalidInput,
-									desc: "Can't parse preprocessed file",
-									detail: Some(e)
-								});
-							}
-						}
+			match File::open(temp_file.path()) {
+				Ok(mut stream) => {
+					let mut output: Box<Reader> = if task.input_precompiled.is_some() || task.output_precompiled.is_some() {
+						let mut buffer: Vec<u8> = Vec::new();
+						try! (postprocess::filter_preprocessed(&mut stream, &mut buffer, &task.marker_precompiled, task.output_precompiled.is_some()));
+						Box::new(MemReader::new(buffer))
 					} else {
-						content
+						Box::new(stream)
 					};
+					let content = try! (output.read_to_end());
 					{
 						use std::hash::Writer;
-						hash.write(output.as_slice());
+						hash.write(content.as_slice());
 					}
 					Ok(PreprocessResult{
 						hash: format!("{:016x}", hash.result()),
-						content: output
+						content: content
 					})
 				}
 				Err(e) => Err(e)
