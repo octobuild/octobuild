@@ -7,21 +7,30 @@ use octobuild::compiler::Compiler;
 use octobuild::cache::Cache;
 
 use std::os;
-use std::io::{TempDir, Command};
+use std::io::{stderr, stdout, TempDir, Command, IoError};
+use std::io::process::{ProcessExit, ProcessOutput};
 
 fn main() {
-	let temp_dir = match TempDir::new("octobuild") {
-		Ok(result) => result,
-		Err(e) => {panic!(e);}
-	};
-	let compiler = VsCompiler::new(&Cache::new(), temp_dir.path());
-	match compiler.compile(&Command::new("cl.exe"), &os::args()[1..]) {
+	match compile() {
 		Ok(output) => {
-			println!("stdout: {}", String::from_utf8_lossy(output.output.as_slice()));
-			println!("stderr: {}", String::from_utf8_lossy(output.error.as_slice()));
+			std::os::set_exit_status(match output.status {
+				ProcessExit::ExitStatus(r) => r,
+				ProcessExit::ExitSignal(r) => r
+			});
 		}
 		Err(e) => {
-			panic!(e);
+			println!("FATAL ERROR: {:?}", e);
+			std::os::set_exit_status(500);
 		}
-	};
+	}
+}
+
+fn compile() -> Result<ProcessOutput, IoError> {
+	let temp_dir = try! (TempDir::new("octobuild"));
+	let compiler = VsCompiler::new(&Cache::new(), temp_dir.path());
+	let output = try! (compiler.compile(&Command::new("cl.exe"), &os::args()[1..]));
+
+	try !(stdout().write(output.output.as_slice()));
+	try !(stderr().write(output.error.as_slice()));
+	Ok(output)
 }
