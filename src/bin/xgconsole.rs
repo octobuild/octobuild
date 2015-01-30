@@ -11,7 +11,7 @@ use octobuild::compiler::Compiler;
 
 use std::os;
 
-use std::io::{Command, File, BufferedReader, IoError, TempDir};
+use std::io::{stdout, stderr, Command, File, BufferedReader, IoError, TempDir};
 use std::io::process::{ProcessExit, ProcessOutput};
 use std::sync::{Arc, Mutex};
 use std::sync::mpsc::{channel, Sender, Receiver};
@@ -25,13 +25,17 @@ task: BuildTask
 
 #[derive(Show)]
 struct ResultMessage {
-index: NodeIndex,
-result: Result<BuildResult, String>
+	index: NodeIndex,
+	task: BuildTask,
+	worker: usize,
+	result: Result<BuildResult, String>
 }
 
 #[derive(Show)]
 struct BuildResult {
-exit_code: ProcessExit,
+	exit_code: ProcessExit,
+	stdout: Vec<u8>,
+	stderr: Vec<u8>,
 }
 
 fn main() {
@@ -53,38 +57,31 @@ fn main() {
 		let temp_path = temp_dir.path().clone();
 		let temp_cache = cache.clone();
 		move |task:TaskMessage| -> ResultMessage {
-			println!("{}: {:?}", worker_id, task.task.title);
-			execute_task(&temp_cache, &temp_path, task)
+			execute_task(&temp_cache, &temp_path, worker_id, task)
 		}
 	});
 
 	let args = os::args();
-	let mut path;
 	if args.len() <= 1 {
-		path = Path::new(&args[0]).dir_path();
-		path.push("../tests/graph-parser.xml");
-	} else {
-		path = Path::new(&args[1]);
+		panic! ("Task file is not defined");
 	}
-	println!("Example path: {}", path.display());
+	let path = Path::new(&args[1]);
 	match File::open(&path) {
-			Ok(file) => {
+		Ok(file) => {
 			match xg::parser::parse(BufferedReader::new(file)) {
-					Ok(graph) => {
+				Ok(graph) => {
 					match validate_graph(graph) {
-							Ok(graph) => {
-								execute_graph(&graph, tx_task, mutex_rx_task, rx_result);
+						Ok(graph) => {
+							execute_graph(&graph, tx_task, mutex_rx_task, rx_result);
 						}
-							Err(msg) =>{panic! (msg);}
-						}
+						Err(msg) =>{panic! (msg);}
+					}
 				}
-					Err(msg) =>{panic! (msg);}
-				}
+				Err(msg) =>{panic! (msg);}
+			}
 		}
-			Err(msg) =>{panic! (msg);}
-		}
-
-	println!("done");
+		Err(msg) =>{panic! (msg);}
+	}
 }
 
 fn create_threads<R: Send, T: Send, Worker:Fn(T) -> R + Send, Factory:Fn(usize) -> Worker>(rx_task: Receiver<T>, tx_result: Sender<R>, num_cpus: usize, factory: Factory) ->  Arc<Mutex<Receiver<T>>> {
@@ -138,23 +135,26 @@ fn validate_graph(graph: Graph<BuildTask, ()>) -> Result<Graph<BuildTask, ()>, S
 	return Err("Found cycles in build dependencies.".to_string());
 }
 
-fn execute_task(cache: &Cache, temp_dir: &Path, message: TaskMessage) -> ResultMessage {
-	println!("{}", message.task.title);
-
+fn execute_task(cache: &Cache, temp_dir: &Path, worker: usize, message: TaskMessage) -> ResultMessage {
 	let args = wincmd::expand_args(&message.task.args, &|name:&str|->Option<String>{os::getenv(name)});
 	match execute_compiler(cache, temp_dir, message.task.exec.as_slice(), &Path::new(&message.task.working_dir), args.as_slice()) {
 		Ok(output) => {
-			println!("stdout: {}", String::from_utf8_lossy(output.output.as_slice()));
-			println!("stderr: {}", String::from_utf8_lossy(output.error.as_slice()));
 			ResultMessage {
 				index: message.index,
+				task: message.task,
+				worker: worker,
 				result: Ok(BuildResult {
-				exit_code: output.status
-			})
-		}}
+					exit_code: output.status,
+					stdout: output.output,
+					stderr: output.error
+				})
+			}
+		}
 		Err(e) => {
 			ResultMessage {
 				index: message.index,
+				task: message.task,
+				worker: worker,
 				result: Err(format!("Failed to start process: {}", e))
 			}
 		}
@@ -195,9 +195,11 @@ fn execute_graph(graph: &Graph<BuildTask, ()>, tx_task: Sender<TaskMessage>, rx_
 	for message in rx_result.iter() {
 		assert!(!completed[message.index.node_id()]);
 		count += 1;
-		println!("R {}/{}: {:?}", count, completed.len(), message);
+		println!("#{} {}/{}: {}", message.worker, count, completed.len(), message.task.title);
 		match message.result {
-				Ok (result) => {
+			Ok (result) => {
+				stdout().write(result.stdout.as_slice());
+				stderr().write(result.stderr.as_slice());
 				if !result.exit_code.success() {
 					break;
 				}
@@ -215,7 +217,7 @@ fn execute_graph(graph: &Graph<BuildTask, ()>, tx_task: Sender<TaskMessage>, rx_
 					true
 				});
 			}
-				Err (e) => {
+			Err (e) => {
 				println!("{}", e);
 				break;
 			}
