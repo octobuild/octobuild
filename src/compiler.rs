@@ -1,11 +1,11 @@
-use std::io::IoError;
-use std::io::IoErrorKind;
-use std::io::Command;
-use std::io::process::ProcessOutput;
+use std::old_io::IoError;
+use std::old_io::IoErrorKind;
+use std::old_io::Command;
+use std::old_io::process::ProcessOutput;
 
 // Scope of command line argument.
 #[derive(Copy)]
-#[derive(Show)]
+#[derive(Debug)]
 #[derive(PartialEq)]
 pub enum Scope {
 	// Preprocessing argument
@@ -19,7 +19,7 @@ pub enum Scope {
 }
 
 #[derive(Copy)]
-#[derive(Show)]
+#[derive(Debug)]
 #[derive(PartialEq)]
 pub enum InputKind {
 	Source,
@@ -28,14 +28,14 @@ pub enum InputKind {
 }
 
 #[derive(Copy)]
-#[derive(Show)]
+#[derive(Debug)]
 #[derive(PartialEq)]
 pub enum OutputKind {
 	Object,
 	Marker,
 }
 
-#[derive(Show)]
+#[derive(Debug)]
 #[derive(PartialEq)]
 pub enum Arg {
 	Flag{scope:Scope, flag: String},

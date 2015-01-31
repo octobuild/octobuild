@@ -1,6 +1,6 @@
 use std::hash;
 use std::hash::SipHasher;
-use std::io::{IoError, IoErrorKind, Reader};
+use std::old_io::{IoError, IoErrorKind, Reader};
 
 pub const DEFAULT_BUF_SIZE: usize = 1024 * 64;
 

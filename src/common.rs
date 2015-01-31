@@ -1,4 +1,4 @@
-#[derive(Show)]
+#[derive(Debug)]
 #[derive(Clone)]
 pub struct BuildTask {
 	pub title: String,

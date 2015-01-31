@@ -11,16 +11,16 @@ use octobuild::compiler::Compiler;
 
 use std::os;
 
-use std::io::{stdout, stderr, Command, File, BufferedReader, IoError, TempDir};
-use std::io::process::{ProcessExit, ProcessOutput};
+use std::old_io::{stdout, stderr, Command, File, BufferedReader, IoError, TempDir};
+use std::old_io::process::{ProcessExit, ProcessOutput};
 use std::sync::{Arc, Mutex};
 use std::sync::mpsc::{channel, Sender, Receiver};
 use std::thread::Thread;
 
 #[derive(Show)]
 struct TaskMessage {
-index: NodeIndex,
-task: BuildTask
+	index: NodeIndex,
+	task: BuildTask
 }
 
 #[derive(Show)]

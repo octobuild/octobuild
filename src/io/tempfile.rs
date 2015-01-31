@@ -1,7 +1,7 @@
 extern crate uuid;
 
-use std::io::fs;
-use std::io::IoResult;
+use std::old_io::fs;
+use std::old_io::IoResult;
 
 pub struct TempFile {
 	path: Option<Path>,

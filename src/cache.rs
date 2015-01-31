@@ -1,7 +1,7 @@
 use std::os;
-use std::io::fs;
-use std::io::{File, IoError, IoErrorKind, Reader, Writer, USER_RWX};
-use std::io::process::{ProcessOutput, ProcessExit};
+use std::old_io::fs;
+use std::old_io::{File, IoError, IoErrorKind, Reader, Writer, USER_RWX};
+use std::old_io::process::{ProcessOutput, ProcessExit};
 use std::sync::{Arc, Mutex};
 use std::collections::HashMap;
 use std::collections::hash_map::Entry;

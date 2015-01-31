@@ -1,5 +1,5 @@
 use std::slice::Iter;
-use std::io::Command;
+use std::old_io::Command;
 use std::ascii::AsciiExt;
 
 use super::super::compiler::{Arg, CompilationTask, Scope, InputKind, OutputKind};

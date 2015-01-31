@@ -7,8 +7,8 @@ use octobuild::compiler::Compiler;
 use octobuild::cache::Cache;
 
 use std::os;
-use std::io::{stderr, stdout, TempDir, Command, IoError};
-use std::io::process::{ProcessExit, ProcessOutput};
+use std::old_io::{stderr, stdout, TempDir, Command, IoError};
+use std::old_io::process::{ProcessExit, ProcessOutput};
 
 fn main() {
 	match compile() {

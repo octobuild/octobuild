@@ -8,8 +8,8 @@ use super::super::utils::filter;
 use super::super::utils::hash_text;
 use super::super::io::tempfile::TempFile;
 
-use std::io::{Command, File, IoError, IoErrorKind, MemReader};
-use std::io::process::ProcessOutput;
+use std::old_io::{Command, File, IoError, IoErrorKind, MemReader};
+use std::old_io::process::ProcessOutput;
 use std::hash::SipHasher;
 
 pub struct VsCompiler {

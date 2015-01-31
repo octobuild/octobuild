@@ -1,8 +1,8 @@
-use std::io::{Reader, Writer, IoError, IoErrorKind};
+use std::old_io::{Reader, Writer, IoError, IoErrorKind};
 
 use super::super::utils::DEFAULT_BUF_SIZE;
 
-#[derive(Show)]
+#[derive(Debug)]
 enum Directive {
 	// raw, file
 	Line(Vec<u8>, String),
@@ -220,7 +220,7 @@ fn skip_line(first: Option<u8>, reader: &mut Reader, raw: &mut Vec<u8>) -> Resul
 
 #[cfg(test)]
 mod test {
-	use std::io::MemReader;
+	use std::old_io::MemReader;
 
 	fn check_filter(original: &str, expected: &str, marker: Option<String>, keep_headers: bool) {
 		let mut writer: Vec<u8> = Vec::new();

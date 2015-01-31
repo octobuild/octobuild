@@ -4,13 +4,13 @@ use common::{BuildTask};
 use graph::{Graph, NodeIndex};
 use wincmd;
 
-use std::io::Buffer;
+use std::old_io::Buffer;
 use std::collections::HashMap;
 
 use self::xml::reader::EventReader;
 use self::xml::reader::events::XmlEvent;
 
-#[derive(Show)]
+#[derive(Debug)]
 struct XgTask {
 	id: Option<String>,
 	title: Option<String>,
@@ -19,7 +19,7 @@ struct XgTask {
 	depends_on: Vec<String>,
 }
 
-#[derive(Show)]
+#[derive(Debug)]
 struct XgTool {
 	id: String,
 	exec: String,
