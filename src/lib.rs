@@ -1,4 +1,10 @@
-#![allow(unstable)]
+#![feature(core)]
+#![feature(collections)]
+#![feature(hash)]
+#![feature(io)]
+#![feature(path)]
+#![feature(os)]
+#![feature(std_misc)]
 pub mod cache;
 pub mod common;
 pub mod compiler;

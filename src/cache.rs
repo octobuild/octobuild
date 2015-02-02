@@ -128,7 +128,7 @@ fn write_cache(path: &Path, paths: &Vec<Path>, output: &ProcessOutput) -> Result
 	}
 	try! (fs::mkdir_recursive(&path.dir_path(), USER_RWX));
 	let mut stream = try! (File::create(path));
-	try! (stream.write(HEADER));
+	try! (stream.write_all(HEADER));
 	try! (stream.write_le_uint(paths.len()));
 	let mut buf: [u8; DEFAULT_BUF_SIZE] = [0; DEFAULT_BUF_SIZE];
 	for path in paths.iter() {
@@ -137,7 +137,7 @@ fn write_cache(path: &Path, paths: &Vec<Path>, output: &ProcessOutput) -> Result
 			match file.read(&mut buf) {
 				Ok(size) => {
 					try! (stream.write_le_uint(size));
-					try! (stream.write(&buf.as_slice()[0..size]));
+					try! (stream.write_all(&buf.as_slice()[0..size]));
 				}
 				Err(ref e) if e.kind == IoErrorKind::EndOfFile => break,
 				Err(e) => return Err(e)
@@ -146,7 +146,7 @@ fn write_cache(path: &Path, paths: &Vec<Path>, output: &ProcessOutput) -> Result
 		try! (stream.write_le_uint(0));
 	}
 	try! (write_output(&mut stream, output));
-	try! (stream.write(FOOTER));
+	try! (stream.write_all(FOOTER));
 	Ok(())
 }
 
@@ -172,7 +172,7 @@ fn read_cache(path: &Path, paths: &Vec<Path>) -> Result<ProcessOutput, IoError> 
 			let size = try! (stream.read_le_uint());
 			if size == 0 {break;}
 			let block = try! (stream.read_exact(size));
-			try! (file.write(block.as_slice()));
+			try! (file.write_all(block.as_slice()));
 		}
 	}
 	let output = try! (read_output(&mut stream));
@@ -188,7 +188,7 @@ fn read_cache(path: &Path, paths: &Vec<Path>) -> Result<ProcessOutput, IoError> 
 
 fn write_blob(stream: &mut Writer, blob: &[u8]) -> Result<(), IoError> {
 	try! (stream.write_le_uint(blob.len()));
-	try! (stream.write(blob));
+	try! (stream.write_all(blob));
 	Ok(())
 }
 

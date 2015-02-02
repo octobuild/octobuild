@@ -152,7 +152,7 @@ impl Compiler for VsCompiler {
 		self.cache.run_cached(hash_params.as_slice(), &inputs, &outputs, || -> Result<ProcessOutput, IoError> {
 			// Input file path.
 			let input_temp = TempFile::new_in(&self.temp_dir, ".i");
-			try! (File::create(input_temp.path()).write(preprocessed.content.as_slice()));
+			try! (File::create(input_temp.path()).write_all(preprocessed.content.as_slice()));
 			// Run compiler.
 			let mut command = task.command.clone();
 			command

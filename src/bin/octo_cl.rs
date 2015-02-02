@@ -1,6 +1,7 @@
-#![allow(unstable)]
+#![feature(core)]
+#![feature(io)]
+#![feature(os)]
 extern crate octobuild;
-extern crate log;
 
 use octobuild::vs::compiler::VsCompiler;
 use octobuild::compiler::Compiler;
@@ -30,7 +31,7 @@ fn compile() -> Result<ProcessOutput, IoError> {
 	let compiler = VsCompiler::new(&Cache::new(), temp_dir.path());
 	let output = try! (compiler.compile(&Command::new("cl.exe"), &os::args()[1..]));
 
-	try !(stdout().write(output.output.as_slice()));
-	try !(stderr().write(output.error.as_slice()));
+	try !(stdout().write_all(output.output.as_slice()));
+	try !(stderr().write_all(output.error.as_slice()));
 	Ok(output)
 }

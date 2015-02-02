@@ -39,8 +39,8 @@ pub fn filter_preprocessed(reader: &mut Reader, writer: &mut Writer, marker: &Op
 						entry_file = match entry_file {
 							Some(path) => {
 								if header_found && (path  == file) {
-									try! (writer.write(b"#pragma hdrstop\n"));
-									try! (writer.write(raw.as_slice()));
+									try! (writer.write_all(b"#pragma hdrstop\n"));
+									try! (writer.write_all(raw.as_slice()));
 									break;
 								}
 								match *marker {
@@ -57,16 +57,16 @@ pub fn filter_preprocessed(reader: &mut Reader, writer: &mut Writer, marker: &Op
 							None => Some(file)
 						};
 						if keep_headers {
-							try! (writer.write(raw.as_slice()));
+							try! (writer.write_all(raw.as_slice()));
 						}
 					}
 					Directive::HdrStop(raw) => {
-						try! (writer.write(raw.as_slice()));
+						try! (writer.write_all(raw.as_slice()));
 						break;
 					}
 					Directive::Unknown(raw) => {
 						if keep_headers {
-							try! (writer.write(raw.as_slice()));
+							try! (writer.write_all(raw.as_slice()));
 						}
 					}
 				}
@@ -84,7 +84,7 @@ pub fn filter_preprocessed(reader: &mut Reader, writer: &mut Writer, marker: &Op
 	loop {
 		match reader.read(&mut buf) {
 			Ok(size) => {
-				try! (writer.write(&buf.as_slice()[0..size]));
+				try! (writer.write_all(&buf.as_slice()[0..size]));
 			}
 			Err(ref e) if e.kind == IoErrorKind::EndOfFile => break,
 			Err(e) => return Err(e)

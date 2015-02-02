@@ -1,4 +1,9 @@
-#![allow(unstable)]
+#![feature(core)]
+#![feature(collections)]
+#![feature(io)]
+#![feature(path)]
+#![feature(os)]
+#![feature(std_misc)]
 extern crate octobuild;
 
 use octobuild::common::BuildTask;
@@ -17,13 +22,13 @@ use std::sync::{Arc, Mutex};
 use std::sync::mpsc::{channel, Sender, Receiver};
 use std::thread::Thread;
 
-#[derive(Show)]
+#[derive(Debug)]
 struct TaskMessage {
 	index: NodeIndex,
 	task: BuildTask
 }
 
-#[derive(Show)]
+#[derive(Debug)]
 struct ResultMessage {
 	index: NodeIndex,
 	task: BuildTask,
@@ -31,7 +36,7 @@ struct ResultMessage {
 	result: Result<BuildResult, String>
 }
 
-#[derive(Show)]
+#[derive(Debug)]
 struct BuildResult {
 	exit_code: ProcessExit,
 	stdout: Vec<u8>,
@@ -87,8 +92,8 @@ fn main() {
 fn create_threads<R: Send, T: Send, Worker:Fn(T) -> R + Send, Factory:Fn(usize) -> Worker>(rx_task: Receiver<T>, tx_result: Sender<R>, num_cpus: usize, factory: Factory) ->  Arc<Mutex<Receiver<T>>> {
 	let mutex_rx_task = Arc::new(Mutex::new(rx_task));
 	for cpu_id in range(0, num_cpus) {
-	 		let local_rx_task = mutex_rx_task.clone();
-			let local_tx_result = tx_result.clone();
+		let local_rx_task = mutex_rx_task.clone();
+		let local_tx_result = tx_result.clone();
 		let worker = factory(cpu_id);
 		Thread::spawn(move || {
 			loop {
@@ -110,10 +115,10 @@ fn create_threads<R: Send, T: Send, Worker:Fn(T) -> R + Send, Factory:Fn(usize) 
 fn validate_graph(graph: Graph<BuildTask, ()>) -> Result<Graph<BuildTask, ()>, String> {
 	let mut completed:Vec<bool> = Vec::new();
 	let mut queue:Vec<NodeIndex> = Vec::new();
-		graph. each_node(|index: NodeIndex, _:&Node<BuildTask>|->bool {
-			completed.push(false);
-			queue.push(index);
-			true
+	graph.each_node(|index: NodeIndex, _:&Node<BuildTask>|->bool {
+		completed.push(false);
+		queue.push(index);
+		true
 	});
 	let mut count:usize = 0;
 	let mut i:usize = 0;
@@ -121,9 +126,9 @@ fn validate_graph(graph: Graph<BuildTask, ()>) -> Result<Graph<BuildTask, ()>, S
 		let index = queue[i];
 		if (!completed[index.node_id()]) && (is_ready(&graph, &completed, &index)) {
 			completed[index.node_id()] = true;
-				graph.each_incoming_edge(index, |_:EdgeIndex, edge:&Edge<()>| -> bool {
-					queue.push(edge.source());
-					true
+			graph.each_incoming_edge(index, |_:EdgeIndex, edge:&Edge<()>| -> bool {
+				queue.push(edge.source());
+				true
 			});
 			count += 1;
 			if count ==completed.len() {
@@ -177,18 +182,18 @@ fn execute_compiler(cache: &Cache, temp_dir: &Path, program: &str, cwd: &Path, a
 fn execute_graph(graph: &Graph<BuildTask, ()>, tx_task: Sender<TaskMessage>, rx_task: Arc<Mutex<Receiver<TaskMessage>>>, rx_result: Receiver<ResultMessage>) {
 	let mut completed:Vec<bool> = Vec::new();
 		graph. each_node(|index: NodeIndex, node:&Node<BuildTask>|->bool {
-		let mut has_edges = false;
+			let mut has_edges = false;
 			graph.each_outgoing_edge(index, |_:EdgeIndex, _:&Edge<()>| -> bool {
 			has_edges = true;
 			false
 		});
 		if !has_edges {
-				tx_task.send(TaskMessage{
-			index: index,
-			task: node.data.clone(),
-			})  ;
+			tx_task.send(TaskMessage{
+				index: index,
+				task: node.data.clone(),
+			});
 		}
-			completed.push(false);
+		completed.push(false);
 		true
 	});
 	let mut count:usize = 0;
@@ -198,8 +203,8 @@ fn execute_graph(graph: &Graph<BuildTask, ()>, tx_task: Sender<TaskMessage>, rx_
 		println!("#{} {}/{}: {}", message.worker, count, completed.len(), message.task.title);
 		match message.result {
 			Ok (result) => {
-				stdout().write(result.stdout.as_slice());
-				stderr().write(result.stderr.as_slice());
+				stdout().write_all(result.stdout.as_slice());
+				stderr().write_all(result.stderr.as_slice());
 				if !result.exit_code.success() {
 					break;
 				}
@@ -208,10 +213,10 @@ fn execute_graph(graph: &Graph<BuildTask, ()>, tx_task: Sender<TaskMessage>, rx_
 					let source = edge.source();
 					if !completed[source.node_id()] {
 						if is_ready(graph, &completed, &source) {
-								tx_task.send(TaskMessage{
-							index: source,
-							task: graph.node(source).data.clone(),
-							})  ;
+							tx_task.send(TaskMessage{
+								index: source,
+								task: graph.node(source).data.clone(),
+							});
 						}
 					}
 					true
@@ -221,7 +226,7 @@ fn execute_graph(graph: &Graph<BuildTask, ()>, tx_task: Sender<TaskMessage>, rx_
 				println!("{}", e);
 				break;
 			}
-			}
+		}
 		if count == completed.len() {
 			break;
 		}
@@ -230,11 +235,11 @@ fn execute_graph(graph: &Graph<BuildTask, ()>, tx_task: Sender<TaskMessage>, rx_
 	free(tx_task);
 	// Cleanup task list.
 	match rx_task.lock() {
-			queue => {
+		queue => {
 			for _ in queue.iter() {
 			}
 		}
-		}
+	}
 	// Wait for in progress task completion.
 	for _ in rx_result.iter() {
 	}
