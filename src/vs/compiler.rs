@@ -8,7 +8,7 @@ use super::super::utils::filter;
 use super::super::utils::hash_text;
 use super::super::io::tempfile::TempFile;
 
-use std::old_io::{Command, File, IoError, IoErrorKind, MemReader};
+use std::old_io::{Command, File, IoError, IoErrorKind, MemReader, BufferedReader};
 use std::old_io::process::ProcessOutput;
 use std::hash::SipHasher;
 
@@ -74,10 +74,10 @@ impl Compiler for VsCompiler {
 		let output = try! (command.output());
 		if output.status.success() {
 			match File::open(temp_file.path()) {
-				Ok(mut stream) => {
+				Ok(stream) => {
 					let mut output: Box<Reader> = if task.input_precompiled.is_some() || task.output_precompiled.is_some() {
 						let mut buffer: Vec<u8> = Vec::new();
-						try! (postprocess::filter_preprocessed(&mut stream, &mut buffer, &task.marker_precompiled, task.output_precompiled.is_some()));
+						try! (postprocess::filter_preprocessed(&mut BufferedReader::new(stream), &mut buffer, &task.marker_precompiled, task.output_precompiled.is_some()));
 						Box::new(MemReader::new(buffer))
 					} else {
 						Box::new(stream)
