@@ -1,5 +1,4 @@
 #![feature(core)]
-#![feature(collections)]
 #![feature(io)]
 #![feature(path)]
 #![feature(os)]
@@ -16,7 +15,7 @@ use octobuild::compiler::Compiler;
 
 use std::os;
 
-use std::old_io::{stdout, stderr, Command, File, BufferedReader, IoError, TempDir};
+use std::old_io::{stdout, stderr, Command, File, BufferedReader, IoError, IoErrorKind, TempDir};
 use std::old_io::process::{ProcessExit, ProcessOutput};
 use std::sync::{Arc, Mutex};
 use std::sync::mpsc::{channel, Sender, Receiver};
@@ -33,7 +32,7 @@ struct ResultMessage {
 	index: NodeIndex,
 	task: BuildTask,
 	worker: usize,
-	result: Result<BuildResult, String>
+	result: Result<BuildResult, IoError>
 }
 
 #[derive(Debug)]
@@ -44,49 +43,52 @@ struct BuildResult {
 }
 
 fn main() {
-	let temp_dir = match TempDir::new("octobuild") {
-		Ok(result) => result,
-		Err(e) => {panic!(e);}
-	};
-
 	println!("XGConsole:");
-	for arg in os::args().iter() {
+	let args = os::args();
+	for arg in args.iter() {
 		println!("  {}", arg);
 	}
+	match execute(&args.as_slice()[1..]) {
+		Ok(result) => {
+			std::os::set_exit_status(match result {
+				ProcessExit::ExitStatus(r) => r,
+				ProcessExit::ExitSignal(r) => r
+			});
+		}
+		Err(e) => {
+			println!("FATAL ERROR: {:?}", e);
+			std::os::set_exit_status(500);
+		}
+	}
+}
 
-	let (tx_result, rx_result): (Sender<ResultMessage>, Receiver<ResultMessage>) = channel();
-	let (tx_task, rx_task): (Sender<TaskMessage>, Receiver<TaskMessage>) = channel();
+fn execute(args: &[String]) -> Result<ProcessExit, IoError> {
 	let cache = Cache::new();
+	let temp_dir = try! (TempDir::new("octobuild"));
+	for arg in args.iter() {
+		if arg.starts_with("/") {continue}
 
-	let mutex_rx_task = create_threads(rx_task, tx_result, std::os::num_cpus(), |worker_id:usize| {
-		let temp_path = temp_dir.path().clone();
-		let temp_cache = cache.clone();
-		move |task:TaskMessage| -> ResultMessage {
-			execute_task(&temp_cache, &temp_path, worker_id, task)
-		}
-	});
+		let (tx_result, rx_result): (Sender<ResultMessage>, Receiver<ResultMessage>) = channel();
+		let (tx_task, rx_task): (Sender<TaskMessage>, Receiver<TaskMessage>) = channel();
 
-	let args = os::args();
-	if args.len() <= 1 {
-		panic! ("Task file is not defined");
-	}
-	let path = Path::new(&args[1]);
-	match File::open(&path) {
-		Ok(file) => {
-			match xg::parser::parse(BufferedReader::new(file)) {
-				Ok(graph) => {
-					match validate_graph(graph) {
-						Ok(graph) => {
-							execute_graph(&graph, tx_task, mutex_rx_task, rx_result);
-						}
-						Err(msg) =>{panic! (msg);}
-					}
-				}
-				Err(msg) =>{panic! (msg);}
+		create_threads(rx_task, tx_result, std::os::num_cpus(), |worker_id:usize| {
+			let temp_path = temp_dir.path().clone();
+			let temp_cache = cache.clone();
+			move |task:TaskMessage| -> ResultMessage {
+				execute_task(&temp_cache, &temp_path, worker_id, task)
 			}
+		});	
+
+		let path = Path::new(arg);
+		let file = try! (File::open(&path));
+		let graph = try! (xg::parser::parse(BufferedReader::new(file)));
+		let validated_graph = try! (validate_graph(graph));
+		let result = try! (execute_graph(&validated_graph, tx_task, rx_result));
+		if !result.success() {
+			return Ok(result);
 		}
-		Err(msg) =>{panic! (msg);}
 	}
+	Ok(ProcessExit::ExitStatus(0))
 }
 
 fn create_threads<R: Send, T: Send, Worker:Fn(T) -> R + Send, Factory:Fn(usize) -> Worker>(rx_task: Receiver<T>, tx_result: Sender<R>, num_cpus: usize, factory: Factory) ->  Arc<Mutex<Receiver<T>>> {
@@ -112,7 +114,7 @@ fn create_threads<R: Send, T: Send, Worker:Fn(T) -> R + Send, Factory:Fn(usize) 
 	mutex_rx_task
 }
 
-fn validate_graph(graph: Graph<BuildTask, ()>) -> Result<Graph<BuildTask, ()>, String> {
+fn validate_graph(graph: Graph<BuildTask, ()>) -> Result<Graph<BuildTask, ()>, IoError> {
 	let mut completed:Vec<bool> = Vec::new();
 	let mut queue:Vec<NodeIndex> = Vec::new();
 	graph.each_node(|index: NodeIndex, _:&Node<BuildTask>|->bool {
@@ -137,7 +139,11 @@ fn validate_graph(graph: Graph<BuildTask, ()>) -> Result<Graph<BuildTask, ()>, S
 		}
 		i = i + 1;
 	}
-	return Err("Found cycles in build dependencies.".to_string());
+	Err(IoError {
+		kind: IoErrorKind::InvalidInput,
+		desc: "Found cycles in build dependencies",
+		detail: None
+	})
 }
 
 fn execute_task(cache: &Cache, temp_dir: &Path, worker: usize, message: TaskMessage) -> ResultMessage {
@@ -160,7 +166,7 @@ fn execute_task(cache: &Cache, temp_dir: &Path, worker: usize, message: TaskMess
 				index: message.index,
 				task: message.task,
 				worker: worker,
-				result: Err(format!("Failed to start process: {}", e))
+				result: Err(e)
 			}
 		}
 	}
@@ -179,73 +185,81 @@ fn execute_compiler(cache: &Cache, temp_dir: &Path, program: &str, cwd: &Path, a
 	}
 }
 
-fn execute_graph(graph: &Graph<BuildTask, ()>, tx_task: Sender<TaskMessage>, rx_task: Arc<Mutex<Receiver<TaskMessage>>>, rx_result: Receiver<ResultMessage>) {
+fn execute_graph(graph: &Graph<BuildTask, ()>, tx_task: Sender<TaskMessage>, rx_result: Receiver<ResultMessage>) -> Result<ProcessExit, IoError> {
+	// Run all tasks.
+	let result = execute_until_failed(graph, tx_task, &rx_result);
+	// Wait for in progress task completion.
+	for _ in rx_result.iter() {
+	}
+	result
+}
+
+fn execute_until_failed(graph: &Graph<BuildTask, ()>, tx_task: Sender<TaskMessage>, rx_result: &Receiver<ResultMessage>) -> Result<ProcessExit, IoError> {
 	let mut completed:Vec<bool> = Vec::new();
-		graph. each_node(|index: NodeIndex, node:&Node<BuildTask>|->bool {
-			let mut has_edges = false;
-			graph.each_outgoing_edge(index, |_:EdgeIndex, _:&Edge<()>| -> bool {
+	if !graph.each_node(|index: NodeIndex, node:&Node<BuildTask>|->bool {
+		let mut has_edges = false;
+		graph.each_outgoing_edge(index, |_:EdgeIndex, _:&Edge<()>| -> bool {
 			has_edges = true;
 			false
 		});
+		completed.push(false);
 		if !has_edges {
-			tx_task.send(TaskMessage{
+			match tx_task.send(TaskMessage{
 				index: index,
 				task: node.data.clone(),
-			});
+			}) {
+				Ok(_) => true,
+				Err(_) => false,
+			}
+		} else {
+			true
 		}
-		completed.push(false);
-		true
-	});
+	}) {
+		return Err(IoError {
+			kind: IoErrorKind::BrokenPipe,
+			desc: "Can't schedule root tasks",
+			detail: None
+		});
+	}
+
 	let mut count:usize = 0;
 	for message in rx_result.iter() {
 		assert!(!completed[message.index.node_id()]);
 		count += 1;
 		println!("#{} {}/{}: {}", message.worker, count, completed.len(), message.task.title);
-		match message.result {
-			Ok (result) => {
-				stdout().write_all(result.stdout.as_slice());
-				stderr().write_all(result.stderr.as_slice());
-				if !result.exit_code.success() {
-					break;
-				}
-				completed[message.index.node_id()] = true;
-					graph.each_incoming_edge(message.index, |_:EdgeIndex, edge:&Edge<()>| -> bool {
-					let source = edge.source();
-					if !completed[source.node_id()] {
-						if is_ready(graph, &completed, &source) {
-							tx_task.send(TaskMessage{
-								index: source,
-								task: graph.node(source).data.clone(),
-							});
-						}
+		let result = try! (message.result);
+		try! (stdout().write_all(result.stdout.as_slice()));
+		try! (stderr().write_all(result.stderr.as_slice()));
+		if !result.exit_code.success() {
+			return Ok(result.exit_code);
+		}
+		completed[message.index.node_id()] = true;
+		if !graph.each_incoming_edge(message.index, |_:EdgeIndex, edge:&Edge<()>| -> bool {
+			let source = edge.source();
+			if !completed[source.node_id()] {
+				if is_ready(graph, &completed, &source) {
+					match tx_task.send(TaskMessage{
+						index: source,
+						task: graph.node(source).data.clone(),
+					}) {
+						Ok(_) => {},
+						Err(_) => {return false;}
 					}
-					true
-				});
+				}
 			}
-			Err (e) => {
-				println!("{}", e);
-				break;
-			}
-		}
+			true
+		}) {
+			return Err(IoError {
+				kind: IoErrorKind::BrokenPipe,
+				desc: "Can't schedule child task",
+				detail: None
+			});
+		};
 		if count == completed.len() {
-			break;
+			return Ok(ProcessExit::ExitStatus(0));
 		}
 	}
-	// No more tasks.
-	free(tx_task);
-	// Cleanup task list.
-	match rx_task.lock() {
-		queue => {
-			for _ in queue.iter() {
-			}
-		}
-	}
-	// Wait for in progress task completion.
-	for _ in rx_result.iter() {
-	}
-}
-
-fn free<T>(_:T) {
+	panic! ("Unexpected end of result pipe");
 }
 
 fn is_ready(graph: &Graph<BuildTask, ()>, completed: &Vec<bool>, source: &NodeIndex) -> bool {

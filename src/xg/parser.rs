@@ -4,7 +4,7 @@ use common::{BuildTask};
 use graph::{Graph, NodeIndex};
 use wincmd;
 
-use std::old_io::Buffer;
+use std::old_io::{Buffer, IoError, IoErrorKind};
 use std::collections::HashMap;
 
 use self::xml::reader::EventReader;
@@ -27,7 +27,7 @@ struct XgTool {
 	output: Option<String>,
 }
 
-pub fn parse<B: Buffer>(reader: B) -> Result<Graph<BuildTask, ()>, String> {
+pub fn parse<B: Buffer>(reader: B) -> Result<Graph<BuildTask, ()>, IoError> {
 	let mut parser = EventReader::new(reader);
 	let mut tasks:Vec<XgTask> = Vec::new();
 	let mut tools:HashMap<String, XgTool> = HashMap::new();
@@ -36,24 +36,11 @@ pub fn parse<B: Buffer>(reader: B) -> Result<Graph<BuildTask, ()>, String> {
 			XmlEvent::StartElement {name, attributes, ..} => {
 				match name.local_name.as_slice() {
 					"Task" => {
-						match parse_task(&attributes) {
-							Ok(task) => {
-								tasks.push(task);
-							}
-							Err(msg) => {
-								return Err(msg);
-							}
-						};
+						tasks.push(try! (parse_task (&attributes)));
 					}
 					"Tool" => {
-						match parse_tool(&attributes) {
-							Ok(tool) => {
-								tools.insert(tool.id.to_string(), tool);
-							}
-							Err(msg) => {
-								return Err(msg);
-							}
-						};
+						let tool = try! (parse_tool (&attributes));
+						tools.insert(tool.id.to_string(), tool);
 					}
 					_ => {}
 				}
@@ -67,7 +54,7 @@ pub fn parse<B: Buffer>(reader: B) -> Result<Graph<BuildTask, ()>, String> {
 	parse_create_graph(&tasks, &tools)
 }
 
-fn parse_create_graph(tasks:&Vec<XgTask>, tools:&HashMap<String, XgTool>) -> Result<Graph<BuildTask, ()>, String> {
+fn parse_create_graph(tasks:&Vec<XgTask>, tools:&HashMap<String, XgTool>) -> Result<Graph<BuildTask, ()>, IoError> {
 	let mut graph: Graph<BuildTask, ()> = Graph::new();
 	let mut nodes: Vec<NodeIndex> = Vec::new();
 	let mut task_refs: HashMap<&str, NodeIndex> = HashMap::new();
@@ -97,7 +84,11 @@ fn parse_create_graph(tasks:&Vec<XgTask>, tools:&HashMap<String, XgTool>) -> Res
 				nodes.push(node);
 			}
 			_ => {
-				return Err(format!("Can't find tool with id: {}", task.tool));
+				return Err(IoError {
+					kind: IoErrorKind::InvalidInput,
+					desc: "Can't find tool with id",
+					detail: Some(task.tool.clone())
+				});
 			}
 		}
 	}
@@ -111,7 +102,11 @@ fn parse_create_graph(tasks:&Vec<XgTask>, tools:&HashMap<String, XgTool>) -> Res
 					graph.add_edge(*node, *v, ());
 				}
 				_ => {
-					return Err(format!("Can't find task for dependency with id: {}", id));
+					return Err(IoError {
+						kind: IoErrorKind::InvalidInput,
+						desc: "Can't find task for dependency with id",
+						detail: Some(id.clone())
+					});
 				}
 			}
 		}
@@ -127,20 +122,30 @@ fn map_attributes (attributes: &Vec<xml::attribute::OwnedAttribute>) -> HashMap<
 	attrs
 }
 
-fn parse_task (attributes: & Vec<xml::attribute::OwnedAttribute>)->Result<XgTask, String> {
+fn parse_task (attributes: & Vec<xml::attribute::OwnedAttribute>)->Result<XgTask, IoError> {
 	let mut attrs = map_attributes(attributes);
 	// Tool
-	let tool: String;
-	match attrs.remove("Tool") {
-		Some(v) => {tool = v;}
-		_ => {return Err("Invalid task data: attribute @Tool not found.".to_string());}
-	}
+	let tool = match attrs.remove("Tool") {
+		Some(v) => v,
+		_ => {
+			return Err(IoError {
+				kind: IoErrorKind::InvalidInput,
+				desc: "Invalid task data: attribute @Tool not found",
+				detail: None
+			});
+		}
+	};
 	// WorkingDir
-	let working_dir: String;
-	match attrs.remove("WorkingDir") {
-		Some(v) => {working_dir = v;}
-		_ => {return Err("Invalid task data: attribute @WorkingDir not found.".to_string());}
-	}
+	let working_dir = match attrs.remove("WorkingDir") {
+		Some(v) => v,
+		_ => {
+			return Err(IoError {
+				kind: IoErrorKind::InvalidInput,
+				desc: "Invalid task data: attribute @WorkingDir not found",
+				detail: None
+			});
+		}
+	};
 	// DependsOn
 	let mut depends_on : Vec<String> = Vec::new();
 	match attrs.remove("DependsOn") {
@@ -162,21 +167,31 @@ fn parse_task (attributes: & Vec<xml::attribute::OwnedAttribute>)->Result<XgTask
 	})
 }
 
-fn parse_tool (attributes: &Vec<xml::attribute::OwnedAttribute>)->Result<XgTool, String> {
+fn parse_tool (attributes: &Vec<xml::attribute::OwnedAttribute>)->Result<XgTool, IoError> {
 	let mut attrs = map_attributes(attributes);
 	// Name
-	let id: String;
-	match attrs.remove("Name") {
-		Some(v) => {id = v;}
-		_ => {return Err("Invalid task data: attribute @Name not found.".to_string());}
-	}
+	let id = match attrs.remove("Name") {
+		Some(v) => v,
+		_ => {
+			return Err(IoError {
+				kind: IoErrorKind::InvalidInput,
+				desc: "Invalid task data: attribute @Name not found",
+				detail: None
+			});
+		}
+	};
 	// Path
-	let exec: String;
-	match attrs.remove("Path") {
-		Some(v) => {exec = v;}
-		_ => {return Err("Invalid task data: attribute @Name not found.".to_string());}
-	}
-
+	let exec = match attrs.remove("Path") {
+		Some(v) => v,
+		_ => {
+			return Err(IoError {
+				kind: IoErrorKind::InvalidInput,
+				desc: "Invalid task data: attribute @Path not found",
+				detail: None
+			});
+		}
+	};
+	
 	Ok(XgTool {
 		id: id,
 		exec: exec,
