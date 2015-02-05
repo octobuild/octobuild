@@ -1,6 +1,7 @@
 #![feature(collections)]
 #![feature(asm)]
 #![feature(io)]
+#![allow(non_snake_case)]
 
 extern crate winapi;
 extern crate "advapi32-sys" as advapi32;
@@ -16,7 +17,7 @@ fn main() {
 	
 	unsafe {
 		let service_name = service_name();
-		let service_table: &[LPCSERVICE_TABLE_ENTRYW] = &[
+		let service_table: &[*const SERVICE_TABLE_ENTRYW] = &[
 			&SERVICE_TABLE_ENTRYW {
 				lpServiceName: service_name.as_ptr(),
 				lpServiceProc: service_main,
@@ -37,7 +38,7 @@ fn service_name() -> Vec<u16> {
 	result
 }
 
-fn create_service_status(current_state: SERVICE_CURRENT_STATE) -> SERVICE_STATUS {
+fn create_service_status(current_state: DWORD) -> SERVICE_STATUS {
 	SERVICE_STATUS {
 		dwServiceType: SERVICE_WIN32_OWN_PROCESS,
 		dwCurrentState: current_state,
@@ -59,22 +60,22 @@ unsafe extern "system" fn service_main(
 	let service_name = service_name();
 	let handle = RegisterServiceCtrlHandlerExW(service_name.as_ptr(), control_handler, ptr::null_mut()); 
 	service_handle = Some(handle);
-	SetServiceStatus (handle, &create_service_status(SERVICE_CURRENT_STATE::START_PENDING));
-	SetServiceStatus (handle, &create_service_status(SERVICE_CURRENT_STATE::RUNNING));
+	SetServiceStatus (handle, &mut create_service_status(SERVICE_START_PENDING));
+	SetServiceStatus (handle, &mut create_service_status(SERVICE_RUNNING));
 	log("service_main: END");
 }
 
 unsafe extern "system" fn control_handler(
-	dwControl: SERVICE_CONTROL,
+	dwControl: DWORD,
 	dwEventType: DWORD,
 	lpEventData: LPVOID,
 	lpContext: LPVOID
 ) -> DWORD {
 	match dwControl {
-		SERVICE_CONTROL::STOP | SERVICE_CONTROL::SHUTDOWN => {
+		SERVICE_CONTROL_STOP | SERVICE_CONTROL_SHUTDOWN => {
 			log("control_handler: STOP");
 			match service_handle {
-				Some(handle) => {SetServiceStatus (handle, &create_service_status(SERVICE_CURRENT_STATE::STOPPED));}
+				Some(handle) => {SetServiceStatus (handle, &mut create_service_status(SERVICE_STOPPED));}
 				None => {}
 			}
 		}

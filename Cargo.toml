@@ -8,3 +8,9 @@ version = "*"
 
 [dependencies.uuid]
 version = "*"
+
+[dependencies.winapi]
+version = "*"
+
+[dependencies.advapi32-sys]
+version = "*"
