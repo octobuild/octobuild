@@ -30,9 +30,11 @@
 //! the field `next_edge`). Each of those fields is an array that should
 //! be indexed by the direction (see the type `Direction`).
 
+#![allow(dead_code)] // still WIP
+
 use std::fmt::{Formatter, Error, Debug};
-use std::collections::BitvSet;
 use std::usize;
+use std::collections::BitSet;
 
 pub struct Graph<N,E> {
     nodes: Vec<Node<N>> ,
@@ -60,33 +62,33 @@ impl<E: Debug> Debug for Edge<E> {
 }
 
 #[derive(Clone, Copy, PartialEq, Debug)]
-pub struct NodeIndex(pub usize);
+pub struct NodeIndex(pub uint);
 #[allow(non_upper_case_globals)]
 pub const InvalidNodeIndex: NodeIndex = NodeIndex(usize::MAX);
 
 #[derive(Copy, PartialEq, Debug)]
-pub struct EdgeIndex(pub usize);
+pub struct EdgeIndex(pub uint);
 #[allow(non_upper_case_globals)]
 pub const InvalidEdgeIndex: EdgeIndex = EdgeIndex(usize::MAX);
 
 // Use a private field here to guarantee no more instances are created:
 #[derive(Copy, Debug)]
-pub struct Direction { repr: usize }
+pub struct Direction { repr: uint }
 #[allow(non_upper_case_globals)]
 pub const Outgoing: Direction = Direction { repr: 0 };
 #[allow(non_upper_case_globals)]
 pub const Incoming: Direction = Direction { repr: 1 };
 
 impl NodeIndex {
-    fn get(&self) -> usize { let NodeIndex(v) = *self; v }
+    fn get(&self) -> uint { let NodeIndex(v) = *self; v }
     /// Returns unique id (unique with respect to the graph holding associated node).
-    pub fn node_id(&self) -> usize { self.get() }
+    pub fn node_id(&self) -> uint { self.get() }
 }
 
 impl EdgeIndex {
-    fn get(&self) -> usize { let EdgeIndex(v) = *self; v }
+    fn get(&self) -> uint { let EdgeIndex(v) = *self; v }
     /// Returns unique id (unique with respect to the graph holding associated edge).
-    pub fn edge_id(&self) -> usize { self.get() }
+    pub fn edge_id(&self) -> uint { self.get() }
 }
 
 impl<N,E> Graph<N,E> {
@@ -97,8 +99,8 @@ impl<N,E> Graph<N,E> {
         }
     }
 
-    pub fn with_capacity(num_nodes: usize,
-                         num_edges: usize) -> Graph<N,E> {
+    pub fn with_capacity(num_nodes: uint,
+                         num_edges: uint) -> Graph<N,E> {
         Graph {
             nodes: Vec::with_capacity(num_nodes),
             edges: Vec::with_capacity(num_edges),
@@ -110,14 +112,12 @@ impl<N,E> Graph<N,E> {
 
     #[inline]
     pub fn all_nodes<'a>(&'a self) -> &'a [Node<N>] {
-        let nodes: &'a [Node<N>] = self.nodes.as_slice();
-        nodes
+        &self.nodes
     }
 
     #[inline]
     pub fn all_edges<'a>(&'a self) -> &'a [Edge<E>] {
-        let edges: &'a [Edge<E>] = self.edges.as_slice();
-        edges
+        &self.edges
     }
 
     ///////////////////////////////////////////////////////////////////////////
@@ -275,7 +275,7 @@ impl<N,E> Graph<N,E> {
     // computation.
 
     pub fn iterate_until_fixed_point<'a, F>(&'a self, mut op: F) where
-        F: FnMut(usize, EdgeIndex, &'a Edge<E>) -> bool,
+        F: FnMut(uint, EdgeIndex, &'a Edge<E>) -> bool,
     {
         let mut iteration = 0;
         let mut changed = true;
@@ -292,7 +292,7 @@ impl<N,E> Graph<N,E> {
         DepthFirstTraversal {
             graph: self,
             stack: vec![start],
-            visited: BitvSet::new()
+            visited: BitSet::new()
         }
     }
 }
@@ -300,7 +300,7 @@ impl<N,E> Graph<N,E> {
 pub struct DepthFirstTraversal<'g, N:'g, E:'g> {
     graph: &'g Graph<N, E>,
     stack: Vec<NodeIndex>,
-    visited: BitvSet
+    visited: BitSet
 }
 
 impl<'g, N, E> Iterator for DepthFirstTraversal<'g, N, E> {
@@ -350,7 +350,7 @@ impl<E> Edge<E> {
 
 #[cfg(test)]
 mod test {
-    use graph::*;
+    use middle::graph::*;
     use std::fmt::Debug;
 
     type TestNode = Node<&'static str>;
@@ -417,6 +417,8 @@ mod test {
         graph.each_incoming_edge(start_index, |edge_index, edge| {
             assert!(graph.edge_data(edge_index) == &edge.data);
             assert!(counter < expected_incoming.len());
+            debug!("counter={:?} expected={:?} edge_index={:?} edge={:?}",
+                   counter, expected_incoming[counter], edge_index, edge);
             match expected_incoming[counter] {
                 (ref e, ref n) => {
                     assert!(e == &edge.data);
@@ -433,6 +435,8 @@ mod test {
         graph.each_outgoing_edge(start_index, |edge_index, edge| {
             assert!(graph.edge_data(edge_index) == &edge.data);
             assert!(counter < expected_outgoing.len());
+            debug!("counter={:?} expected={:?} edge_index={:?} edge={:?}",
+                   counter, expected_outgoing[counter], edge_index, edge);
             match expected_outgoing[counter] {
                 (ref e, ref n) => {
                     assert!(e == &edge.data);

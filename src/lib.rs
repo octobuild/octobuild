@@ -5,6 +5,7 @@
 #![feature(path)]
 #![feature(os)]
 #![feature(std_misc)]
+#![feature(int_uint)]
 pub mod cache;
 pub mod common;
 pub mod compiler;
