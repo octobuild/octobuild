@@ -10,7 +10,7 @@ use super::super::io::tempfile::TempFile;
 
 use std::old_io::{Command, File, IoError, IoErrorKind, MemReader, BufferedReader};
 use std::old_io::process::ProcessOutput;
-use std::hash::SipHasher;
+use std::hash::{SipHasher, Hasher};
 
 pub struct VsCompiler {
 	cache: Cache,
@@ -61,11 +61,8 @@ impl Compiler for VsCompiler {
 	
 		// Hash data.
 		let mut hash = SipHasher::new();
-		{
-			use std::hash::Writer;
-			hash.write(&[0]);
-			hash.write(wincmd::join(&args).as_bytes());
-		}
+		hash.write_u8(0);
+		hash.write(wincmd::join(&args).as_bytes());
 	
 		let mut command = task.command.clone();
 		command
@@ -83,10 +80,7 @@ impl Compiler for VsCompiler {
 						Box::new(stream)
 					};
 					let content = try! (output.read_to_end());
-					{
-						use std::hash::Writer;
-						hash.write(content.as_slice());
-					}
+					hash.write(content.as_slice());
 					Ok(PreprocessResult{
 						hash: format!("{:016x}", hash.result()),
 						content: content

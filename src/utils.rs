@@ -1,5 +1,5 @@
 use std::hash;
-use std::hash::SipHasher;
+use std::hash::{Hasher, SipHasher};
 use std::old_io::{IoError, IoErrorKind, Reader};
 
 pub const DEFAULT_BUF_SIZE: usize = 1024 * 64;
@@ -18,11 +18,9 @@ pub fn filter<T, R, F:Fn(&T) -> Option<R>>(args: &Vec<T>, filter:F) -> Vec<R> {
 }
 
 pub fn hash_text(data: &[u8]) -> String {
-	use std::hash::Writer;
-
 	let mut hash = SipHasher::new();
 	hash.write(data);
-	format!("{:016x}", hash.result())
+	format!("{:016x}", hash.finish())
 }
 
 pub fn hash_stream(stream: &mut Reader) -> Result<String, IoError> {
@@ -31,7 +29,7 @@ pub fn hash_stream(stream: &mut Reader) -> Result<String, IoError> {
 	Ok(format!("{:016x}", hash.result()))
 }
 
-pub fn hash_write_stream(hash: &mut hash::Writer, stream: &mut Reader) -> Result<(), IoError> {
+pub fn hash_write_stream(hash: &mut Hasher, stream: &mut Reader) -> Result<(), IoError> {
 	let mut buf: [u8; DEFAULT_BUF_SIZE] = [0; DEFAULT_BUF_SIZE];
 	loop {
 		match stream.read(&mut buf) {

@@ -5,7 +5,7 @@ use std::old_io::process::{ProcessOutput, ProcessExit};
 use std::sync::{Arc, Mutex};
 use std::collections::HashMap;
 use std::collections::hash_map::Entry;
-use std::hash::SipHasher;
+use std::hash::{Hasher, SipHasher};
 
 use super::utils::hash_write_stream;
 use super::utils::DEFAULT_BUF_SIZE;
@@ -52,12 +52,10 @@ impl Cache {
 	}
 
 	fn generate_hash(&self, params: &str, inputs: &Vec<Path>) -> Result<String, IoError> {
-		use std::hash::Writer;
-
 		let mut hash = SipHasher::new();
 		// str
 		hash.write(params.as_bytes());
-		hash.write(&[0]);
+		hash.write_u8(0);
 		// inputs
 		for input in inputs.iter() {
 			let file_hash = try! (self.get_file_hash(input));
