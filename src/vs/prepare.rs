@@ -213,7 +213,7 @@ fn test_parse_argument() {
 	use super::super::wincmd;
 
 	assert_eq!(
-		parse_arguments(&wincmd::parse("/c /Yusample.h /Fpsample.h.pch /Fosample.cpp.o /DTEST /D TEST2 sample.cpp")[]).unwrap(),
+		parse_arguments(&wincmd::parse("/c /Yusample.h /Fpsample.h.pch /Fosample.cpp.o /DTEST /D TEST2 sample.cpp").as_slice()).unwrap(),
 		[
 			Arg::Flag { scope: Scope::Ignore, flag: "c".to_string()},
 			Arg::Input { kind: InputKind::Marker, flag: "Yu".to_string(), file: "sample.h".to_string()},

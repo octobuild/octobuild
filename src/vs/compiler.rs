@@ -60,7 +60,8 @@ impl Compiler for VsCompiler {
 		args.push(task.input_source.display().to_string());
 	
 		// Hash data.
-		let mut hash = SipHasher::new();
+		let mut sip_hash = SipHasher::new();
+		let hash: &mut Hasher = &mut sip_hash;
 		hash.write_u8(0);
 		hash.write(wincmd::join(&args).as_bytes());
 	
@@ -82,7 +83,7 @@ impl Compiler for VsCompiler {
 					let content = try! (output.read_to_end());
 					hash.write(content.as_slice());
 					Ok(PreprocessResult{
-						hash: format!("{:016x}", hash.result()),
+						hash: format!("{:016x}", hash.finish()),
 						content: content
 					})
 				}

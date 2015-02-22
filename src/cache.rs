@@ -52,7 +52,8 @@ impl Cache {
 	}
 
 	fn generate_hash(&self, params: &str, inputs: &Vec<Path>) -> Result<String, IoError> {
-		let mut hash = SipHasher::new();
+		let mut sip_hash = SipHasher::new();
+		let hash: &mut Hasher = &mut sip_hash;
 		// str
 		hash.write(params.as_bytes());
 		hash.write_u8(0);
@@ -61,7 +62,7 @@ impl Cache {
 			let file_hash = try! (self.get_file_hash(input));
 			hash.write(file_hash.as_bytes());
 		}
-		Ok(format!("{:016x}", hash.result()))
+		Ok(format!("{:016x}", hash.finish()))
 	}
 
 	pub fn get_file_hash(&self, path: &Path) -> Result<String, IoError> {
@@ -78,7 +79,7 @@ impl Cache {
 					kind: IoErrorKind::OtherIoError,
 					desc: "Mutex error",
 					detail: Some(e.to_string())
-				})
+				});
 			}
 		};
 		// Get file hash.

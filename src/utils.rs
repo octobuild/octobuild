@@ -18,7 +18,8 @@ pub fn filter<T, R, F:Fn(&T) -> Option<R>>(args: &Vec<T>, filter:F) -> Vec<R> {
 }
 
 pub fn hash_text(data: &[u8]) -> String {
-	let mut hash = SipHasher::new();
+	let mut sip_hash = SipHasher::new();
+	let hash: &mut Hasher = &mut sip_hash;
 	hash.write(data);
 	format!("{:016x}", hash.finish())
 }
