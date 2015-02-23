@@ -83,7 +83,7 @@ impl Cache {
 			}
 		};
 		// Get file hash.
-		match hash_lock.lock() {
+		let result = match hash_lock.lock() { // rust: #22722
 			Ok(mut hash_entry) => {
 				// Validate entry, if exists.
 				match *hash_entry {
@@ -110,7 +110,8 @@ impl Cache {
 				desc: "Mutex error",
 				detail: Some(e.to_string())
 			})
-		}
+		};
+		result
 	}
 }
 
