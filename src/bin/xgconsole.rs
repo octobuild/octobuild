@@ -91,7 +91,7 @@ fn execute(args: &[String]) -> Result<ProcessExit, IoError> {
 	Ok(ProcessExit::ExitStatus(0))
 }
 
-fn create_threads<R: Send, T: Send, Worker:Fn(T) -> R + Send, Factory:Fn(usize) -> Worker>(rx_task: Receiver<T>, tx_result: Sender<R>, num_cpus: usize, factory: Factory) ->  Arc<Mutex<Receiver<T>>> {
+fn create_threads<R: 'static + Send, T: 'static + Send, Worker:'static + Fn(T) -> R + Send, Factory:Fn(usize) -> Worker>(rx_task: Receiver<T>, tx_result: Sender<R>, num_cpus: usize, factory: Factory) ->  Arc<Mutex<Receiver<T>>> {
 	let mutex_rx_task = Arc::new(Mutex::new(rx_task));
 	for cpu_id in range(0, num_cpus) {
 		let local_rx_task = mutex_rx_task.clone();

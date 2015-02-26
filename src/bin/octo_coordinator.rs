@@ -1,6 +1,8 @@
 #![feature(collections)]
+#![feature(core)]
 #![feature(asm)]
-#![feature(io)]
+#![feature(old_io)]
+#![feature(old_path)]
 #![allow(non_snake_case)]
 
 extern crate winapi;
@@ -8,7 +10,6 @@ extern crate "advapi32-sys" as advapi32;
 
 use std::old_io::{File, Open, ReadWrite, IoError, SeekStyle};
 use std::ptr;
-use std::mem::*;
 use winapi::*;
 use advapi32::*;
 
@@ -20,7 +21,7 @@ fn main() {
 		let service_table: &[*const SERVICE_TABLE_ENTRYW] = &[
 			&SERVICE_TABLE_ENTRYW {
 				lpServiceName: service_name.as_ptr(),
-				lpServiceProc: service_main,
+				lpServiceProc: Some(service_main),
 			},
 			ptr::null()
 		];
@@ -58,7 +59,7 @@ unsafe extern "system" fn service_main(
 ) {
 	log("service_main: BEGIN");
 	let service_name = service_name();
-	let handle = RegisterServiceCtrlHandlerExW(service_name.as_ptr(), control_handler, ptr::null_mut()); 
+	let handle = RegisterServiceCtrlHandlerExW(service_name.as_ptr(), Some(control_handler), ptr::null_mut()); 
 	service_handle = Some(handle);
 	SetServiceStatus (handle, &mut create_service_status(SERVICE_START_PENDING));
 	SetServiceStatus (handle, &mut create_service_status(SERVICE_RUNNING));
