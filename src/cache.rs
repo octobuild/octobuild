@@ -1,3 +1,5 @@
+extern crate "lz4-rs" as lz4;
+
 use std::os;
 use std::old_io::fs;
 use std::old_io::{File, IoError, IoErrorKind, Reader, Writer, USER_RWX};
@@ -6,6 +8,7 @@ use std::sync::{Arc, Mutex};
 use std::collections::HashMap;
 use std::collections::hash_map::Entry;
 use std::hash::{Hasher, SipHasher};
+
 
 use super::utils::hash_write_stream;
 use super::utils::DEFAULT_BUF_SIZE;
@@ -39,7 +42,7 @@ impl Cache {
 
 	pub fn run_cached<F: Fn()->Result<ProcessOutput, IoError>>(&self, params: &str, inputs: &Vec<Path>, outputs: &Vec<Path>, worker: F) -> Result<ProcessOutput, IoError> {
 		let hash = try! (self.generate_hash(params, inputs));
-		let path = self.cache_dir.join(&hash[0..2]).join(&hash[2..4]).join(&hash[4..]);
+		let path = self.cache_dir.join(&hash[0..2]).join(&hash[2..4]).join(&(hash[4..].to_string() + ".lz4"));
 		// Try to read data from cache.
 		match read_cache(&path, outputs) {
 			Ok(output) => {return Ok(output)}
@@ -127,7 +130,7 @@ fn write_cache(path: &Path, paths: &Vec<Path>, output: &ProcessOutput) -> Result
 		return Ok(());
 	}
 	try! (fs::mkdir_recursive(&path.dir_path(), USER_RWX));
-	let mut stream = try! (File::create(path));
+	let mut stream = try! (lz4::Encoder::new(try! (File::create(path)), 1));
 	try! (stream.write_all(HEADER));
 	try! (stream.write_le_uint(paths.len()));
 	let mut buf: [u8; DEFAULT_BUF_SIZE] = [0; DEFAULT_BUF_SIZE];
@@ -147,11 +150,13 @@ fn write_cache(path: &Path, paths: &Vec<Path>, output: &ProcessOutput) -> Result
 	}
 	try! (write_output(&mut stream, output));
 	try! (stream.write_all(FOOTER));
-	Ok(())
+	match stream.finish() {
+		(_, result) => result
+	}
 }
 
 fn read_cache(path: &Path, paths: &Vec<Path>) -> Result<ProcessOutput, IoError> {
-	let mut stream = try! (File::open(path));
+	let mut stream = try! (lz4::Decoder::new (try! (File::open(path))));
 	if try! (stream.read_exact(HEADER.len())) != HEADER {
 		return Err(IoError {
 			kind: IoErrorKind::InvalidInput,
