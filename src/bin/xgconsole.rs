@@ -1,6 +1,6 @@
 #![feature(core)]
-#![feature(io)]
-#![feature(path)]
+#![feature(old_io)]
+#![feature(old_path)]
 #![feature(os)]
 #![feature(std_misc)]
 extern crate octobuild;
