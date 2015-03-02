@@ -3,7 +3,7 @@ name = "octobuild"
 version = "0.0.2"
 authors = [ "Artem V. Navrotskiy <bozaro@users.noreply.github.com>" ]
 
-[dependencies.lz4-rs]
+[dependencies.lz4]
 version = "*"
 
 [dependencies.xml-rs]
