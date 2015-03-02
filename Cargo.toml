@@ -4,7 +4,7 @@ version = "0.0.2"
 authors = [ "Artem V. Navrotskiy <bozaro@users.noreply.github.com>" ]
 
 [dependencies.lz4-rs]
-git = "https://github.com/bozaro/lz4-rs.git"
+version = "*"
 
 [dependencies.xml-rs]
 version = "*"
