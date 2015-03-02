@@ -1,6 +1,6 @@
 [package]
 name = "octobuild"
-version = "0.0.1"
+version = "0.0.2"
 authors = [ "Artem V. Navrotskiy <bozaro@users.noreply.github.com>" ]
 
 [dependencies.lz4-rs]
