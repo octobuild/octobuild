@@ -3,6 +3,9 @@ name = "octobuild"
 version = "0.0.2"
 authors = [ "Artem V. Navrotskiy <bozaro@users.noreply.github.com>" ]
 
+[dependencies.demon]
+version = "*"
+
 [dependencies.lz4]
 version = "*"
 
@@ -10,10 +13,4 @@ version = "*"
 version = "*"
 
 [dependencies.uuid]
-version = "*"
-
-[dependencies.winapi]
-version = "*"
-
-[dependencies.advapi32-sys]
 version = "*"
