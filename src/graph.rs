@@ -350,7 +350,7 @@ impl<E> Edge<E> {
 
 #[cfg(test)]
 mod test {
-    use middle::graph::*;
+    use graph::*;
     use std::fmt::Debug;
 
     type TestNode = Node<&'static str>;
@@ -417,7 +417,7 @@ mod test {
         graph.each_incoming_edge(start_index, |edge_index, edge| {
             assert!(graph.edge_data(edge_index) == &edge.data);
             assert!(counter < expected_incoming.len());
-            debug!("counter={:?} expected={:?} edge_index={:?} edge={:?}",
+            println!("counter={:?} expected={:?} edge_index={:?} edge={:?}",
                    counter, expected_incoming[counter], edge_index, edge);
             match expected_incoming[counter] {
                 (ref e, ref n) => {
@@ -435,7 +435,7 @@ mod test {
         graph.each_outgoing_edge(start_index, |edge_index, edge| {
             assert!(graph.edge_data(edge_index) == &edge.data);
             assert!(counter < expected_outgoing.len());
-            debug!("counter={:?} expected={:?} edge_index={:?} edge={:?}",
+            println!("counter={:?} expected={:?} edge_index={:?} edge={:?}",
                    counter, expected_outgoing[counter], edge_index, edge);
             match expected_outgoing[counter] {
                 (ref e, ref n) => {
