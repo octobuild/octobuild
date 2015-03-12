@@ -1,12 +1,11 @@
-#![feature(fs)]
 #![feature(io)]
-#![feature(env)]
 #![feature(path)]
 
-extern crate demon;
-use demon::State;
-use demon::Demon;
-use demon::DemonRunner;
+extern crate daemon;
+
+use daemon::State;
+use daemon::Daemon;
+use daemon::DaemonRunner;
 use std::env;
 use std::fs::OpenOptions;
 use std::io::Error;
@@ -15,10 +14,10 @@ use std::sync::mpsc::Receiver;
 
 fn main() {
 	log("Example started.");
-	let demon = Demon {
+	let daemon = Daemon {
 		name: "octobuild_coordinator".to_string()
 	};
-	demon.run(move |rx: Receiver<State>| {
+	daemon.run(move |rx: Receiver<State>| {
 		log("Worker started.");
 		for signal in rx.iter() {
 			match signal {
@@ -39,9 +38,9 @@ fn log(message: &str) {
 }
 
 fn log_safe(message: &str) -> Result<(), Error> {
-//	println! ("{}", message);
+	println! ("{}", message);
 	let path = try! (env::current_exe()).with_extension("log");
-	let mut file = try! (OpenOptions::new().create(true).append(true).open(&path));
+	let mut file = try! (OpenOptions::new().create(true).write(true).append(true).open(&path));
 	try! (file.write(message.as_bytes()));
 	try! (file.write(b"\n"));
 	Ok(())
