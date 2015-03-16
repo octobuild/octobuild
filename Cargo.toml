@@ -1,6 +1,6 @@
 [package]
 name = "octobuild"
-version = "0.0.2"
+version = "0.0.3"
 authors = [ "Artem V. Navrotskiy <bozaro@users.noreply.github.com>" ]
 
 [dependencies.daemon]

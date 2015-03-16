@@ -3,7 +3,7 @@
      xmlns="http://schemas.microsoft.com/wix/2006/wi"
      xsi:schemaLocation="http://schemas.microsoft.com/wix/2006/wi wix.xsd">
     <?define ProductName="octobuild" ?>
-    <?define ProductVersion="0.0.2" ?>
+    <?define ProductVersion="0.0.3" ?>
 
     <?if $(sys.BUILDARCH)="x86"?>
     <?define Program_Files="ProgramFilesFolder"?>
