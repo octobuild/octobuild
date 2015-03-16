@@ -1,17 +1,17 @@
 use std::slice::Iter;
-use std::old_io::Command;
 use std::ascii::AsciiExt;
+use std::path::{Path, PathBuf};
 
-use super::super::compiler::{Arg, CompilationTask, Scope, InputKind, OutputKind};
+use super::super::compiler::{Arg, CommandInfo, CompilationTask, Scope, InputKind, OutputKind};
 use super::super::utils::filter;
 
-pub fn create_task(command: &Command, args: &[String]) -> Result<CompilationTask, String> {
+pub fn create_task(command: CommandInfo, args: &[String]) -> Result<CompilationTask, String> {
 	match parse_arguments(args) {
 		Ok(parsed_args) => {
 			// Source file name.
-			let input_source = match filter(&parsed_args, |arg:&Arg|->Option<Path> {
+			let input_source = match filter(&parsed_args, |arg:&Arg|->Option<PathBuf> {
 				match *arg {
-					Arg::Input{ref kind, ref file, ..} if *kind == InputKind::Source => {Some(Path::new(file))}
+					Arg::Input{ref kind, ref file, ..} if *kind == InputKind::Source => {Some(Path::new(file).to_path_buf())}
 					_ => {None}
 				}
 			}).as_slice() {
@@ -20,9 +20,9 @@ pub fn create_task(command: &Command, args: &[String]) -> Result<CompilationTask
 				v => {return Err(format!("Found too many source files: {:?}", v));}
 			};
 			// Precompiled header file name.
-			let precompiled_file = match filter(&parsed_args, |arg:&Arg|->Option<Path>{
+			let precompiled_file = match filter(&parsed_args, |arg:&Arg|->Option<PathBuf>{
 				match *arg {
-					Arg::Input{ref kind, ref file, ..} if *kind == InputKind::Precompiled => {Some(Path::new(file))}
+					Arg::Input{ref kind, ref file, ..} if *kind == InputKind::Precompiled => {Some(Path::new(file).to_path_buf())}
 					_ => {None}
 				}
 			}).as_slice() {
@@ -50,7 +50,7 @@ pub fn create_task(command: &Command, args: &[String]) -> Result<CompilationTask
 					marker_precompiled=if path.len() > 0 {Some(path.clone())} else {None};
 					let precompiled_path = match precompiled_file {
 						Some(v) => v,
-						None => Path::new(path).with_extension(".pch")
+						None => Path::new(path).with_extension(".pch").to_path_buf()
 					};
 					if *input {
 						output_precompiled=None;
@@ -65,9 +65,9 @@ pub fn create_task(command: &Command, args: &[String]) -> Result<CompilationTask
 				}
 			};
 			// Output object file name.
-			let output_object = match filter(&parsed_args, |arg:&Arg|->Option<Path> {
+			let output_object = match filter(&parsed_args, |arg:&Arg|->Option<PathBuf> {
 				match *arg {
-					Arg::Output{ref kind, ref file, ..} if *kind == OutputKind::Object => Some(Path::new(file)),
+					Arg::Output{ref kind, ref file, ..} if *kind == OutputKind::Object => Some(Path::new(file).to_path_buf()),
 					_ => None
 				}
 			}).as_slice() {
@@ -86,12 +86,15 @@ pub fn create_task(command: &Command, args: &[String]) -> Result<CompilationTask
 				}
 			}).as_slice() {
 				[]  => {
-				match input_source.extension_str() {
-						Some(e) if e.eq_ignore_ascii_case("cpp") => {language = "P".to_string();}
-						Some(e) if e.eq_ignore_ascii_case("c") => {language = "C".to_string();}
-						_ => {
-						return Err(format!("Can't detect file language by extension: {:?}", input_source));
+				match input_source.extension() {
+					Some(extension) => {
+						match extension.to_str() {
+							Some(e) if e.eq_ignore_ascii_case("cpp") => {language = "P".to_string();}
+							Some(e) if e.eq_ignore_ascii_case("c") => {language = "C".to_string();}
+							_ => {return Err(format!("Can't detect file language by extension: {:?}", input_source));}
+						}
 					}
+					_ => {return Err(format!("Can't detect file language by extension: {:?}", input_source));}
 				}
 			}
 			[ref v] => {
@@ -106,7 +109,7 @@ pub fn create_task(command: &Command, args: &[String]) -> Result<CompilationTask
 			};
 
 			Ok(CompilationTask{
-				command: command.clone(),
+				command: command,
 				args: parsed_args,
 				language: language,
 				input_source: input_source,

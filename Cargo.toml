@@ -1,6 +1,6 @@
 [package]
 name = "octobuild"
-version = "0.0.3"
+version = "0.0.4"
 authors = [ "Artem V. Navrotskiy <bozaro@users.noreply.github.com>" ]
 
 [dependencies.daemon]
@@ -13,4 +13,7 @@ version = "*"
 version = "*"
 
 [dependencies.uuid]
+version = "*"
+
+[dependencies.tempdir]
 version = "*"

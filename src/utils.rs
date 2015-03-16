@@ -1,6 +1,5 @@
-use std::hash;
 use std::hash::{Hasher, SipHasher};
-use std::old_io::{IoError, IoErrorKind, Reader};
+use std::io::{Error, Read};
 
 pub const DEFAULT_BUF_SIZE: usize = 1024 * 64;
 
@@ -24,22 +23,20 @@ pub fn hash_text(data: &[u8]) -> String {
 	format!("{:016x}", hash.finish())
 }
 
-pub fn hash_stream(stream: &mut Reader) -> Result<String, IoError> {
+pub fn hash_stream(stream: &mut Read) -> Result<String, Error> {
 	let mut hash = SipHasher::new();
 	try! (hash_write_stream(&mut hash, stream));
-	Ok(format!("{:016x}", hash.result()))
+	Ok(format!("{:016x}", hash.finish()))
 }
 
-pub fn hash_write_stream(hash: &mut Hasher, stream: &mut Reader) -> Result<(), IoError> {
+pub fn hash_write_stream(hash: &mut Hasher, stream: &mut Read) -> Result<(), Error> {
 	let mut buf: [u8; DEFAULT_BUF_SIZE] = [0; DEFAULT_BUF_SIZE];
 	loop {
-		match stream.read(&mut buf) {
-			Ok(size) => {
-				hash.write(&buf.as_slice()[0..size]);
-			}
-			Err(ref e) if e.kind == IoErrorKind::EndOfFile => break,
-			Err(e) => return Err(e)
+		let size = try! (stream.read(&mut buf));
+		if size <= 0 {
+			break;
 		}
+		hash.write(&buf.as_slice()[0..size]);
 	}
 	Ok(())
 }

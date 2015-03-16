@@ -1,6 +1,3 @@
-#![feature(io)]
-#![feature(path)]
-
 extern crate daemon;
 
 use daemon::State;

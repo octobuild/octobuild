@@ -1,6 +1,8 @@
-use std::old_io::{Reader, Writer, IoError, IoErrorKind};
+use std::io::{Read, Write, Error};
+use std::path::Path;
 
 use super::super::utils::DEFAULT_BUF_SIZE;
+use super::super::io::binary::*;
 
 #[derive(Debug)]
 enum Directive {
@@ -12,23 +14,23 @@ enum Directive {
 	Unknown(Vec<u8>)
 }
 
-pub fn filter_preprocessed(reader: &mut Reader, writer: &mut Writer, marker: &Option<String>, keep_headers: bool) -> Result<(), IoError> {
+pub fn filter_preprocessed(reader: &mut Read, writer: &mut Write, marker: &Option<String>, keep_headers: bool) -> Result<(), Error> {
 	let mut line_begin = true;
 	// Entry file.
 	let mut entry_file: Option<String> = None;
 	let mut header_found: bool = false;
 	loop {
-		let c = try! (reader.read_u8());
+		let c = try! (read_u8(reader));
 		match c {
 			b'\n' | b'\r' => {
 				if keep_headers {
-					try! (writer.write_u8(c));
+					try! (write_u8(writer, c));
 				}
 				line_begin = true;
 			}
 			b'\t' | b' ' => {
 				if keep_headers {
-					try! (writer.write_u8(c));
+					try! (write_u8(writer, c));
 				}
 			}
 			b'#' if line_begin => {
@@ -46,7 +48,7 @@ pub fn filter_preprocessed(reader: &mut Reader, writer: &mut Writer, marker: &Op
 								match *marker {
 									Some(ref raw_path) => {
 										let path = raw_path.replace("\\", "/");
-										if file == path || Path::new(file.as_slice()).ends_with_path(&Path::new(path.as_slice())) {
+										if file == path || Path::new(file.as_slice()).ends_with(&Path::new(path.as_slice())) {
 											header_found = true;
 										}
 									}
@@ -73,7 +75,7 @@ pub fn filter_preprocessed(reader: &mut Reader, writer: &mut Writer, marker: &Op
 			}
 			_ => {
 				if keep_headers {
-					try! (writer.write_u8(c));
+					try! (write_u8(writer, c));
 				}
 				line_begin = false;
 			}
@@ -82,18 +84,16 @@ pub fn filter_preprocessed(reader: &mut Reader, writer: &mut Writer, marker: &Op
 	// Copy end of stream.
 	let mut buf: [u8; DEFAULT_BUF_SIZE] = [0; DEFAULT_BUF_SIZE];
 	loop {
-		match reader.read(&mut buf) {
-			Ok(size) => {
-				try! (writer.write_all(&buf.as_slice()[0..size]));
-			}
-			Err(ref e) if e.kind == IoErrorKind::EndOfFile => break,
-			Err(e) => return Err(e)
+		let size = try! (reader.read(&mut buf));
+		if size <= 0 {
+			break;
 		}
+		try! (writer.write_all(&buf.as_slice()[0..size]));
 	}
 	Ok(())
 }
 
-fn read_directive(first: u8, reader: &mut Reader) -> Result<Directive, IoError> {
+fn read_directive(first: u8, reader: &mut Read) -> Result<Directive, Error> {
 	let mut raw: Vec<u8> = Vec::new();
 	raw.push(first);
 	let (next, token) = try! (read_token(None, reader, &mut raw));
@@ -107,7 +107,7 @@ fn read_directive(first: u8, reader: &mut Reader) -> Result<Directive, IoError> 
 	}
 }
 
-fn read_token(first: Option<u8>, reader: &mut Reader, raw: &mut Vec<u8>) -> Result<(Option<u8>, Vec<u8>), IoError> {
+fn read_token(first: Option<u8>, reader: &mut Read, raw: &mut Vec<u8>) -> Result<(Option<u8>, Vec<u8>), Error> {
 	match try! (skip_spaces(first, reader, raw)) {
 		Some(first_char) => {
 			let mut token: Vec<u8> = Vec::new();
@@ -120,7 +120,7 @@ fn read_token(first: Option<u8>, reader: &mut Reader, raw: &mut Vec<u8>) -> Resu
 				quote = false;
 			}
 			loop {
-				let c = try! (reader.read_u8());
+				let c = try! (read_u8(reader));
 				raw.push(c);
 				if quote {
 					if escape {
@@ -134,7 +134,7 @@ fn read_token(first: Option<u8>, reader: &mut Reader, raw: &mut Vec<u8>) -> Resu
 					} else if c == ('\\' as u8) {
 						escape = true;
 					} else if c == b'"' {
-						let n = try! (reader.read_u8());
+						let n = try! (read_u8(reader));
 						raw.push(n);
 						return Ok((Some(n), token));
 					} else {
@@ -158,7 +158,7 @@ fn read_token(first: Option<u8>, reader: &mut Reader, raw: &mut Vec<u8>) -> Resu
 	}
 }
 
-fn read_directive_line(first: Option<u8>, reader: &mut Reader, mut raw: Vec<u8>) -> Result<Directive, IoError> {
+fn read_directive_line(first: Option<u8>, reader: &mut Read, mut raw: Vec<u8>) -> Result<Directive, Error> {
 	// Line number
 	let (next1, _) = try! (read_token(first, reader, &mut raw));
 	// File name
@@ -167,7 +167,7 @@ fn read_directive_line(first: Option<u8>, reader: &mut Reader, mut raw: Vec<u8>)
 	Ok(Directive::Line(raw, String::from_utf8_lossy(file.as_slice()).to_string()))
 }
 
-fn read_directive_pragma(first: Option<u8>, reader: &mut Reader, mut raw: Vec<u8>) -> Result<Directive, IoError> {
+fn read_directive_pragma(first: Option<u8>, reader: &mut Read, mut raw: Vec<u8>) -> Result<Directive, Error> {
 	let (next, token) = try! (read_token(first, reader, &mut raw));
 	try! (skip_line(next, reader, &mut raw));
 	match token.as_slice() {
@@ -176,7 +176,7 @@ fn read_directive_pragma(first: Option<u8>, reader: &mut Reader, mut raw: Vec<u8
 	}
 }
 
-fn skip_spaces(first: Option<u8>, reader: &mut Reader, raw: &mut Vec<u8>) -> Result<Option<u8>, IoError> {
+fn skip_spaces(first: Option<u8>, reader: &mut Read, raw: &mut Vec<u8>) -> Result<Option<u8>, Error> {
 	match first {
 		Some(c) => {
 			match c {
@@ -188,8 +188,8 @@ fn skip_spaces(first: Option<u8>, reader: &mut Reader, raw: &mut Vec<u8>) -> Res
 		_ => {}
 	}
 	loop {
-		let c = try! (reader.read_u8());
-		try! (raw.write_u8(c));
+		let c = try! (read_u8(reader));
+		try! (write_u8(raw, c));
 		match c {
 			b'\n' | b'\r' => {return Ok(None);}
 			b'\t' | b' ' => {}
@@ -198,7 +198,7 @@ fn skip_spaces(first: Option<u8>, reader: &mut Reader, raw: &mut Vec<u8>) -> Res
 	}
 }
 
-fn skip_line(first: Option<u8>, reader: &mut Reader, raw: &mut Vec<u8>) -> Result<(), IoError> {
+fn skip_line(first: Option<u8>, reader: &mut Read, raw: &mut Vec<u8>) -> Result<(), Error> {
 	match first {
 		Some(c) => {
 			match c {
@@ -209,8 +209,8 @@ fn skip_line(first: Option<u8>, reader: &mut Reader, raw: &mut Vec<u8>) -> Resul
 		_ => {}
 	}
 	loop {
-		let c = try! (reader.read_u8());
-		try! (raw.write_u8(c));
+		let c = try! (read_u8(reader));
+		try! (write_u8(raw, c));
 		match c {
 			b'\n' | b'\r' => {return Ok(());}
 			_ => {}
@@ -220,13 +220,13 @@ fn skip_line(first: Option<u8>, reader: &mut Reader, raw: &mut Vec<u8>) -> Resul
 
 #[cfg(test)]
 mod test {
-	use std::old_io::MemReader;
+	use std::io::Cursor;
 
 	fn check_filter(original: &str, expected: &str, marker: Option<String>, keep_headers: bool) {
 		let mut writer: Vec<u8> = Vec::new();
 		let mut stream: Vec<u8> = Vec::new();
 		stream.push_all(original.as_bytes());
-		match super::filter_preprocessed(&mut MemReader::new(stream), &mut writer, &marker, keep_headers) {
+		match super::filter_preprocessed(&mut Cursor::new(stream), &mut writer, &marker, keep_headers) {
 			Ok(_) => {assert_eq! (String::from_utf8_lossy(writer.as_slice()), expected)}
 			Err(e) => {panic! (e);}
 		}

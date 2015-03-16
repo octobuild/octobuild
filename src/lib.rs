@@ -1,9 +1,9 @@
 #![feature(core)]
 #![feature(collections)]
 #![feature(hash)]
+#![feature(io)]
+#![feature(fs_time)]
 #![feature(old_io)]
-#![feature(old_path)]
-#![feature(os)]
 #![feature(std_misc)]
 #![feature(int_uint)]
 pub mod cache;
@@ -14,6 +14,7 @@ pub mod utils;
 pub mod wincmd;
 pub mod io {
 	pub mod tempfile;
+	pub mod binary;
 }
 pub mod xg {
 	pub mod parser;

@@ -76,9 +76,9 @@ pub fn expand_arg<F: Fn(&str) -> Option<String>>(arg: &str, resolver: &F) -> Str
 	let mut result = String::new();
 	let mut suffix = arg;
 	loop {
-		match suffix.find_str("$(") {
+		match suffix.find("$(") {
 			Some(begin) => {
-				match suffix[begin..].find_str(")") {
+				match suffix[begin..].find(")") {
 					Some(end) => {
 						let name = &suffix[begin + 2..begin + end];
 						match resolver(name) {

@@ -1,37 +1,45 @@
 #![feature(core)]
-#![feature(io)]
-#![feature(os)]
+#![feature(exit_status)]
 extern crate octobuild;
+extern crate tempdir;
 
 use octobuild::vs::compiler::VsCompiler;
-use octobuild::compiler::Compiler;
+use octobuild::compiler::*;
 use octobuild::cache::Cache;
 
-use std::os;
-use std::old_io::{stderr, stdout, TempDir, Command, IoError};
-use std::old_io::process::{ProcessExit, ProcessOutput};
+use tempdir::TempDir;
+
+use std::env;
+use std::io;
+use std::io::{Error, Write};
+use std::iter::FromIterator;
+use std::path::Path;
 
 fn main() {
 	match compile() {
 		Ok(output) => {
-			std::os::set_exit_status(match output.status {
-				ProcessExit::ExitStatus(r) => r,
-				ProcessExit::ExitSignal(r) => r
+			env::set_exit_status(match output.status {
+				Some(r) => r,
+				None => 501
 			});
 		}
 		Err(e) => {
 			println!("FATAL ERROR: {:?}", e);
-			std::os::set_exit_status(500);
+			env::set_exit_status(500);
 		}
 	}
 }
 
-fn compile() -> Result<ProcessOutput, IoError> {
+fn compile() -> Result<OutputInfo, Error> {
 	let temp_dir = try! (TempDir::new("octobuild"));
 	let compiler = VsCompiler::new(&Cache::new(), temp_dir.path());
-	let output = try! (compiler.compile(&Command::new("cl.exe"), &os::args()[1..]));
+	let args = Vec::from_iter(env::args());
+	let output = try! (compiler.compile(CommandInfo {
+		program: Path::new("cl.exe").to_path_buf(),
+		current_dir: None,
+	}, &args[1..]));
 
-	try !(stdout().write_all(output.output.as_slice()));
-	try !(stderr().write_all(output.error.as_slice()));
+	try !(io::stdout().write_all(output.stdout.as_slice()));
+	try !(io::stderr().write_all(output.stderr.as_slice()));
 	Ok(output)
 }

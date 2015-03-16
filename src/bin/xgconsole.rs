@@ -1,9 +1,10 @@
 #![feature(core)]
-#![feature(old_io)]
-#![feature(old_path)]
+#![feature(exit_status)]
+#![feature(io)]
 #![feature(os)]
 #![feature(std_misc)]
 extern crate octobuild;
+extern crate tempdir;
 
 use octobuild::common::BuildTask;
 use octobuild::cache::Cache;
@@ -11,12 +12,16 @@ use octobuild::wincmd;
 use octobuild::xg;
 use octobuild::graph::{Graph, NodeIndex, Node, EdgeIndex, Edge};
 use octobuild::vs::compiler::VsCompiler;
-use octobuild::compiler::Compiler;
+use octobuild::compiler::*;
 
-use std::os;
+use tempdir::TempDir;
 
-use std::old_io::{stdout, stderr, Command, File, BufferedReader, IoError, IoErrorKind, TempDir};
-use std::old_io::process::{ProcessExit, ProcessOutput};
+use std::fs::File;
+use std::env;
+use std::io::{BufReader, Error, ErrorKind, Write};
+use std::io;
+use std::iter::FromIterator;
+use std::path::Path;
 use std::sync::{Arc, Mutex};
 use std::sync::mpsc::{channel, Sender, Receiver};
 use std::thread::Thread;
@@ -32,37 +37,30 @@ struct ResultMessage {
 	index: NodeIndex,
 	task: BuildTask,
 	worker: usize,
-	result: Result<BuildResult, IoError>
-}
-
-#[derive(Debug)]
-struct BuildResult {
-	exit_code: ProcessExit,
-	stdout: Vec<u8>,
-	stderr: Vec<u8>,
+	result: Result<OutputInfo, Error>
 }
 
 fn main() {
 	println!("XGConsole:");
-	let args = os::args();
+	let args = Vec::from_iter(env::args());
 	for arg in args.iter() {
 		println!("  {}", arg);
 	}
 	match execute(&args.as_slice()[1..]) {
 		Ok(result) => {
-			std::os::set_exit_status(match result {
-				ProcessExit::ExitStatus(r) => r,
-				ProcessExit::ExitSignal(r) => r
+			env::set_exit_status(match result {
+				Some(r) => r,
+				None => 500
 			});
 		}
 		Err(e) => {
 			println!("FATAL ERROR: {:?}", e);
-			std::os::set_exit_status(500);
+			env::set_exit_status(500);
 		}
 	}
 }
 
-fn execute(args: &[String]) -> Result<ProcessExit, IoError> {
+fn execute(args: &[String]) -> Result<Option<i32>, Error> {
 	let cache = Cache::new();
 	let temp_dir = try! (TempDir::new("octobuild"));
 	for arg in args.iter() {
@@ -72,7 +70,7 @@ fn execute(args: &[String]) -> Result<ProcessExit, IoError> {
 		let (tx_task, rx_task): (Sender<TaskMessage>, Receiver<TaskMessage>) = channel();
 
 		create_threads(rx_task, tx_result, std::os::num_cpus(), |worker_id:usize| {
-			let temp_path = temp_dir.path().clone();
+			let temp_path = temp_dir.path().to_path_buf();
 			let temp_cache = cache.clone();
 			move |task:TaskMessage| -> ResultMessage {
 				execute_task(&temp_cache, &temp_path, worker_id, task)
@@ -81,14 +79,14 @@ fn execute(args: &[String]) -> Result<ProcessExit, IoError> {
 
 		let path = Path::new(arg);
 		let file = try! (File::open(&path));
-		let graph = try! (xg::parser::parse(BufferedReader::new(file)));
+		let graph = try! (xg::parser::parse(BufReader::new(file)));
 		let validated_graph = try! (validate_graph(graph));
-		let result = try! (execute_graph(&validated_graph, tx_task, rx_result));
-		if !result.success() {
-			return Ok(result);
+		match try! (execute_graph(&validated_graph, tx_task, rx_result)) {
+			Some(v) if v == 0 => {}
+			v => {return Ok(v)}
 		}
 	}
-	Ok(ProcessExit::ExitStatus(0))
+	Ok(Some(0))
 }
 
 fn create_threads<R: 'static + Send, T: 'static + Send, Worker:'static + Fn(T) -> R + Send, Factory:Fn(usize) -> Worker>(rx_task: Receiver<T>, tx_result: Sender<R>, num_cpus: usize, factory: Factory) ->  Arc<Mutex<Receiver<T>>> {
@@ -114,7 +112,7 @@ fn create_threads<R: 'static + Send, T: 'static + Send, Worker:'static + Fn(T) -
 	mutex_rx_task
 }
 
-fn validate_graph(graph: Graph<BuildTask, ()>) -> Result<Graph<BuildTask, ()>, IoError> {
+fn validate_graph(graph: Graph<BuildTask, ()>) -> Result<Graph<BuildTask, ()>, Error> {
 	let mut completed:Vec<bool> = Vec::new();
 	let mut queue:Vec<NodeIndex> = Vec::new();
 	graph.each_node(|index: NodeIndex, _:&Node<BuildTask>|->bool {
@@ -139,53 +137,37 @@ fn validate_graph(graph: Graph<BuildTask, ()>) -> Result<Graph<BuildTask, ()>, I
 		}
 		i = i + 1;
 	}
-	Err(IoError {
-		kind: IoErrorKind::InvalidInput,
-		desc: "Found cycles in build dependencies",
-		detail: None
-	})
+	Err(Error::new(ErrorKind::InvalidInput, "Found cycles in build dependencies", None))
 }
 
 fn execute_task(cache: &Cache, temp_dir: &Path, worker: usize, message: TaskMessage) -> ResultMessage {
-	let args = wincmd::expand_args(&message.task.args, &|name:&str|->Option<String>{os::getenv(name)});
-	match execute_compiler(cache, temp_dir, message.task.exec.as_slice(), &Path::new(&message.task.working_dir), args.as_slice()) {
-		Ok(output) => {
-			ResultMessage {
-				index: message.index,
-				task: message.task,
-				worker: worker,
-				result: Ok(BuildResult {
-					exit_code: output.status,
-					stdout: output.output,
-					stderr: output.error
-				})
-			}
-		}
-		Err(e) => {
-			ResultMessage {
-				index: message.index,
-				task: message.task,
-				worker: worker,
-				result: Err(e)
-			}
-		}
+	let args = wincmd::expand_args(&message.task.args, &|name:&str|->Option<String>{env::var(name).ok()});
+	let output = execute_compiler(cache, temp_dir, message.task.exec.as_slice(), &Path::new(&message.task.working_dir), args.as_slice());
+	ResultMessage {
+		index: message.index,
+		task: message.task,
+		worker: worker,
+		result: output,
 	}
 }
 
-fn execute_compiler(cache: &Cache, temp_dir: &Path, program: &str, cwd: &Path, args: &[String]) -> Result<ProcessOutput, IoError> {
-	let mut command = Command::new(program);
-	command.cwd(cwd);
-	if Path::new(program).ends_with_path(&Path::new("cl.exe")) {
+fn execute_compiler(cache: &Cache, temp_dir: &Path, program: &str, cwd: &Path, args: &[String]) -> Result<OutputInfo, Error> {
+	let command = CommandInfo {
+		program: Path::new(program).to_path_buf(),
+		current_dir: Some(cwd.to_path_buf()),
+	};
+	if Path::new(program).ends_with("cl.exe") {
 		let compiler = VsCompiler::new(cache, temp_dir);
-		compiler.compile(&command, args)
+		compiler.compile(command, args)
 	} else {
-		command
+		command.to_command()
 			.args(args.as_slice())
 			.output()
+			.map(|o| OutputInfo::new(o))
 	}
 }
 
-fn execute_graph(graph: &Graph<BuildTask, ()>, tx_task: Sender<TaskMessage>, rx_result: Receiver<ResultMessage>) -> Result<ProcessExit, IoError> {
+fn execute_graph(graph: &Graph<BuildTask, ()>, tx_task: Sender<TaskMessage>, rx_result: Receiver<ResultMessage>) -> Result<Option<i32>, Error> {
 	// Run all tasks.
 	let result = execute_until_failed(graph, tx_task, &rx_result);
 	// Wait for in progress task completion.
@@ -194,7 +176,7 @@ fn execute_graph(graph: &Graph<BuildTask, ()>, tx_task: Sender<TaskMessage>, rx_
 	result
 }
 
-fn execute_until_failed(graph: &Graph<BuildTask, ()>, tx_task: Sender<TaskMessage>, rx_result: &Receiver<ResultMessage>) -> Result<ProcessExit, IoError> {
+fn execute_until_failed(graph: &Graph<BuildTask, ()>, tx_task: Sender<TaskMessage>, rx_result: &Receiver<ResultMessage>) -> Result<Option<i32>, Error> {
 	let mut completed:Vec<bool> = Vec::new();
 	if !graph.each_node(|index: NodeIndex, node:&Node<BuildTask>|->bool {
 		let mut has_edges = false;
@@ -215,11 +197,7 @@ fn execute_until_failed(graph: &Graph<BuildTask, ()>, tx_task: Sender<TaskMessag
 			true
 		}
 	}) {
-		return Err(IoError {
-			kind: IoErrorKind::BrokenPipe,
-			desc: "Can't schedule root tasks",
-			detail: None
-		});
+		return Err(Error::new(ErrorKind::BrokenPipe, "Can't schedule root tasks", None));
 	}
 
 	let mut count:usize = 0;
@@ -228,10 +206,10 @@ fn execute_until_failed(graph: &Graph<BuildTask, ()>, tx_task: Sender<TaskMessag
 		count += 1;
 		println!("#{} {}/{}: {}", message.worker, count, completed.len(), message.task.title);
 		let result = try! (message.result);
-		try! (stdout().write_all(result.stdout.as_slice()));
-		try! (stderr().write_all(result.stderr.as_slice()));
-		if !result.exit_code.success() {
-			return Ok(result.exit_code);
+		try! (io::stdout().write_all(result.stdout.as_slice()));
+		try! (io::stderr().write_all(result.stderr.as_slice()));
+		if !result.success() {
+			return Ok(result.status);
 		}
 		completed[message.index.node_id()] = true;
 		if !graph.each_incoming_edge(message.index, |_:EdgeIndex, edge:&Edge<()>| -> bool {
@@ -249,14 +227,10 @@ fn execute_until_failed(graph: &Graph<BuildTask, ()>, tx_task: Sender<TaskMessag
 			}
 			true
 		}) {
-			return Err(IoError {
-				kind: IoErrorKind::BrokenPipe,
-				desc: "Can't schedule child task",
-				detail: None
-			});
+			return Err(Error::new(ErrorKind::BrokenPipe, "Can't schedule child task", None));
 		};
 		if count == completed.len() {
-			return Ok(ProcessExit::ExitStatus(0));
+			return Ok(Some(0));
 		}
 	}
 	panic! ("Unexpected end of result pipe");
