@@ -42,7 +42,7 @@ impl Cache {
 
 	pub fn run_cached<F: Fn()->Result<ProcessOutput, IoError>>(&self, params: &str, inputs: &Vec<Path>, outputs: &Vec<Path>, worker: F) -> Result<ProcessOutput, IoError> {
 		let hash = try! (self.generate_hash(params, inputs));
-		let path = self.cache_dir.join(&hash[0..2]).join(&hash[2..4]).join(&(hash[4..].to_string() + ".lz4"));
+		let path = self.cache_dir.join(&hash[0..2]).join(&(hash[2..].to_string() + ".lz4"));
 		// Try to read data from cache.
 		match read_cache(&path, outputs) {
 			Ok(output) => {return Ok(output)}
