@@ -97,7 +97,10 @@ pub trait Compiler {
 		match self.try_compile(command, args) {
 			Ok(output) => Ok(output),
 			// todo: log error reason
-			Err(_) => command.clone().args(args).output()
+			Err(e) => {
+				println! ("Can't use octobuild for compiling file, use failback compilation: {:?}", e);
+				command.clone().args(args).output()
+			}
 		}
 	}
 }
