@@ -86,6 +86,7 @@ fn execute(args: &[String]) -> Result<Option<i32>, Error> {
 			v => {return Ok(v)}
 		}
 	}
+	cache.cleanup(16 * 1024 * 1024 * 1024);
 	Ok(Some(0))
 }
 

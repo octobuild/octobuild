@@ -2,7 +2,7 @@ extern crate lz4;
 
 use std::env;
 use std::fs;
-use std::fs::File;
+use std::fs::{File, PathExt};
 use std::io::{Error, ErrorKind, Read, Write};
 use std::sync::{Arc, Mutex};
 use std::collections::HashMap;
@@ -17,6 +17,7 @@ use super::io::binary::*;
 
 const HEADER: &'static [u8] = b"OBCF\x00\x01";
 const FOOTER: &'static [u8] = b"END\x00";
+const SUFFIX: &'static str = ".lz4";
 
 struct FileHash {
 	hash: String,
@@ -44,7 +45,7 @@ impl Cache {
 
 	pub fn run_cached<F: Fn()->Result<OutputInfo, Error>>(&self, params: &str, inputs: &Vec<PathBuf>, outputs: &Vec<PathBuf>, worker: F) -> Result<OutputInfo, Error> {
 		let hash = try! (self.generate_hash(params, inputs));
-		let path = self.cache_dir.join(&hash[0..2]).join(&(hash[2..].to_string() + ".lz4"));
+		let path = self.cache_dir.join(&hash[0..2]).join(&(hash[2..].to_string() + SUFFIX));
 		// Try to read data from cache.
 		match read_cache(&path, outputs) {
 			Ok(output) => {return Ok(output)}
@@ -54,6 +55,17 @@ impl Cache {
 		let output = try !(worker());
 		try !(write_cache(&path, outputs, &output));
 		Ok(output)
+	}
+
+	pub fn cleanup(&self, max_cache_size: u64) -> Result<(), Error> {
+		for item in try! (fs::walk_dir(&self.cache_dir)) {
+			let path = try! (item).path();
+			if path.to_str().map_or(false, |v| v.ends_with(SUFFIX)) && path.is_file() {
+				let attr = try! (fs::metadata(&path));
+				println! ("{:?} {} {} {}", path, attr.is_file(), attr.len(), attr.modified());
+			}
+		}
+		Ok(())
 	}
 
 	fn generate_hash(&self, params: &str, inputs: &Vec<PathBuf>) -> Result<String, Error> {
