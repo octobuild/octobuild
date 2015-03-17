@@ -2,8 +2,8 @@ extern crate lz4;
 
 use std::env;
 use std::fs;
-use std::fs::{File, PathExt};
-use std::io::{Error, ErrorKind, Read, Write};
+use std::fs::{File, PathExt, OpenOptions};
+use std::io::{Error, ErrorKind, Read, Write, Seek, SeekFrom};
 use std::sync::{Arc, Mutex};
 use std::collections::HashMap;
 use std::collections::hash_map::Entry;
@@ -29,6 +29,12 @@ struct FileHash {
 pub struct Cache {
 	file_hash: Arc<Mutex<HashMap<PathBuf, Arc<Mutex<Option<FileHash>>>>>>,
 	cache_dir: PathBuf
+}
+
+struct CacheFile {
+	path: PathBuf,
+	size: u64,
+	accessed: u64,
 }
 
 impl Cache {
@@ -58,11 +64,27 @@ impl Cache {
 	}
 
 	pub fn cleanup(&self, max_cache_size: u64) -> Result<(), Error> {
+		let mut files: Vec<CacheFile> = Vec::new();
 		for item in try! (fs::walk_dir(&self.cache_dir)) {
 			let path = try! (item).path();
-			if path.to_str().map_or(false, |v| v.ends_with(SUFFIX)) && path.is_file() {
+			if path.to_str().map_or(false, |v| v.ends_with(SUFFIX)) {
 				let attr = try! (fs::metadata(&path));
-				println! ("{:?} {} {} {}", path, attr.is_file(), attr.len(), attr.modified());
+				if attr.is_file() {
+					files.push(CacheFile {
+						path: path,
+						size: attr.len(),
+						accessed: attr.modified(),
+					});
+				}
+			}
+		}
+		files.as_mut_slice().sort_by(|a, b| b.accessed.cmp(&a.accessed));
+		
+		let mut cache_size: u64 = 0;
+		for item in files.into_iter() {
+			cache_size += item.size;
+			if cache_size > max_cache_size {
+				let _ = try!(fs::remove_file(&item.path));
 			}
 		}
 		Ok(())
@@ -163,7 +185,10 @@ fn write_cache(path: &Path, paths: &Vec<PathBuf>, output: &OutputInfo) -> Result
 }
 
 fn read_cache(path: &Path, paths: &Vec<PathBuf>) -> Result<OutputInfo, Error> {
-	let mut stream = try! (lz4::Decoder::new (try! (File::open(path))));
+	let mut file = try! (OpenOptions::new().read(true).write(true).open(Path::new(path)));
+	try! (file.write(&[4]));
+	try! (file.seek(SeekFrom::Start(0)));
+	let mut stream = try! (lz4::Decoder::new (file));
 	if try! (read_exact(&mut stream, HEADER.len())) != HEADER {
 		return Err(Error::new(ErrorKind::InvalidInput, "Invalid cache file header", Some(path.display().to_string())));
 	}

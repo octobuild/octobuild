@@ -3,6 +3,7 @@
 #![feature(hash)]
 #![feature(io)]
 #![feature(fs_time)]
+#![feature(fs_walk)]
 #![feature(old_io)]
 #![feature(std_misc)]
 #![feature(int_uint)]
