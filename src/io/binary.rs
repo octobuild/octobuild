@@ -62,6 +62,9 @@ pub fn read_le_usize(stream: &mut Read) -> Result<usize> {
 /// recommended to use the `push_at_least` or `read` methods.
 pub fn read_exact(stream: &mut Read, len: uint) -> Result<Vec<u8>> {
     let mut buf = Vec::with_capacity(len);
+    unsafe {
+        buf.set_len(len);
+    }
     let mut pos = 0;
     while pos < len {
         let size = try! (stream.read(&mut buf[pos..len]));
