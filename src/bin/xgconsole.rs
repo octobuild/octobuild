@@ -2,7 +2,6 @@
 #![feature(exit_status)]
 #![feature(io)]
 #![feature(os)]
-#![feature(std_misc)]
 extern crate octobuild;
 extern crate tempdir;
 
@@ -24,7 +23,7 @@ use std::iter::FromIterator;
 use std::path::Path;
 use std::sync::{Arc, Mutex};
 use std::sync::mpsc::{channel, Sender, Receiver};
-use std::thread::Thread;
+use std::thread;
 
 #[derive(Debug)]
 struct TaskMessage {
@@ -96,7 +95,7 @@ fn create_threads<R: 'static + Send, T: 'static + Send, Worker:'static + Fn(T) -
 		let local_rx_task = mutex_rx_task.clone();
 		let local_tx_result = tx_result.clone();
 		let worker = factory(cpu_id);
-		Thread::spawn(move || {
+		thread::spawn(move || {
 			loop {
 				let task: T;
 				match local_rx_task.lock().unwrap().recv() {
