@@ -171,7 +171,7 @@ fn parse_argument(iter: &mut  Iter<String>) -> Option<Result<Arg, String>> {
 							s if s.starts_with("G") => Ok(Arg::Flag{scope: Scope::Shared, flag:flag.to_string()}),
 							s if s.starts_with("RTC") => Ok(Arg::Flag{scope: Scope::Shared, flag:flag.to_string()}),
 							s if s.starts_with("Z") => Ok(Arg::Flag{scope: Scope::Shared, flag:flag.to_string()}),
-							s if s.starts_with("d2") => Ok(Arg::Flag{scope: Scope::Shared, flag:flag.to_string()}), // For flag: d2Zi+
+							s if s.starts_with("d2Zi+") => Ok(Arg::Flag{scope: Scope::Shared, flag:flag.to_string()}),
 							s if s.starts_with("MD") => Ok(Arg::Flag{scope: Scope::Shared, flag:flag.to_string()}),
 							s if s.starts_with("MT") => Ok(Arg::Flag{scope: Scope::Shared, flag:flag.to_string()}),
 							s if s.starts_with("EH") => Ok(Arg::Flag{scope: Scope::Shared, flag:flag.to_string()}),

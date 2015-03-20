@@ -69,7 +69,8 @@ impl Compiler for VsCompiler {
 		let mut command = task.command.to_command();
 		command
 			.args(args.as_slice())
-			.arg(join_flag("/Fi", &temp_file.path()).as_slice());
+			.arg(join_flag("/Fi", &temp_file.path()).as_slice())
+			.arg(join_flag("/Fo", &task.output_object).as_slice()); // /Fo option also set output path for #import directive
 		let output = try! (command.output());
 		if output.status.success() {
 			match File::open(temp_file.path()) {
