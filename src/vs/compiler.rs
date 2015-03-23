@@ -1,4 +1,4 @@
-pub use super::super::compiler::{Arg, Compiler, CompilationTask, CommandInfo, OutputInfo, PreprocessResult, Scope};
+pub use super::super::compiler::*;
 
 use super::super::cache::Cache;
 use super::postprocess;
@@ -8,7 +8,7 @@ use super::super::utils::hash_text;
 use super::super::io::tempfile::TempFile;
 
 use std::fs::File;
-use std::io::{Error, ErrorKind, BufReader, Cursor, Read, Write};
+use std::io::{Error, BufReader, Cursor, Read, Write};
 use std::hash::{SipHasher, Hasher};
 use std::path::{Path, PathBuf};
 use std::process::Output;
@@ -32,7 +32,7 @@ impl Compiler for VsCompiler {
 		super::prepare::create_task(command, args)
 	}
 
-	fn preprocess_step(&self, task: &CompilationTask) -> Result<PreprocessResult, Error> {
+	fn preprocess_step(&self, task: &CompilationTask) -> Result<PreprocessOutput, Error> {
 		// Make parameters list for preprocessing.
 		let mut args = filter(&task.args, |arg:&Arg|->Option<String> {
 			match arg {
@@ -85,15 +85,15 @@ impl Compiler for VsCompiler {
 					let mut content = Vec::new();
 					try! (output.read_to_end(&mut content));
 					hash.write(content.as_slice());
-					Ok(PreprocessResult{
+					Ok(PreprocessOutput::Success(PreprocessResult {
 						hash: format!("{:016x}", hash.finish()),
 						content: content
-					})
+					}))
 				}
 				Err(e) => Err(e)
 			}
 		} else {
-			Err(Error::new(ErrorKind::Other, "Invalid preprocessor exit code with parameters", Some(format!("{:?}", args))))
+			Ok(PreprocessOutput::Failed(OutputInfo::new(output)))
 		}
 	}
 
