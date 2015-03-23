@@ -106,12 +106,12 @@ pub struct CompilationTask {
 	pub marker_precompiled: Option<String>,
 }
 
-pub enum PreprocessOutput {
-	Success(PreprocessResult),
+pub enum PreprocessResult {
+	Success(PreprocessedSource),
 	Failed(OutputInfo)
 }
 
-pub struct PreprocessResult {
+pub struct PreprocessedSource {
 	// Hash
 	pub hash: String,
 	// Preprocessed file
@@ -123,18 +123,18 @@ pub trait Compiler {
 	fn create_task(&self, command: CommandInfo, args: &[String]) -> Result<CompilationTask, String>;
 
 	// Preprocessing source file.
-	fn preprocess_step(&self, task: &CompilationTask) -> Result<PreprocessOutput, Error>;
+	fn preprocess_step(&self, task: &CompilationTask) -> Result<PreprocessResult, Error>;
 
 	// Compile preprocessed file.
-	fn compile_step(&self, task: &CompilationTask, preprocessed: PreprocessResult) -> Result<OutputInfo, Error>;
+	fn compile_step(&self, task: &CompilationTask, preprocessed: PreprocessedSource) -> Result<OutputInfo, Error>;
 	
 	// Run preprocess and compile.
 	fn try_compile(&self, command: CommandInfo, args: &[String]) -> Result<OutputInfo, Error> {
 		match self.create_task(command, args) {
 			Ok(task) => {
 				match try! (self.preprocess_step(&task)) {
-					PreprocessOutput::Success(preprocessed) => self.compile_step(&task, preprocessed),
-					PreprocessOutput::Failed(output) => Ok(output),
+					PreprocessResult::Success(preprocessed) => self.compile_step(&task, preprocessed),
+					PreprocessResult::Failed(output) => Ok(output),
 				}
 			}
 			Err(e) => Err(Error::new(ErrorKind::InvalidInput, "Can't parse command line arguments", Some(e)))

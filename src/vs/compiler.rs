@@ -32,7 +32,7 @@ impl Compiler for VsCompiler {
 		super::prepare::create_task(command, args)
 	}
 
-	fn preprocess_step(&self, task: &CompilationTask) -> Result<PreprocessOutput, Error> {
+	fn preprocess_step(&self, task: &CompilationTask) -> Result<PreprocessResult, Error> {
 		// Make parameters list for preprocessing.
 		let mut args = filter(&task.args, |arg:&Arg|->Option<String> {
 			match arg {
@@ -85,7 +85,7 @@ impl Compiler for VsCompiler {
 					let mut content = Vec::new();
 					try! (output.read_to_end(&mut content));
 					hash.write(content.as_slice());
-					Ok(PreprocessOutput::Success(PreprocessResult {
+					Ok(PreprocessResult::Success(PreprocessedSource {
 						hash: format!("{:016x}", hash.finish()),
 						content: content
 					}))
@@ -93,12 +93,12 @@ impl Compiler for VsCompiler {
 				Err(e) => Err(e)
 			}
 		} else {
-			Ok(PreprocessOutput::Failed(OutputInfo::new(output)))
+			Ok(PreprocessResult::Failed(OutputInfo::new(output)))
 		}
 	}
 
 	// Compile preprocessed file.
-	fn compile_step(&self, task: &CompilationTask, preprocessed: PreprocessResult) -> Result<OutputInfo, Error> {
+	fn compile_step(&self, task: &CompilationTask, preprocessed: PreprocessedSource) -> Result<OutputInfo, Error> {
 		let mut args = filter(&task.args, |arg:&Arg|->Option<String> {
 			match arg {
 				&Arg::Flag{ref scope, ref flag} => {
