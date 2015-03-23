@@ -93,7 +93,7 @@ impl Compiler for VsCompiler {
 				Err(e) => Err(e)
 			}
 		} else {
-			Err(Error::new(ErrorKind::ResourceUnavailable, "Invalid preprocessor exit code with parameters", Some(format!("{:?}", args))))
+			Err(Error::new(ErrorKind::Other, "Invalid preprocessor exit code with parameters", Some(format!("{:?}", args))))
 		}
 	}
 

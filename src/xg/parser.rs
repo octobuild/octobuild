@@ -88,7 +88,7 @@ fn parse_create_graph(tasks:&Vec<XgTask>, tools:&HashMap<String, XgTool>) -> Res
 			}
 		}
 	}
-	for idx in range(0, nodes.len()) {
+	for idx in 0..nodes.len() {
 		let ref task = tasks[idx];
 		let ref node = nodes[idx];
 		for id in task.depends_on.iter() {

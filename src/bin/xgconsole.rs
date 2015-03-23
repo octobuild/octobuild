@@ -91,7 +91,7 @@ fn execute(args: &[String]) -> Result<Option<i32>, Error> {
 
 fn create_threads<R: 'static + Send, T: 'static + Send, Worker:'static + Fn(T) -> R + Send, Factory:Fn(usize) -> Worker>(rx_task: Receiver<T>, tx_result: Sender<R>, num_cpus: usize, factory: Factory) ->  Arc<Mutex<Receiver<T>>> {
 	let mutex_rx_task = Arc::new(Mutex::new(rx_task));
-	for cpu_id in range(0, num_cpus) {
+	for cpu_id in 0..num_cpus {
 		let local_rx_task = mutex_rx_task.clone();
 		let local_tx_result = tx_result.clone();
 		let worker = factory(cpu_id);

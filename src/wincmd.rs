@@ -66,7 +66,7 @@ pub fn escape(arg: &str) -> String {
 }
 
 fn add_slashes(mut line: String, count: usize) -> String {
-	for _ in range(0, count) {
+	for _ in 0..count {
 		line.push('\\');
 	}
 	line
