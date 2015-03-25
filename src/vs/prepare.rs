@@ -166,7 +166,7 @@ fn parse_argument(iter: &mut  Iter<String>) -> Option<Result<Arg, String>> {
 						match flag {
 							"c" => Ok(Arg::Flag{scope: Scope::Ignore, flag:flag.to_string()}),
 							"bigobj" | "nologo" => Ok(Arg::Flag{scope: Scope::Compiler, flag:flag.to_string()}),
-							s if s.starts_with("T") => Ok(Arg::Flag{scope: Scope::Ignore, flag:flag.to_string()}),
+							s if s.starts_with("T") => Ok(Arg::Param{scope: Scope::Ignore, flag:"T".to_string(), value: s[1..].to_string()}),
 							s if s.starts_with("O") => Ok(Arg::Flag{scope: Scope::Shared, flag:flag.to_string()}),
 							s if s.starts_with("G") => Ok(Arg::Flag{scope: Scope::Shared, flag:flag.to_string()}),
 							s if s.starts_with("RTC") => Ok(Arg::Flag{scope: Scope::Shared, flag:flag.to_string()}),
@@ -217,8 +217,9 @@ fn test_parse_argument() {
 	use super::super::wincmd;
 
 	assert_eq!(
-		parse_arguments(&wincmd::parse("/c /Yusample.h /Fpsample.h.pch /Fosample.cpp.o /DTEST /D TEST2 sample.cpp").as_slice()).unwrap(),
+		parse_arguments(&wincmd::parse("/TP /c /Yusample.h /Fpsample.h.pch /Fosample.cpp.o /DTEST /D TEST2 sample.cpp").as_slice()).unwrap(),
 		[
+			Arg::Param { scope: Scope::Ignore, flag: "T".to_string(), value: "P".to_string()},
 			Arg::Flag { scope: Scope::Ignore, flag: "c".to_string()},
 			Arg::Input { kind: InputKind::Marker, flag: "Yu".to_string(), file: "sample.h".to_string()},
 			Arg::Input { kind: InputKind::Precompiled, flag: "Fp".to_string(), file: "sample.h.pch".to_string()},
