@@ -1,5 +1,7 @@
 using System;
 using System.Text.RegularExpressions;
+using System.Xml;
+using System.Xml.Linq;
 using WixSharp;
 
 class Script
@@ -23,30 +25,37 @@ class Script
     static public void Main(string[] args)
     {
         String version = ReadVersion(@"Cargo.toml");
-        EnvironmentVariable path = new EnvironmentVariable("PATH", "[INSTALLLOCATION]");
-        path.Permanent = false;
-        path.Part = EnvVarPart.last;
-        path.Action = EnvVarAction.set;
-        path.System = true;
+        Feature featureBuilder = new Feature("Octobuild Builder", true, false);
         Project project = new Project("Octobuild",
-            new Dir(@"%ProgramFiles64Folder%\octobuild",
-                new File(@"target\release\xgconsole.exe"),
-                new File(@"LICENSE-MIT")
+            new Dir(@"%ProgramFiles64Folder%\Octobuild",
+                new File(featureBuilder, @"target\release\xgconsole.exe"),
+                new File(featureBuilder, @"LICENSE")
             ),
-            path
+            new EnvironmentVariable(featureBuilder, "PATH", "[INSTALLDIR]")
+            {
+                Permanent = false,
+                Part = EnvVarPart.last,
+                Action = EnvVarAction.set,
+                System = true,
+            }
         );
         project.LicenceFile = @"LICENSE.rtf";
         project.GUID = new Guid("b4505233-6377-406b-955b-2547d86a99a7");
         project.UI = WUI.WixUI_InstallDir;
-        project.Package.AttributesDefinition = "Platform=x64";
+        project.Package.AttributesDefinition = @"Platform=x64;InstallScope=perMachine";
         project.Version = new Version(version);
         project.OutFileName = @"target\octobuild-" + version + "-x86_64";
 
-        foreach (var file in project.AllFiles)
-        {
-            file.Attributes.Add("Component:Win64", "yes");
-        }
-
+        Compiler.WixSourceGenerated += new XDocumentGeneratedDlgt(Compiler_WixSourceGenerated);
         Compiler.BuildMsi(project);
+        Compiler.BuildWxs(project);
+    }
+
+    static void Compiler_WixSourceGenerated(XDocument document)
+    {
+        foreach (XElement comp in document.Root.AllElements("Component"))
+        {
+            comp.Add(new XAttribute("Win64", "yes"));
+        }
     }
 }
