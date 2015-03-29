@@ -34,7 +34,7 @@ pub fn parse<B: Read>(reader: B) -> Result<Graph<BuildTask, ()>, Error> {
 	for e in parser.events() {
 		match e {
 			XmlEvent::StartElement {name, attributes, ..} => {
-				match name.local_name.as_slice() {
+				match &name.local_name[..] {
 					"Task" => {
 						tasks.push(try! (parse_task (&attributes)));
 					}
@@ -92,8 +92,7 @@ fn parse_create_graph(tasks:&Vec<XgTask>, tools:&HashMap<String, XgTool>) -> Res
 		let ref task = tasks[idx];
 		let ref node = nodes[idx];
 		for id in task.depends_on.iter() {
-			let dep_node = task_refs.get(id.as_slice());
-			match dep_node {
+			match task_refs.get(&id[..]) {
 				Some(v) => {
 					graph.add_edge(*node, *v, ());
 				}
