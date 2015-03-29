@@ -25,6 +25,24 @@ impl VsCompiler {
 			temp_dir: temp_dir.to_path_buf()
 		}
 	}
+
+	fn run_compiler(&self, task: &CompilationTask, source: &Path, args: &Vec<String>) -> Result<OutputInfo, Error> {
+		let mut command = task.command.to_command();
+		command
+			.args(&args)
+			.arg(source.to_str().unwrap())
+			.arg("/c")
+			.arg(&join_flag("/Fo", &task.output_object));
+		match &task.input_precompiled {
+			&Some(ref path) => {command.arg(&join_flag("/Fp", path));}
+			&None => {}
+		}
+		match &task.output_precompiled {
+			&Some(ref path) => {command.arg(&join_flag("/Fp", path));}
+			&None => {}
+		}
+		command.output().map(|o| OutputInfo::new(o))
+	}
 }
 
 impl Compiler for VsCompiler {
@@ -139,31 +157,32 @@ impl Compiler for VsCompiler {
 		let mut outputs: Vec<PathBuf> = Vec::new();
 		outputs.push(task.output_object.clone());
 		match &task.output_precompiled {
-			&Some(ref path) => {outputs.push(path.clone());}
+			&Some(ref path) => {
+				outputs.push(path.clone());
+				match &task.marker_precompiled {
+					&Some(ref path) => {
+						args.push("/Yc".to_string() + &path);
+					}
+					&None => {}
+				}
+			}
 			&None => {}
 		}
 	
 		let hash_params = hash_text(&preprocessed.content) + &wincmd::join(&args);
 		self.cache.run_cached(&hash_params, &inputs, &outputs, || -> Result<OutputInfo, Error> {
-			// Input file path.
-			let input_temp = TempFile::new_in(&self.temp_dir, ".i");
-			try! (try! (File::create(input_temp.path())).write_all(&preprocessed.content));
-			// Run compiler.
-			let mut command = task.command.to_command();
-			command
-				.args(&args)
-				.arg(input_temp.path().to_str().unwrap())
-				.arg("/c")
-				.arg(&join_flag("/Fo", &task.output_object));
-			match &task.input_precompiled {
-				&Some(ref path) => {command.arg(&join_flag("/Fp", path));}
-				&None => {}
-			}
 			match &task.output_precompiled {
-				&Some(ref path) => {command.arg(&join_flag("/Fp", path));}
-				&None => {}
-			}		
-			command.output().map(|o| OutputInfo::new(o))
+				&Some(_) => {
+					// Input file path.
+					self.run_compiler(task, &task.input_source, &args)
+				}
+				&None => {
+					// Input file path.
+					let input_temp = TempFile::new_in(&self.temp_dir, ".i");
+					try! (try! (File::create(input_temp.path())).write_all(&preprocessed.content));
+					self.run_compiler(task, input_temp.path(), &args)
+				}
+			}
 		})
 	}
 }
