@@ -45,13 +45,13 @@ pub fn filter_preprocessed(reader: &mut Read, writer: &mut Write, marker: &Optio
 							Some(path) => {
 								if header_found && (path == file) {
 									try! (writer.write_all(b"#pragma hdrstop\n"));
-									try! (writer.write_all(raw.as_slice()));
+									try! (writer.write_all(&raw));
 									break;
 								}
 								match *marker {
 									Some(ref raw_path) => {
 										let path = raw_path.replace("\\", "/");
-										if file == path || Path::new(file.as_slice()).ends_with(&Path::new(path.as_slice())) {
+										if file == path || Path::new(&file).ends_with(&Path::new(&path)) {
 											header_found = true;
 										}
 									}
@@ -63,16 +63,16 @@ pub fn filter_preprocessed(reader: &mut Read, writer: &mut Write, marker: &Optio
 						};
 						header_files.insert(file);
 						if keep_headers {
-							try! (writer.write_all(raw.as_slice()));
+							try! (writer.write_all(&raw));
 						}
 					}
 					Directive::HdrStop(raw) => {
-						try! (writer.write_all(raw.as_slice()));
+						try! (writer.write_all(&raw));
 						break;
 					}
 					Directive::Unknown(raw) => {
 						if keep_headers {
-							try! (writer.write_all(raw.as_slice()));
+							try! (writer.write_all(&raw));
 						}
 					}
 				}
@@ -92,7 +92,7 @@ pub fn filter_preprocessed(reader: &mut Read, writer: &mut Write, marker: &Optio
 		if size <= 0 {
 			break;
 		}
-		try! (writer.write_all(&buf.as_slice()[0..size]));
+		try! (writer.write_all(&buf[0..size]));
 	}
 	Ok(Vec::from_iter(header_files.into_iter()))
 }
@@ -168,7 +168,7 @@ fn read_directive_line(first: Option<u8>, reader: &mut Read, mut raw: Vec<u8>) -
 	// File name
 	let (next2, file) = try! (read_token(next1, reader, &mut raw));
 	try! (skip_line(next2, reader, &mut raw));
-	Ok(Directive::Line(raw, String::from_utf8_lossy(file.as_slice()).to_string()))
+	Ok(Directive::Line(raw, String::from_utf8_lossy(&file).to_string()))
 }
 
 fn read_directive_pragma(first: Option<u8>, reader: &mut Read, mut raw: Vec<u8>) -> Result<Directive, Error> {
@@ -231,7 +231,7 @@ mod test {
 		let mut stream: Vec<u8> = Vec::new();
 		stream.push_all(original.as_bytes());
 		match super::filter_preprocessed(&mut Cursor::new(stream), &mut writer, &marker, keep_headers) {
-			Ok(_) => {assert_eq! (String::from_utf8_lossy(writer.as_slice()), expected)}
+			Ok(_) => {assert_eq! (String::from_utf8_lossy(&writer), expected)}
 			Err(e) => {panic! (e);}
 		}
 	}

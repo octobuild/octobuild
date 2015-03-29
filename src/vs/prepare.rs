@@ -150,7 +150,7 @@ fn parse_argument(iter: &mut  Iter<String>) -> Option<Result<Arg, String>> {
 	match iter.next() {
 		Some(arg) => Some(
 			if has_param_prefix(arg) {
-				let flag = arg[1..].as_slice();
+				let flag = &arg[1..];
 				match is_spaceable_param(flag) {
 					Some((prefix, scope)) => {
 						if flag == prefix {
@@ -217,7 +217,7 @@ fn test_parse_argument() {
 	use super::super::wincmd;
 
 	assert_eq!(
-		parse_arguments(&wincmd::parse("/TP /c /Yusample.h /Fpsample.h.pch /Fosample.cpp.o /DTEST /D TEST2 sample.cpp").as_slice()).unwrap(),
+		parse_arguments(&wincmd::parse("/TP /c /Yusample.h /Fpsample.h.pch /Fosample.cpp.o /DTEST /D TEST2 sample.cpp")).unwrap(),
 		[
 			Arg::Param { scope: Scope::Ignore, flag: "T".to_string(), value: "P".to_string()},
 			Arg::Flag { scope: Scope::Ignore, flag: "c".to_string()},

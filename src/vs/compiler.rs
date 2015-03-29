@@ -38,13 +38,13 @@ impl Compiler for VsCompiler {
 			match arg {
 				&Arg::Flag{ref scope, ref flag} => {
 					match scope {
-						&Scope::Preprocessor | &Scope::Shared => Some("/".to_string() + flag.as_slice()),
+						&Scope::Preprocessor | &Scope::Shared => Some("/".to_string() + &flag),
 						&Scope::Ignore | &Scope::Compiler => None
 					}
 				}
 				&Arg::Param{ref scope, ref  flag, ref value} => {
 					match scope {
-						&Scope::Preprocessor | &Scope::Shared => Some("/".to_string() + flag.as_slice() + value.as_slice()),
+						&Scope::Preprocessor | &Scope::Shared => Some("/".to_string() + &flag + &value),
 						&Scope::Ignore | &Scope::Compiler => None
 					}
 				}
@@ -56,7 +56,7 @@ impl Compiler for VsCompiler {
 		// Add preprocessor paramters.
 		let temp_file = TempFile::new_in(&self.temp_dir, ".i");
 		args.push("/nologo".to_string());
-		args.push("/T".to_string() + task.language.as_slice());
+		args.push("/T".to_string() + &task.language);
 		args.push("/P".to_string());
 		args.push(task.input_source.display().to_string());
 	
@@ -68,9 +68,9 @@ impl Compiler for VsCompiler {
 	
 		let mut command = task.command.to_command();
 		command
-			.args(args.as_slice())
-			.arg(join_flag("/Fi", &temp_file.path()).as_slice())
-			.arg(join_flag("/Fo", &task.output_object).as_slice()); // /Fo option also set output path for #import directive
+			.args(&args)
+			.arg(&join_flag("/Fi", &temp_file.path()))
+			.arg(&join_flag("/Fo", &task.output_object)); // /Fo option also set output path for #import directive
 		let output = try! (command.output());
 		if output.status.success() {
 			match File::open(temp_file.path()) {
@@ -84,7 +84,7 @@ impl Compiler for VsCompiler {
 					};
 					let mut content = Vec::new();
 					try! (output.read_to_end(&mut content));
-					hash.write(content.as_slice());
+					hash.write(&content);
 					Ok(PreprocessResult::Success(PreprocessedSource {
 						hash: format!("{:016x}", hash.finish()),
 						content: content
@@ -103,13 +103,13 @@ impl Compiler for VsCompiler {
 			match arg {
 				&Arg::Flag{ref scope, ref flag} => {
 					match scope {
-						&Scope::Compiler | &Scope::Shared => Some("/".to_string() + flag.as_slice()),
+						&Scope::Compiler | &Scope::Shared => Some("/".to_string() + &flag),
 						&Scope::Ignore | &Scope::Preprocessor => None
 					}
 				}
 				&Arg::Param{ref scope, ref  flag, ref value} => {
 					match scope {
-						&Scope::Compiler | &Scope::Shared => Some("/".to_string() + flag.as_slice() + value.as_slice()),
+						&Scope::Compiler | &Scope::Shared => Some("/".to_string() + &flag + &value),
 						&Scope::Ignore | &Scope::Preprocessor => None
 					}
 				}
@@ -117,11 +117,11 @@ impl Compiler for VsCompiler {
 				&Arg::Output{..} => None
 			}
 		});
-		args.push("/T".to_string() + task.language.as_slice());
+		args.push("/T".to_string() + &task.language);
 		match &task.input_precompiled {
 			&Some(ref path) => {
 				args.push("/Yu".to_string());
-				args.push("/Fp".to_string() + path.display().to_string().as_slice());
+				args.push("/Fp".to_string() + &path.display().to_string());
 			}
 			&None => {}
 		}
@@ -142,24 +142,24 @@ impl Compiler for VsCompiler {
 			&None => {}
 		}
 	
-		let hash_params = hash_text(preprocessed.content.as_slice()) + wincmd::join(&args).as_slice();
-		self.cache.run_cached(hash_params.as_slice(), &inputs, &outputs, || -> Result<OutputInfo, Error> {
+		let hash_params = hash_text(&preprocessed.content) + &wincmd::join(&args);
+		self.cache.run_cached(&hash_params, &inputs, &outputs, || -> Result<OutputInfo, Error> {
 			// Input file path.
 			let input_temp = TempFile::new_in(&self.temp_dir, ".i");
-			try! (try! (File::create(input_temp.path())).write_all(preprocessed.content.as_slice()));
+			try! (try! (File::create(input_temp.path())).write_all(&preprocessed.content));
 			// Run compiler.
 			let mut command = task.command.to_command();
 			command
-				.args(args.as_slice())
+				.args(&args)
 				.arg(input_temp.path().to_str().unwrap())
 				.arg("/c")
-				.arg(join_flag("/Fo", &task.output_object).as_slice());
+				.arg(&join_flag("/Fo", &task.output_object));
 			match &task.input_precompiled {
-				&Some(ref path) => {command.arg(join_flag("/Fp", path).as_slice());}
+				&Some(ref path) => {command.arg(&join_flag("/Fp", path));}
 				&None => {}
 			}
 			match &task.output_precompiled {
-				&Some(ref path) => {command.arg(join_flag("/Fp", path).as_slice());}
+				&Some(ref path) => {command.arg(&join_flag("/Fp", path));}
 				&None => {}
 			}		
 			command.output().map(|o| OutputInfo::new(o))
@@ -168,5 +168,5 @@ impl Compiler for VsCompiler {
 }
 
 pub fn join_flag(flag: &str, path: &Path) -> String {
-	flag.to_string() + path.to_str().unwrap().as_slice()
+	flag.to_string() + &path.to_str().unwrap()
 }

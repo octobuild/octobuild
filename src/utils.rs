@@ -36,7 +36,7 @@ pub fn hash_write_stream(hash: &mut Hasher, stream: &mut Read) -> Result<(), Err
 		if size <= 0 {
 			break;
 		}
-		hash.write(&buf.as_slice()[0..size]);
+		hash.write(&buf[0..size]);
 	}
 	Ok(())
 }

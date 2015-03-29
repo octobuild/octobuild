@@ -59,7 +59,7 @@ fn parse_create_graph(tasks:&Vec<XgTask>, tools:&HashMap<String, XgTool>) -> Res
 	let mut nodes: Vec<NodeIndex> = Vec::new();
 	let mut task_refs: HashMap<&str, NodeIndex> = HashMap::new();
 	for task in tasks.iter() {
-		match tools.get(task.tool.as_slice()){
+		match tools.get(&task.tool){
 			Some(tool) => {
 				let node = graph.add_node(BuildTask {
 					title: match task.title {
@@ -72,12 +72,12 @@ fn parse_create_graph(tasks:&Vec<XgTask>, tools:&HashMap<String, XgTool>) -> Res
 						}
 					},
 					exec: tool.exec.clone(),
-					args: wincmd::parse(tool.args.as_slice()),
+					args: wincmd::parse(&tool.args),
 					working_dir : task.working_dir.clone(),
 				});
 				match task.id {
 					Some(ref v) => {
-						task_refs.insert(v.as_slice(), node);
+						task_refs.insert(&v, node);
 					}
 					_ => {}
 				}

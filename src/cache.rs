@@ -40,7 +40,7 @@ struct CacheFile {
 impl Cache {
 	pub fn new() -> Self {
 		let cache_dir = match env::var("OCTOBUILD_CACHE") {
-			Ok(value) => Path::new(value.as_slice()).to_path_buf(),
+			Ok(value) => Path::new(&value).to_path_buf(),
 			Err(_) => env::home_dir().unwrap().join(".octobuild").join("cache")
 		};
 		Cache {
@@ -173,7 +173,7 @@ fn write_cache(path: &Path, paths: &Vec<PathBuf>, output: &OutputInfo) -> Result
 				break;
 			}
 			try! (write_le_usize(&mut stream, size));
-			try! (stream.write_all(&buf.as_slice()[0..size]));
+			try! (stream.write_all(&buf[0..size]));
 		}
 		try! (write_le_usize(&mut stream, 0));
 	}
@@ -201,7 +201,7 @@ fn read_cache(path: &Path, paths: &Vec<PathBuf>) -> Result<OutputInfo, Error> {
 			let size = try! (read_le_usize(&mut stream));
 			if size == 0 {break;}
 			let block = try! (read_exact(&mut stream, size));
-			try! (file.write_all(block.as_slice()));
+			try! (file.write_all(&block));
 		}
 	}
 	let output = try! (read_output(&mut stream));
@@ -223,8 +223,8 @@ fn read_blob(stream: &mut Read) -> Result<Vec<u8>, Error> {
 }
 
 fn write_output(stream: &mut Write, output: &OutputInfo) -> Result<(), Error> {
-	try! (write_blob(stream, output.stdout.as_slice()));
-	try! (write_blob(stream, output.stderr.as_slice()));
+	try! (write_blob(stream, &output.stdout));
+	try! (write_blob(stream, &output.stderr));
 	Ok(())
 }
 

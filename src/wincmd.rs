@@ -55,7 +55,7 @@ pub fn join(args: &Vec<String>) -> String {
 		if result.len() > 0 {
 			result = result + " ";
 		}
-		result = result + escape(arg.as_slice()).as_slice();
+		result = result + &escape(&arg);
 	}
 	result
 }
@@ -83,7 +83,7 @@ pub fn expand_arg<F: Fn(&str) -> Option<String>>(arg: &str, resolver: &F) -> Str
 						let name = &suffix[begin + 2..begin + end];
 						match resolver(name) {
 							Some(ref value) => {
-								result = result + &suffix[..begin] + value.as_slice();
+								result = result + &suffix[..begin] + &value;
 							}
 							None => {
 								result = result + &suffix[..begin + end + 1];
@@ -109,7 +109,7 @@ pub fn expand_arg<F: Fn(&str) -> Option<String>>(arg: &str, resolver: &F) -> Str
 pub fn expand_args<F: Fn(&str) -> Option<String>>(args: &Vec<String>, resolver: &F) -> Vec<String> {
 	let mut result:Vec<String> = Vec::new();
 	for arg in args.iter() {
-		result.push(expand_arg(arg.as_slice(), resolver));
+		result.push(expand_arg(&arg, resolver));
 	}
 	result
 }

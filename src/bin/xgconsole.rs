@@ -1,4 +1,3 @@
-#![feature(core)]
 #![feature(exit_status)]
 #![feature(io)]
 #![feature(os)]
@@ -45,7 +44,7 @@ fn main() {
 	for arg in args.iter() {
 		println!("  {}", arg);
 	}
-	match execute(&args.as_slice()[1..]) {
+	match execute(&args[1..]) {
 		Ok(result) => {
 			env::set_exit_status(match result {
 				Some(r) => r,
@@ -142,7 +141,7 @@ fn validate_graph(graph: Graph<BuildTask, ()>) -> Result<Graph<BuildTask, ()>, E
 
 fn execute_task(cache: &Cache, temp_dir: &Path, worker: usize, message: TaskMessage) -> ResultMessage {
 	let args = wincmd::expand_args(&message.task.args, &|name:&str|->Option<String>{env::var(name).ok()});
-	let output = execute_compiler(cache, temp_dir, message.task.exec.as_slice(), &Path::new(&message.task.working_dir), args.as_slice());
+	let output = execute_compiler(cache, temp_dir, &message.task.exec, &Path::new(&message.task.working_dir), &args);
 	ResultMessage {
 		index: message.index,
 		task: message.task,
@@ -161,7 +160,7 @@ fn execute_compiler(cache: &Cache, temp_dir: &Path, program: &str, cwd: &Path, a
 		compiler.compile(command, args)
 	} else {
 		command.to_command()
-			.args(args.as_slice())
+			.args(&args)
 			.output()
 			.map(|o| OutputInfo::new(o))
 	}
@@ -206,8 +205,8 @@ fn execute_until_failed(graph: &Graph<BuildTask, ()>, tx_task: Sender<TaskMessag
 		count += 1;
 		println!("#{} {}/{}: {}", message.worker, count, completed.len(), message.task.title);
 		let result = try! (message.result);
-		try! (io::stdout().write_all(result.stdout.as_slice()));
-		try! (io::stderr().write_all(result.stderr.as_slice()));
+		try! (io::stdout().write_all(&result.stdout));
+		try! (io::stderr().write_all(&result.stderr));
 		if !result.success() {
 			return Ok(result.status);
 		}

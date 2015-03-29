@@ -1,4 +1,3 @@
-#![feature(core)]
 #![feature(exit_status)]
 extern crate octobuild;
 extern crate tempdir;
@@ -39,7 +38,7 @@ fn compile() -> Result<OutputInfo, Error> {
 		current_dir: None,
 	}, &args[1..]));
 
-	try !(io::stdout().write_all(output.stdout.as_slice()));
-	try !(io::stderr().write_all(output.stderr.as_slice()));
+	try !(io::stdout().write_all(&output.stdout));
+	try !(io::stderr().write_all(&output.stderr));
 	Ok(output)
 }
