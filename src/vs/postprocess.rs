@@ -1,4 +1,6 @@
+use std::collections::HashSet;
 use std::io::{Read, Write, Error};
+use std::iter::FromIterator;
 use std::path::Path;
 
 use super::super::utils::DEFAULT_BUF_SIZE;
@@ -14,11 +16,12 @@ enum Directive {
 	Unknown(Vec<u8>)
 }
 
-pub fn filter_preprocessed(reader: &mut Read, writer: &mut Write, marker: &Option<String>, keep_headers: bool) -> Result<(), Error> {
+pub fn filter_preprocessed(reader: &mut Read, writer: &mut Write, marker: &Option<String>, keep_headers: bool) -> Result<Vec<String>, Error> {
 	let mut line_begin = true;
 	// Entry file.
 	let mut entry_file: Option<String> = None;
 	let mut header_found: bool = false;
+	let mut header_files: HashSet<String> = HashSet::new();
 	loop {
 		let c = try! (read_u8(reader));
 		match c {
@@ -40,7 +43,7 @@ pub fn filter_preprocessed(reader: &mut Read, writer: &mut Write, marker: &Optio
 						let file = raw_file.replace("\\", "/");
 						entry_file = match entry_file {
 							Some(path) => {
-								if header_found && (path  == file) {
+								if header_found && (path == file) {
 									try! (writer.write_all(b"#pragma hdrstop\n"));
 									try! (writer.write_all(raw.as_slice()));
 									break;
@@ -56,8 +59,9 @@ pub fn filter_preprocessed(reader: &mut Read, writer: &mut Write, marker: &Optio
 								}
 								Some(path)
 							}
-							None => Some(file)
+							None => Some(file.clone())
 						};
+						header_files.insert(file);
 						if keep_headers {
 							try! (writer.write_all(raw.as_slice()));
 						}
@@ -90,7 +94,7 @@ pub fn filter_preprocessed(reader: &mut Read, writer: &mut Write, marker: &Optio
 		}
 		try! (writer.write_all(&buf.as_slice()[0..size]));
 	}
-	Ok(())
+	Ok(Vec::from_iter(header_files.into_iter()))
 }
 
 fn read_directive(first: u8, reader: &mut Read) -> Result<Directive, Error> {
