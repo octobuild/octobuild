@@ -75,19 +75,20 @@ impl Compiler for VsCompiler {
 		if output.status.success() {
 			match File::open(temp_file.path()) {
 				Ok(stream) => {
-					let mut output: Box<Read> = if task.input_precompiled.is_some() || task.output_precompiled.is_some() {
+					let (mut output, sources): (Box<Read>, Vec<PathBuf>) = if task.input_precompiled.is_some() || task.output_precompiled.is_some() {
 						let mut buffer: Vec<u8> = Vec::new();
-						try! (postprocess::filter_preprocessed(&mut BufReader::new(stream), &mut buffer, &task.marker_precompiled, task.output_precompiled.is_some()));
-						Box::new(Cursor::new(buffer))
+						let sources = try! (postprocess::filter_preprocessed(&task.command.current_dir, &mut BufReader::new(stream), &mut buffer, &task.marker_precompiled, task.output_precompiled.is_some()));
+						(Box::new(Cursor::new(buffer)), sources)
 					} else {
-						Box::new(stream)
+						(Box::new(stream), Vec::new())
 					};
 					let mut content = Vec::new();
 					try! (output.read_to_end(&mut content));
 					hash.write(&content);
 					Ok(PreprocessResult::Success(PreprocessedSource {
 						hash: format!("{:016x}", hash.finish()),
-						content: content
+						sources: sources,
+						content: content,
 					}))
 				}
 				Err(e) => Err(e)

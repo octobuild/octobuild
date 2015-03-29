@@ -5,7 +5,6 @@
 #![feature(fs_time)]
 #![feature(fs_walk)]
 #![feature(old_io)]
-#![feature(std_misc)]
 #![feature(int_uint)]
 pub mod cache;
 pub mod common;

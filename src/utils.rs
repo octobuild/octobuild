@@ -1,19 +1,11 @@
 use std::hash::{Hasher, SipHasher};
+use std::iter::FromIterator;
 use std::io::{Error, Read};
 
 pub const DEFAULT_BUF_SIZE: usize = 1024 * 64;
 
 pub fn filter<T, R, F:Fn(&T) -> Option<R>>(args: &Vec<T>, filter:F) -> Vec<R> {
-	let mut result: Vec<R> = Vec::new();
-	for arg in args.iter() {
-		match filter(arg) {
-			Some(v) => {
-				result.push(v);
-			}
-			None => {}
-		}
-	}
-	result
+	Vec::from_iter(args.iter().filter_map(filter))
 }
 
 pub fn hash_text(data: &[u8]) -> String {

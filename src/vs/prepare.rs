@@ -9,23 +9,23 @@ pub fn create_task(command: CommandInfo, args: &[String]) -> Result<CompilationT
 	match parse_arguments(args) {
 		Ok(parsed_args) => {
 			// Source file name.
-			let input_source = match filter(&parsed_args, |arg:&Arg|->Option<PathBuf> {
+			let input_source = match &filter(&parsed_args, |arg:&Arg|->Option<PathBuf> {
 				match *arg {
 					Arg::Input{ref kind, ref file, ..} if *kind == InputKind::Source => {Some(Path::new(file).to_path_buf())}
 					_ => {None}
 				}
-			}).as_slice() {
+			})[..] {
 				[] => {return Err(format!("Can't find source file path."));}
 				[ref v] => v.clone(),
 				v => {return Err(format!("Found too many source files: {:?}", v));}
 			};
 			// Precompiled header file name.
-			let precompiled_file = match filter(&parsed_args, |arg:&Arg|->Option<PathBuf>{
+			let precompiled_file = match &filter(&parsed_args, |arg:&Arg|->Option<PathBuf>{
 				match *arg {
 					Arg::Input{ref kind, ref file, ..} if *kind == InputKind::Precompiled => {Some(Path::new(file).to_path_buf())}
 					_ => {None}
 				}
-			}).as_slice() {
+			})[..] {
 				[] => None,
 				[ref v] => Some(v.clone()),
 				v => {return Err(format!("Found too many precompiled header files: {:?}", v));}
@@ -34,13 +34,13 @@ pub fn create_task(command: CommandInfo, args: &[String]) -> Result<CompilationT
 			let marker_precompiled;
 			let input_precompiled;
 			let output_precompiled;
-			match filter(&parsed_args, |arg:&Arg|->Option<(bool, String)>{
+			match &filter(&parsed_args, |arg:&Arg|->Option<(bool, String)>{
 				match *arg {
 					Arg::Input{ref kind, ref file, ..} if *kind == InputKind::Marker => Some((true, file.clone())),
 					Arg::Output{ref kind, ref file, ..} if *kind == OutputKind::Marker => Some((false, file.clone())),
 					_ => None
 				}
-			}).as_slice() {
+			})[..] {
 				[] => {
 					marker_precompiled=None;
 					input_precompiled=None;
@@ -65,12 +65,12 @@ pub fn create_task(command: CommandInfo, args: &[String]) -> Result<CompilationT
 				}
 			};
 			// Output object file name.
-			let output_object = match filter(&parsed_args, |arg:&Arg|->Option<PathBuf> {
+			let output_object = match &filter(&parsed_args, |arg:&Arg|->Option<PathBuf> {
 				match *arg {
 					Arg::Output{ref kind, ref file, ..} if *kind == OutputKind::Object => Some(Path::new(file).to_path_buf()),
 					_ => None
 				}
-			}).as_slice() {
+			})[..] {
 				[] => input_source.with_extension("obj"),
 				[ref v] => v.clone(),
 				v => {
@@ -79,12 +79,12 @@ pub fn create_task(command: CommandInfo, args: &[String]) -> Result<CompilationT
 			};
 			// Language
 			let language: String;
-			match filter(&parsed_args, |arg:&Arg|->Option<String>{
+			match &filter(&parsed_args, |arg:&Arg|->Option<String>{
 				match arg {
 					&Arg::Param{ref flag, ref value, ..} if *flag == "T" => Some(value.clone()),
 					_ => None
 				}
-			}).as_slice() {
+			})[..] {
 				[]  => {
 				match input_source.extension() {
 					Some(extension) => {

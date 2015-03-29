@@ -1,7 +1,7 @@
 use std::collections::HashSet;
 use std::io::{Read, Write, Error};
 use std::iter::FromIterator;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use super::super::utils::DEFAULT_BUF_SIZE;
 use super::super::io::binary::*;
@@ -16,7 +16,7 @@ enum Directive {
 	Unknown(Vec<u8>)
 }
 
-pub fn filter_preprocessed(reader: &mut Read, writer: &mut Write, marker: &Option<String>, keep_headers: bool) -> Result<Vec<String>, Error> {
+pub fn filter_preprocessed(base: &Option<PathBuf>, reader: &mut Read, writer: &mut Write, marker: &Option<String>, keep_headers: bool) -> Result<Vec<PathBuf>, Error> {
 	let mut line_begin = true;
 	// Entry file.
 	let mut entry_file: Option<String> = None;
@@ -94,7 +94,12 @@ pub fn filter_preprocessed(reader: &mut Read, writer: &mut Write, marker: &Optio
 		}
 		try! (writer.write_all(&buf[0..size]));
 	}
-	Ok(Vec::from_iter(header_files.into_iter()))
+	Ok(Vec::from_iter(header_files.into_iter().map(|arg:String|->PathBuf {
+		match base {
+			&Some(ref path) => path.join(arg),
+			&None => Path::new(&arg).to_path_buf(),
+		}
+	})))
 }
 
 fn read_directive(first: u8, reader: &mut Read) -> Result<Directive, Error> {
