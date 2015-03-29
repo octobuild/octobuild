@@ -98,7 +98,7 @@ pub fn create_task(command: CommandInfo, args: &[String]) -> Result<CompilationT
 				}
 			}
 			[ref v] => {
-				match v.as_slice() {
+				match &v[..] {
 						"P" | "C" => {language = v.clone();}
 						_ => { return Err(format!("Unknown source language type: {}", v));}
 					}

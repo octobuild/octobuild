@@ -101,7 +101,7 @@ fn read_directive(first: u8, reader: &mut Read) -> Result<Directive, Error> {
 	let mut raw: Vec<u8> = Vec::new();
 	raw.push(first);
 	let (next, token) = try! (read_token(None, reader, &mut raw));
-	match token.as_slice() {
+	match &token[..] {
 		b"line" => read_directive_line(next, reader, raw),
 		b"pragma" => read_directive_pragma(next, reader, raw),
 		_ => {
@@ -174,7 +174,7 @@ fn read_directive_line(first: Option<u8>, reader: &mut Read, mut raw: Vec<u8>) -
 fn read_directive_pragma(first: Option<u8>, reader: &mut Read, mut raw: Vec<u8>) -> Result<Directive, Error> {
 	let (next, token) = try! (read_token(first, reader, &mut raw));
 	try! (skip_line(next, reader, &mut raw));
-	match token.as_slice() {
+	match &token[..] {
 		b"hdrstop" => Ok(Directive::HdrStop(raw)),
 		_ => Ok(Directive::Unknown(raw))
 	}
