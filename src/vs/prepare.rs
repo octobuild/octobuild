@@ -229,8 +229,8 @@ fn test_parse_argument() {
 			Arg::Input { kind: InputKind::Marker, flag: "Yu".to_string(), file: "sample.h".to_string()},
 			Arg::Input { kind: InputKind::Precompiled, flag: "Fp".to_string(), file: "sample.h.pch".to_string()},
 			Arg::Output { kind: OutputKind::Object, flag: "Fo".to_string(), file: "sample.cpp.o".to_string()},
-			Arg::Param { scope: Scope::Preprocessor, flag: "D".to_string(), value: "TEST".to_string()},
-			Arg::Param { scope: Scope::Preprocessor, flag: "D".to_string(), value: "TEST2".to_string()},
+			Arg::Param { scope: Scope::Shared, flag: "D".to_string(), value: "TEST".to_string()},
+			Arg::Param { scope: Scope::Shared, flag: "D".to_string(), value: "TEST2".to_string()},
 			Arg::Input { kind: InputKind::Source, flag: "".to_string(), file: "sample.cpp".to_string()}
 		]
 	)
