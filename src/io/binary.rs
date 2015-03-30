@@ -60,7 +60,7 @@ pub fn read_le_usize(stream: &mut Read) -> Result<usize> {
 /// have already been consumed from the underlying reader, and they are lost
 /// (not returned as part of the error). If this is unacceptable, then it is
 /// recommended to use the `push_at_least` or `read` methods.
-pub fn read_exact(stream: &mut Read, len: uint) -> Result<Vec<u8>> {
+pub fn read_exact(stream: &mut Read, len: usize) -> Result<Vec<u8>> {
     let mut buf = Vec::with_capacity(len);
     unsafe {
         buf.set_len(len);

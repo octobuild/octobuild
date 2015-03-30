@@ -5,7 +5,7 @@
 #![feature(fs_time)]
 #![feature(fs_walk)]
 #![feature(old_io)]
-#![feature(int_uint)]
+#![feature(slice_patterns)]
 pub mod cache;
 pub mod common;
 pub mod compiler;
