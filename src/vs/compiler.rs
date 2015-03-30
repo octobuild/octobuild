@@ -123,12 +123,14 @@ impl Compiler for VsCompiler {
 				&Arg::Flag{ref scope, ref flag} => {
 					match scope {
 						&Scope::Compiler | &Scope::Shared => Some("/".to_string() + &flag),
+						&Scope::Preprocessor if task.output_precompiled.is_some() => Some("/".to_string() + &flag),
 						&Scope::Ignore | &Scope::Preprocessor => None
 					}
 				}
 				&Arg::Param{ref scope, ref  flag, ref value} => {
 					match scope {
 						&Scope::Compiler | &Scope::Shared => Some("/".to_string() + &flag + &value),
+						&Scope::Preprocessor if task.output_precompiled.is_some() => Some("/".to_string() + &flag + &value),
 						&Scope::Ignore | &Scope::Preprocessor => None
 					}
 				}
@@ -159,12 +161,6 @@ impl Compiler for VsCompiler {
 		match &task.output_precompiled {
 			&Some(ref path) => {
 				outputs.push(path.clone());
-				match &task.marker_precompiled {
-					&Some(ref path) => {
-						args.push("/Yc".to_string() + &path);
-					}
-					&None => {}
-				}
 			}
 			&None => {}
 		}

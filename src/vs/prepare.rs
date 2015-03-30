@@ -194,7 +194,12 @@ fn parse_argument(iter: &mut  Iter<String>) -> Option<Result<Arg, String>> {
 }
 
 fn is_spaceable_param(flag: &str) -> Option<(&str, Scope)> {
-	for prefix in ["I", "D"].iter() {
+	for prefix in ["D"].iter() {
+		if flag.starts_with(*prefix) {
+			return Some((*prefix, Scope::Shared));
+		}
+	}
+	for prefix in ["I"].iter() {
 		if flag.starts_with(*prefix) {
 			return Some((*prefix, Scope::Preprocessor));
 		}
