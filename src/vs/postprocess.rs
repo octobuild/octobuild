@@ -235,7 +235,7 @@ mod test {
 		let mut writer: Vec<u8> = Vec::new();
 		let mut stream: Vec<u8> = Vec::new();
 		stream.push_all(original.as_bytes());
-		match super::filter_preprocessed(&mut Cursor::new(stream), &mut writer, &marker, keep_headers) {
+		match super::filter_preprocessed(&None, &mut Cursor::new(stream), &mut writer, &marker, keep_headers) {
 			Ok(_) => {assert_eq! (String::from_utf8_lossy(&writer), expected)}
 			Err(e) => {panic! (e);}
 		}
