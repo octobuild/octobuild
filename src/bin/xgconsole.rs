@@ -39,7 +39,7 @@ struct ResultMessage {
 }
 
 fn main() {
-	println!("XGConsole:");
+	println!("XGConsole ({}):", octobuild::VERSION);
 	let args = Vec::from_iter(env::args());
 	for arg in args.iter() {
 		println!("  {}", arg);

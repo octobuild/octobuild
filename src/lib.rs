@@ -6,6 +6,9 @@
 #![feature(fs_walk)]
 #![feature(old_io)]
 #![feature(slice_patterns)]
+
+pub const VERSION: &'static str = env!("CARGO_PKG_VERSION");
+
 pub mod cache;
 pub mod common;
 pub mod compiler;
