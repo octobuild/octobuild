@@ -1,0 +1,22 @@
+﻿version: '{branch}-{build}'
+
+install:
+  - ps: Start-FileDownload 'https://static.rust-lang.org/dist/rust-nightly-i686-pc-windows-gnu.exe'
+  - ps: Start-FileDownload 'https://www.bozaro.ru/pub/WixSharp.1.0.10.0.7z' WixSharp.7z
+  - rust-nightly-i686-pc-windows-gnu.exe /VERYSILENT /NORESTART /DIR="C:\Program Files (x86)\Rust"
+  - 7z.exe x WixSharp.7z -oWixSharp
+  - SET WIXSHARP_DIR=%APPVEYOR_BUILD_FOLDER%\WixSharp\
+  - SET PATH=%PATH%;C:\Program Files (x86)\Rust\bin;C:\MINGW\bin;%WIXSHARP_DIR%
+  - rustc -V
+  - cargo -V
+  - git submodule update --init --recursive
+
+build: false
+
+test_script:
+  - cargo test
+  - cargo build --release
+  - cscs.exe wixcs\setup.cs
+
+artifacts:
+  - path: target/octobuild-*.msi
