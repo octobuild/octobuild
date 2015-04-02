@@ -25,3 +25,4 @@ deploy:
 - provider: GitHub
   auth_token:
     secure: kDcv8Gxce2mGLKoZF9usWBmDzlUxxGLidDzKKehtPAx+m/Fbwpb7TLqbsUn8ecfv
+  draft: true
