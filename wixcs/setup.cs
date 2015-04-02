@@ -62,9 +62,11 @@ class Script
 			}
 		);
 		project.LicenceFile = @"LICENSE.rtf";
+		project.LicenceFile = @"LICENSE.rtf";
 		project.GUID = new Guid("b4505233-6377-406b-955b-2547d86a99a7");
 		project.UI = WUI.WixUI_InstallDir;
 		project.Version = new Version(version);
+		project.Manufacturer = "Artem V. Navrotskiy";
 		project.OutFileName = @"target\octobuild-" + version + "-" + target;
 
 		if (target == Target.x86_64)
