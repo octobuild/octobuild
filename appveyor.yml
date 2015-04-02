@@ -15,16 +15,14 @@ build: false
 
 test_script:
 - cargo test
-
-artifacts:
-- path: target/octobuild-*.msi
-
-before_deploy:
-- cargo build --release
-- cscs.exe wixcs\setup.cs
+- if "%APPVEYOR_REPO_TAG%" == "true" (cargo build --release)
+- if "%APPVEYOR_REPO_TAG%" == "true" (cscs.exe wixcs\setup.cs)
 
 deploy:
 - provider: GitHub
   auth_token:
     secure: kDcv8Gxce2mGLKoZF9usWBmDzlUxxGLidDzKKehtPAx+m/Fbwpb7TLqbsUn8ecfv
-  prerelease: true
+  on:
+    appveyor_repo_tag: true
+  artifact: target/octobuild-*.msi
+  draft: true
