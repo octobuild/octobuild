@@ -15,11 +15,13 @@ build: false
 
 test_script:
 - cargo test
-- cargo build --release
-- cscs.exe wixcs\setup.cs
 
 artifacts:
 - path: target/octobuild-*.msi
+
+before_deploy:
+- cargo build --release
+- cscs.exe wixcs\setup.cs
 
 deploy:
 - provider: GitHub
