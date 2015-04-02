@@ -5,8 +5,8 @@ install:
   - ps: Start-FileDownload 'https://wixsharp.codeplex.com/downloads/get/1441782' WixSharp.7z
   - rust-nightly-i686-pc-windows-gnu.exe /VERYSILENT /NORESTART /DIR="C:\Program Files (x86)\Rust"
   - 7z.exe x WixSharp.7z -oWixSharp
-  - SET PATH=%PATH%;C:\Program Files (x86)\Rust\bin;C:\MINGW\bin
   - SET WIXSHARP_DIR=%APPVEYOR_BUILD_FOLDER%\WixSharp\
+  - SET PATH=%PATH%;C:\Program Files (x86)\Rust\bin;C:\MINGW\bin;%WIXSHARP_DIR%
   - rustc -V
   - cargo -V
   - git submodule update --init --recursive
@@ -16,4 +16,4 @@ build: false
 test_script:
   - cargo test
   - cargo build --release
-  - %WIXSHARP_DIR%\cscs.exe wixcs\setup.cs
+  - cscs.exe wixcs\setup.cs
