@@ -41,7 +41,7 @@ deploy:
   draft: false
   prerelease: false
 - provider: NuGet
-  server: https://www.myget.org/
+  server: https://www.myget.org/F/bozaro/
   api_key:
     secure: 8Xgud8TmDRF6fW3jZSI16SsDFPyYh8S/5HUCpHmeEV793APr4WT3xwFUu9HlM+eY
   artifact: /.*\.nupkg/
