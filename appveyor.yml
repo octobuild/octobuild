@@ -23,11 +23,13 @@ test_script:
 - rustc -V
 - cargo -V
 - cargo test
-- if "%APPVEYOR_REPO_TAG%" == "true" (cargo build --release)
-- if "%APPVEYOR_REPO_TAG%" == "true" (cscs.exe wixcs\setup.cs)
+- cargo build --release
+- cscs.exe wixcs\setup.cs
+- nuget pack target\octobuild.nuspec -OutputDirectory target
 
 artifacts:
 - path: target/octobuild-*.msi
+- path: target/octobuild-*.nupkg
 
 deploy:
 - provider: GitHub
@@ -37,3 +39,8 @@ deploy:
     appveyor_repo_tag: true
   draft: false
   prerelease: false
+- provider: NuGet
+  server: http://chocolatey.org/
+  api_key:
+    secure: 5tG16DzbxdonFS7/jYYidxVgIA8QogBVx7u0TYvikAhygXezrVWn1JKAihEnM5D7
+  artifact: /.*\.nupkg/

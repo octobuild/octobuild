@@ -1,4 +1,5 @@
 using System;
+using System.Text;
 using System.Text.RegularExpressions;
 using System.Xml;
 using System.Xml.Linq;
@@ -42,6 +43,14 @@ class Script
 		}
 	}
 
+	static void CreateNuspec(string template, string output, string version, Target target)
+	{
+		string content = System.IO.File.ReadAllText(template, Encoding.UTF8);
+		content = content.Replace("$version$", version);
+		content = content.Replace("$target$", target.ToString());
+		System.IO.File.WriteAllText(output, content, Encoding.UTF8);
+	}
+
 	static public void Main(string[] args)
 	{
 		Target target = ReadTarget(@"target\release\target.txt");
@@ -77,6 +86,7 @@ class Script
 
 		Compiler.BuildMsi(project);
 		Compiler.BuildWxs(project);
+		CreateNuspec(@"wixcs\octobuild.nuspec", @"target\octobuild.nuspec", version, target);
 	}
 
 	static void Compiler_WixSourceGenerated(XDocument document)
