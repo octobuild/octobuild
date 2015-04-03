@@ -57,11 +57,15 @@ class Script
 		String version = ReadVersion(@"Cargo.toml");
 		Feature featureBuilder = new Feature("Octobuild Builder", true, false);
 		String programFile = (target == Target.x86_64) ? "%ProgramFiles64Folder%" : "%ProgramFilesFolder%";
+		Dir dir = new Dir(programFile + @"\Octobuild",
+			new File(featureBuilder, @"target\release\xgconsole.exe"),
+			new File(featureBuilder, @"LICENSE")
+		);
+		foreach (string file in System.IO.Directory.GetFiles(@"target\release", "*.dll")) {
+			dir.Files.Add(new File(featureBuilder, @"target\release\*.dll"));
+		}
 		Project project = new Project("Octobuild",
-			new Dir(programFile + @"\Octobuild",
-				new File(featureBuilder, @"target\release\xgconsole.exe"),
-				new File(featureBuilder, @"LICENSE")
-			),
+			dir,
 			new EnvironmentVariable(featureBuilder, "PATH", "[INSTALLDIR]")
 			{
 				Permanent = false,

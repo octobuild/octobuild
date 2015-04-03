@@ -4,7 +4,7 @@ build: false
 
 environment:
   matrix:
-#  - target: i686
+  - target: i686
   - target: x86_64
 
 install:
@@ -24,6 +24,7 @@ test_script:
 - cargo -V
 - cargo test
 - cargo build --release
+- if "%TARGET%" == "i686" (copy rust-%TARGET%\bin\libgcc*.dll target\release\)
 - cscs.exe wixcs\setup.cs
 - nuget pack target\octobuild.nuspec -OutputDirectory target
 
@@ -40,12 +41,12 @@ deploy:
   draft: false
   prerelease: false
 - provider: NuGet
-  server: http://chocolatey.org/
-  api_key:
-    secure: 5tG16DzbxdonFS7/jYYidxVgIA8QogBVx7u0TYvikAhygXezrVWn1JKAihEnM5D7
-  artifact: /.*\.nupkg/
-- provider: NuGet
   server: https://www.myget.org/
   api_key:
     secure: 8Xgud8TmDRF6fW3jZSI16SsDFPyYh8S/5HUCpHmeEV793APr4WT3xwFUu9HlM+eY
+  artifact: /.*\.nupkg/
+- provider: NuGet
+  server: http://chocolatey.org/
+  api_key:
+    secure: 5tG16DzbxdonFS7/jYYidxVgIA8QogBVx7u0TYvikAhygXezrVWn1JKAihEnM5D7
   artifact: /.*\.nupkg/
