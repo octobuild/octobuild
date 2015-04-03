@@ -1,3 +1,5 @@
+extern crate libc;
+
 use std::hash::{Hasher, SipHasher};
 use std::iter::FromIterator;
 use std::io::{Error, Read};
@@ -31,4 +33,9 @@ pub fn hash_write_stream(hash: &mut Hasher, stream: &mut Read) -> Result<(), Err
 		hash.write(&buf[0..size]);
 	}
 	Ok(())
+}
+
+pub fn num_cpus() -> usize {
+	extern { fn rust_get_num_cpus() -> libc::uintptr_t; }
+	unsafe { rust_get_num_cpus() as usize }
 }

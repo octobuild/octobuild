@@ -1,9 +1,9 @@
 #![feature(core)]
 #![feature(collections)]
 #![feature(hash)]
-#![feature(io)]
 #![feature(fs_time)]
 #![feature(fs_walk)]
+#![feature(libc)]
 #![feature(old_io)]
 #![feature(slice_patterns)]
 

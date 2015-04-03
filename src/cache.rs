@@ -1,6 +1,7 @@
 extern crate lz4;
 
 use std::env;
+use std::fmt::{Display, Formatter};
 use std::fs;
 use std::fs::{File, PathExt, OpenOptions};
 use std::io::{Error, ErrorKind, Read, Write, Seek, SeekFrom};
@@ -18,6 +19,40 @@ use super::io::binary::*;
 const HEADER: &'static [u8] = b"OBCF\x00\x02";
 const FOOTER: &'static [u8] = b"END\x00";
 const SUFFIX: &'static str = ".lz4";
+
+#[derive(Debug)]
+pub enum CacheError {
+	InvalidHeader(PathBuf),
+	InvalidFooter(PathBuf),
+	PackedFilesMismatch(PathBuf),
+	MutexError(String),
+}
+
+impl Display for CacheError {
+	fn fmt(&self, f: &mut Formatter) -> Result<(), ::std::fmt::Error> {
+		match self {
+			&CacheError::InvalidHeader(ref path) => write!(f, "invalid cache file header: {}", path.display()),
+			&CacheError::InvalidFooter(ref path) => write!(f, "invalid cache file footer: {}", path.display()),
+			&CacheError::PackedFilesMismatch(ref path) => write!(f, "unexpected count of packed cached files: {}", path.display()),
+			&CacheError::MutexError(ref message) => write!(f, "mutex error: {}", message),
+		}
+	}
+}
+
+impl ::std::error::Error for CacheError {
+	fn description(&self) -> &str {
+		match self {
+			&CacheError::InvalidHeader(_) => "invalid cache file header",
+			&CacheError::InvalidFooter(_) => "invalid cache file footer",
+			&CacheError::PackedFilesMismatch(_) => "unexpected count of packed cached files",
+			&CacheError::MutexError(_) => "mutex error",
+		}
+	}
+
+	fn cause(&self) -> Option<&::std::error::Error> {
+		None
+	}
+}
 
 struct FileHash {
 	hash: String,
@@ -78,7 +113,7 @@ impl Cache {
 				}
 			}
 		}
-		files.as_mut_slice().sort_by(|a, b| b.accessed.cmp(&a.accessed));
+		files.sort_by(|a, b| b.accessed.cmp(&a.accessed));
 		
 		let mut cache_size: u64 = 0;
 		for item in files.into_iter() {
@@ -114,7 +149,7 @@ impl Cache {
 				}
 			}
 			Err(e) => {
-				return Err(Error::new(ErrorKind::Other, "Mutex error", Some(e.to_string())));
+				return Err(Error::new(ErrorKind::Other, CacheError::MutexError(e.to_string())));
 			}
 		};
 		// Get file hash.
@@ -140,7 +175,7 @@ impl Cache {
 				});
 				Ok(hash)
 			}
-			Err(e) => Err(Error::new(ErrorKind::Other, "Mutex error", Some(e.to_string())))
+			Err(e) => Err(Error::new(ErrorKind::Other, CacheError::MutexError(e.to_string())))
 		};
 		result
 	}
@@ -190,10 +225,10 @@ fn read_cache(path: &Path, paths: &Vec<PathBuf>) -> Result<OutputInfo, Error> {
 	try! (file.seek(SeekFrom::Start(0)));
 	let mut stream = try! (lz4::Decoder::new (file));
 	if try! (read_exact(&mut stream, HEADER.len())) != HEADER {
-		return Err(Error::new(ErrorKind::InvalidInput, "Invalid cache file header", Some(path.display().to_string())));
+		return Err(Error::new(ErrorKind::InvalidInput, CacheError::InvalidHeader(path.to_path_buf())));
 	}
 	if try! (read_le_usize(&mut stream)) != paths.len() {
-		return Err(Error::new(ErrorKind::InvalidInput, "Unexpected count of packed cached files", Some(path.display().to_string())));
+		return Err(Error::new(ErrorKind::InvalidInput, CacheError::PackedFilesMismatch(path.to_path_buf())));
 	} 
 	for path in paths.iter() {
 		let mut file = try! (File::create(path));
@@ -206,7 +241,7 @@ fn read_cache(path: &Path, paths: &Vec<PathBuf>) -> Result<OutputInfo, Error> {
 	}
 	let output = try! (read_output(&mut stream));
 	if try! (read_exact(&mut stream, FOOTER.len())) != FOOTER {
-		return Err(Error::new(ErrorKind::InvalidInput, "Invalid cache file footer", Some(path.display().to_string())));
+		return Err(Error::new(ErrorKind::InvalidInput, CacheError::InvalidFooter(path.to_path_buf())));
 	}
 	Ok(output)
 }

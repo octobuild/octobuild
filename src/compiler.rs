@@ -1,6 +1,32 @@
+use std::fmt::{Display, Formatter};
 use std::io::{Error, ErrorKind};
 use std::path::PathBuf;
 use std::process::{Command, Output};
+
+#[derive(Debug)]
+pub enum CompilerError {
+	InvalidArguments(String),
+}
+				
+impl Display for CompilerError {
+	fn fmt(&self, f: &mut Formatter) -> Result<(), ::std::fmt::Error> {
+		match self {
+			&CompilerError::InvalidArguments(ref arg) => write!(f, "can't parse command line arguments: {}", arg),
+		}
+	}
+}
+
+impl ::std::error::Error for CompilerError {
+	fn description(&self) -> &str {
+		match self {
+			&CompilerError::InvalidArguments(_) => "can't parse command line arguments",
+		}
+	}
+
+	fn cause(&self) -> Option<&::std::error::Error> {
+		None
+	}
+}
 
 // Scope of command line argument.
 #[derive(Copy)]
@@ -139,7 +165,7 @@ pub trait Compiler {
 					PreprocessResult::Failed(output) => Ok(output),
 				}
 			}
-			Err(e) => Err(Error::new(ErrorKind::InvalidInput, "Can't parse command line arguments", Some(e)))
+			Err(e) => Err(Error::new(ErrorKind::InvalidInput, CompilerError::InvalidArguments(e)))
 		}
 	}
 

@@ -1,6 +1,4 @@
 #![feature(exit_status)]
-#![feature(io)]
-#![feature(os)]
 extern crate octobuild;
 extern crate tempdir;
 
@@ -8,6 +6,7 @@ use octobuild::common::BuildTask;
 use octobuild::cache::Cache;
 use octobuild::wincmd;
 use octobuild::xg;
+use octobuild::utils;
 use octobuild::graph::{Graph, NodeIndex, Node, EdgeIndex, Edge};
 use octobuild::vs::compiler::VsCompiler;
 use octobuild::compiler::*;
@@ -67,7 +66,7 @@ fn execute(args: &[String]) -> Result<Option<i32>, Error> {
 		let (tx_result, rx_result): (Sender<ResultMessage>, Receiver<ResultMessage>) = channel();
 		let (tx_task, rx_task): (Sender<TaskMessage>, Receiver<TaskMessage>) = channel();
 
-		let mutex_rx_task = create_threads(rx_task, tx_result, std::os::num_cpus(), |worker_id:usize| {
+		let mutex_rx_task = create_threads(rx_task, tx_result, utils::num_cpus(), |worker_id:usize| {
 			let temp_path = temp_dir.path().to_path_buf();
 			let temp_cache = cache.clone();
 			move |task:TaskMessage| -> ResultMessage {
@@ -136,7 +135,7 @@ fn validate_graph(graph: Graph<BuildTask, ()>) -> Result<Graph<BuildTask, ()>, E
 		}
 		i = i + 1;
 	}
-	Err(Error::new(ErrorKind::InvalidInput, "Found cycles in build dependencies", None))
+	Err(Error::new(ErrorKind::InvalidInput, "Found cycles in build dependencies"))
 }
 
 fn execute_task(cache: &Cache, temp_dir: &Path, worker: usize, message: TaskMessage) -> ResultMessage {
@@ -199,7 +198,7 @@ fn execute_until_failed(graph: &Graph<BuildTask, ()>, tx_task: Sender<TaskMessag
 			true
 		}
 	}) {
-		return Err(Error::new(ErrorKind::BrokenPipe, "Can't schedule root tasks", None));
+		return Err(Error::new(ErrorKind::BrokenPipe, "Can't schedule root tasks"));
 	}
 
 	let mut count:usize = 0;
@@ -229,7 +228,7 @@ fn execute_until_failed(graph: &Graph<BuildTask, ()>, tx_task: Sender<TaskMessag
 			}
 			true
 		}) {
-			return Err(Error::new(ErrorKind::BrokenPipe, "Can't schedule child task", None));
+			return Err(Error::new(ErrorKind::BrokenPipe, "Can't schedule child task"));
 		};
 		if count == completed.len() {
 			return Ok(Some(0));

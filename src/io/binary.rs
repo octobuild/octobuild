@@ -7,7 +7,7 @@ fn read_byte(stream: &mut Read) -> Result<u8> {
 	let mut buf = [0];
 	let size = try! (stream.read(&mut buf));
 	if size <= 0 {
-		return Err(Error::new(ErrorKind::InvalidInput, "Unexpected end of data", None));
+		return Err(Error::new(ErrorKind::InvalidInput, "Unexpected end of data"));
 	}
 	Ok(buf[0])
 }
@@ -69,7 +69,7 @@ pub fn read_exact(stream: &mut Read, len: usize) -> Result<Vec<u8>> {
     while pos < len {
         let size = try! (stream.read(&mut buf[pos..len]));
         if size <= 0 {
-            return Err(Error::new(ErrorKind::InvalidInput, "Unexpected end of data", None));
+            return Err(Error::new(ErrorKind::InvalidInput, "Unexpected end of data"));
         }
         pos += size;
 
