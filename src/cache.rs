@@ -15,7 +15,7 @@ use super::utils::hash_write_stream;
 use super::utils::DEFAULT_BUF_SIZE;
 use super::io::binary::*;
 
-const HEADER: &'static [u8] = b"OBCF\x00\x01";
+const HEADER: &'static [u8] = b"OBCF\x00\x02";
 const FOOTER: &'static [u8] = b"END\x00";
 const SUFFIX: &'static str = ".lz4";
 
