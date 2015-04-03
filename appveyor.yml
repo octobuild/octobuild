@@ -2,11 +2,14 @@
 
 install:
 - ps: Start-FileDownload 'https://static.rust-lang.org/dist/rust-nightly-i686-pc-windows-gnu.exe'
-- ps: Start-FileDownload 'https://www.bozaro.ru/pub/WixSharp.1.0.10.0.7z' WixSharp.7z
+- ps: Start-FileDownload 'https://static.bozaro.ru/x86_64-4.9.2-release-win32-seh-rt_v4-rev2.7z' mingw64.7z
+- ps: Start-FileDownload 'https://static.bozaro.ru/WixSharp.1.0.10.0.7z' WixSharp.7z
 - rust-nightly-i686-pc-windows-gnu.exe /VERYSILENT /NORESTART /DIR="C:\Program Files (x86)\Rust"
-- 7z.exe x WixSharp.7z -oWixSharp
+- 7z.exe x WixSharp.7z -oWixSharp > nul
+- 7z.exe x mingw64.7z > nul
 - SET WIXSHARP_DIR=%APPVEYOR_BUILD_FOLDER%\WixSharp\
-- SET PATH=%PATH%;C:\Program Files (x86)\Rust\bin;C:\MINGW\bin;%WIXSHARP_DIR%
+- SET MINGW_DIR=%APPVEYOR_BUILD_FOLDER%\mingw64\
+- SET PATH=%PATH%;C:\Program Files (x86)\Rust\bin;%MINGW_DIR%\bin;%WIXSHARP_DIR%
 - rustc -V
 - cargo -V
 - git submodule update --init --recursive
