@@ -4,7 +4,7 @@ build: false
 
 environment:
   matrix:
-  - target: i686
+#  - target: i686
   - target: x86_64
 
 install:
@@ -26,11 +26,14 @@ test_script:
 - if "%APPVEYOR_REPO_TAG%" == "true" (cargo build --release)
 - if "%APPVEYOR_REPO_TAG%" == "true" (cscs.exe wixcs\setup.cs)
 
+artifacts:
+- path: target/octobuild-*.msi
+
 deploy:
 - provider: GitHub
   auth_token:
     secure: kDcv8Gxce2mGLKoZF9usWBmDzlUxxGLidDzKKehtPAx+m/Fbwpb7TLqbsUn8ecfv
   on:
     appveyor_repo_tag: true
-  artifact: target/octobuild-*.msi
-  draft: true
+  draft: false
+  prerelease: false
