@@ -1,22 +1,27 @@
-﻿version: '{branch}-{build}'
+version: '{branch}-{build}'
+
+build: false
+
+environment:
+  matrix:
+  - target: i686
+  - target: x86_64
 
 install:
-- ps: Start-FileDownload 'https://static.rust-lang.org/dist/rust-nightly-i686-pc-windows-gnu.exe'
-- ps: Start-FileDownload 'https://static.bozaro.ru/x86_64-4.9.2-release-win32-seh-rt_v4-rev2.7z' mingw64.7z
-- ps: Start-FileDownload 'https://static.bozaro.ru/WixSharp.1.0.10.0.7z' WixSharp.7z
-- rust-nightly-i686-pc-windows-gnu.exe /VERYSILENT /NORESTART /DIR="C:\Program Files (x86)\Rust"
+- ps: Start-FileDownload "https://static.rust-lang.org/dist/rust-nightly-$env:target-pc-windows-gnu.exe"
+- ps: Start-FileDownload "https://static.bozaro.ru/x86_64-4.9.2-release-win32-seh-rt_v4-rev2.7z" mingw64.7z
+- ps: Start-FileDownload "https://static.bozaro.ru/WixSharp.1.0.10.0.7z" WixSharp.7z
+- rust-nightly-%TARGET%-pc-windows-gnu.exe   /VERYSILENT /NORESTART /DIR="%APPVEYOR_BUILD_FOLDER%\rust-%TARGET%"
 - 7z.exe x WixSharp.7z -oWixSharp > nul
 - 7z.exe x mingw64.7z > nul
 - SET WIXSHARP_DIR=%APPVEYOR_BUILD_FOLDER%\WixSharp\
 - SET MINGW_DIR=%APPVEYOR_BUILD_FOLDER%\mingw64\
-- SET PATH=%PATH%;C:\Program Files (x86)\Rust\bin;%MINGW_DIR%\bin;%WIXSHARP_DIR%
-- rustc -V
-- cargo -V
 - git submodule update --init --recursive
 
-build: false
-
 test_script:
+- SET PATH=%PATH%;%APPVEYOR_BUILD_FOLDER%\rust-%TARGET%\bin;%MINGW_DIR%\bin;%WIXSHARP_DIR%
+- rustc -V
+- cargo -V
 - cargo test
 - if "%APPVEYOR_REPO_TAG%" == "true" (cargo build --release)
 - if "%APPVEYOR_REPO_TAG%" == "true" (cscs.exe wixcs\setup.cs)
