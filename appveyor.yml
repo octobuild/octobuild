@@ -44,3 +44,8 @@ deploy:
   api_key:
     secure: 5tG16DzbxdonFS7/jYYidxVgIA8QogBVx7u0TYvikAhygXezrVWn1JKAihEnM5D7
   artifact: /.*\.nupkg/
+- provider: NuGet
+  server: https://www.myget.org/
+  api_key:
+    secure: 8Xgud8TmDRF6fW3jZSI16SsDFPyYh8S/5HUCpHmeEV793APr4WT3xwFUu9HlM+eY
+  artifact: /.*\.nupkg/
