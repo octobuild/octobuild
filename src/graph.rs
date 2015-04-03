@@ -66,13 +66,13 @@ pub struct NodeIndex(pub usize);
 #[allow(non_upper_case_globals)]
 pub const InvalidNodeIndex: NodeIndex = NodeIndex(usize::MAX);
 
-#[derive(Copy, PartialEq, Debug)]
+#[derive(Clone, Copy, PartialEq, Debug)]
 pub struct EdgeIndex(pub usize);
 #[allow(non_upper_case_globals)]
 pub const InvalidEdgeIndex: EdgeIndex = EdgeIndex(usize::MAX);
 
 // Use a private field here to guarantee no more instances are created:
-#[derive(Copy, Debug)]
+#[derive(Clone, Copy, Debug)]
 pub struct Direction { repr: usize }
 #[allow(non_upper_case_globals)]
 pub const Outgoing: Direction = Direction { repr: 0 };

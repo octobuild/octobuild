@@ -30,6 +30,7 @@ impl ::std::error::Error for CompilerError {
 
 // Scope of command line argument.
 #[derive(Copy)]
+#[derive(Clone)]
 #[derive(Debug)]
 #[derive(PartialEq)]
 pub enum Scope {
@@ -44,6 +45,7 @@ pub enum Scope {
 }
 
 #[derive(Copy)]
+#[derive(Clone)]
 #[derive(Debug)]
 #[derive(PartialEq)]
 pub enum InputKind {
@@ -53,6 +55,7 @@ pub enum InputKind {
 }
 
 #[derive(Copy)]
+#[derive(Clone)]
 #[derive(Debug)]
 #[derive(PartialEq)]
 pub enum OutputKind {
