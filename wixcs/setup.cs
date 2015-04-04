@@ -62,7 +62,7 @@ class Script
 			new File(featureBuilder, @"LICENSE")
 		);
 		foreach (string file in System.IO.Directory.GetFiles(@"target\release", "*.dll")) {
-			dir.Files.Add(new File(featureBuilder, @"target\release\*.dll"));
+			dir.Files.Add(new File(featureBuilder, file));
 		}
 		Project project = new Project("Octobuild",
 			dir,
