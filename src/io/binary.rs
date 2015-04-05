@@ -47,7 +47,7 @@ pub fn read_i8(stream: &mut Read) -> Result<i8> {
 ///
 /// The number of bytes returned is system-dependent.
 pub fn read_le_usize(stream: &mut Read) -> Result<usize> {
-    read_le_uint_n(stream, std::usize::BYTES).map(|i| i as usize)
+    read_le_uint_n(stream, std::usize::BYTES as u32).map(|i| i as usize)
 }
 
 /// Reads exactly `len` bytes and gives you back a new vector of length
@@ -92,5 +92,5 @@ pub fn write_i8(stream: &mut Write, n: i8) -> Result<()> {
 /// Write a little-endian uint (number of bytes depends on system).
 #[inline]
 pub fn write_le_usize(stream: &mut Write, n: usize) -> Result<()> {
-    extensions::u64_to_le_bytes(n as u64, std::usize::BYTES as usize, |v| stream.write_all(v))
+    extensions::u64_to_le_bytes(n as u64, std::usize::BYTES, |v| stream.write_all(v))
 }
