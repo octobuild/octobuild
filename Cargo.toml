@@ -4,9 +4,6 @@ build = "src/build.rs"
 version = "0.0.10"
 authors = [ "Artem V. Navrotskiy <bozaro@users.noreply.github.com>" ]
 
-[dependencies.daemon]
-version = "*"
-
 [dependencies.lz4]
 version = "*"
 
