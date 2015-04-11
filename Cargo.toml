@@ -4,7 +4,18 @@ build = "src/build.rs"
 version = "0.0.10"
 authors = [ "Artem V. Navrotskiy <bozaro@users.noreply.github.com>" ]
 
+[[bin]]
+name = "octo_cl"
+test = false
+
+[[bin]]
+name = "xgconsole"
+test = false
+
 [dependencies.lz4]
+version = "*"
+
+[dependencies.libc]
 version = "*"
 
 [dependencies.xml-rs]
