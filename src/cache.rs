@@ -198,7 +198,7 @@ fn write_cache(path: &Path, paths: &Vec<PathBuf>, output: &OutputInfo) -> Result
 	}
 	let mut stream = try! (lz4::Encoder::new(try! (File::create(path)), 1));
 	try! (stream.write_all(HEADER));
-	try! (write_le_usize(&mut stream, paths.len()));
+	try! (write_usize(&mut stream, paths.len()));
 	let mut buf: [u8; DEFAULT_BUF_SIZE] = [0; DEFAULT_BUF_SIZE];
 	for path in paths.iter() {
 		let mut file = try! (File::open(path));
@@ -207,10 +207,10 @@ fn write_cache(path: &Path, paths: &Vec<PathBuf>, output: &OutputInfo) -> Result
 			if size <= 0 {
 				break;
 			}
-			try! (write_le_usize(&mut stream, size));
+			try! (write_usize(&mut stream, size));
 			try! (stream.write_all(&buf[0..size]));
 		}
-		try! (write_le_usize(&mut stream, 0));
+		try! (write_usize(&mut stream, 0));
 	}
 	try! (write_output(&mut stream, output));
 	try! (stream.write_all(FOOTER));
@@ -227,13 +227,13 @@ fn read_cache(path: &Path, paths: &Vec<PathBuf>) -> Result<OutputInfo, Error> {
 	if try! (read_exact(&mut stream, HEADER.len())) != HEADER {
 		return Err(Error::new(ErrorKind::InvalidInput, CacheError::InvalidHeader(path.to_path_buf())));
 	}
-	if try! (read_le_usize(&mut stream)) != paths.len() {
+	if try! (read_usize(&mut stream)) != paths.len() {
 		return Err(Error::new(ErrorKind::InvalidInput, CacheError::PackedFilesMismatch(path.to_path_buf())));
 	} 
 	for path in paths.iter() {
 		let mut file = try! (File::create(path));
 		loop {
-			let size = try! (read_le_usize(&mut stream));
+			let size = try! (read_usize(&mut stream));
 			if size == 0 {break;}
 			let block = try! (read_exact(&mut stream, size));
 			try! (file.write_all(&block));
@@ -247,13 +247,13 @@ fn read_cache(path: &Path, paths: &Vec<PathBuf>) -> Result<OutputInfo, Error> {
 }
 
 fn write_blob(stream: &mut Write, blob: &[u8]) -> Result<(), Error> {
-	try! (write_le_usize(stream, blob.len()));
+	try! (write_usize(stream, blob.len()));
 	try! (stream.write_all(blob));
 	Ok(())
 }
 
 fn read_blob(stream: &mut Read) -> Result<Vec<u8>, Error> {
-	let size = try! (read_le_usize(stream));
+	let size = try! (read_usize(stream));
 	read_exact(stream, size)
 }
 

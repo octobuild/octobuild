@@ -1,5 +1,4 @@
-﻿use std;
-use std::old_io::extensions;
+﻿use std::mem;
 use std::io::{Error, ErrorKind, Read, Write, Result};
 
 /// Reads a single byte. Returns `Err` on EOF.
@@ -10,44 +9,6 @@ fn read_byte(stream: &mut Read) -> Result<u8> {
 		return Err(Error::new(ErrorKind::InvalidInput, "Unexpected end of data"));
 	}
 	Ok(buf[0])
-}
-
-/// Reads `n` little-endian unsigned integer bytes.
-///
-/// `n` must be between 1 and 8, inclusive.
-fn read_le_uint_n(stream: &mut Read, nbytes: u32) -> Result<u64> {
-    assert!(nbytes > 0 && nbytes <= 8);
-
-    let mut val = 0u64;
-    let mut pos = 0;
-    let mut i = nbytes;
-    while i > 0 {
-        val += (try!(read_u8(stream)) as u64) << pos;
-        pos += 8;
-        i -= 1;
-    }
-    Ok(val)
-}
-
-/// Read a u8.
-///
-/// `u8`s are 1 byte.
-pub fn read_u8(stream: &mut Read) -> Result<u8> {
-    read_byte(stream)
-}
-
-/// Read an i8.
-///
-/// `i8`s are 1 byte.
-pub fn read_i8(stream: &mut Read) -> Result<i8> {
-    read_byte(stream).map(|i| i as i8)
-}
-
-/// Reads a little-endian unsigned integer.
-///
-/// The number of bytes returned is system-dependent.
-pub fn read_le_usize(stream: &mut Read) -> Result<usize> {
-    read_le_uint_n(stream, std::usize::BYTES as u32).map(|i| i as usize)
 }
 
 /// Reads exactly `len` bytes and gives you back a new vector of length
@@ -65,32 +26,53 @@ pub fn read_exact(stream: &mut Read, len: usize) -> Result<Vec<u8>> {
     unsafe {
         buf.set_len(len);
     }
+    try! (read_array(stream, &mut buf[..]));
+    Ok(buf)
+}
+
+fn read_array(stream: &mut Read, buf: &mut [u8]) -> Result<()> {
     let mut pos = 0;
-    while pos < len {
-        let size = try! (stream.read(&mut buf[pos..len]));
+    while pos < buf.len() {
+        let size = try! (stream.read(&mut buf[pos..]));
         if size <= 0 {
             return Err(Error::new(ErrorKind::InvalidInput, "Unexpected end of data"));
         }
         pos += size;
 
     }
-    Ok(buf)
+    Ok(())
 }
 
-/// Write a u8 (1 byte).
 #[inline]
 pub fn write_u8(stream: &mut Write, n: u8) -> Result<()> {
     stream.write_all(&[n])
 }
 
-/// Write an i8 (1 byte).
 #[inline]
-pub fn write_i8(stream: &mut Write, n: i8) -> Result<()> {
-    stream.write_all(&[n as u8])
+fn write_u64(stream: &mut Write, i: u64) -> Result<()> {
+    stream.write_all(&unsafe { mem::transmute::<_, [u8; 8]>(i) })
 }
 
-/// Write a little-endian uint (number of bytes depends on system).
 #[inline]
-pub fn write_le_usize(stream: &mut Write, n: usize) -> Result<()> {
-    extensions::u64_to_le_bytes(n as u64, std::usize::BYTES, |v| stream.write_all(v))
+pub fn write_usize(stream: &mut Write, i: usize) -> Result<()> {
+    write_u64(stream, i as u64)
+}
+
+#[inline]
+pub fn read_u8(stream: &mut Read) -> Result<u8> {
+    read_byte(stream)
+}
+
+#[inline]
+fn read_u64(stream: &mut Read) -> Result<u64> {
+    let mut buf: [u8; 8] = [0; 8];
+    try! (read_array(stream, &mut buf));
+    Ok(unsafe { 
+        mem::transmute_copy::<_, u64>(&buf)
+    })
+}
+
+#[inline]
+pub fn read_usize(stream: &mut Read) -> Result<usize> {
+    read_u64(stream).map(|i| i as usize)
 }

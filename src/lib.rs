@@ -1,9 +1,7 @@
-#![feature(core)]
 #![feature(collections)]
 #![feature(hash)]
 #![feature(fs_time)]
 #![feature(fs_walk)]
-#![feature(old_io)]
 #![feature(slice_patterns)]
 
 pub const VERSION: &'static str = env!("CARGO_PKG_VERSION");
