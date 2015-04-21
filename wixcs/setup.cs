@@ -99,7 +99,7 @@ class Script
 
         if (target == Target.x86_64)
         {
-            project.Package.AttributesDefinition += @";Platform=x64";
+            project.Package.AttributesDefinition += @";Platform=x64;InstallScope=perMachine";
             Compiler.WixSourceGenerated += new XDocumentGeneratedDlgt(Compiler_WixSourceGenerated);
         }
 
