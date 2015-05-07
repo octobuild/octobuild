@@ -4,6 +4,9 @@ build = "src/build.rs"
 version = "0.0.11"
 authors = [ "Artem V. Navrotskiy <bozaro@users.noreply.github.com>" ]
 
+[profile.bench]
+debug = true
+
 [[bin]]
 name = "octo_cl"
 test = false
