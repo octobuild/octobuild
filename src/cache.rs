@@ -196,24 +196,39 @@ fn write_cache(path: &Path, paths: &Vec<PathBuf>, output: &OutputInfo) -> Result
 		Some(parent) => try! (fs::create_dir_all(&parent)),
 		None => ()
 	}
-	let mut stream = try! (lz4::Encoder::new(try! (File::create(path)), 1));
-	try! (stream.write_all(HEADER));
-	try! (write_usize(&mut stream, paths.len()));
-	let mut buf: [u8; DEFAULT_BUF_SIZE] = [0; DEFAULT_BUF_SIZE];
-	for path in paths.iter() {
-		let mut file = try! (File::open(path));
-		loop {
-			let size = try! (file.read(&mut buf));
-			if size <= 0 {
-				break;
+
+	fn write_cache_inner(stream: &mut Write, paths: &Vec<PathBuf>, output: &OutputInfo) -> Result<(), Error> {
+		try! (stream.write_all(HEADER));
+		try! (write_usize(stream, paths.len()));
+		let mut buf: [u8; DEFAULT_BUF_SIZE] = [0; DEFAULT_BUF_SIZE];
+		for path in paths.iter() {
+			let mut file = try! (File::open(path));
+			loop {
+				let size = try! (file.read(&mut buf));
+				if size <= 0 {
+					break;
+				}
+				try! (write_usize(stream, size));
+				try! (stream.write_all(&buf[0..size]));
 			}
-			try! (write_usize(&mut stream, size));
-			try! (stream.write_all(&buf[0..size]));
+			try! (write_usize(stream, 0));
 		}
-		try! (write_usize(&mut stream, 0));
+		try! (write_output(stream, output));
+		try! (stream.write_all(FOOTER));
+		Ok(())
 	}
-	try! (write_output(&mut stream, output));
-	try! (stream.write_all(FOOTER));
+
+	let mut stream = try! (lz4::Encoder::new(try! (File::create(path)), 1));
+	match write_cache_inner(&mut stream, paths, output) {
+		Err(e) => {
+			let raw_path = path.with_extension(".raw");
+			write_cache_inner(&mut try! (File::create(&raw_path)), paths, output);
+			println!("FAILED: {:?}", raw_path);
+			return Err(e);
+		}
+		Ok(_) => {
+		}
+	}
 	match stream.finish() {
 		(_, result) => result
 	}
