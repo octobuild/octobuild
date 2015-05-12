@@ -197,6 +197,14 @@ fn write_cache(path: &Path, paths: &Vec<PathBuf>, output: &OutputInfo) -> Result
 		None => ()
 	}
 
+	fn write_cache_compressed<W: Write>(write: W, paths: &Vec<PathBuf>, output: &OutputInfo) -> Result<(), Error> {
+		let mut stream = try! (lz4::Encoder::new(write, 1));
+		try! (write_cache_inner(&mut stream, paths, output));
+		match stream.finish() {
+			(_, result) => result
+		}
+	}
+	
 	fn write_cache_inner(stream: &mut Write, paths: &Vec<PathBuf>, output: &OutputInfo) -> Result<(), Error> {
 		try! (stream.write_all(HEADER));
 		try! (write_usize(stream, paths.len()));
@@ -218,19 +226,14 @@ fn write_cache(path: &Path, paths: &Vec<PathBuf>, output: &OutputInfo) -> Result
 		Ok(())
 	}
 
-	let mut stream = try! (lz4::Encoder::new(try! (File::create(path)), 1));
-	match write_cache_inner(&mut stream, paths, output) {
+	match write_cache_compressed(try! (File::create(path)), paths, output) {
 		Err(e) => {
-			let raw_path = path.with_extension(".raw");
+			let raw_path = path.with_extension("raw");
 			write_cache_inner(&mut try! (File::create(&raw_path)), paths, output);
 			println!("FAILED: {:?}", raw_path);
 			return Err(e);
 		}
-		Ok(_) => {
-		}
-	}
-	match stream.finish() {
-		(_, result) => result
+		Ok(v) => Ok(v),
 	}
 }
 
