@@ -228,13 +228,26 @@ fn write_cache(path: &Path, paths: &Vec<PathBuf>, output: &OutputInfo) -> Result
 
 	match write_cache_compressed(try! (File::create(path)), paths, output) {
 		Err(e) => {
-			let raw_path = path.with_extension("raw");
-			write_cache_inner(&mut try! (File::create(&raw_path)), paths, output);
+			let raw_path = path.with_extension("blk");
+			write_cache_inner(&mut BlockWrite(try! (File::create(&raw_path))), paths, output);
 			println!("FAILED: {:?}", raw_path);
 			return Err(e);
 		}
 		Ok(v) => Ok(v),
 	}
+}
+
+struct BlockWrite<W: Write> (W);
+
+impl<W: Write> Write for BlockWrite<W> {
+    fn write(&mut self, buf: &[u8]) -> Result<usize, Error> {
+    	try! (write_usize(&mut self.0, buf.len()));
+    	self.0.write(buf)
+    }
+
+    fn flush(&mut self) -> Result<(), Error> {
+    	self.0.flush()
+    }
 }
 
 fn read_cache(path: &Path, paths: &Vec<PathBuf>) -> Result<OutputInfo, Error> {
