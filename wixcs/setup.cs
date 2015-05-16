@@ -95,11 +95,11 @@ class Script
         project.Version = new Version(version);
         project.Manufacturer = "Artem V. Navrotskiy";
         project.OutFileName = @"target\octobuild-" + version + "-" + target;
-        project.Package.AttributesDefinition = @"InstallPrivileges=elevated";
+        project.Package.AttributesDefinition = @"InstallPrivileges=elevated;InstallScope=perMachine";
 
         if (target == Target.x86_64)
         {
-            project.Package.AttributesDefinition += @";Platform=x64;InstallScope=perMachine";
+            project.Package.AttributesDefinition += @";Platform=x64";
             Compiler.WixSourceGenerated += new XDocumentGeneratedDlgt(Compiler_WixSourceGenerated);
         }
 
