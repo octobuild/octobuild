@@ -9,12 +9,6 @@ using WixSharp;
 
 class Script
 {
-    enum Target
-    {
-        i686,
-        x86_64,
-    }
-
     static public string ReadVersion(string path)
     {
         System.IO.StreamReader file = new System.IO.StreamReader(path);
@@ -31,25 +25,37 @@ class Script
         return null;
     }
 
-    static Target ReadTarget(string path)
+    static Platform ReadPlatform(string path)
     {
         String target = System.IO.File.ReadAllText(path);
         switch (target)
         {
             case "x86_64-pc-windows-gnu":
-                return Target.x86_64;
+                return Platform.x64;
             case "i686-pc-windows-gnu":
-                return Target.i686;
+                return Platform.x86;
             default:
                 throw new Exception("Unknown target: " + target);
         }
     }
 
-    static void CreateNuspec(string template, string output, string version, Target target)
+    static string PlatformName(Platform platform)
+    {
+        switch (platform) { 
+            case Platform.x64:
+                return "x86_64";
+            case Platform.x86:
+                return "i686";
+            default:
+                throw new Exception("Unknown platform: " + platform);
+        }
+    }
+
+    static void CreateNuspec(string template, string output, string version, Platform target)
     {
         string content = System.IO.File.ReadAllText(template, Encoding.UTF8);
         content = content.Replace("$version$", version);
-        content = content.Replace("$target$", target.ToString());
+        content = content.Replace("$target$", PlatformName(target));
         System.IO.File.WriteAllText(output, content, Encoding.UTF8);
     }
 
@@ -57,11 +63,10 @@ class Script
     {
         Console.WriteLine("WixSharp version: " + FileVersionInfo.GetVersionInfo(typeof(WixSharp.Project).Assembly.Location).FileVersion);
 
-        Target target = ReadTarget(@"target\release\target.txt");
+        Platform platform = ReadPlatform(@"target\release\target.txt");
         String version = ReadVersion(@"Cargo.toml");
         Feature featureBuilder = new Feature("Octobuild Builder", true, false);
         featureBuilder.AttributesDefinition = @"AllowAdvertise=no";
-        String programFile = (target == Target.x86_64) ? "%ProgramFiles64Folder%" : "%ProgramFilesFolder%";
 
         List<WixEntity> files = new List<WixEntity>();
         files.Add(new File(featureBuilder, @"target\release\xgconsole.exe"));
@@ -73,7 +78,7 @@ class Script
         Project project = new Project("Octobuild",
             new Property("ApplicationFolderName", "Octobuild"),
             new Property("WixAppFolder", "WixPerMachineFolder"),
-            new Dir(new Id("APPLICATIONFOLDER"), programFile + @"\Octobuild", files.ToArray()),
+            new Dir(new Id("APPLICATIONFOLDER"), @"%ProgramFilesFolder%\Octobuild", files.ToArray()),
             new EnvironmentVariable(featureBuilder, "PATH", "[APPLICATIONFOLDER]")
             {
                 Permanent = false,
@@ -91,31 +96,19 @@ class Script
                 Condition = new Condition("NOT ALLUSERS")
             }
         );
+        project.ControlPanelInfo.Manufacturer = "Artem V. Navrotskiy";
+        project.ControlPanelInfo.UrlInfoAbout = "https://github.com/bozaro/octobuild";
         project.LicenceFile = @"LICENSE.rtf";
         project.LicenceFile = @"LICENSE.rtf";
         project.GUID = new Guid("b4505233-6377-406b-955b-2547d86a99a7");
         project.UI = WUI.WixUI_Advanced;
         project.Version = new Version(version);
-        project.Manufacturer = "Artem V. Navrotskiy";
-        project.OutFileName = @"target\octobuild-" + version + "-" + target;
+        project.OutFileName = @"target\octobuild-" + version + "-" + PlatformName(platform);
+        project.Platform = Platform.x64;
         project.Package.AttributesDefinition = @"InstallPrivileges=elevated;InstallScope=perMachine";
-
-        if (target == Target.x86_64)
-        {
-            project.Package.AttributesDefinition += @";Platform=x64";
-            Compiler.WixSourceGenerated += new XDocumentGeneratedDlgt(Compiler_WixSourceGenerated);
-        }
 
         Compiler.BuildMsi(project);
         Compiler.BuildWxs(project);
-        CreateNuspec(@"wixcs\octobuild.nuspec", @"target\octobuild.nuspec", version, target);
-    }
-
-    static void Compiler_WixSourceGenerated(XDocument document)
-    {
-        foreach (XElement comp in document.Root.AllElements("Component"))
-        {
-            comp.Add(new XAttribute("Win64", "yes"));
-        }
+        CreateNuspec(@"wixcs\octobuild.nuspec", @"target\octobuild.nuspec", version, platform);
     }
 }
