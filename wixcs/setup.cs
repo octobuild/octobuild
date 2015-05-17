@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Xml;
@@ -54,6 +55,8 @@ class Script
 
     static public void Main(string[] args)
     {
+        Console.WriteLine("WixSharp version: " + FileVersionInfo.GetVersionInfo(typeof(WixSharp.Project).Assembly.Location).FileVersion);
+
         Target target = ReadTarget(@"target\release\target.txt");
         String version = ReadVersion(@"Cargo.toml");
         Feature featureBuilder = new Feature("Octobuild Builder", true, false);
