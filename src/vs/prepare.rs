@@ -176,6 +176,7 @@ fn parse_argument(iter: &mut  Iter<String>) -> Option<Result<Arg, String>> {
 							s if s.starts_with("MT") => Ok(Arg::Flag{scope: Scope::Shared, flag:flag.to_string()}),
 							s if s.starts_with("EH") => Ok(Arg::Flag{scope: Scope::Shared, flag:flag.to_string()}),
 							s if s.starts_with("fp:") => Ok(Arg::Flag{scope: Scope::Shared, flag:flag.to_string()}),
+							s if s.starts_with("arch:") => Ok(Arg::Flag{scope: Scope::Shared, flag:flag.to_string()}),
 							s if s.starts_with("errorReport:") => Ok(Arg::Flag{scope: Scope::Shared, flag:flag.to_string()}),
 							s if s.starts_with("Fo") => Ok(Arg::Output{kind:OutputKind::Object, flag:"Fo".to_string(), file:s[2..].to_string()}),
 							s if s.starts_with("Fp") => Ok(Arg::Input{kind:InputKind::Precompiled, flag:"Fp".to_string(), file:s[2..].to_string()}),
@@ -222,7 +223,7 @@ fn test_parse_argument() {
 	use super::super::wincmd;
 
 	assert_eq!(
-		parse_arguments(&wincmd::parse("/TP /c /Yusample.h /Fpsample.h.pch /Fosample.cpp.o /DTEST /D TEST2 sample.cpp")).unwrap(),
+		parse_arguments(&wincmd::parse("/TP /c /Yusample.h /Fpsample.h.pch /Fosample.cpp.o /DTEST /D TEST2 /arch:AVX sample.cpp")).unwrap(),
 		[
 			Arg::Param { scope: Scope::Ignore, flag: "T".to_string(), value: "P".to_string()},
 			Arg::Flag { scope: Scope::Ignore, flag: "c".to_string()},
@@ -231,6 +232,7 @@ fn test_parse_argument() {
 			Arg::Output { kind: OutputKind::Object, flag: "Fo".to_string(), file: "sample.cpp.o".to_string()},
 			Arg::Param { scope: Scope::Shared, flag: "D".to_string(), value: "TEST".to_string()},
 			Arg::Param { scope: Scope::Shared, flag: "D".to_string(), value: "TEST2".to_string()},
+			Arg::Flag { scope: Scope::Shared, flag: "arch:AVX".to_string()},
 			Arg::Input { kind: InputKind::Source, flag: "".to_string(), file: "sample.cpp".to_string()}
 		]
 	)
