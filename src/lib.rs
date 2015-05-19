@@ -4,6 +4,8 @@
 #![feature(fs_walk)]
 #![feature(slice_patterns)]
 
+include!(concat!(env!("OUT_DIR"), "/version.rs"));
+
 pub const VERSION: &'static str = env!("CARGO_PKG_VERSION");
 
 pub mod cache;
@@ -12,6 +14,7 @@ pub mod compiler;
 pub mod graph;
 pub mod utils;
 pub mod wincmd;
+pub mod version;
 pub mod io {
 	pub mod tempfile;
 	pub mod binary;
