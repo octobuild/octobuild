@@ -15,6 +15,7 @@ use super::compiler::OutputInfo;
 use super::utils::hash_write_stream;
 use super::utils::DEFAULT_BUF_SIZE;
 use super::io::binary::*;
+use super::version;
 
 const HEADER: &'static [u8] = b"OBCF\x00\x02";
 const FOOTER: &'static [u8] = b"END\x00";
@@ -229,7 +230,9 @@ fn write_cache(path: &Path, paths: &Vec<PathBuf>, output: &OutputInfo) -> Result
 	match write_cache_compressed(try! (File::create(path)), paths, output) {
 		Err(e) => {
 			let raw_path = path.with_extension("blk");
-			write_cache_inner(&mut BlockWrite(try! (File::create(&raw_path))), paths, output);
+			let mut stream = BlockWrite(try! (File::create(&raw_path)));
+			let _ = stream.write(&version::full_version().into_bytes());
+			let _ = write_cache_inner(&mut stream, paths, output);
 			println!("COMPRESSION FAILED. PLEASE SEND FILE TO DEVELOPER: {:?}", raw_path);
 			return Err(e);
 		}
@@ -240,14 +243,14 @@ fn write_cache(path: &Path, paths: &Vec<PathBuf>, output: &OutputInfo) -> Result
 struct BlockWrite<W: Write> (W);
 
 impl<W: Write> Write for BlockWrite<W> {
-    fn write(&mut self, buf: &[u8]) -> Result<usize, Error> {
-    	try! (write_usize(&mut self.0, buf.len()));
-    	self.0.write(buf)
-    }
+	fn write(&mut self, buf: &[u8]) -> Result<usize, Error> {
+		try! (write_usize(&mut self.0, buf.len()));
+		self.0.write(buf)
+	}
 
-    fn flush(&mut self) -> Result<(), Error> {
-    	self.0.flush()
-    }
+	fn flush(&mut self) -> Result<(), Error> {
+		self.0.flush()
+	}
 }
 
 fn read_cache(path: &Path, paths: &Vec<PathBuf>) -> Result<OutputInfo, Error> {
