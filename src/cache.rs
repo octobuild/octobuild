@@ -230,7 +230,7 @@ fn write_cache(path: &Path, paths: &Vec<PathBuf>, output: &OutputInfo) -> Result
 		Err(e) => {
 			let raw_path = path.with_extension("blk");
 			write_cache_inner(&mut BlockWrite(try! (File::create(&raw_path))), paths, output);
-			println!("FAILED: {:?}", raw_path);
+			println!("COMPRESSION FAILED. PLEASE SEND FILE TO DEVELOPER: {:?}", raw_path);
 			return Err(e);
 		}
 		Ok(v) => Ok(v),
