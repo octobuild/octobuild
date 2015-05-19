@@ -7,6 +7,7 @@ use octobuild::cache::Cache;
 use octobuild::wincmd;
 use octobuild::xg;
 use octobuild::utils;
+use octobuild::version;
 use octobuild::graph::{Graph, NodeIndex, Node, EdgeIndex, Edge};
 use octobuild::vs::compiler::VsCompiler;
 use octobuild::compiler::*;
@@ -38,7 +39,7 @@ struct ResultMessage {
 }
 
 fn main() {
-	println!("XGConsole ({}, {}-{}):", octobuild::VERSION, std::env::consts::ARCH, std::env::consts::OS);
+	println!("XGConsole ({}):", version::full_version());
 	let args = Vec::from_iter(env::args());
 	for arg in args.iter() {
 		println!("  {}", arg);
