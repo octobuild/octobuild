@@ -63,7 +63,7 @@ impl Compiler for VsCompiler {
 		// Hash data.
 		let mut sip_hash = SipHasher::new();
 		let hash: &mut Hasher = &mut sip_hash;
-		hash.write_u8(0);
+		hash.write(&[0]);
 		hash.write(wincmd::join(&args).as_bytes());
 	
 		let mut command = task.command.to_command();

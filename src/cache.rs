@@ -131,7 +131,7 @@ impl Cache {
 		let hash: &mut Hasher = &mut sip_hash;
 		// str
 		hash.write(params.as_bytes());
-		hash.write_u8(0);
+		hash.write(&[0]);
 		// inputs
 		for input in inputs.iter() {
 			let file_hash = try! (self.get_file_hash(input));
