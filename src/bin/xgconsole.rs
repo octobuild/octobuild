@@ -1,5 +1,6 @@
 #![feature(exit_status)]
 extern crate octobuild;
+extern crate petgraph;
 extern crate tempdir;
 
 use octobuild::common::BuildTask;
@@ -8,10 +9,12 @@ use octobuild::wincmd;
 use octobuild::xg;
 use octobuild::utils;
 use octobuild::version;
-use octobuild::graph::{Graph, NodeIndex, Node, EdgeIndex, Edge};
 use octobuild::vs::compiler::VsCompiler;
 use octobuild::compiler::*;
 
+
+use petgraph::{Graph, EdgeDirection};
+use petgraph::graph::NodeIndex;
 use tempdir::TempDir;
 
 use std::fs::File;
@@ -114,21 +117,19 @@ fn create_threads<R: 'static + Send, T: 'static + Send, Worker:'static + Fn(T) -
 fn validate_graph(graph: Graph<BuildTask, ()>) -> Result<Graph<BuildTask, ()>, Error> {
 	let mut completed:Vec<bool> = Vec::new();
 	let mut queue:Vec<NodeIndex> = Vec::new();
-	graph.each_node(|index: NodeIndex, _:&Node<BuildTask>|->bool {
+	for index in 0 .. graph.node_count() {
 		completed.push(false);
-		queue.push(index);
-		true
-	});
+		queue.push(NodeIndex::new(index));
+	}
 	let mut count:usize = 0;
 	let mut i:usize = 0;
 	while i < queue.len() {
 		let index = queue[i];
-		if (!completed[index.node_id()]) && (is_ready(&graph, &completed, &index)) {
-			completed[index.node_id()] = true;
-			graph.each_incoming_edge(index, |_:EdgeIndex, edge:&Edge<()>| -> bool {
-				queue.push(edge.source());
-				true
-			});
+		if (!completed[index.index()]) && (is_ready(&graph, &completed, &index)) {
+			completed[index.index()] = true;
+			for neighbor in graph.neighbors_directed(index, EdgeDirection::Incoming) {
+				queue.push(neighbor);
+			}
 			count += 1;
 			if count ==completed.len() {
 				return Ok(graph);
@@ -180,31 +181,19 @@ fn execute_graph(graph: &Graph<BuildTask, ()>, tx_task: Sender<TaskMessage>, mut
 
 fn execute_until_failed(graph: &Graph<BuildTask, ()>, tx_task: Sender<TaskMessage>, rx_result: &Receiver<ResultMessage>) -> Result<Option<i32>, Error> {
 	let mut completed:Vec<bool> = Vec::new();
-	if !graph.each_node(|index: NodeIndex, node:&Node<BuildTask>|->bool {
-		let mut has_edges = false;
-		graph.each_outgoing_edge(index, |_:EdgeIndex, _:&Edge<()>| -> bool {
-			has_edges = true;
-			false
-		});
+	for _ in 0 .. graph.node_count() {
 		completed.push(false);
-		if !has_edges {
-			match tx_task.send(TaskMessage{
-				index: index,
-				task: node.data.clone(),
-			}) {
-				Ok(_) => true,
-				Err(_) => false,
-			}
-		} else {
-			true
-		}
-	}) {
-		return Err(Error::new(ErrorKind::BrokenPipe, "Can't schedule root tasks"));
+	}
+	for index in graph.without_edges(EdgeDirection::Incoming) {
+		try! (tx_task.send(TaskMessage{
+			index: index,
+			task: graph.node_weight(index).unwrap().clone(),
+		}).map_err(|e| Error::new(ErrorKind::Other, e)));
 	}
 
 	let mut count:usize = 0;
 	for message in rx_result.iter() {
-		assert!(!completed[message.index.node_id()]);
+		assert!(!completed[message.index.index()]);
 		count += 1;
 		println!("#{} {}/{}: {}", message.worker, count, completed.len(), message.task.title);
 		let result = try! (message.result);
@@ -213,24 +202,19 @@ fn execute_until_failed(graph: &Graph<BuildTask, ()>, tx_task: Sender<TaskMessag
 		if !result.success() {
 			return Ok(result.status);
 		}
-		completed[message.index.node_id()] = true;
-		if !graph.each_incoming_edge(message.index, |_:EdgeIndex, edge:&Edge<()>| -> bool {
-			let source = edge.source();
-			if !completed[source.node_id()] {
+		completed[message.index.index()] = true;
+
+		for source in graph.neighbors_directed(message.index, EdgeDirection::Incoming) {
+			if !completed[source.index()] {
 				if is_ready(graph, &completed, &source) {
-					match tx_task.send(TaskMessage{
+					try! (tx_task.send(TaskMessage{
 						index: source,
-						task: graph.node(source).data.clone(),
-					}) {
-						Ok(_) => {},
-						Err(_) => {return false;}
-					}
+						task: graph.node_weight(source).unwrap().clone(),
+					}).map_err(|e| Error::new(ErrorKind::Other, e)));
 				}
 			}
-			true
-		}) {
-			return Err(Error::new(ErrorKind::BrokenPipe, "Can't schedule child task"));
-		};
+		}
+
 		if count == completed.len() {
 			return Ok(Some(0));
 		}
@@ -239,14 +223,10 @@ fn execute_until_failed(graph: &Graph<BuildTask, ()>, tx_task: Sender<TaskMessag
 }
 
 fn is_ready(graph: &Graph<BuildTask, ()>, completed: &Vec<bool>, source: &NodeIndex) -> bool {
-	let mut ready = true;
-		graph.each_outgoing_edge(*source, |_:EdgeIndex, deps:&Edge<()>| -> bool {
-		if !completed[deps.target().node_id()]{
-			ready = false;
-			false
-		} else {
-			true
+	for neighbor in graph.neighbors_directed(*source, EdgeDirection::Outgoing) {
+		if !completed[neighbor.index()]{
+			return false
 		}
-	});
-	ready
+	}
+	true
 }

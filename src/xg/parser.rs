@@ -1,12 +1,14 @@
 extern crate xml;
+extern crate petgraph;
 
 use common::{BuildTask};
-use graph::{Graph, NodeIndex};
 use wincmd;
 
 use std::fmt::{Display, Formatter};
 use std::io::{Read, Error, ErrorKind};
 use std::collections::HashMap;
+
+use self::petgraph::graph::{Graph, NodeIndex};
 
 use self::xml::reader::EventReader;
 use self::xml::reader::events::XmlEvent;

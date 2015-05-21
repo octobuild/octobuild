@@ -1,4 +1,3 @@
-#![feature(collections)]
 #![feature(fs_time)]
 #![feature(fs_walk)]
 
@@ -9,7 +8,6 @@ pub const VERSION: &'static str = env!("CARGO_PKG_VERSION");
 pub mod cache;
 pub mod common;
 pub mod compiler;
-pub mod graph;
 pub mod utils;
 pub mod wincmd;
 pub mod version;

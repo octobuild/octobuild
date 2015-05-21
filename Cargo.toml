@@ -15,17 +15,10 @@ test = false
 name = "xgconsole"
 test = false
 
-[dependencies.lz4]
-version = "*"
-
-[dependencies.libc]
-version = "*"
-
-[dependencies.xml-rs]
-version = "*"
-
-[dependencies.uuid]
-version = "*"
-
-[dependencies.tempdir]
-version = "*"
+[dependencies]
+lz4 = "*"
+libc = "*"
+petgraph = "*"
+xml-rs = "*"
+uuid = "*"
+tempdir = "*"
