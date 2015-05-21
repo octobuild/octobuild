@@ -16,6 +16,7 @@ name = "xgconsole"
 test = false
 
 [dependencies]
+filetime = "*"
 lz4 = "*"
 libc = "*"
 petgraph = "*"

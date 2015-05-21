@@ -1,4 +1,3 @@
-#![feature(fs_time)]
 include!(concat!(env!("OUT_DIR"), "/version.rs"));
 
 pub const VERSION: &'static str = env!("CARGO_PKG_VERSION");

@@ -1,4 +1,5 @@
 extern crate lz4;
+extern crate filetime;
 
 use std::env;
 use std::fmt::{Display, Formatter};
@@ -10,6 +11,8 @@ use std::collections::HashMap;
 use std::collections::hash_map::Entry;
 use std::hash::{Hasher, SipHasher};
 use std::path::{Path, PathBuf};
+
+use self::filetime::FileTime;
 
 use super::compiler::OutputInfo;
 use super::utils::hash_write_stream;
@@ -58,7 +61,7 @@ impl ::std::error::Error for CacheError {
 struct FileHash {
 	hash: String,
 	size: u64,
-	modified: u64,
+	modified: FileTime,
 }
 
 #[derive(Clone)]
@@ -70,7 +73,7 @@ pub struct Cache {
 struct CacheFile {
 	path: PathBuf,
 	size: u64,
-	accessed: u64,
+	accessed: FileTime,
 }
 
 impl Cache {
@@ -147,7 +150,7 @@ impl Cache {
 				match *hash_entry {
 					Some(ref value) => {
 						let stat = try! (fs::metadata(path));
-						if value.size == stat.len() && value.modified == stat.modified() {
+						if value.size == stat.len() && value.modified == FileTime::from_last_modification_time(&stat) {
 							return Ok(value.hash.clone());
 						}
 					}
@@ -159,7 +162,7 @@ impl Cache {
 				*hash_entry = Some(FileHash {
 					hash: hash.clone(),
 					size: stat.len(),
-					modified: stat.modified(),
+					modified: FileTime::from_last_modification_time(&stat),
 				});
 				Ok(hash)
 			}
@@ -173,15 +176,15 @@ fn find_cache_files(dir: &Path, mut files: Vec<CacheFile>) -> Result<Vec<CacheFi
 	for entry in try!(fs::read_dir(dir)) {
 		let entry = try!(entry);
 		let path = entry.path();
-		let attr = try! (fs::metadata(&path));
-		if attr.is_dir() {
+		let stat = try! (fs::metadata(&path));
+		if stat.is_dir() {
 			let r = find_cache_files(&path, files);
 			files = try! (r);
 		} else {
 			files.push(CacheFile {
 				path: path,
-				size: attr.len(),
-				accessed: attr.modified(),
+				size: stat.len(),
+				accessed: FileTime::from_last_modification_time(&stat),
 			});
 		}
 	}
