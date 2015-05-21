@@ -1,7 +1,6 @@
 #![feature(collections)]
 #![feature(fs_time)]
 #![feature(fs_walk)]
-#![feature(slice_patterns)]
 
 include!(concat!(env!("OUT_DIR"), "/version.rs"));
 
