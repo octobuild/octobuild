@@ -101,18 +101,8 @@ impl Cache {
 
 	pub fn cleanup(&self, max_cache_size: u64) -> Result<(), Error> {
 		let mut files: Vec<CacheFile> = Vec::new();
-		for item in try! (fs::walk_dir(&self.cache_dir)) {
-			let path = try! (item).path();
-			if path.to_str().map_or(false, |v| v.ends_with(SUFFIX)) {
-				let attr = try! (fs::metadata(&path));
-				if attr.is_file() {
-					files.push(CacheFile {
-						path: path,
-						size: attr.len(),
-						accessed: attr.modified(),
-					});
-				}
-			}
+		if self.cache_dir.is_dir() {
+			files = try! (find_cache_files(&self.cache_dir, files));
 		}
 		files.sort_by(|a, b| b.accessed.cmp(&a.accessed));
 		
@@ -180,6 +170,25 @@ impl Cache {
 		};
 		result
 	}
+}
+
+fn find_cache_files(dir: &Path, mut files: Vec<CacheFile>) -> Result<Vec<CacheFile>, Error> {
+	for entry in try!(fs::read_dir(dir)) {
+		let entry = try!(entry);
+		let path = entry.path();
+		let attr = try! (fs::metadata(&path));
+		if attr.is_dir() {
+			let r = find_cache_files(&path, files);
+			files = try! (r);
+		} else {
+			files.push(CacheFile {
+				path: path,
+				size: attr.len(),
+				accessed: attr.modified(),
+			});
+		}
+	}
+	Ok(files)
 }
 
 fn generate_file_hash(path: &Path) -> Result<String, Error> {

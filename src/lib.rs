@@ -1,6 +1,5 @@
+#![feature(path_ext)]
 #![feature(fs_time)]
-#![feature(fs_walk)]
-
 include!(concat!(env!("OUT_DIR"), "/version.rs"));
 
 pub const VERSION: &'static str = env!("CARGO_PKG_VERSION");
