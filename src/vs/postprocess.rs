@@ -229,12 +229,12 @@ fn skip_line(first: Option<u8>, reader: &mut Read, raw: &mut Vec<u8>) -> Result<
 
 #[cfg(test)]
 mod test {
-	use std::io::Cursor;
+	use std::io::{Write, Cursor};
 
 	fn check_filter(original: &str, expected: &str, marker: Option<String>, keep_headers: bool) {
 		let mut writer: Vec<u8> = Vec::new();
 		let mut stream: Vec<u8> = Vec::new();
-		stream.push_all(original.as_bytes());
+		stream.write(&original.as_bytes()[..]).unwrap();
 		match super::filter_preprocessed(&None, &mut Cursor::new(stream), &mut writer, &marker, keep_headers) {
 			Ok(_) => {assert_eq! (String::from_utf8_lossy(&writer), expected)}
 			Err(e) => {panic! (e);}

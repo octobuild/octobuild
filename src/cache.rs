@@ -208,7 +208,7 @@ fn write_cache(path: &Path, paths: &Vec<PathBuf>, output: &OutputInfo) -> Result
 	}
 
 	fn write_cache_compressed<W: Write>(write: W, paths: &Vec<PathBuf>, output: &OutputInfo) -> Result<(), Error> {
-		let mut stream = try! (lz4::EncoderParams::new().level(1).build(write));
+		let mut stream = try! (lz4::EncoderBuilder::new().level(1).build(write));
 		try! (write_cache_inner(&mut stream, paths, output));
 		match stream.finish() {
 			(_, result) => result
