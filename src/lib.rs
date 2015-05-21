@@ -1,4 +1,3 @@
-#![feature(path_ext)]
 #![feature(fs_time)]
 include!(concat!(env!("OUT_DIR"), "/version.rs"));
 

@@ -3,7 +3,7 @@ extern crate lz4;
 use std::env;
 use std::fmt::{Display, Formatter};
 use std::fs;
-use std::fs::{File, PathExt, OpenOptions};
+use std::fs::{File, OpenOptions};
 use std::io::{Error, ErrorKind, Read, Write, Seek, SeekFrom};
 use std::sync::{Arc, Mutex};
 use std::collections::HashMap;
@@ -100,10 +100,7 @@ impl Cache {
 	}
 
 	pub fn cleanup(&self, max_cache_size: u64) -> Result<(), Error> {
-		let mut files: Vec<CacheFile> = Vec::new();
-		if self.cache_dir.is_dir() {
-			files = try! (find_cache_files(&self.cache_dir, files));
-		}
+		let mut files = try! (find_cache_files(&self.cache_dir, Vec::new()));
 		files.sort_by(|a, b| b.accessed.cmp(&a.accessed));
 		
 		let mut cache_size: u64 = 0;
