@@ -28,6 +28,7 @@ build() {
 	# Build
 	rustc --version
 	cargo version
+	cargo clean
 	cargo test
 	cargo build --release
 	
