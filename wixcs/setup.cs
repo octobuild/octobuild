@@ -41,7 +41,8 @@ class Script
 
     static string PlatformName(Platform platform)
     {
-        switch (platform) { 
+        switch (platform)
+        {
             case Platform.x64:
                 return "x86_64";
             case Platform.x86:
@@ -75,10 +76,12 @@ class Script
         {
             files.Add(new File(featureBuilder, file));
         }
-        Project project = new Project("Octobuild",
+
+        List<WixEntity> projectEntries = new List<WixEntity>();
+        projectEntries.AddRange(new WixEntity[] {
             new Property("ApplicationFolderName", "Octobuild"),
             new Property("WixAppFolder", "WixPerMachineFolder"),
-            new Dir(new Id("APPLICATIONFOLDER"), @"%ProgramFilesFolder%\Octobuild", files.ToArray()),
+            new Dir(new Id("APPLICATIONFOLDER"), @"%ProgramFiles%\Octobuild", files.ToArray()),
             new EnvironmentVariable(featureBuilder, "PATH", "[APPLICATIONFOLDER]")
             {
                 Permanent = false,
@@ -95,7 +98,25 @@ class Script
                 System = false,
                 Condition = new Condition("NOT ALLUSERS")
             }
-        );
+        });
+
+        if (platform == Platform.x64)
+        {
+            foreach (Sequence sequence in new Sequence[] { Sequence.InstallUISequence, Sequence.InstallExecuteSequence })
+            {
+                projectEntries.Add(
+                    new SetPropertyAction("WixPerMachineFolder", "[ProgramFiles64Folder][ApplicationFolderName]")
+                    {
+                        Execute = Execute.immediate,
+                        When = When.After,
+                        Sequence = sequence,
+                        Step = new Step("WixSetDefaultPerMachineFolder")
+                    }
+                );
+            }
+        }
+
+        Project project = new Project("Octobuild", projectEntries.ToArray());
         project.ControlPanelInfo.Manufacturer = "Artem V. Navrotskiy";
         project.ControlPanelInfo.UrlInfoAbout = "https://github.com/bozaro/octobuild";
         project.LicenceFile = @"LICENSE.rtf";
