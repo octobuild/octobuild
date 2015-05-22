@@ -100,6 +100,7 @@ class Script
             }
         });
 
+        // Workarong for bug with invalid default installation path "C:\Program Files (x86)" for x86_64 platform.
         if (platform == Platform.x64)
         {
             foreach (Sequence sequence in new Sequence[] { Sequence.InstallUISequence, Sequence.InstallExecuteSequence })
