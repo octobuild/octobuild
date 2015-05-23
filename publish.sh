@@ -12,7 +12,7 @@ if [ "$TAGNAME" == "" ]; then
 	exit 1
 fi
 
-github-release release --tag $TAGNAME --draft
+github-release info --tag $TAGNAME || github-release release --tag $TAGNAME --draft
 	
 for i in target/*.msi target/*.nupkg; do
 	github-release upload --tag $TAGNAME --file $i --name `basename $i`
