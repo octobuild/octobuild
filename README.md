@@ -6,7 +6,7 @@ octobuild
 
 [![Build Status](https://travis-ci.org/bozaro/octobuild.svg?branch=master)](https://travis-ci.org/bozaro/octobuild)
 
-[![Build Status](https://builder.bozaro.ru/buildStatus/icon?job=octobuild-win-x86_64/master)](https://builder.bozaro.ru/job/octobuild-win-x86_64/branch/master/)
+[![Build Status](https://builder.bozaro.ru/buildStatus/icon?job=octobuild-win/master)](https://builder.bozaro.ru/job/octobuild-win/branch/master/)
 
 Simple distributed compile system for C++
 
