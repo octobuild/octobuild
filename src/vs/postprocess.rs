@@ -229,7 +229,11 @@ fn skip_line(first: Option<u8>, reader: &mut Read, raw: &mut Vec<u8>) -> Result<
 
 #[cfg(test)]
 mod test {
-	use std::io::{Write, Cursor};
+	extern crate test;
+
+	use std::io::{Read, Write, Cursor};
+	use std::fs::File;
+	use self::test::Bencher;
 
 	fn check_filter(original: &str, expected: &str, marker: Option<String>, keep_headers: bool) {
 		let mut writer: Vec<u8> = Vec::new();
@@ -340,5 +344,18 @@ int main(int argc, char **argv) {
 	return 0;
 }
 "#, Some("e:\\work\\octobuild\\test_cl\\sample header.h".to_string()), true);
+	}
+
+	fn bench_filter(b: &mut Bencher, path: &str, marker: Option<String>, keep_headers: bool) {
+		let mut source = Vec::new();
+		File::open(path).unwrap().read_to_end(&mut source).unwrap();
+		b.iter(|| {
+			super::filter_preprocessed(&None, &mut Cursor::new(source.clone()), &mut Vec::new(), &marker, keep_headers).unwrap();
+		});
+	}
+	
+	#[bench]
+	fn bench_check_filter(b: &mut Bencher) {
+		bench_filter(b, "tests/filter_preprocessed.i", Some("c:\\bozaro\\github\\octobuild\\test_cl\\sample.h".to_string()), false)
 	}
 }
