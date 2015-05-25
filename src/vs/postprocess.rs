@@ -350,7 +350,9 @@ int main(int argc, char **argv) {
 		let mut source = Vec::new();
 		File::open(path).unwrap().read_to_end(&mut source).unwrap();
 		b.iter(|| {
-			super::filter_preprocessed(&None, &mut Cursor::new(source.clone()), &mut Vec::new(), &marker, keep_headers).unwrap();
+			let mut result = Vec::new();
+			super::filter_preprocessed(&None, &mut Cursor::new(source.clone()), &mut result, &marker, keep_headers).unwrap();
+			result
 		});
 	}
 	
