@@ -148,7 +148,7 @@ impl Compiler for VsCompiler {
 		}
 	
 		let hash_params = hash_text(&preprocessed.content) + &wincmd::join(&args);
-		self.cache.run_cached(&hash_params, &inputs, &outputs, || -> Result<OutputInfo, Error> {
+		self.cache.run_file_cached(&hash_params, &inputs, &outputs, || -> Result<OutputInfo, Error> {
 			// Input file path.
 			let input_temp = TempFile::new_in(&self.temp_dir, ".i");
 			try! (try! (File::create(input_temp.path())).write_all(&preprocessed.content));
@@ -168,7 +168,7 @@ impl Compiler for VsCompiler {
 				&None => {}
 			}		
 			command.output().map(|o| OutputInfo::new(o))
-		})
+		}, || true)
 	}
 }
 

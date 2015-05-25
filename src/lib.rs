@@ -13,6 +13,9 @@ pub mod version;
 pub mod io {
 	pub mod tempfile;
 	pub mod binary;
+	pub mod filecache;
+	pub mod hashwriter;
+	pub mod memcache;
 }
 pub mod xg {
 	pub mod parser;
