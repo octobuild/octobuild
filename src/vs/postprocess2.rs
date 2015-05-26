@@ -14,20 +14,6 @@ pub enum ScannerError {
 	LiteralEol,
 }
 
-pub trait ScannerVisitor {
-	fn visit_bom(&mut self) -> Result<(), Error> {
-		Ok(())
-	}
-
-	fn visit_pragma_once(&mut self) -> Result<(), Error> {
-		Ok(())
-	}
-
-	fn visit_include(&mut self, include: Include<Vec<u8>>) -> Result<Include<Vec<u8>>, Error> {
-		Ok(include)
-	}
-}
-
 const BUF_SIZE: usize = 0x10000;
 				
 impl Display for ScannerError {
@@ -72,28 +58,26 @@ pub enum Include<T> {
 	Angle(T),
 }
 
-struct EmptyVisitor;
-
-impl ScannerVisitor for EmptyVisitor {
-}
-
 pub fn filter_preprocessed(base: &Option<PathBuf>, reader: &mut Read, writer: &mut Write, marker: &Option<String>, keep_headers: bool) -> Result<Vec<PathBuf>, Error> {
-	try!(parse_source(reader, writer, &mut EmptyVisitor));
+	try!(parse_source(reader, writer, keep_headers));
 	Ok(Vec::new())
 }
 
-pub fn parse_source(reader: &mut Read, writer: &mut Write, visitor: &mut ScannerVisitor) -> Result<(), Error> {
+pub fn parse_source(reader: &mut Read, writer: &mut Write, keep_headers: bool) -> Result<(), Error> {
 	let mut state = ScannerState {
 		buf_data: [0; BUF_SIZE],
 		buf_read: 0,
 		buf_copy: 0,
 		buf_size: 0,
+
 		reader: reader,
 		writer: writer,
-		visitor: visitor,
+
+		keep_headers: keep_headers,
 	};
 	try! (state.parse_bom());
 	while try!(state.parse_line()) {
+
 	}
 	Ok(())
 }
@@ -106,7 +90,8 @@ struct ScannerState<'a> {
 
 	reader: &'a mut Read,
 	writer: &'a mut Write,
-	visitor: &'a mut ScannerVisitor,
+
+	keep_headers: bool,
 }
 
 impl <'a> ScannerState<'a> {
@@ -123,6 +108,14 @@ impl <'a> ScannerState<'a> {
 			return Ok(None)
 		}
 		Ok(Some(self.buf_data[self.buf_read]))
+	}
+
+	#[inline(always)]
+	fn next(&mut self) -> Result<(), Error> {
+		match self.keep_headers {
+			true => self.copy(),
+			false => self.skip(),
+		}
 	}
 
 	#[inline(always)]
@@ -169,13 +162,13 @@ impl <'a> ScannerState<'a> {
 		for bom_char in bom.iter() {
 			match try! (self.peek()) {
 				Some(c) if c == *bom_char => {
-					try!(self.copy());
+					try!(self.next());
 				}
 				Some(_) => {return Ok(());},
 				None => {return Ok(());},
 			};
 		}
-		try! (self.visitor.visit_bom());
+		//try! (self.visitor.visit_bom());
 		Ok(())
 	}
 
@@ -185,18 +178,38 @@ impl <'a> ScannerState<'a> {
 				try!(self.copy());
 				self.parse_directive()
 			}
-			Some(_) => self.parse_code(),
+			Some(_) => self.next_line(),
 			None => Ok(false),
+		}
+	}
+
+	fn next_line(&mut self) -> Result<bool, Error> {
+		loop {
+			match try! (self.peek()) {
+				// end-of-line ::= newline | carriage-return | carriage-return newline
+				Some(b'\n') | Some(b'\r') => {
+					try! (self.copy());
+					return Ok(true);
+				}
+				Some(_) => {
+					try! (self.next());
+				}
+				None => {
+					return Ok(false);
+				}
+			}
 		}
 	}
 
 	fn parse_directive(&mut self) -> Result<bool, Error> {
 		try!(self.parse_spaces(false));
 		match &try!(self.parse_token(0x20))[..] {
-			b"error" => self.parse_process_line(true),
 			b"include" => self.parse_directive_include(),
 			b"pragma" => self.parse_directive_pragma(),
-			_ => self.parse_code(),
+			token => {
+				try! (self.write(&token));
+				self.next_line()
+			}
 		}	
 	}
 
@@ -211,7 +224,7 @@ impl <'a> ScannerState<'a> {
 					_ => (return Err(Error::new(ErrorKind::InvalidInput, ScannerError::IncludeUnexpected(c)))),
 				};
 				try!(self.skip());
-				match try!(self.visitor.visit_include(include)) {
+				/*match try!(self.visitor.visit_include(include)) {
 					Include::Angle(path) => {
 						try!(self.write(b"<"));
 						try!(self.write(&path));
@@ -222,7 +235,7 @@ impl <'a> ScannerState<'a> {
 						try!(self.write(&path));
 						try!(self.write(b"\""));
 					}
-				}
+				}*/
 			}
 			None => {
 				return Err(Error::new(ErrorKind::InvalidInput, ScannerError::IncludeEof));
@@ -241,7 +254,7 @@ impl <'a> ScannerState<'a> {
 
 	fn parse_directive_pragma_once(&mut self) -> Result<bool, Error> {
 		try! (self.parse_code());
-		try! (self.visitor.visit_pragma_once());
+		//try! (self.visitor.visit_pragma_once());
 		Ok(true)
 	}
 
@@ -336,11 +349,11 @@ impl <'a> ScannerState<'a> {
 					match c {
 						// non-nl-white-space ::= a blank, tab, or formfeed character
 						b' ' | b'\t' | b'\x0C' => {
-							try!(self.copy());
+							try!(self.next());
 						}
 						// end-of-line ::= newline | carriage-return | carriage-return newline
 						b'\n' | b'\r' if with_new_line => {
-							try!(self.copy());
+							try!(self.next());
 						}
 						_ => {
 							return Ok(Some(c));
@@ -433,7 +446,7 @@ impl <'a> ScannerState<'a> {
 					break;
 				}
 			};
-			try! (self.copy());
+			try! (self.skip());
 		}
 		Ok(token)
 	}
