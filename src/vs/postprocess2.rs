@@ -1,6 +1,7 @@
 use std::hash::Hasher;
 use std::fmt::{Display, Formatter};
 use std::io::{Read, Write, Error, ErrorKind};
+use std::path::PathBuf;
 
 #[derive(Clone, Copy, Debug)]
 pub enum ScannerError {
@@ -69,6 +70,16 @@ impl ::std::error::Error for ScannerError {
 pub enum Include<T> {
 	Quoted(T),
 	Angle(T),
+}
+
+struct EmptyVisitor;
+
+impl ScannerVisitor for EmptyVisitor {
+}
+
+pub fn filter_preprocessed(base: &Option<PathBuf>, reader: &mut Read, writer: &mut Write, marker: &Option<String>, keep_headers: bool) -> Result<Vec<PathBuf>, Error> {
+	try!(parse_source(reader, writer, &mut EmptyVisitor));
+	Ok(Vec::new())
 }
 
 pub fn parse_source(reader: &mut Read, writer: &mut Write, visitor: &mut ScannerVisitor) -> Result<(), Error> {
@@ -485,197 +496,133 @@ impl <'a> ScannerState<'a> {
 mod test {
 	extern crate test;
 
-	use std::io::{Cursor, Write, Error};
+	use std::io::{Read, Write, Cursor};
 	use std::fs::File;
-	use std::hash::{Hasher, SipHasher};
 	use self::test::Bencher;
 
-	use super::{Include, ScannerVisitor};
-	use super::super::super::io::hashwriter::HashWriter;
-
-	struct CollectVisitor {
-		once: bool,
-		bom: bool,
-		includes: Vec<Include<Vec<u8>>>,
-	}
-
-	impl ScannerVisitor for CollectVisitor {
-		fn visit_include(&mut self, include: Include<Vec<u8>>) -> Result<Include<Vec<u8>>, Error> {
-			self.includes.push(include.clone());
-			Ok(include)
-		}
-
-		fn visit_pragma_once(&mut self) -> Result<(), Error> {
-			self.once = true;
-			Ok(())
-		}
-
-		fn visit_bom(&mut self) -> Result<(), Error> {
-			self.bom = true;
-			Ok(())
-		}
-	}
-
-	fn check_filter(original: &str, expected: &str, includes: &[Include<Vec<u8>>], once: bool, bom: bool) {
+	fn check_filter(original: &str, expected: &str, marker: Option<String>, keep_headers: bool) {
 		let mut writer: Vec<u8> = Vec::new();
 		let mut stream: Vec<u8> = Vec::new();
-		stream.write(&original.as_bytes());
-		let mut visitor = CollectVisitor {
-			once: false,
-			bom: false,
-			includes: Vec::new(),
-		};
-		match super::parse_source(&mut Cursor::new(stream), &mut writer, &mut visitor) {
-			Ok(_) => {
-				assert_eq! (String::from_utf8_lossy(&writer), expected);
-				assert_eq! (&visitor.includes[..], includes);
-				assert_eq! (visitor.once, once);
-				assert_eq! (visitor.bom, bom);
-			}
+		stream.write(&original.as_bytes()[..]).unwrap();
+		match super::filter_preprocessed(&None, &mut Cursor::new(stream), &mut writer, &marker, keep_headers) {
+			Ok(_) => {assert_eq! (String::from_utf8_lossy(&writer), expected)}
 			Err(e) => {panic! (e);}
 		}
 	}
 
 	#[test]
-	fn test_simple() {
+	fn test_filter_precompiled_keep() {
 		check_filter(
-r#"// my first program in C++
+r#"#line 1 "sample.cpp"
+#line 1 "e:/work/octobuild/test_cl/sample header.h"
 # pragma once
-#include <iostream>
-#include "sample.h"
+void hello();
+#line 2 "sample.cpp"
 
-/**
- * Entry point
-#include <math>
- */
-int main(/*char** argv*/)
-{
-  int a = 10 / 1;
-  std::cout << "Hello World! // :)";
-}"#,
-r#"
+int main(int argc, char **argv) {
+	return 0;
+}
+"#,
+r#"#line 1 "sample.cpp"
+#line 1 "e:/work/octobuild/test_cl/sample header.h"
 # pragma once
-#include <iostream>
-#include "sample.h"
+void hello();
+#pragma hdrstop
+#line 2 "sample.cpp"
 
-
-
-
-
-int main()
-{
-  int a = 10 / 1;
-  std::cout << "Hello World! // :)";
-}"#,
-		&[
-			Include::Angle(Vec::from("iostream")),
-			Include::Quoted(Vec::from("sample.h")),
-		],
-		true,
-		false
-		)
+int main(int argc, char **argv) {
+	return 0;
+}
+"#, Some("sample header.h".to_string()), true)
 	}
 
 	#[test]
-	fn test_simple_bom() {
+	fn test_filter_precompiled_remove() {
 		check_filter(
-"\u{FEFF}#include <iostream>
-#include \"sample.h\"
+r#"#line 1 "sample.cpp"
+#line 1 "e:/work/octobuild/test_cl/sample header.h"
+# pragma once
+void hello1();
+void hello2();
+#line 2 "sample.cpp"
 
-/**/int main(/*char** argv*/)
-{
+int main(int argc, char **argv) {
 	return 0;
-}",
-"\u{FEFF}#include <iostream>
-#include \"sample.h\"
+}
+"#, 
+r#"#pragma hdrstop
+#line 2 "sample.cpp"
 
-int main()
-{
+int main(int argc, char **argv) {
 	return 0;
-}",
-		&[
-			Include::Angle(Vec::from("iostream")),
-			Include::Quoted(Vec::from("sample.h")),
-		],
-		false,
-		true
-		)
+}
+"#, Some("sample header.h".to_string()), false);
 	}
 
 	#[test]
-	fn test_simple_no_bom() {
+	fn test_filter_precompiled_hdrstop() {
 		check_filter(
-"#include <iostream>
-#include \"sample.h\"
+r#"#line 1 "sample.cpp"
+ #line 1 "e:/work/octobuild/test_cl/sample header.h"
+void hello();
+# pragma  hdrstop
+void data();
+# pragma once
+#line 2 "sample.cpp"
 
-int main(/*char** argv*/)
-{
+int main(int argc, char **argv) {
 	return 0;
-}",
-"#include <iostream>
-#include \"sample.h\"
+}
+"#,
+r#"# pragma  hdrstop
+void data();
+# pragma once
+#line 2 "sample.cpp"
 
-int main()
-{
+int main(int argc, char **argv) {
 	return 0;
-}",
-		&[
-			Include::Angle(Vec::from("iostream")),
-			Include::Quoted(Vec::from("sample.h")),
-		],
-		false,
-		false
-		)
-	}
-
-	fn test_parse_source(path: &str) -> u64 {
-		let mut stream = File::open(path).unwrap();
-		let mut writer = HashWriter::new(SipHasher::new());
-		super::parse_source(&mut stream, &mut writer, &mut CollectVisitor {
-			once: false,
-			bom: false,
-			includes: Vec::new(),
-		}).unwrap();
-		writer.finish()
+}
+"#, None, false);
 	}
 
 	#[test]
-	fn test_parse_source_sqlite3_c() {
-		test_parse_source("tests/cpp/sqlite3.c");
+	fn test_filter_precompiled_winpath() {
+		check_filter(
+r#"#line 1 "sample.cpp"
+#line 1 "e:\\work\\octobuild\\test_cl\\sample header.h"
+# pragma once
+void hello();
+#line 2 "sample.cpp"
+
+int main(int argc, char **argv) {
+	return 0;
+}
+"#,
+r#"#line 1 "sample.cpp"
+#line 1 "e:\\work\\octobuild\\test_cl\\sample header.h"
+# pragma once
+void hello();
+#pragma hdrstop
+#line 2 "sample.cpp"
+
+int main(int argc, char **argv) {
+	return 0;
+}
+"#, Some("e:\\work\\octobuild\\test_cl\\sample header.h".to_string()), true);
 	}
 
-	#[test]
-	fn test_parse_source_sqlite3_h() {
-		test_parse_source("tests/cpp/sqlite3.h");
+	fn bench_filter(b: &mut Bencher, path: &str, marker: Option<String>, keep_headers: bool) {
+		let mut source = Vec::new();
+		File::open(path).unwrap().read_to_end(&mut source).unwrap();
+		b.iter(|| {
+			let mut result = Vec::new();
+			super::filter_preprocessed(&None, &mut Cursor::new(source.clone()), &mut result, &marker, keep_headers).unwrap();
+			result
+		});
 	}
-
-	#[test]
-	fn test_parse_source_lz4_c() {
-		test_parse_source("tests/cpp/lz4.c");
-	}
-
-	#[test]
-	fn test_parse_source_lz4_h() {
-		test_parse_source("tests/cpp/lz4.h");
-	}
-
+	
 	#[bench]
-	fn bench_parse_source_sqlite3_c(b: &mut Bencher) {
-		b.iter(|| test_parse_source_sqlite3_c());
-	}
-
-	#[bench]
-	fn bench_parse_source_sqlite3_h(b: &mut Bencher) {
-		b.iter(|| test_parse_source_sqlite3_h());
-	}
-
-	#[bench]
-	fn bench_parse_source_lz4_c(b: &mut Bencher) {
-		b.iter(|| test_parse_source_lz4_c());
-	}
-
-	#[bench]
-	fn bench_parse_source_lz4_h(b: &mut Bencher) {
-		b.iter(|| test_parse_source_lz4_h());
+	fn bench_check_filter(b: &mut Bencher) {
+		bench_filter(b, "tests/filter_preprocessed.i", Some("c:\\bozaro\\github\\octobuild\\test_cl\\sample.h".to_string()), false)
 	}
 }
