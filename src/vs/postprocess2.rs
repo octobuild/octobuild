@@ -1,4 +1,5 @@
 use std::hash::Hasher;
+use std::ffi::{OsStr, OsString};
 use std::fmt::{Display, Formatter};
 use std::io::{Read, Write, Error, ErrorKind};
 use std::path::PathBuf;
@@ -74,6 +75,8 @@ pub fn parse_source(reader: &mut Read, writer: &mut Write, keep_headers: bool) -
 		writer: writer,
 
 		keep_headers: keep_headers,
+
+		utf8: false,
 		done: false,
 	};
 	try! (state.parse_bom());
@@ -100,6 +103,8 @@ struct ScannerState<'a> {
 	writer: &'a mut Write,
 
 	keep_headers: bool,
+	
+	utf8: bool,
 	done: bool,
 }
 
@@ -177,7 +182,7 @@ impl <'a> ScannerState<'a> {
 				None => {return Ok(());},
 			};
 		}
-		//try! (self.visitor.visit_bom());
+		self.utf8 = true;
 		Ok(())
 	}
 
@@ -228,8 +233,9 @@ impl <'a> ScannerState<'a> {
 		try!(self.parse_spaces(false));
 		let line = try!(self.parse_token(0x10));
 		try!(self.parse_spaces(false));
-		let file = try!(self.parse_literal(0x10000));
-		println!("#LINE [{:?}] [{:?}]", String::from_utf8_lossy(&line), String::from_utf8_lossy(&file));
+		let file = try!(self.parse_string(0x10000)).replace("\\", "/");
+
+		println!("#LINE [{:?}] [{:?}]", String::from_utf8_lossy(&line), file);
 		self.next_line()
 	}
 
@@ -377,6 +383,14 @@ impl <'a> ScannerState<'a> {
 		Ok(token)
 	}
 
+	fn parse_string(&mut self, limit: usize) -> Result<String, Error> {
+		let bytes = try! (self.parse_literal(limit));
+		match self.utf8 {
+			true => String::from_utf8(bytes).map_err(|e| Error::new(ErrorKind::InvalidInput, e)),
+			false => local_bytes_to_string(bytes),
+		}
+	}
+
 	fn parse_literal(&mut self, limit: usize) -> Result<Vec<u8>, Error> {
 		let mut token: Vec<u8> = Vec::with_capacity(limit);
 		let quote = try! (self.peek()).unwrap();
@@ -406,10 +420,53 @@ impl <'a> ScannerState<'a> {
 	}
 }
 
+fn local_bytes_to_string(vec: Vec<u8>) -> Result<String, Error> {
+	#[cfg(unix)]
+	fn local_bytes_to_string_inner(vec: Vec<u8>) -> Result<String, Error> {
+		match OsString::from_bytes(vec) {
+			Some(s) => s.into_string().map_err(|e| Error::new(ErrorKind::InvalidInput, "Can't convert bytes to Unicode")),
+			None => Err(Error::new(ErrorKind::InvalidInput, "Can't convert bytes to Unicode")),
+		}
+	}
+
+	#[cfg(windows)]
+	fn local_bytes_to_string_inner(vec: Vec<u8>) -> Option<OsString> {
+		extern crate winapi;
+		extern crate kernel32;
+
+		use std::ptr;
+
+		const MB_COMPOSITE: winapi::DWORD = 0x00000002; // use composite chars
+		const MB_ERR_INVALID_CHARS: winapi::DWORD = 0x00000008; // use composite chars
+
+		// Empty string
+		if vec.len() == 0 {
+			return Ok(String::new());
+		}
+		unsafe {
+			// Get length of UTF-16 string
+			let len = kernel32::MultiByteToWideChar(winapi::CP_ACP, MB_COMPOSITE | MB_ERR_INVALID_CHARS, vec.as_ptr() as winapi::LPCSTR, vec.len() as i32, ptr::null_mut(), 0);
+			if len <= 0 {
+				return None;
+			}
+			// Convert ANSI to UTF-16
+			let mut utf: Vec<u16> = Vec::with_capacity(len as usize);
+			utf.set_len(len as usize);
+			if kernel32::MultiByteToWideChar(winapi::CP_ACP, MB_COMPOSITE | MB_ERR_INVALID_CHARS, vec.as_ptr() as winapi::LPCSTR, vec.len() as i32, utf.as_mut_ptr(), len) <= 0 {
+				return None;
+			}
+			String::from_utf16(&utf).map_err(|e| Error::new(ErrorKind::InvalidInput, e))
+		}
+	}
+
+	local_bytes_to_string_inner(vec)
+}
+
 #[cfg(test)]
 mod test {
 	extern crate test;
 
+	use std::ffi::OsString;
 	use std::io::{Read, Write, Cursor};
 	use std::fs::File;
 	use self::test::Bencher;
@@ -538,5 +595,15 @@ int main(int argc, char **argv) {
 	#[bench]
 	fn bench_check_filter(b: &mut Bencher) {
 		bench_filter(b, "tests/filter_preprocessed.i", Some("c:\\bozaro\\github\\octobuild\\test_cl\\sample.h".to_string()), false)
+	}
+
+	/**
+	 * Test for checking converting ANSI to Unicode characters on Ms Windows.
+	 * Since the test is dependent on the environment, checked only Latin characters.
+	 */
+	#[test]
+	fn test_local_bytes_to_string() {
+		let vec = Vec::from("test\0data");
+		assert_eq!(super::local_bytes_to_string(vec.clone()).ok(), String::from_utf8(vec).ok());
 	}
 }
