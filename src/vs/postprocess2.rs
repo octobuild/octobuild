@@ -8,9 +8,11 @@ use std::path::Path;
 pub enum PostprocessError {
 	LiteralEol,
 	LiteralEof,
+	LiteralTooLong,
 	EscapeEof,
 	MarkerNotFound,
 	InvalidLiteral,
+	TokenTooLong,
 }
 
 const BUF_SIZE: usize = 0x10000;
@@ -20,9 +22,11 @@ impl Display for PostprocessError {
 		match self {
 			&PostprocessError::LiteralEol => write!(f, "unexpected end of line in literal"),
 			&PostprocessError::LiteralEof => write!(f, "unexpected end of stream in literal"),
+			&PostprocessError::LiteralTooLong => write!(f, "literal too long"),
 			&PostprocessError::EscapeEof => write!(f, "unexpected end of escape sequence"),
 			&PostprocessError::MarkerNotFound => write!(f, "can't find precompiled header marker in preprocessed file"),
 			&PostprocessError::InvalidLiteral => write!(f, "can't create string from literal"),
+			&PostprocessError::TokenTooLong => write!(f, "token too long"),
 		}
 	}
 }
@@ -32,9 +36,11 @@ impl ::std::error::Error for PostprocessError {
 		match self {
 			&PostprocessError::LiteralEol => "unexpected end of line in literal",
 			&PostprocessError::LiteralEof => "unexpected end of stream in literal",
+			&PostprocessError::LiteralTooLong => "literal too long",
 			&PostprocessError::EscapeEof => "unexpected end of escape sequence",
 			&PostprocessError::MarkerNotFound => "can't find precompiled header marker in preprocessed file",
 			&PostprocessError::InvalidLiteral => "can't create string from literal",
+			&PostprocessError::TokenTooLong => "token too long",
 		}
 	}
 
@@ -74,12 +80,7 @@ pub fn filter_preprocessed(reader: &mut Read, writer: &mut Write, marker: &Optio
 	try! (state.parse_bom());
 	while try!(state.parse_line()) {
 		if state.done {
-			loop {
-			 	match try!(state.peek()) {
-			 		Some(_) => {try!(state.copy())}
-			 		None => {return Ok(())}
-			 	}
-			}
+			return state.copy_to_end();
 		}
 	}
 	Err(Error::new(ErrorKind::InvalidInput, PostprocessError::MarkerNotFound))
@@ -112,7 +113,9 @@ impl <'a> ScannerState<'a> {
 
 	#[inline(always)]
 	fn peek(&mut self) -> Result<Option<u8>, Error> {
-		try! (self.read());
+		if self.buf_read == self.buf_size {
+			try! (self.read());
+		}
 		if self.buf_size == 0 {
 			return Ok(None)
 		}
@@ -120,47 +123,44 @@ impl <'a> ScannerState<'a> {
 	}
 
 	#[inline(always)]
-	fn next(&mut self) -> Result<(), Error> {
-		match self.keep_headers {
-			true => self.copy(),
-			false => self.skip(),
-		}
+	fn next(&mut self) {
+		assert! (self.buf_read < self.buf_size);
+		self.buf_read += 1;
 	}
 
 	#[inline(always)]
-	fn skip(&mut self) -> Result<(), Error> {
-		try! (self.read());
-		if self.buf_read < self.buf_size {
-			try!(self.flush());
-			self.buf_read += 1;
-			self.buf_copy = self.buf_read;
-		}
-		Ok(())
-	}
-
-	#[inline(always)]
-	fn copy(&mut self) -> Result<(), Error> {
-		try! (self.read());
-		if self.buf_read < self.buf_size {
-			self.buf_read += 1;
-		}
-		Ok(())
-	}
-
-	#[inline(always)]
-	fn read(&mut self) -> Result<(), Error> {
+	fn read(&mut self) -> Result<usize, Error> {
 		if self.buf_read == self.buf_size {
 			try! (self.flush());
 			self.buf_read = 0;
 			self.buf_copy = 0;
 			self.buf_size = try! (self.reader.read(&mut self.buf_data));
 		}
-		Ok(())
+		Ok(self.buf_size)
 	}
+
+	fn copy_to_end(&mut self) -> Result<(), Error> {
+		try!(self.writer.write(&self.buf_data[self.buf_copy..self.buf_size]));
+		self.buf_copy = 0;
+		self.buf_size = 0;
+		loop {
+			match try! (self.reader.read(&mut self.buf_data)) {
+				0 => {
+					return Ok(());
+				}
+				size => {
+					try! (self.writer.write(&self.buf_data[0..size]));
+				}
+			}
+		}
+	}
+
 
 	fn flush(&mut self) -> Result<(), Error> {
 		if self.buf_copy != self.buf_read {
-			try! (self.writer.write(&self.buf_data[self.buf_copy..self.buf_read]));
+			if self.keep_headers {
+				try! (self.writer.write(&self.buf_data[self.buf_copy..self.buf_read]));
+			}
 			self.buf_copy = self.buf_read;
 		}
 		Ok(())
@@ -171,7 +171,7 @@ impl <'a> ScannerState<'a> {
 		for bom_char in bom.iter() {
 			match try! (self.peek()) {
 				Some(c) if c == *bom_char => {
-					try!(self.next());
+					self.next();
 				}
 				Some(_) => {return Ok(());},
 				None => {return Ok(());},
@@ -182,9 +182,10 @@ impl <'a> ScannerState<'a> {
 	}
 
 	fn parse_line(&mut self) -> Result<bool, Error> {
-		match try! (self.parse_spaces(true)) {
+		try! (self.parse_spaces());
+		match try!(self.peek()) {
 			Some(b'#') => {
-				try!(self.next());
+				self.next();
 				self.parse_directive()
 			}
 			Some(_) => self.next_line(),
@@ -194,24 +195,27 @@ impl <'a> ScannerState<'a> {
 
 	fn next_line(&mut self) -> Result<bool, Error> {
 		loop {
-			match try! (self.peek()) {
-				// end-of-line ::= newline | carriage-return | carriage-return newline
-				Some(b'\n') | Some(b'\r') => {
-					try! (self.next());
-					return Ok(true);
+			assert! (self.buf_size <= self.buf_data.len());
+			for i in self.buf_read..self.buf_size {
+				match self.buf_data[i] {
+					b'\n' | b'\r' => {
+						// end-of-line ::= newline | carriage-return | carriage-return newline
+						self.buf_read = i + 1;
+						return Ok(true);
+					}
+					_ => {
+					}
 				}
-				Some(_) => {
-					try! (self.next());
-				}
-				None => {
-					return Ok(false);
-				}
+			}
+			self.buf_read = self.buf_size;
+			if try! (self.read()) == 0 {
+				return Ok(false);
 			}
 		}
 	}
 
 	fn parse_directive(&mut self) -> Result<bool, Error> {
-		try!(self.parse_spaces(false));
+		try!(self.parse_spaces());
 		match &try!(self.parse_token(0x20))[..] {
 			b"line" => self.parse_directive_line(),
 			b"pragma" => self.parse_directive_pragma(),
@@ -220,11 +224,10 @@ impl <'a> ScannerState<'a> {
 	}
 
 	fn parse_directive_line(&mut self) -> Result<bool, Error> {
-		try!(self.parse_spaces(false));
+		try!(self.parse_spaces());
 		let line = try!(self.parse_token(0x10));
-		try!(self.parse_spaces(false));
-		let (mut file, raw) = try!(self.parse_literal(0x10000));
-		file = file.replace("\\", "/");
+		try!(self.parse_spaces());
+		let (file, raw) = try!(self.parse_path(0x400));
 		try!(self.next_line());
 		self.entry_file = match self.entry_file.take() {
 			Some(ref path) => {
@@ -253,7 +256,7 @@ impl <'a> ScannerState<'a> {
 	}
 
 	fn parse_directive_pragma(&mut self) -> Result<bool, Error> {
-		try!(self.parse_spaces(false));
+		try!(self.parse_spaces());
 		match &try!(self.parse_token(0x20))[..] {
 			b"hdrstop" => {
 				if !self.keep_headers {
@@ -269,10 +272,10 @@ impl <'a> ScannerState<'a> {
 	}
 
 	fn parse_escape(&mut self) -> Result<u8, Error> {
-		try! (self.next());
+		self.next();
 		match try! (self.peek()) {
 			Some(c) => {
-				try! (self.next());
+				self.next();
 				match c {
 					b'n' => Ok(b'\n'),
 					b'r' => Ok(b'\r'),
@@ -286,53 +289,50 @@ impl <'a> ScannerState<'a> {
 		}
 	}
 
-	fn parse_spaces(&mut self, with_new_line: bool) -> Result<Option<u8>, Error> {
+	fn parse_spaces(&mut self) -> Result<(), Error> {
 		loop {
-			match try!(self.peek()) {
-				Some(c) => {
-					match c {
-						// non-nl-white-space ::= a blank, tab, or formfeed character
-						b' ' | b'\t' | b'\x0C' => {
-							try!(self.next());
-						}
-						// end-of-line ::= newline | carriage-return | carriage-return newline
-						b'\n' | b'\r' if with_new_line => {
-							try!(self.next());
-						}
-						_ => {
-							return Ok(Some(c));
-						}
+			assert! (self.buf_size <= self.buf_data.len());
+			while self.buf_read != self.buf_size {
+				match self.buf_data[self.buf_read] {
+					// non-nl-white-space ::= a blank, tab, or formfeed character
+					b' ' | b'\t' | b'\x0C' => {
+						self.next();
+					}
+					_ => {
+						return Ok(());
 					}
 				}
-				None => {
-					return Ok(None);
-				}
-			};
+			}
+			if try! (self.read()) == 0 {
+				return Ok(());
+			}
 		}
 	}
 
 	fn parse_token(&mut self, limit: usize) -> Result<Vec<u8>, Error> {
 		let mut token: Vec<u8> = Vec::with_capacity(limit);
-		while token.len() < limit {
-			match try! (self.peek()) {
-				Some(c) => {
-					match c {
-						// end-of-line ::= newline | carriage-return | carriage-return newline
-						b'a'...b'z' | b'A'...b'Z' | b'0'...b'9' | b'_' => {
-							token.push(c);
-						}
-						_ => {
-							break;
-						}
+		loop {
+			assert! (self.buf_size <= self.buf_data.len());
+			while self.buf_read != self.buf_size {
+				let c: u8 = self.buf_data[self.buf_read];
+				match c {
+					// end-of-line ::= newline | carriage-return | carriage-return newline
+					b'a'...b'z' | b'A'...b'Z' | b'0'...b'9' | b'_' => {
+						token.push(c);
+					}
+					_ => {
+						return Ok(token);
 					}
 				}
-				None => {
-					break;
-				}
-			};
-			try! (self.next());
+				self.next();
+			}
+			if token.len() > BUF_SIZE {
+				return Err(Error::new(ErrorKind::InvalidInput, PostprocessError::TokenTooLong))
+			}
+			if try! (self.read()) == 0 {
+				return Ok(token);
+			}
 		}
-		Ok(token)
 	}
 
 	fn literal_to_string(&self, bytes: Vec<u8>) -> Result<String, Error> {
@@ -342,35 +342,44 @@ impl <'a> ScannerState<'a> {
 		}
 	}
 
-	fn parse_literal(&mut self, limit: usize) -> Result<(String, Vec<u8>), Error> {
+	fn parse_path(&mut self, limit: usize) -> Result<(String, Vec<u8>), Error> {
 		let mut token: Vec<u8> = Vec::with_capacity(limit);
 		let mut raw: Vec<u8> = Vec::with_capacity(limit);
 		let quote = try! (self.peek()).unwrap();
 		raw.push(quote);
-		try!(self.next());
+		self.next();
 		loop {
-			match try!(self.peek()) {
-				// end-of-line ::= newline | carriage-return | carriage-return newline
-				Some(b'\n') | Some(b'\r') => {
-					return Err(Error::new(ErrorKind::InvalidInput, PostprocessError::LiteralEol));
-				}
-				Some(b'\\') => {
-					let c = try!(self.parse_escape());
-					raw.push(b'\\');
-					raw.push(c);
-					token.push(c);
-				}
-				Some(c) => {
-					try!(self.next());
-					raw.push(c);
-					if c == quote {
-						return Ok((try!(self.literal_to_string(token)), raw));
+			assert! (self.buf_size <= self.buf_data.len());
+			while self.buf_read != self.buf_size {
+				let c: u8 = self.buf_data[self.buf_read];
+				match c {
+					// end-of-line ::= newline | carriage-return | carriage-return newline
+					b'\n' | b'\r' => {
+						return Err(Error::new(ErrorKind::InvalidInput, PostprocessError::LiteralEol));
 					}
-					token.push(c);
+					b'\\' => {
+						raw.push(b'\\');
+						raw.push(c);
+						match try!(self.parse_escape()) {
+							b'\\' => token.push(b'/'),
+							v => token.push(v),
+						}
+					}
+					c => {
+						self.next();
+						raw.push(c);
+						if c == quote {
+							return Ok((try!(self.literal_to_string(token)), raw));
+						}
+						token.push(c);
+					}
 				}
-				None => {
+			}
+			if raw.len() > BUF_SIZE {
+				return Err(Error::new(ErrorKind::InvalidInput, PostprocessError::LiteralTooLong))
+			}
+			if try! (self.read()) == 0 {
 					return Err(Error::new(ErrorKind::InvalidInput, PostprocessError::LiteralEof));
-				}
 			}
 		}
 	}
@@ -543,7 +552,7 @@ int main(int argc, char **argv) {
 		let mut source = Vec::new();
 		File::open(path).unwrap().read_to_end(&mut source).unwrap();
 		b.iter(|| {
-			let mut result = Vec::new();
+			let mut result = Vec::with_capacity(source.len());
 			super::filter_preprocessed(&mut Cursor::new(source.clone()), &mut result, &marker, keep_headers).unwrap();
 			result
 		});

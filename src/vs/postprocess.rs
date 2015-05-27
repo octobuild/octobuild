@@ -344,7 +344,7 @@ int main(int argc, char **argv) {
 		let mut source = Vec::new();
 		File::open(path).unwrap().read_to_end(&mut source).unwrap();
 		b.iter(|| {
-			let mut result = Vec::new();
+			let mut result = Vec::with_capacity(source.len());
 			super::filter_preprocessed(&mut Cursor::new(source.clone()), &mut result, &marker, keep_headers).unwrap();
 			result
 		});
