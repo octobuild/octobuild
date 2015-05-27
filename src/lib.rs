@@ -1,4 +1,5 @@
 #![feature(convert)]
+#![feature(collections)]
 #![feature(test)]
 
 include!(concat!(env!("OUT_DIR"), "/version.rs"));
