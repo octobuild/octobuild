@@ -221,12 +221,7 @@ impl <'a> ScannerState<'a> {
 		match &try!(self.parse_token(0x20))[..] {
 			b"line" => self.parse_directive_line(),
 			b"pragma" => self.parse_directive_pragma(),
-			token => {
-				if self.keep_headers {
-					try! (self.write(&token));
-				}
-				self.next_line()
-			}
+			_ => self.next_line(),
 		}	
 	}
 
@@ -234,19 +229,23 @@ impl <'a> ScannerState<'a> {
 		try!(self.parse_spaces(false));
 		let line = try!(self.parse_token(0x10));
 		try!(self.parse_spaces(false));
-		let file = try!(self.parse_string(0x10000)).replace("\\", "/");
+		let (mut file, raw) = try!(self.parse_literal(0x10000));
+		file = file.replace("\\", "/");
 		try!(self.next_line());
-		self.entry_file = match &self.entry_file {
-			&Some(ref path) => {
+		self.entry_file = match self.entry_file.take() {
+			Some(ref path) => {
 				if self.header_found && (path == &file) {
 					self.done = true;
-					try! (self.writer.write_all(b"#pragma hdrstop\n"));
-					//try! (writer.write_all(&raw));
+					try! (self.write(b"#pragma hdrstop\n#line "));
+					try! (self.write(&line));
+					try! (self.write(b" "));
+					try! (self.write(&raw));
+					try! (self.write(b"\n"));
 				}
 				match self.marker {
 					&Some(ref raw_path) => {
 						let path = raw_path.replace("\\", "/");
-						if file == path || Path::new(&file).ends_with(&Path::new(&path)) {
+						if (file == path) || Path::new(&file).ends_with(&Path::new(&path)) {
 							self.header_found = true;
 						}
 					}
@@ -254,7 +253,7 @@ impl <'a> ScannerState<'a> {
 				}
 				Some(path.clone())
 			}
-			&None => Some(file.clone())
+			None => Some(file)
 		};
 		Ok(true)
 	}
@@ -269,8 +268,7 @@ impl <'a> ScannerState<'a> {
 				self.done = true;
 				Ok(true)
 			},
-			token => {
-				try! (self.write(&token));
+			_ => {
 				self.next_line()
 			}
 		}
@@ -398,22 +396,23 @@ impl <'a> ScannerState<'a> {
 					break;
 				}
 			};
-			try! (self.skip());
+			try! (self.next());
 		}
 		Ok(token)
 	}
 
-	fn parse_string(&mut self, limit: usize) -> Result<String, Error> {
-		let bytes = try! (self.parse_literal(limit));
+	fn literal_to_string(&self, bytes: Vec<u8>) -> Result<String, Error> {
 		match self.utf8 {
 			true => String::from_utf8(bytes).map_err(|e| Error::new(ErrorKind::InvalidInput, e)),
 			false => local_bytes_to_string(bytes),
 		}
 	}
 
-	fn parse_literal(&mut self, limit: usize) -> Result<Vec<u8>, Error> {
+	fn parse_literal(&mut self, limit: usize) -> Result<(String, Vec<u8>), Error> {
 		let mut token: Vec<u8> = Vec::with_capacity(limit);
+		let mut raw: Vec<u8> = Vec::with_capacity(limit);
 		let quote = try! (self.peek()).unwrap();
+		raw.push(quote);
 		try!(self.next());
 		loop {
 			match try!(self.peek()) {
@@ -423,12 +422,15 @@ impl <'a> ScannerState<'a> {
 				}
 				Some(b'\\') => {
 					let c = try!(self.parse_escape());
+					raw.push(b'\\');
+					raw.push(c);
 					token.push(c);
 				}
 				Some(c) => {
 					try!(self.next());
+					raw.push(c);
 					if c == quote {
-						return Ok(token);
+						return Ok((try!(self.literal_to_string(token)), raw));
 					}
 					token.push(c);
 				}
@@ -518,6 +520,7 @@ r#"#line 1 "sample.cpp"
 #line 1 "e:/work/octobuild/test_cl/sample header.h"
 # pragma once
 void hello();
+#line 2 "sample.cpp"
 #pragma hdrstop
 #line 2 "sample.cpp"
 
@@ -593,6 +596,7 @@ r#"#line 1 "sample.cpp"
 #line 1 "e:\\work\\octobuild\\test_cl\\sample header.h"
 # pragma once
 void hello();
+#line 2 "sample.cpp"
 #pragma hdrstop
 #line 2 "sample.cpp"
 
