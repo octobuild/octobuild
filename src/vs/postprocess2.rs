@@ -74,12 +74,20 @@ pub fn parse_source(reader: &mut Read, writer: &mut Write, keep_headers: bool) -
 		writer: writer,
 
 		keep_headers: keep_headers,
+		done: false,
 	};
 	try! (state.parse_bom());
 	while try!(state.parse_line()) {
-
+		if state.done {
+			loop {
+			 	match try!(state.peek()) {
+			 		Some(v) => {try!(state.copy())}
+			 		None => {return Ok(())}
+			 	}
+			}
+		}
 	}
-	Ok(())
+	Err(Error::new(ErrorKind::InvalidInput, "Unexpected end of stream"))
 }
 
 struct ScannerState<'a> {
@@ -92,6 +100,7 @@ struct ScannerState<'a> {
 	writer: &'a mut Write,
 
 	keep_headers: bool,
+	done: bool,
 }
 
 impl <'a> ScannerState<'a> {
@@ -175,7 +184,7 @@ impl <'a> ScannerState<'a> {
 	fn parse_line(&mut self) -> Result<bool, Error> {
 		match try! (self.parse_spaces(true)) {
 			Some(b'#') => {
-				try!(self.copy());
+				try!(self.next());
 				self.parse_directive()
 			}
 			Some(_) => self.next_line(),
@@ -188,7 +197,7 @@ impl <'a> ScannerState<'a> {
 			match try! (self.peek()) {
 				// end-of-line ::= newline | carriage-return | carriage-return newline
 				Some(b'\n') | Some(b'\r') => {
-					try! (self.copy());
+					try! (self.next());
 					return Ok(true);
 				}
 				Some(_) => {
@@ -207,7 +216,9 @@ impl <'a> ScannerState<'a> {
 			b"include" => self.parse_directive_include(),
 			b"pragma" => self.parse_directive_pragma(),
 			token => {
-				try! (self.write(&token));
+				if self.keep_headers {
+					try! (self.write(&token));
+				}
 				self.next_line()
 			}
 		}	
@@ -247,8 +258,17 @@ impl <'a> ScannerState<'a> {
 	fn parse_directive_pragma(&mut self) -> Result<bool, Error> {
 		try!(self.parse_spaces(false));
 		match &try!(self.parse_token(0x20))[..] {
-			b"once" => self.parse_directive_pragma_once(),
-			_ => self.parse_code(),
+			b"hdrstop" => {
+				if !self.keep_headers {
+					try! (self.write(b"#pragma hdrstop"));
+				}
+				self.done = true;
+				Ok(true)
+			},
+			token => {
+				try! (self.write(&token));
+				self.next_line()
+			}
 		}
 	}
 
@@ -587,7 +607,7 @@ int main(int argc, char **argv) {
 	return 0;
 }
 "#,
-r#"# pragma  hdrstop
+r#"#pragma hdrstop
 void data();
 # pragma once
 #line 2 "sample.cpp"
