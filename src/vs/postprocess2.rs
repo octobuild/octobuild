@@ -2,7 +2,6 @@ use std::hash::Hasher;
 use std::ffi::OsString;
 use std::fmt::{Display, Formatter};
 use std::io::{Read, Write, Error, ErrorKind};
-use std::path::Path;
 
 #[derive(Clone, Copy, Debug)]
 pub enum PostprocessError {
@@ -70,14 +69,22 @@ pub fn filter_preprocessed(reader: &mut Read, writer: &mut Write, marker: &Optio
 		writer: writer,
 
 		keep_headers: keep_headers,
-		marker: marker,
-
+		marker: None,
 		utf8: false,
 		header_found: false,
 		entry_file: None,
 		done: false,
 	};
 	try! (state.parse_bom());
+	state.marker = match marker.as_ref() {
+		Some(ref v) => {
+			match state.utf8 {
+				true => Some(Vec::from(v.as_bytes())),
+				false => Some(try! (string_to_local_bytes(v.replace("\\", "/")))),
+			}
+		},
+		None => None,
+	};
 	while try!(state.parse_line()) {
 		if state.done {
 			return state.copy_to_end();
@@ -96,11 +103,11 @@ struct ScannerState<'a> {
 	writer: &'a mut Write,
 
 	keep_headers: bool,
-	marker: &'a Option<String>,
+	marker: Option<Vec<u8>>,
 	
 	utf8: bool,
 	header_found: bool,
-	entry_file: Option<String>,
+	entry_file: Option<Vec<u8>>,
 	done: bool,
 }
 
@@ -195,16 +202,15 @@ impl <'a> ScannerState<'a> {
 
 	fn next_line(&mut self) -> Result<bool, Error> {
 		loop {
-			assert! (self.buf_size <= self.buf_data.len());
 			for i in self.buf_read..self.buf_size {
-				match self.buf_data[i] {
-					b'\n' | b'\r' => {
-						// end-of-line ::= newline | carriage-return | carriage-return newline
-						self.buf_read = i + 1;
-						return Ok(true);
-					}
-					_ => {
-					}
+				let c = self.buf_data[i];
+				if c | (b'\n' | b'\r') != (b'\n' | b'\r') {
+					continue;
+				}
+				if (c == b'\n') || (c == b'\r') {
+					// end-of-line ::= newline | carriage-return | carriage-return newline
+					self.buf_read = i + 1;
+					return Ok(true);
 				}
 			}
 			self.buf_read = self.buf_size;
@@ -226,14 +232,16 @@ impl <'a> ScannerState<'a> {
 
 	fn parse_directive_line(&mut self) -> Result<bool, Error> {
 		let mut line_token = [0; 0x10];
+		let mut file_token = [0; 0x400];
+		let mut file_raw = [0; 0x400];
 		try!(self.parse_spaces());
 		let line = try!(self.parse_token(&mut line_token));
 		try!(self.parse_spaces());
-		let (file, raw) = try!(self.parse_path(0x400));
+		let (file, raw) = try!(self.parse_path(&mut file_token, &mut file_raw));
 		try!(self.next_line());
 		self.entry_file = match self.entry_file.take() {
-			Some(ref path) => {
-				if self.header_found && (path == &file) {
+			Some(path) => {
+				if self.header_found && (path == file) {
 					self.done = true;
 					try! (self.write(b"#pragma hdrstop\n#line "));
 					try! (self.write(&line));
@@ -241,18 +249,17 @@ impl <'a> ScannerState<'a> {
 					try! (self.write(&raw));
 					try! (self.write(b"\n"));
 				}
-				match self.marker {
-					&Some(ref raw_path) => {
-						let path = raw_path.replace("\\", "/");
-						if (file == path) || Path::new(&file).ends_with(&Path::new(&path)) {
+				match &self.marker {
+					&Some(ref path) => {
+						if is_subpath(&file, &path) {
 							self.header_found = true;
 						}
 					}
 					&None => {}
 				}
-				Some(path.clone())
+				Some(path)
 			}
-			None => Some(file)
+			None => Some(Vec::from(file))
 		};
 		Ok(true)
 	}
@@ -339,19 +346,12 @@ impl <'a> ScannerState<'a> {
 		}
 	}
 
-	fn literal_to_string(&self, bytes: Vec<u8>) -> Result<String, Error> {
-		match self.utf8 {
-			true => String::from_utf8(bytes).map_err(|_| Error::new(ErrorKind::InvalidInput, PostprocessError::InvalidLiteral)),
-			false => local_bytes_to_string(bytes),
-		}
-	}
-
-	fn parse_path(&mut self, limit: usize) -> Result<(String, Vec<u8>), Error> {
-		let mut token: Vec<u8> = Vec::with_capacity(limit);
-		let mut raw: Vec<u8> = Vec::with_capacity(limit);
+	fn parse_path<'t, 'r>(&mut self, token: &'t mut [u8], raw: &'r mut [u8]) -> Result<(&'t [u8], &'r [u8]), Error> {
 		let quote = try! (self.peek()).unwrap();
-		raw.push(quote);
+		raw[0] = quote;
 		self.next();
+		let mut token_offset = 0;
+		let mut raw_offset = 1;
 		loop {
 			assert! (self.buf_size <= self.buf_data.len());
 			while self.buf_read != self.buf_size {
@@ -362,25 +362,29 @@ impl <'a> ScannerState<'a> {
 						return Err(Error::new(ErrorKind::InvalidInput, PostprocessError::LiteralEol));
 					}
 					b'\\' => {
-						raw.push(b'\\');
-						raw.push(c);
-						match try!(self.parse_escape()) {
-							b'\\' => token.push(b'/'),
-							v => token.push(v),
-						}
+						raw[raw_offset+0] = b'\\';
+						raw[raw_offset+1] = c;
+						raw_offset += 2;
+						token[token_offset] = match try!(self.parse_escape()) {
+							b'\\' => b'/',
+							v => v,
+						};
+						token_offset += 1;
 					}
 					c => {
 						self.next();
-						raw.push(c);
+						raw[raw_offset] = c;
+						raw_offset += 1;
 						if c == quote {
-							return Ok((try!(self.literal_to_string(token)), raw));
+							return Ok((&token[..token_offset], &raw[..raw_offset]));
 						}
-						token.push(c);
+						token[token_offset] = c;
+						token_offset += 1;
 					}
 				}
-			}
-			if raw.len() > BUF_SIZE {
-				return Err(Error::new(ErrorKind::InvalidInput, PostprocessError::LiteralTooLong))
+				if (raw_offset >= raw.len() - 2) || (token_offset >= token.len() - 1) {
+					return Err(Error::new(ErrorKind::InvalidInput, PostprocessError::LiteralTooLong))
+				}
 			}
 			if try! (self.read()) == 0 {
 					return Err(Error::new(ErrorKind::InvalidInput, PostprocessError::LiteralEof));
@@ -389,17 +393,24 @@ impl <'a> ScannerState<'a> {
 	}
 }
 
-fn local_bytes_to_string(vec: Vec<u8>) -> Result<String, Error> {
+fn is_subpath(parent: &[u8], child: &[u8]) -> bool {
+	if parent == child {
+		return true;
+	}
+	parent.ends_with(child) && (parent[parent.len() - child.len() - 1] == b'/')
+}
+
+fn string_to_local_bytes(s: String) -> Result<Vec<u8>, Error> {
 	#[cfg(unix)]
-	fn local_bytes_to_string_inner(vec: Vec<u8>) -> Result<String, Error> {
-		match OsString::from_bytes(vec) {
-			Some(s) => s.into_string().map_err(|_| Error::new(ErrorKind::InvalidInput, PostprocessError::InvalidLiteral)),
+	fn string_to_local_bytes_inner(s: String) -> Result<Vec<u8>, Error> {
+		match OsString::from(s).to_bytes() {
+			Some(v) => Ok(Vec::from(v)),
 			None => Err(Error::new(ErrorKind::InvalidInput, PostprocessError::InvalidLiteral)),
 		}
 	}
 
 	#[cfg(windows)]
-	fn local_bytes_to_string_inner(vec: Vec<u8>) -> Result<String, Error> {
+	fn string_to_local_bytes_inner(vec: Vec<u8>) -> Result<String, Error> {
 		extern crate winapi;
 		extern crate kernel32;
 
@@ -428,7 +439,7 @@ fn local_bytes_to_string(vec: Vec<u8>) -> Result<String, Error> {
 		}
 	}
 
-	local_bytes_to_string_inner(vec)
+	string_to_local_bytes_inner(s)
 }
 
 #[cfg(test)]
@@ -572,8 +583,8 @@ int main(int argc, char **argv) {
 	 * Since the test is dependent on the environment, checked only Latin characters.
 	 */
 	#[test]
-	fn test_local_bytes_to_string() {
-		let vec = Vec::from("test\0data");
-		assert_eq!(super::local_bytes_to_string(vec.clone()).ok(), String::from_utf8(vec).ok());
+	fn test_string_to_local_bytes() {
+		let s = "test\0data";
+		assert_eq!(super::string_to_local_bytes(s.to_string()).unwrap(), s.to_string().into_bytes());
 	}
 }
