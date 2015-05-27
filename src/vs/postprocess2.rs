@@ -2,7 +2,7 @@ use std::hash::Hasher;
 use std::ffi::{OsStr, OsString};
 use std::fmt::{Display, Formatter};
 use std::io::{Read, Write, Error, ErrorKind};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 #[derive(Clone, Copy, Debug)]
 pub enum ScannerError {
@@ -60,11 +60,11 @@ pub enum Include<T> {
 }
 
 pub fn filter_preprocessed(base: &Option<PathBuf>, reader: &mut Read, writer: &mut Write, marker: &Option<String>, keep_headers: bool) -> Result<Vec<PathBuf>, Error> {
-	try!(parse_source(reader, writer, keep_headers));
+	try!(parse_source(reader, writer, marker, keep_headers));
 	Ok(Vec::new())
 }
 
-pub fn parse_source(reader: &mut Read, writer: &mut Write, keep_headers: bool) -> Result<(), Error> {
+pub fn parse_source(reader: &mut Read, writer: &mut Write, marker: &Option<String>, keep_headers: bool) -> Result<(), Error> {
 	let mut state = ScannerState {
 		buf_data: [0; BUF_SIZE],
 		buf_read: 0,
@@ -75,8 +75,11 @@ pub fn parse_source(reader: &mut Read, writer: &mut Write, keep_headers: bool) -
 		writer: writer,
 
 		keep_headers: keep_headers,
+		marker: marker,
 
 		utf8: false,
+		header_found: false,
+		entry_file: None,
 		done: false,
 	};
 	try! (state.parse_bom());
@@ -103,8 +106,11 @@ struct ScannerState<'a> {
 	writer: &'a mut Write,
 
 	keep_headers: bool,
+	marker: &'a Option<String>,
 	
 	utf8: bool,
+	header_found: bool,
+	entry_file: Option<String>,
 	done: bool,
 }
 
@@ -234,9 +240,31 @@ impl <'a> ScannerState<'a> {
 		let line = try!(self.parse_token(0x10));
 		try!(self.parse_spaces(false));
 		let file = try!(self.parse_string(0x10000)).replace("\\", "/");
+		try!(self.next_line());
 
 		println!("#LINE [{:?}] [{:?}]", String::from_utf8_lossy(&line), file);
-		self.next_line()
+
+		self.entry_file = match &self.entry_file {
+			&Some(ref path) => {
+				if self.header_found && (path == &file) {
+					self.done = true;
+					try! (self.writer.write_all(b"#pragma hdrstop\n"));
+					//try! (writer.write_all(&raw));
+				}
+				match self.marker {
+					&Some(ref raw_path) => {
+						let path = raw_path.replace("\\", "/");
+						if file == path || Path::new(&file).ends_with(&Path::new(&path)) {
+							self.header_found = true;
+						}
+					}
+					&None => {}
+				}
+				Some(path.clone())
+			}
+			&None => Some(file.clone())
+		};
+		Ok(true)
 	}
 
 	fn parse_directive_pragma(&mut self) -> Result<bool, Error> {
