@@ -213,7 +213,7 @@ impl <'a> ScannerState<'a> {
 	fn parse_directive(&mut self) -> Result<bool, Error> {
 		try!(self.parse_spaces(false));
 		match &try!(self.parse_token(0x20))[..] {
-			b"include" => self.parse_directive_include(),
+			b"line" => self.parse_directive_line(),
 			b"pragma" => self.parse_directive_pragma(),
 			token => {
 				if self.keep_headers {
@@ -224,35 +224,13 @@ impl <'a> ScannerState<'a> {
 		}	
 	}
 
-	fn parse_directive_include(&mut self) -> Result<bool, Error> {
+	fn parse_directive_line(&mut self) -> Result<bool, Error> {
 		try!(self.parse_spaces(false));
-		match try!(self.peek()) {
-			Some(c) => {
-				try!(self.skip());
-				let include = match c {
-					b'<' => Include::Angle(try!(self.parse_token_until(b'>'))),
-					b'"' => Include::Quoted(try!(self.parse_token_until(b'"'))),
-					_ => (return Err(Error::new(ErrorKind::InvalidInput, ScannerError::IncludeUnexpected(c)))),
-				};
-				try!(self.skip());
-				/*match try!(self.visitor.visit_include(include)) {
-					Include::Angle(path) => {
-						try!(self.write(b"<"));
-						try!(self.write(&path));
-						try!(self.write(b">"));
-					}
-					Include::Quoted(path) => {
-						try!(self.write(b"\""));
-						try!(self.write(&path));
-						try!(self.write(b"\""));
-					}
-				}*/
-			}
-			None => {
-				return Err(Error::new(ErrorKind::InvalidInput, ScannerError::IncludeEof));
-			}
-		}
-		self.parse_code()
+		let line = try!(self.parse_token(0x10));
+		try!(self.parse_spaces(false));
+		let file = try!(self.parse_literal(0x10000));
+		println!("#LINE [{:?}] [{:?}]", String::from_utf8_lossy(&line), String::from_utf8_lossy(&file));
+		self.next_line()
 	}
 
 	fn parse_directive_pragma(&mut self) -> Result<bool, Error> {
@@ -272,92 +250,20 @@ impl <'a> ScannerState<'a> {
 		}
 	}
 
-	fn parse_directive_pragma_once(&mut self) -> Result<bool, Error> {
-		try! (self.parse_code());
-		//try! (self.visitor.visit_pragma_once());
-		Ok(true)
-	}
-
-	fn parse_escape(&mut self) -> Result<bool, Error> {
-		try! (self.copy());
+	fn parse_escape(&mut self) -> Result<u8, Error> {
+		try! (self.next());
 		match try! (self.peek()) {
-			Some(b'\r') => {
-				try! (self.copy());
-				match try! (self.peek()) {
-					Some(b'\n') => {
-						try! (self.copy());
-						Ok(true)
-					}
-					Some(_) => Ok(true),
-					None => Ok(false),
+			Some(c) => {
+				try! (self.next());
+				match c {
+					b'n' => Ok(b'\n'),
+					b'r' => Ok(b'\r'),
+					b't' => Ok(b'\t'),
+					c => Ok(c)
 				}
-			}
-			Some(b'\n') => {
-				try! (self.copy());
-				match try! (self.peek()) {
-					Some(b'\r') => {
-						try! (self.copy());
-						Ok(true)
-					}
-					Some(_) => Ok(true),
-					None => Ok(false),
-				}
-			}
-			Some(_) => {
-				try! (self.copy());
-				Ok(true)
 			}
 			None => {
-				Ok(false)
-			}
-		}
-	}
-
-	fn parse_code(&mut self) -> Result<bool, Error> {
-		loop {
-			while self.buf_read != self.buf_size {
-				match self.buf_data[self.buf_read] {
-					// end-of-line ::= newline | carriage-return | carriage-return newline
-					b'\n' | b'\r' => {
-						return Ok(true);
-					}
-					b'\\' => {
-						try!(self.parse_escape());
-					}
-					b'"' | b'\'' => {
-						try!(self.parse_literal());
-					}
-					b'/' => {
-						try! (self.skip());
-						match try!(self.peek()) {
-							Some(b'*') => {
-								try!(self.skip());
-								return self.parse_skip_multiline_comment();
-							}
-							Some(b'/') => {
-								return self.parse_process_line(false);
-							}
-							Some(c) => {
-								try!(self.skip());
-								try!(self.write(&[b'/', c]));
-							}
-							None => {
-								try!(self.copy());
-								return Ok(false);
-							}
-						}
-					}
-					_ => {
-						self.buf_read += 1;
-					}
-				}
-			}
-			try! (self.flush());
-			self.buf_read = 0;
-			self.buf_copy = 0;
-			self.buf_size = try! (self.reader.read(&mut self.buf_data));
-			if self.buf_size == 0 {
-				return Ok(false);
+				Err(Error::new(ErrorKind::InvalidInput, "Unexpected end of stream"))
 			}
 		}
 	}
@@ -471,32 +377,10 @@ impl <'a> ScannerState<'a> {
 		Ok(token)
 	}
 
-	fn parse_token_until(&mut self, marker: u8) -> Result<Vec<u8>, Error> {
-		let mut token: Vec<u8> = Vec::new();
-		loop {
-			match try!(self.peek()) {
-				Some(c) if c == marker => {
-					return Ok(token);
-				}
-				// end-of-line ::= newline | carriage-return | carriage-return newline
-				Some(b'\n') | Some(b'\r') => {
-					return Err(Error::new(ErrorKind::InvalidInput, ScannerError::TokenEol));
-				}
-				Some(c) => {
-					token.push(c);
-				}
-				None => {
-					return Err(Error::new(ErrorKind::InvalidInput, ScannerError::TokenEof));
-				}
-			}
-			try!(self.skip());
-		}
-	}
-
-	fn parse_literal(&mut self) -> Result<bool, Error> {
+	fn parse_literal(&mut self, limit: usize) -> Result<Vec<u8>, Error> {
+		let mut token: Vec<u8> = Vec::with_capacity(limit);
 		let quote = try! (self.peek()).unwrap();
-		try!(self.copy());
-		let mut escape = false;
+		try!(self.next());
 		loop {
 			match try!(self.peek()) {
 				// end-of-line ::= newline | carriage-return | carriage-return newline
@@ -504,18 +388,15 @@ impl <'a> ScannerState<'a> {
 					return Err(Error::new(ErrorKind::InvalidInput, ScannerError::LiteralEol));
 				}
 				Some(b'\\') => {
-					try!(self.parse_escape());
+					let c = try!(self.parse_escape());
+					token.push(c);
 				}
 				Some(c) => {
-					try!(self.copy());
-					if !escape {
-						if c == quote {
-							return Ok(true);
-						}
-						escape = c == b'\\';
-					} else {
-						escape = false;
+					try!(self.next());
+					if c == quote {
+						return Ok(token);
 					}
+					token.push(c);
 				}
 				None => {
 					return Err(Error::new(ErrorKind::InvalidInput, ScannerError::LiteralEof));
