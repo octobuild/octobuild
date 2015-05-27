@@ -395,7 +395,7 @@ fn local_bytes_to_string(vec: Vec<u8>) -> Result<String, Error> {
 	}
 
 	#[cfg(windows)]
-	fn local_bytes_to_string_inner(vec: Vec<u8>) -> Option<OsString> {
+	fn local_bytes_to_string_inner(vec: Vec<u8>) -> Result<String, Error> {
 		extern crate winapi;
 		extern crate kernel32;
 
@@ -412,13 +412,13 @@ fn local_bytes_to_string(vec: Vec<u8>) -> Result<String, Error> {
 			// Get length of UTF-16 string
 			let len = kernel32::MultiByteToWideChar(winapi::CP_ACP, MB_COMPOSITE | MB_ERR_INVALID_CHARS, vec.as_ptr() as winapi::LPCSTR, vec.len() as i32, ptr::null_mut(), 0);
 			if len <= 0 {
-				return None;
+				return Err(Error::new(ErrorKind::InvalidInput, PostprocessError::InvalidLiteral));
 			}
 			// Convert ANSI to UTF-16
 			let mut utf: Vec<u16> = Vec::with_capacity(len as usize);
 			utf.set_len(len as usize);
 			if kernel32::MultiByteToWideChar(winapi::CP_ACP, MB_COMPOSITE | MB_ERR_INVALID_CHARS, vec.as_ptr() as winapi::LPCSTR, vec.len() as i32, utf.as_mut_ptr(), len) <= 0 {
-				return None;
+				return Err(Error::new(ErrorKind::InvalidInput, PostprocessError::InvalidLiteral));
 			}
 			String::from_utf16(&utf).map_err(|e| Error::new(ErrorKind::InvalidInput, e))
 		}

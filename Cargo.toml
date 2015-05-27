@@ -23,3 +23,11 @@ petgraph = "*"
 xml-rs = "*"
 uuid = "*"
 tempdir = "*"
+
+[target.i686-pc-windows-gnu.dependencies]
+winapi = "*"
+kernel32-sys = "*"
+
+[target.x86_64-pc-windows-gnu.dependencies]
+winapi = "*"
+kernel32-sys = "*"
