@@ -1,46 +1,40 @@
 use std::hash::Hasher;
-use std::ffi::{OsStr, OsString};
+use std::ffi::OsString;
 use std::fmt::{Display, Formatter};
 use std::io::{Read, Write, Error, ErrorKind};
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 #[derive(Clone, Copy, Debug)]
-pub enum ScannerError {
-	InvalidStream,
-	IncludeEof,
-	IncludeUnexpected(u8),
-	TokenEof,
-	TokenEol,
-	LiteralEof,
+pub enum PostprocessError {
 	LiteralEol,
+	LiteralEof,
+	EscapeEof,
+	MarkerNotFound,
+	InvalidLiteral,
 }
 
 const BUF_SIZE: usize = 0x10000;
 				
-impl Display for ScannerError {
+impl Display for PostprocessError {
 	fn fmt(&self, f: &mut Formatter) -> Result<(), ::std::fmt::Error> {
 		match self {
-			&ScannerError::InvalidStream => write!(f, "internal error on stream reading"),
-			&ScannerError::IncludeEof => write!(f, "can't parse #include directive: unexpected end of file"),
-			&ScannerError::IncludeUnexpected(c) => write!(f, "can't parse #include directive: unexpected characted `{}`", c),
-			&ScannerError::TokenEof => write!(f, "unexpected end of stream in token"),
-			&ScannerError::TokenEol => write!(f, "unexpected end of line in token"),
-			&ScannerError::LiteralEof => write!(f, "unexpected end of stream in literal"),
-			&ScannerError::LiteralEol => write!(f, "unexpected end of line in literal"),
+			&PostprocessError::LiteralEol => write!(f, "unexpected end of line in literal"),
+			&PostprocessError::LiteralEof => write!(f, "unexpected end of stream in literal"),
+			&PostprocessError::EscapeEof => write!(f, "unexpected end of escape sequence"),
+			&PostprocessError::MarkerNotFound => write!(f, "can't find precompiled header marker in preprocessed file"),
+			&PostprocessError::InvalidLiteral => write!(f, "can't create string from literal"),
 		}
 	}
 }
 
-impl ::std::error::Error for ScannerError {
+impl ::std::error::Error for PostprocessError {
 	fn description(&self) -> &str {
 		match self {
-			&ScannerError::InvalidStream => "internal error on stream reading",
-			&ScannerError::IncludeEof => "can't parse #include directive: unexpected end of file",
-			&ScannerError::IncludeUnexpected(_) => "can't parse #include directive: unexpected characted",
-			&ScannerError::TokenEof => "unexpected end of stream in token",
-			&ScannerError::TokenEol => "unexpected end of line in token",
-			&ScannerError::LiteralEof => "unexpected end of stream in literal",
-			&ScannerError::LiteralEol => "unexpected end of line in literal",
+			&PostprocessError::LiteralEol => "unexpected end of line in literal",
+			&PostprocessError::LiteralEof => "unexpected end of stream in literal",
+			&PostprocessError::EscapeEof => "unexpected end of escape sequence",
+			&PostprocessError::MarkerNotFound => "can't find precompiled header marker in preprocessed file",
+			&PostprocessError::InvalidLiteral => "can't create string from literal",
 		}
 	}
 
@@ -82,13 +76,13 @@ pub fn filter_preprocessed(reader: &mut Read, writer: &mut Write, marker: &Optio
 		if state.done {
 			loop {
 			 	match try!(state.peek()) {
-			 		Some(v) => {try!(state.copy())}
+			 		Some(_) => {try!(state.copy())}
 			 		None => {return Ok(())}
 			 	}
 			}
 		}
 	}
-	Err(Error::new(ErrorKind::InvalidInput, "Unexpected end of stream"))
+	Err(Error::new(ErrorKind::InvalidInput, PostprocessError::MarkerNotFound))
 }
 
 struct ScannerState<'a> {
@@ -287,7 +281,7 @@ impl <'a> ScannerState<'a> {
 				}
 			}
 			None => {
-				Err(Error::new(ErrorKind::InvalidInput, "Unexpected end of stream"))
+				Err(Error::new(ErrorKind::InvalidInput, PostprocessError::EscapeEof))
 			}
 		}
 	}
@@ -317,66 +311,6 @@ impl <'a> ScannerState<'a> {
 		}
 	}
 
-	fn parse_process_line(&mut self, copy: bool) -> Result<bool, Error> {
-		loop {
-			match try! (self.peek()) {
-				// end-of-line ::= newline | carriage-return | carriage-return newline
-				Some(b'\n') | Some(b'\r') => {
-					return Ok(true);
-				}
-				Some(b'\\') => {
-					try!(self.parse_escape());
-				}
-				Some(_) => {
-					try!(match copy {
-						true => self.copy(),
-						false => self.skip(),
-					});
-				}
-				None => {
-					return Ok(false);
-				}
-			};
-		}
-	}
-
-	fn parse_skip_multiline_comment(&mut self) -> Result<bool, Error> {
-		self.flush();
-		let mut asterisk = false;
-		loop {
-			while self.buf_read != self.buf_size {
-				asterisk = match self.buf_data[self.buf_read] {
-					b'*' => {
-						self.buf_read += 1;
-						true
-					}
-					b'/' if asterisk => {
-						self.buf_read += 1;
-						self.buf_copy = self.buf_read;
-						return Ok(true);
-					}
-					// end-of-line ::= newline | carriage-return | carriage-return newline
-					b'\n' | b'\r' => {
-						try! (self.writer.write(&[self.buf_data[self.buf_read]]));
-						self.buf_read += 1;
-						false
-					}
-					_ => {
-						self.buf_read += 1;
-						false
-					}
-				}
-			}
-			try! (self.flush());
-			self.buf_read = 0;
-			self.buf_copy = 0;
-			self.buf_size = try! (self.reader.read(&mut self.buf_data));
-			if self.buf_size == 0 {
-				return Ok(false);
-			}
-		}
-	}
-
 	fn parse_token(&mut self, limit: usize) -> Result<Vec<u8>, Error> {
 		let mut token: Vec<u8> = Vec::with_capacity(limit);
 		while token.len() < limit {
@@ -403,7 +337,7 @@ impl <'a> ScannerState<'a> {
 
 	fn literal_to_string(&self, bytes: Vec<u8>) -> Result<String, Error> {
 		match self.utf8 {
-			true => String::from_utf8(bytes).map_err(|e| Error::new(ErrorKind::InvalidInput, e)),
+			true => String::from_utf8(bytes).map_err(|_| Error::new(ErrorKind::InvalidInput, PostprocessError::InvalidLiteral)),
 			false => local_bytes_to_string(bytes),
 		}
 	}
@@ -418,7 +352,7 @@ impl <'a> ScannerState<'a> {
 			match try!(self.peek()) {
 				// end-of-line ::= newline | carriage-return | carriage-return newline
 				Some(b'\n') | Some(b'\r') => {
-					return Err(Error::new(ErrorKind::InvalidInput, ScannerError::LiteralEol));
+					return Err(Error::new(ErrorKind::InvalidInput, PostprocessError::LiteralEol));
 				}
 				Some(b'\\') => {
 					let c = try!(self.parse_escape());
@@ -435,7 +369,7 @@ impl <'a> ScannerState<'a> {
 					token.push(c);
 				}
 				None => {
-					return Err(Error::new(ErrorKind::InvalidInput, ScannerError::LiteralEof));
+					return Err(Error::new(ErrorKind::InvalidInput, PostprocessError::LiteralEof));
 				}
 			}
 		}
@@ -446,8 +380,8 @@ fn local_bytes_to_string(vec: Vec<u8>) -> Result<String, Error> {
 	#[cfg(unix)]
 	fn local_bytes_to_string_inner(vec: Vec<u8>) -> Result<String, Error> {
 		match OsString::from_bytes(vec) {
-			Some(s) => s.into_string().map_err(|e| Error::new(ErrorKind::InvalidInput, "Can't convert bytes to Unicode")),
-			None => Err(Error::new(ErrorKind::InvalidInput, "Can't convert bytes to Unicode")),
+			Some(s) => s.into_string().map_err(|_| Error::new(ErrorKind::InvalidInput, PostprocessError::InvalidLiteral)),
+			None => Err(Error::new(ErrorKind::InvalidInput, PostprocessError::InvalidLiteral)),
 		}
 	}
 
@@ -488,7 +422,6 @@ fn local_bytes_to_string(vec: Vec<u8>) -> Result<String, Error> {
 mod test {
 	extern crate test;
 
-	use std::ffi::OsString;
 	use std::io::{Read, Write, Cursor};
 	use std::fs::File;
 	use self::test::Bencher;

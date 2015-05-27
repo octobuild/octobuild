@@ -1,7 +1,6 @@
 use std::collections::HashSet;
 use std::io::{Read, Write, Error};
-use std::iter::FromIterator;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use super::super::utils::DEFAULT_BUF_SIZE;
 use super::super::io::binary::*;
