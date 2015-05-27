@@ -2,7 +2,6 @@ pub use super::super::compiler::*;
 
 use super::super::cache::Cache;
 use super::postprocess;
-use super::postprocess2;
 use super::super::wincmd;
 use super::super::utils::filter;
 use super::super::utils::hash_text;
@@ -78,10 +77,7 @@ impl Compiler for VsCompiler {
 				Ok(stream) => {
 					let mut output: Box<Read> = if task.input_precompiled.is_some() || task.output_precompiled.is_some() {
 						let mut buffer: Vec<u8> = Vec::new();
-						match 0 == 0 {
-							true => try! (postprocess2::filter_preprocessed(&mut BufReader::new(stream), &mut buffer, &task.marker_precompiled, task.output_precompiled.is_some())),
-							false => try! (postprocess::filter_preprocessed(&mut BufReader::new(stream), &mut buffer, &task.marker_precompiled, task.output_precompiled.is_some())),
-						}
+						try! (postprocess::filter_preprocessed(&mut BufReader::new(stream), &mut buffer, &task.marker_precompiled, task.output_precompiled.is_some()));
 						Box::new(Cursor::new(buffer))
 					} else {
 						Box::new(stream)
