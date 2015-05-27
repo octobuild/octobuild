@@ -59,12 +59,7 @@ pub enum Include<T> {
 	Angle(T),
 }
 
-pub fn filter_preprocessed(base: &Option<PathBuf>, reader: &mut Read, writer: &mut Write, marker: &Option<String>, keep_headers: bool) -> Result<Vec<PathBuf>, Error> {
-	try!(parse_source(reader, writer, marker, keep_headers));
-	Ok(Vec::new())
-}
-
-pub fn parse_source(reader: &mut Read, writer: &mut Write, marker: &Option<String>, keep_headers: bool) -> Result<(), Error> {
+pub fn filter_preprocessed(reader: &mut Read, writer: &mut Write, marker: &Option<String>, keep_headers: bool) -> Result<(), Error> {
 	let mut state = ScannerState {
 		buf_data: [0; BUF_SIZE],
 		buf_read: 0,
@@ -241,9 +236,6 @@ impl <'a> ScannerState<'a> {
 		try!(self.parse_spaces(false));
 		let file = try!(self.parse_string(0x10000)).replace("\\", "/");
 		try!(self.next_line());
-
-		println!("#LINE [{:?}] [{:?}]", String::from_utf8_lossy(&line), file);
-
 		self.entry_file = match &self.entry_file {
 			&Some(ref path) => {
 				if self.header_found && (path == &file) {
@@ -503,7 +495,7 @@ mod test {
 		let mut writer: Vec<u8> = Vec::new();
 		let mut stream: Vec<u8> = Vec::new();
 		stream.write(&original.as_bytes()[..]).unwrap();
-		match super::filter_preprocessed(&None, &mut Cursor::new(stream), &mut writer, &marker, keep_headers) {
+		match super::filter_preprocessed(&mut Cursor::new(stream), &mut writer, &marker, keep_headers) {
 			Ok(_) => {assert_eq! (String::from_utf8_lossy(&writer), expected)}
 			Err(e) => {panic! (e);}
 		}
@@ -615,7 +607,7 @@ int main(int argc, char **argv) {
 		File::open(path).unwrap().read_to_end(&mut source).unwrap();
 		b.iter(|| {
 			let mut result = Vec::new();
-			super::filter_preprocessed(&None, &mut Cursor::new(source.clone()), &mut result, &marker, keep_headers).unwrap();
+			super::filter_preprocessed(&mut Cursor::new(source.clone()), &mut result, &marker, keep_headers).unwrap();
 			result
 		});
 	}

@@ -143,8 +143,6 @@ pub enum PreprocessResult {
 pub struct PreprocessedSource {
 	// Hash
 	pub hash: String,
-	// Source file names
-	pub sources: Vec<PathBuf>,
 	// Preprocessed file
 	pub content: Vec<u8>,
 }

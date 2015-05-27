@@ -16,7 +16,7 @@ enum Directive {
 	Unknown(Vec<u8>)
 }
 
-pub fn filter_preprocessed(base: &Option<PathBuf>, reader: &mut Read, writer: &mut Write, marker: &Option<String>, keep_headers: bool) -> Result<Vec<PathBuf>, Error> {
+pub fn filter_preprocessed(reader: &mut Read, writer: &mut Write, marker: &Option<String>, keep_headers: bool) -> Result<(), Error> {
 	let mut line_begin = true;
 	// Entry file.
 	let mut entry_file: Option<String> = None;
@@ -94,12 +94,7 @@ pub fn filter_preprocessed(base: &Option<PathBuf>, reader: &mut Read, writer: &m
 		}
 		try! (writer.write_all(&buf[0..size]));
 	}
-	Ok(Vec::from_iter(header_files.into_iter().map(|arg:String|->PathBuf {
-		match base {
-			&Some(ref path) => path.join(arg),
-			&None => Path::new(&arg).to_path_buf(),
-		}
-	})))
+	Ok(())
 }
 
 fn read_directive(first: u8, reader: &mut Read) -> Result<Directive, Error> {
@@ -239,7 +234,7 @@ mod test {
 		let mut writer: Vec<u8> = Vec::new();
 		let mut stream: Vec<u8> = Vec::new();
 		stream.write(&original.as_bytes()[..]).unwrap();
-		match super::filter_preprocessed(&None, &mut Cursor::new(stream), &mut writer, &marker, keep_headers) {
+		match super::filter_preprocessed(&mut Cursor::new(stream), &mut writer, &marker, keep_headers) {
 			Ok(_) => {assert_eq! (String::from_utf8_lossy(&writer), expected)}
 			Err(e) => {panic! (e);}
 		}
@@ -351,7 +346,7 @@ int main(int argc, char **argv) {
 		File::open(path).unwrap().read_to_end(&mut source).unwrap();
 		b.iter(|| {
 			let mut result = Vec::new();
-			super::filter_preprocessed(&None, &mut Cursor::new(source.clone()), &mut result, &marker, keep_headers).unwrap();
+			super::filter_preprocessed(&mut Cursor::new(source.clone()), &mut result, &marker, keep_headers).unwrap();
 			result
 		});
 	}
