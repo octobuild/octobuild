@@ -216,7 +216,8 @@ impl <'a> ScannerState<'a> {
 
 	fn parse_directive(&mut self) -> Result<bool, Error> {
 		try!(self.parse_spaces());
-		match &try!(self.parse_token(0x20))[..] {
+		let mut token = [0; 0x10];
+		match &try!(self.parse_token(&mut token))[..] {
 			b"line" => self.parse_directive_line(),
 			b"pragma" => self.parse_directive_pragma(),
 			_ => self.next_line(),
@@ -224,8 +225,9 @@ impl <'a> ScannerState<'a> {
 	}
 
 	fn parse_directive_line(&mut self) -> Result<bool, Error> {
+		let mut line_token = [0; 0x10];
 		try!(self.parse_spaces());
-		let line = try!(self.parse_token(0x10));
+		let line = try!(self.parse_token(&mut line_token));
 		try!(self.parse_spaces());
 		let (file, raw) = try!(self.parse_path(0x400));
 		try!(self.next_line());
@@ -257,7 +259,8 @@ impl <'a> ScannerState<'a> {
 
 	fn parse_directive_pragma(&mut self) -> Result<bool, Error> {
 		try!(self.parse_spaces());
-		match &try!(self.parse_token(0x20))[..] {
+		let mut token = [0; 0x20];
+		match &try!(self.parse_token(&mut token))[..] {
 			b"hdrstop" => {
 				if !self.keep_headers {
 					try! (self.write(b"#pragma hdrstop"));
@@ -309,8 +312,8 @@ impl <'a> ScannerState<'a> {
 		}
 	}
 
-	fn parse_token(&mut self, limit: usize) -> Result<Vec<u8>, Error> {
-		let mut token: Vec<u8> = Vec::with_capacity(limit);
+	fn parse_token<'b>(&mut self, token: &'b mut [u8]) -> Result<&'b [u8], Error> {
+		let mut offset: usize = 0;
 		loop {
 			assert! (self.buf_size <= self.buf_data.len());
 			while self.buf_read != self.buf_size {
@@ -318,16 +321,17 @@ impl <'a> ScannerState<'a> {
 				match c {
 					// end-of-line ::= newline | carriage-return | carriage-return newline
 					b'a'...b'z' | b'A'...b'Z' | b'0'...b'9' | b'_' => {
-						token.push(c);
+						if offset == token.len() {
+							return Err(Error::new(ErrorKind::InvalidInput, PostprocessError::TokenTooLong))
+						}
+						token[offset] = c;
+						offset += 1;
 					}
 					_ => {
-						return Ok(token);
+						return Ok(&token[0..offset]);
 					}
 				}
 				self.next();
-			}
-			if token.len() > BUF_SIZE {
-				return Err(Error::new(ErrorKind::InvalidInput, PostprocessError::TokenTooLong))
 			}
 			if try! (self.read()) == 0 {
 				return Ok(token);
