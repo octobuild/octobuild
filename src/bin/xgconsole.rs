@@ -184,7 +184,7 @@ fn execute_until_failed(graph: &Graph<BuildTask, ()>, tx_task: Sender<TaskMessag
 	for _ in 0 .. graph.node_count() {
 		completed.push(false);
 	}
-	for index in graph.without_edges(EdgeDirection::Incoming) {
+	for index in graph.without_edges(EdgeDirection::Outgoing) {
 		try! (tx_task.send(TaskMessage{
 			index: index,
 			task: graph.node_weight(index).unwrap().clone(),
