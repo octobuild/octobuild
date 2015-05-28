@@ -84,7 +84,8 @@ pub fn filter_preprocessed(reader: &mut Read, writer: &mut Write, marker: &Optio
 		},
 		None => None,
 	};
-	while try!(state.parse_line()) {
+	while state.buf_size != 0 {
+		try!(state.parse_line());
 		if state.done {
 			return state.copy_to_end();
 		}
@@ -187,49 +188,71 @@ impl <'a> ScannerState<'a> {
 		Ok(())
 	}
 
-	fn parse_line(&mut self) -> Result<bool, Error> {
+	fn parse_line(&mut self) -> Result<(), Error> {
 		try! (self.parse_spaces());
 		match try!(self.peek()) {
 			Some(b'#') => {
 				self.next();
 				self.parse_directive()
 			}
-			Some(_) => self.next_line(),
-			None => Ok(false),
+			Some(_) => {
+				try! (self.next_line());
+				Ok(())
+			}
+			None => Ok(()),
 		}
 	}
 
-	fn next_line(&mut self) -> Result<bool, Error> {
+	fn next_line(&mut self) -> Result<&'static [u8], Error> {
 		loop {
 			for i in self.buf_read..self.buf_size {
 				let c = self.buf_data[i];
 				if c | (b'\n' | b'\r') != (b'\n' | b'\r') {
 					continue;
 				}
-				if (c == b'\n') || (c == b'\r') {
+				if c == b'\r' {
+					self.buf_read = i + 1;
+					if self.buf_read == self.buf_size {
+						if try! (self.read()) == 0 {
+							return Ok(b"\r");
+						}
+
+					}
+					if self.buf_data[self.buf_read] == b'\n' {
+						self.buf_read += 1;
+						return Ok(b"\r\n");
+					}
+					// end-of-line ::= newline | carriage-return | carriage-return newline
+					return Ok(b"\r");
+
+				}
+				if c == b'\n' {
 					// end-of-line ::= newline | carriage-return | carriage-return newline
 					self.buf_read = i + 1;
-					return Ok(true);
+					return Ok(b"\n");
 				}
 			}
 			self.buf_read = self.buf_size;
 			if try! (self.read()) == 0 {
-				return Ok(false);
+				return Ok(b"");
 			}
 		}
 	}
 
-	fn parse_directive(&mut self) -> Result<bool, Error> {
+	fn parse_directive(&mut self) -> Result<(), Error> {
 		try!(self.parse_spaces());
 		let mut token = [0; 0x10];
 		match &try!(self.parse_token(&mut token))[..] {
 			b"line" => self.parse_directive_line(),
 			b"pragma" => self.parse_directive_pragma(),
-			_ => self.next_line(),
+			_ => {
+				try! (self.next_line());
+				Ok(())
+			}
 		}	
 	}
 
-	fn parse_directive_line(&mut self) -> Result<bool, Error> {
+	fn parse_directive_line(&mut self) -> Result<(), Error> {
 		let mut line_token = [0; 0x10];
 		let mut file_token = [0; 0x400];
 		let mut file_raw = [0; 0x400];
@@ -237,16 +260,20 @@ impl <'a> ScannerState<'a> {
 		let line = try!(self.parse_token(&mut line_token));
 		try!(self.parse_spaces());
 		let (file, raw) = try!(self.parse_path(&mut file_token, &mut file_raw));
-		try!(self.next_line());
+		let eol = try!(self.next_line());
 		self.entry_file = match self.entry_file.take() {
 			Some(path) => {
 				if self.header_found && (path == file) {
 					self.done = true;
-					try! (self.write(b"#pragma hdrstop\n#line "));
-					try! (self.write(&line));
-					try! (self.write(b" "));
-					try! (self.write(&raw));
-					try! (self.write(b"\n"));
+					let mut mark = Vec::with_capacity(0x400);
+					try! (mark.write(b"#pragma hdrstop"));
+					try! (mark.write(&eol));
+					try! (mark.write(b"#line "));
+					try! (mark.write(&line));
+					try! (mark.write(b" "));
+					try! (mark.write(&raw));
+					try! (mark.write(&eol));
+					try! (self.write(&mark));
 				}
 				match &self.marker {
 					&Some(ref path) => {
@@ -260,10 +287,10 @@ impl <'a> ScannerState<'a> {
 			}
 			None => Some(Vec::from(file))
 		};
-		Ok(true)
+		Ok(())
 	}
 
-	fn parse_directive_pragma(&mut self) -> Result<bool, Error> {
+	fn parse_directive_pragma(&mut self) -> Result<(), Error> {
 		try!(self.parse_spaces());
 		let mut token = [0; 0x20];
 		match &try!(self.parse_token(&mut token))[..] {
@@ -272,12 +299,12 @@ impl <'a> ScannerState<'a> {
 					try! (self.write(b"#pragma hdrstop"));
 				}
 				self.done = true;
-				Ok(true)
 			},
 			_ => {
-				self.next_line()
+				try! (self.next_line());
 			}
 		}
+		Ok(())
 	}
 
 	fn parse_escape(&mut self) -> Result<u8, Error> {
@@ -453,14 +480,20 @@ mod test {
 	use std::fs::File;
 	use self::test::Bencher;
 
-	fn check_filter(original: &str, expected: &str, marker: Option<String>, keep_headers: bool) {
+	fn check_filter_pass(original: &str, expected: &str, marker: &Option<String>, keep_headers: bool, eol: &str) {
 		let mut writer: Vec<u8> = Vec::new();
 		let mut stream: Vec<u8> = Vec::new();
-		stream.write(&original.as_bytes()[..]).unwrap();
-		match super::filter_preprocessed(&mut Cursor::new(stream), &mut writer, &marker, keep_headers) {
-			Ok(_) => {assert_eq! (String::from_utf8_lossy(&writer), expected)}
+		stream.write(&original.replace("\n", eol).as_bytes()[..]).unwrap();
+		match super::filter_preprocessed(&mut Cursor::new(stream), &mut writer, marker, keep_headers) {
+			Ok(_) => {assert_eq! (String::from_utf8_lossy(&writer), expected.replace("\n", eol))}
 			Err(e) => {panic! (e);}
 		}
+	}
+
+	fn check_filter(original: &str, expected: &str, marker: Option<String>, keep_headers: bool) {
+		check_filter_pass(original, expected, &marker, keep_headers, "\n");
+		check_filter_pass(original, expected, &marker, keep_headers, "\r\n");
+		check_filter_pass(original, expected, &marker, keep_headers, "\r");
 	}
 
 	#[test]
@@ -537,6 +570,35 @@ int main(int argc, char **argv) {
 	return 0;
 }
 "#, None, false);
+	}
+
+	#[test]
+	fn test_filter_precompiled_hdrstop_keep() {
+		check_filter(
+r#"#line 1 "sample.cpp"
+ #line 1 "e:/work/octobuild/test_cl/sample header.h"
+void hello();
+# pragma  hdrstop
+void data();
+# pragma once
+#line 2 "sample.cpp"
+
+int main(int argc, char **argv) {
+	return 0;
+}
+"#,
+r#"#line 1 "sample.cpp"
+ #line 1 "e:/work/octobuild/test_cl/sample header.h"
+void hello();
+# pragma  hdrstop
+void data();
+# pragma once
+#line 2 "sample.cpp"
+
+int main(int argc, char **argv) {
+	return 0;
+}
+"#, None, true);
 	}
 
 	#[test]

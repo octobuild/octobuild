@@ -8,7 +8,7 @@ use super::super::utils::hash_text;
 use super::super::io::tempfile::TempFile;
 
 use std::fs::File;
-use std::io::{Error, BufReader, Cursor, Read, Write};
+use std::io::{Error, Cursor, Read, Write};
 use std::hash::{SipHasher, Hasher};
 use std::path::{Path, PathBuf};
 use std::process::Output;
@@ -74,10 +74,10 @@ impl Compiler for VsCompiler {
 		let output = try! (command.output());
 		if output.status.success() {
 			match File::open(temp_file.path()) {
-				Ok(stream) => {
+				Ok(mut stream) => {
 					let mut output: Box<Read> = if task.input_precompiled.is_some() || task.output_precompiled.is_some() {
 						let mut buffer: Vec<u8> = Vec::new();
-						try! (postprocess::filter_preprocessed(&mut BufReader::new(stream), &mut buffer, &task.marker_precompiled, task.output_precompiled.is_some()));
+						try! (postprocess::filter_preprocessed(&mut stream, &mut buffer, &task.marker_precompiled, task.output_precompiled.is_some()));
 						Box::new(Cursor::new(buffer))
 					} else {
 						Box::new(stream)
