@@ -1,4 +1,3 @@
-#![feature(exit_status)]
 extern crate octobuild;
 extern crate petgraph;
 extern crate tempdir;
@@ -25,6 +24,7 @@ use std::iter::FromIterator;
 use std::path::Path;
 use std::sync::{Arc, Mutex};
 use std::sync::mpsc::{channel, Sender, Receiver};
+use std::process;
 use std::thread;
 
 #[derive(Debug)]
@@ -47,18 +47,18 @@ fn main() {
 	for arg in args.iter() {
 		println!("  {}", arg);
 	}
-	match execute(&args[1..]) {
+	process::exit(match execute(&args[1..]) {
 		Ok(result) => {
-			env::set_exit_status(match result {
+			match result {
 				Some(r) => r,
-				None => 500
-			});
+				None => 501
+			}
 		}
 		Err(e) => {
 			println!("FATAL ERROR: {:?}", e);
-			env::set_exit_status(500);
+			500
 		}
-	}
+	})
 }
 
 fn execute(args: &[String]) -> Result<Option<i32>, Error> {

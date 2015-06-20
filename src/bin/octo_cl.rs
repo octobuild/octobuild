@@ -1,4 +1,3 @@
-#![feature(exit_status)]
 extern crate octobuild;
 extern crate tempdir;
 
@@ -13,20 +12,21 @@ use std::io;
 use std::io::{Error, Write};
 use std::iter::FromIterator;
 use std::path::Path;
+use std::process;
 
 fn main() {
-	match compile() {
+	process::exit(match compile() {
 		Ok(output) => {
-			env::set_exit_status(match output.status {
+			match output.status {
 				Some(r) => r,
 				None => 501
-			});
+			}
 		}
 		Err(e) => {
 			println!("FATAL ERROR: {:?}", e);
-			env::set_exit_status(500);
+			500
 		}
-	}
+	})
 }
 
 fn compile() -> Result<OutputInfo, Error> {
