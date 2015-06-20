@@ -429,12 +429,7 @@ fn is_subpath(parent: &[u8], child: &[u8]) -> bool {
 fn string_to_local_bytes(s: String) -> Result<Vec<u8>, Error> {
 	#[cfg(unix)]
 	fn string_to_local_bytes_inner(s: String) -> Result<Vec<u8>, Error> {
-		use std::ffi::OsString;
-
-		match OsString::from(s).to_bytes() {
-			Some(v) => Ok(Vec::from(v)),
-			None => Err(Error::new(ErrorKind::InvalidInput, PostprocessError::InvalidLiteral)),
-		}
+		Ok(s.into_bytes())
 	}
 
 	#[cfg(windows)]
