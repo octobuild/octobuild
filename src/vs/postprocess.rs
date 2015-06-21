@@ -437,8 +437,9 @@ fn string_to_local_bytes(s: String) -> Result<Vec<u8>, Error> {
 		extern crate winapi;
 		extern crate kernel32;
 
+		use std::ffi::OsStr;
+		use std::os::windows::ffi::OsStrExt;
 		use std::ptr;
-		use std::iter::FromIterator;
 
 		const WC_COMPOSITECHECK: winapi::DWORD = 0x00000200; // use composite chars
 
@@ -447,16 +448,16 @@ fn string_to_local_bytes(s: String) -> Result<Vec<u8>, Error> {
 			return Ok(Vec::new());
 		}
 		unsafe {
-			let wstr: Vec<u16> = Vec::from_iter(s.utf16_units());
+			let wstr: Vec<u16> = OsStr::new(&s).encode_wide().chain(Some(0)).collect::<Vec<_>>();
 			// Get length of ANSI string
-			let len = kernel32::WideCharToMultiByte(winapi::CP_ACP, WC_COMPOSITECHECK, wstr.as_ptr(), wstr.len() as i32, ptr::null_mut(), 0, ptr::null(), ptr::null_mut());
+			let len = kernel32::WideCharToMultiByte(winapi::CP_ACP, WC_COMPOSITECHECK, wstr.as_ptr(), (wstr.len() - 1) as i32, ptr::null_mut(), 0, ptr::null(), ptr::null_mut());
 			if len <= 0 {
 				return Err(Error::new(ErrorKind::InvalidInput, PostprocessError::InvalidLiteral));
 			}
 			// Convert UTF-16 to ANSI
 			let mut astr: Vec<u8> = Vec::with_capacity(len as usize);
 			astr.set_len(len as usize);
-			match kernel32::WideCharToMultiByte(winapi::CP_ACP, WC_COMPOSITECHECK, wstr.as_ptr(), wstr.len() as i32, astr.as_mut_ptr() as winapi::LPSTR, len, ptr::null(), ptr::null_mut()) {
+			match kernel32::WideCharToMultiByte(winapi::CP_ACP, WC_COMPOSITECHECK, wstr.as_ptr(), (wstr.len() - 1) as i32, astr.as_mut_ptr() as winapi::LPSTR, len, ptr::null(), ptr::null_mut()) {
 				l if (l as usize) == astr.len() => Ok(astr),
 				l if l > 0 => Ok(Vec::from(&astr[0..(l as usize)])),
 				_ => Err(Error::new(ErrorKind::InvalidInput, PostprocessError::InvalidLiteral)),
