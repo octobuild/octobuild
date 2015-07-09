@@ -128,6 +128,7 @@ class Script
         project.OutFileName = @"target\octobuild-" + version + "-" + PlatformName(platform);
         project.Platform = Platform.x64;
         project.Package.AttributesDefinition = @"InstallPrivileges=elevated;InstallScope=perMachine";
+        project.MajorUpgradeStrategy = MajorUpgradeStrategy.Default;
 
         Compiler.BuildMsi(project);
         Compiler.BuildWxs(project);
