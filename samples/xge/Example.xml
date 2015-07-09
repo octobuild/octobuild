@@ -1,0 +1,22 @@
+<BuildSet FormatVersion="1">
+  <Environments>
+    <Environment Name="Env_0">
+      <Tools>
+        <Tool Name="Tool0_0"                        GroupPrefix="** For FPS" Params=" /YcE:\Temp\FPS\FPS.h /FpC:\Work\FPS.h.pch C:\Work\PCH.FPS.h.cpp /FoC:\Work\FPS.h.obj" Path="C:\VC/bin/amd64\cl.exe" SkipIfProjectFailed="true" OutputFileMasks="FPS.h.pch,FPS.h.obj" />
+        <Tool Name="Tool1_0"                        GroupPrefix="** For FPS" Params=" /YcE:\Temp\UELinkerFixupsName.h /FpC:\Work\UELinkerFixupsName.h.pch C:\Work\PCH.UELinkerFixupsName.h.cpp /FoC:\Work\UELinkerFixupsName.h.obj" Path="C:\VC/bin/amd64\cl.exe" SkipIfProjectFailed="true" OutputFileMasks="UELinkerFixupsName.h.pch,UELinkerFixupsName.h.obj" />
+        <Tool Name="Tool2_0"                        GroupPrefix="** For FPS" Params=" /YuE:\Temp\FPS\FPS.h /FpC:\Work\FPS.h.pch /FIE:\Temp\FPS\FPS.h E:\Temp\FPS\FPSHUD.cpp /FoC:\Work\FPSHUD.cpp.obj" Path="C:\VC/bin/amd64\cl.exe" SkipIfProjectFailed="true" OutputFileMasks="FPSHUD.cpp.obj" />
+        <Tool Name="Tool9_0" OutputPrefix="FPS.exe" GroupPrefix="** For FPS" Params=" @E:\Temp\FPS\FPS.exe.response /OUT:E:\Temp\FPS\Binaries\Win64\FPS.exe /PDB:E:\Temp\FPS\FPS.pdb" Path="C:\VC/bin/amd64\link.exe" SkipIfProjectFailed="true" OutputFileMasks="FPS.exe,FPS.pdb" />
+      </Tools>
+      <Variables>
+        <Variable Name="Framework40Version" Value="v4.0" />
+        <Variable Name="Platform" Value="x64" />
+      </Variables>
+    </Environment>
+  </Environments>
+  <Project Name="Env_0" Env="Env_0">
+    <Task Caption="PCH.FPS.h.cpp"                Name="Action0_0" Tool="Tool0_0" WorkingDir="C:\Work" />
+    <Task Caption="PCH.UELinkerFixupsName.h.cpp" Name="Action1_0" Tool="Tool1_0" WorkingDir="C:\Work" />
+    <Task Caption="FPSHUD.cpp"                   Name="Action2_0" Tool="Tool2_0" WorkingDir="C:\Work" DependsOn="Action0_0" />
+    <Task                                        Name="Action9_0" Tool="Tool9_0" WorkingDir="C:\Work" DependsOn="Action0_0;Action2_0;Action1_0" />
+  </Project>
+</BuildSet>
