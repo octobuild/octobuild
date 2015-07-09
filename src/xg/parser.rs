@@ -8,6 +8,7 @@ use std::fmt::{Display, Formatter};
 use std::io::{Read, Error, ErrorKind};
 use std::collections::{HashSet, HashMap};
 use std::iter::FromIterator;
+use std::sync::Arc;
 
 use self::petgraph::graph::{Graph, NodeIndex};
 
@@ -57,7 +58,7 @@ impl ::std::error::Error for XgParseError {
 
 #[derive(Debug)]
 struct XgEnvironment {
-    variables: HashMap<String, String>,
+    variables: Arc<HashMap<String, String>>,
     tools: HashMap<String, XgTool>,
 }
 
@@ -149,24 +150,26 @@ fn parse_environments<R: Read>(events: &mut Events<R>, envs: &mut HashMap<String
 }
 
 fn parse_environment<R: Read>(events: &mut Events<R>) -> Result<XgEnvironment, Error> {
-	let mut env = XgEnvironment {
-		variables: HashMap::new(),
-		tools: HashMap::new(),
-	};
+	let mut variables = HashMap::new();
+	let mut tools = HashMap::new();
 	loop {
 		match events.next() {
 			Some(XmlEvent::StartElement {name, ..}) => {
 				match &name.local_name[..] {
-					"Variables" => try!(parse_variables(events, &mut env.variables)),
-					"Tools" => try!(parse_tools(events, &mut env.tools)),
+					"Variables" => try!(parse_variables(events, &mut variables)),
+					"Tools" => try!(parse_tools(events, &mut tools)),
 					_ => try!(parse_skip(events, ())),
 				};
 			}			
-			Some(XmlEvent::EndElement {..}) => {return Ok(env);}
+			Some(XmlEvent::EndElement {..}) => {break;}
 			Some(_) => {}
 			None => {return Err(Error::new(ErrorKind::InvalidInput, XgParseError::EndOfStream));}
 		}
 	}
+	Ok(XgEnvironment {
+		variables: Arc::new(variables),
+		tools: tools,
+	})
 }
 
 fn parse_variables<R: Read>(events: &mut Events<R>, variables: &mut HashMap<String, String>) -> Result<(), Error> {
@@ -311,6 +314,7 @@ fn graph_project(graph: &mut Graph<BuildTask, ()>, project: XgProject, env: &XgE
 			},
 			exec: tool.exec.clone(),
 			args: wincmd::parse(&tool.args),
+			env: env.variables.clone(),
 			working_dir : task.working_dir.clone(),
 		});
 		task_refs.insert(&id, node);

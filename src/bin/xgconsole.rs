@@ -142,7 +142,7 @@ fn validate_graph(graph: Graph<BuildTask, ()>) -> Result<Graph<BuildTask, ()>, E
 
 fn execute_task(cache: &Cache, temp_dir: &Path, worker: usize, message: TaskMessage) -> ResultMessage {
 	let args = wincmd::expand_args(&message.task.args, &|name:&str|->Option<String>{env::var(name).ok()});
-	let output = execute_compiler(cache, temp_dir, &message.task.exec, &Path::new(&message.task.working_dir), &args);
+	let output = execute_compiler(cache, temp_dir, &message.task, &args);
 	ResultMessage {
 		index: message.index,
 		task: message.task,
@@ -151,12 +151,13 @@ fn execute_task(cache: &Cache, temp_dir: &Path, worker: usize, message: TaskMess
 	}
 }
 
-fn execute_compiler(cache: &Cache, temp_dir: &Path, program: &str, cwd: &Path, args: &[String]) -> Result<OutputInfo, Error> {
+fn execute_compiler(cache: &Cache, temp_dir: &Path, task: &BuildTask, args: &[String]) -> Result<OutputInfo, Error> {
 	let command = CommandInfo {
-		program: Path::new(program).to_path_buf(),
-		current_dir: Some(cwd.to_path_buf()),
+		program: Path::new(&task.exec).to_path_buf(),
+		current_dir: Some(Path::new(&task.working_dir).to_path_buf()),
+		env: task.env.clone(),
 	};
-	if Path::new(program).ends_with("cl.exe") {
+	if Path::new(&task.exec).ends_with("cl.exe") {
 		let compiler = VsCompiler::new(cache, temp_dir);
 		compiler.compile(command, args)
 	} else {

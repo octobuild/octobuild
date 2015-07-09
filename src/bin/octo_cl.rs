@@ -7,11 +7,13 @@ use octobuild::cache::Cache;
 
 use tempdir::TempDir;
 
+use std::collections::HashMap;
 use std::env;
 use std::io;
 use std::io::{Error, Write};
 use std::iter::FromIterator;
 use std::path::Path;
+use std::sync::Arc;
 use std::process;
 
 fn main() {
@@ -36,6 +38,7 @@ fn compile() -> Result<OutputInfo, Error> {
 	let output = try! (compiler.compile(CommandInfo {
 		program: Path::new("cl.exe").to_path_buf(),
 		current_dir: None,
+		env: Arc::new(HashMap::new()),
 	}, &args[1..]));
 
 	try !(io::stdout().write_all(&output.stdout));
