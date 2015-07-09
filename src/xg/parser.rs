@@ -6,7 +6,8 @@ use wincmd;
 
 use std::fmt::{Display, Formatter};
 use std::io::{Read, Error, ErrorKind};
-use std::collections::HashMap;
+use std::collections::{HashSet, HashMap};
+use std::iter::FromIterator;
 
 use self::petgraph::graph::{Graph, NodeIndex};
 
@@ -70,10 +71,10 @@ pub fn parse<B: Read>(reader: B) -> Result<Graph<BuildTask, ()>, Error> {
 			XmlEvent::StartElement {name, attributes, ..} => {
 				match &name.local_name[..] {
 					"Task" => {
-						tasks.push(try! (parse_task (&attributes)));
+						tasks.push(try! (parse_task (attributes)));
 					}
 					"Tool" => {
-						let tool = try! (parse_tool (&attributes));
+						let tool = try! (parse_tool (attributes));
 						tools.insert(tool.id.to_string(), tool);
 					}
 					_ => {}
@@ -139,28 +140,18 @@ fn parse_create_graph(tasks:&Vec<XgTask>, tools:&HashMap<String, XgTool>) -> Res
 	Ok(graph)
 }
 
-fn map_attributes (attributes: &Vec<xml::attribute::OwnedAttribute>) -> HashMap<String, String> {
-	let mut attrs: HashMap<String, String> = HashMap::new();
-	for attr in attributes.iter() {
-		attrs.insert(attr.name.local_name.clone(), attr.value.clone());
-	}
-	attrs
+fn map_attributes (attributes: Vec<xml::attribute::OwnedAttribute>) -> HashMap<String, String> {
+	HashMap::from_iter(attributes.into_iter().map(|v| (v.name.local_name, v.value)))
 }
 
-fn parse_task (attributes: & Vec<xml::attribute::OwnedAttribute>)->Result<XgTask, Error> {
+fn parse_task (attributes: Vec<xml::attribute::OwnedAttribute>)->Result<XgTask, Error> {
 	let mut attrs = map_attributes(attributes);
 	let tool = try! (take_attr(&mut attrs, "Tool"));
 	let working_dir = try! (take_attr(&mut attrs, "WorkingDir"));
 	// DependsOn
-	let mut depends_on : Vec<String> = Vec::new();
-	match attrs.remove("DependsOn") {
-		Some(v) => {
-			for item in v.split(";").collect::<Vec<&str>>().iter() {
-				depends_on.push(item.to_string())
-			}
-		}
-		_ => {
-		}
+	let depends_on : HashSet<String> = match attrs.remove("DependsOn") {
+		Some(v) => HashSet::from_iter(v.split(";").map(|v| v.to_string())),
+		_ => HashSet::new()
 	};
 
 	Ok(XgTask {
@@ -168,11 +159,11 @@ fn parse_task (attributes: & Vec<xml::attribute::OwnedAttribute>)->Result<XgTask
 		title: attrs.remove("Caption"),
 		tool: tool,
 		working_dir: working_dir,
-		depends_on: depends_on,
+		depends_on: depends_on.into_iter().collect::<Vec<String>>(),
 	})
 }
 
-fn parse_tool (attributes: &Vec<xml::attribute::OwnedAttribute>)->Result<XgTool, Error> {
+fn parse_tool (attributes: Vec<xml::attribute::OwnedAttribute>)->Result<XgTool, Error> {
 	let mut attrs = map_attributes(attributes);
 	let id = try! (take_attr(&mut attrs, "Name"));
 	let exec = try! (take_attr(&mut attrs, "Path"));
@@ -181,8 +172,8 @@ fn parse_tool (attributes: &Vec<xml::attribute::OwnedAttribute>)->Result<XgTool,
 		exec: exec,
 		output: attrs.remove("OutputPrefix"),
 		args: match attrs.remove("Params") {
-			Some(v) => {v}
-			_ => {String::new()}
+			Some(v) => v,
+			_ => String::new()
 		},
 	})
 }
