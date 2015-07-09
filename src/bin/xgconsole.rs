@@ -181,10 +181,13 @@ fn execute_graph(graph: &Graph<BuildTask, ()>, tx_task: Sender<TaskMessage>, mut
 
 fn execute_until_failed(graph: &Graph<BuildTask, ()>, tx_task: Sender<TaskMessage>, rx_result: &Receiver<ResultMessage>) -> Result<Option<i32>, Error> {
 	let mut completed:Vec<bool> = Vec::new();
+	let mut waiting:Vec<bool> = Vec::new();
 	for _ in 0 .. graph.node_count() {
 		completed.push(false);
+		waiting.push(false);
 	}
 	for index in graph.without_edges(EdgeDirection::Outgoing) {
+		waiting[index.index()] = true;
 		try! (tx_task.send(TaskMessage{
 			index: index,
 			task: graph.node_weight(index).unwrap().clone(),
@@ -205,8 +208,9 @@ fn execute_until_failed(graph: &Graph<BuildTask, ()>, tx_task: Sender<TaskMessag
 		completed[message.index.index()] = true;
 
 		for source in graph.neighbors_directed(message.index, EdgeDirection::Incoming) {
-			if !completed[source.index()] {
-				if is_ready(graph, &completed, &source) {
+			if is_ready(graph, &completed, &source) {
+				if !waiting[source.index()] {
+					waiting[source.index()] = true;
 					try! (tx_task.send(TaskMessage{
 						index: source,
 						task: graph.node_weight(source).unwrap().clone(),
