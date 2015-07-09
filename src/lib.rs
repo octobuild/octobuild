@@ -1,5 +1,3 @@
-#![feature(test)]
-
 include!(concat!(env!("OUT_DIR"), "/version.rs"));
 
 pub const VERSION: &'static str = env!("CARGO_PKG_VERSION");
@@ -22,6 +20,6 @@ pub mod xg {
 }
 pub mod vs {
 	pub mod compiler;
-	mod prepare;
-	mod postprocess;
+	pub mod prepare;
+	pub mod postprocess;
 }

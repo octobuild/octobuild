@@ -470,11 +470,7 @@ fn string_to_local_bytes(s: String) -> Result<Vec<u8>, Error> {
 
 #[cfg(test)]
 mod test {
-	extern crate test;
-
-	use std::io::{Read, Write, Cursor};
-	use std::fs::File;
-	use self::test::Bencher;
+	use std::io::{Write, Cursor};
 
 	fn check_filter_pass(original: &str, expected: &str, marker: &Option<String>, keep_headers: bool, eol: &str) {
 		let mut writer: Vec<u8> = Vec::new();
@@ -622,21 +618,6 @@ int main(int argc, char **argv) {
 	return 0;
 }
 "#, Some("e:\\work\\octobuild\\test_cl\\sample header.h".to_string()), true);
-	}
-
-	fn bench_filter(b: &mut Bencher, path: &str, marker: Option<String>, keep_headers: bool) {
-		let mut source = Vec::new();
-		File::open(path).unwrap().read_to_end(&mut source).unwrap();
-		b.iter(|| {
-			let mut result = Vec::with_capacity(source.len());
-			super::filter_preprocessed(&mut Cursor::new(source.clone()), &mut result, &marker, keep_headers).unwrap();
-			result
-		});
-	}
-	
-	#[bench]
-	fn bench_check_filter(b: &mut Bencher) {
-		bench_filter(b, "tests/filter_preprocessed.i", Some("c:\\bozaro\\github\\octobuild\\test_cl\\sample.h".to_string()), false)
 	}
 
 	/**
