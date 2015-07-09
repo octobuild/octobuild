@@ -1,6 +1,8 @@
+use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
 use std::io::{Error, ErrorKind};
 use std::path::PathBuf;
+use std::sync::Arc;
 use std::process::{Command, Output};
 
 #[derive(Debug)]
@@ -79,11 +81,16 @@ pub struct CommandInfo {
 	pub program: PathBuf,
 	// Working directory
 	pub current_dir: Option<PathBuf>,
+	// Environment variables
+	pub env: Arc<HashMap<String, String>>,
 }
 
 impl CommandInfo {
 	pub fn to_command(&self) -> Command {
 		let mut command = Command::new(&self.program);
+		for (key, value) in self.env.iter() {
+			command.env(key.clone(), value.clone());
+		}
 		match self.current_dir {
 			Some(ref v) => {command.current_dir(&v);}
 			_ => {}
