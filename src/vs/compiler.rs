@@ -58,6 +58,7 @@ impl Compiler for VsCompiler {
 		args.push("/nologo".to_string());
 		args.push("/T".to_string() + &task.language);
 		args.push("/P".to_string());
+		args.push("/we4002".to_string()); // C4002: too many actual parameters for macro 'identifier'
 		args.push(task.input_source.display().to_string());
 	
 		// Hash data.
