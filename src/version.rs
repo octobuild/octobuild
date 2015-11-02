@@ -5,5 +5,5 @@ include!(concat!(env!("OUT_DIR"), "/version.rs"));
 pub const VERSION: &'static str = env!("CARGO_PKG_VERSION");
 
 pub fn full_version() -> String {
-    format!("{}-{}-{} {}", VERSION, ARCH, OS, &REVISION[0..9])
+    format!("{}-{}-{}, rev: {}, rustc: {}", VERSION, ARCH, OS, &REVISION[0..9], RUSTC)
 }

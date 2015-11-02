@@ -15,6 +15,9 @@ test = false
 name = "xgconsole"
 test = false
 
+[build-dependencies]
+rustc_version = "*"
+
 [dependencies]
 filetime = "*"
 lz4 = "*"

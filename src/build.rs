@@ -1,9 +1,13 @@
+extern crate rustc_version;
+
 use std::env;
 use std::io::Error;
 use std::fs::File;
 use std::io::Write;
 use std::path::Path;
 use std::process::Command;
+
+use rustc_version::version;
 
 fn save_platform() -> Result<(), Error> {
     let root_dir = env::var("CARGO_MANIFEST_DIR").unwrap();
@@ -28,7 +32,11 @@ fn save_version() -> Result<(), Error> {
     let mut f = File::create(&dest_path).unwrap();
     f.write_all(&format!(r#"
 pub const REVISION: &'static str = "{revision}";
-    "#, revision = try!(load_revision())).into_bytes())
+pub const RUSTC: &'static str = "{rustc}";
+    "#,
+        revision = try!(load_revision()),
+        rustc = version(),
+    ).into_bytes())
 }
 
 fn main() {
