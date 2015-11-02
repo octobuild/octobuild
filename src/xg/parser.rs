@@ -13,8 +13,7 @@ use std::sync::Arc;
 use self::petgraph::graph::{Graph, NodeIndex};
 
 use self::xml::reader::EventReader;
-use self::xml::reader::Events;
-use self::xml::reader::events::XmlEvent;
+use self::xml::reader::XmlEvent;
 
 #[derive(Debug)]
 pub enum XgParseError {
@@ -24,6 +23,7 @@ pub enum XgParseError {
 	DependencyNotFound(String),
 	InvalidStreamFormat,
 	EndOfStream,
+	XmlError(self::xml::reader::Error),
 }
 				
 impl Display for XgParseError {
@@ -35,6 +35,7 @@ impl Display for XgParseError {
 			&XgParseError::DependencyNotFound(ref id) => write!(f, "сan't find task for dependency with id: {}", id),
 			&XgParseError::InvalidStreamFormat => write!(f, "unexpected XML-stream root element"),
 			&XgParseError::EndOfStream => write!(f, "unexpended end of stream"),
+			&XgParseError::XmlError(ref e) => write!(f, "xml reading error: {}", e),
 		}
 	}
 }
@@ -48,6 +49,7 @@ impl ::std::error::Error for XgParseError {
 			&XgParseError::DependencyNotFound(_) => "сan't find task for dependency by id",
 			&XgParseError::InvalidStreamFormat => "unexpected XML-stream root element",
 			&XgParseError::EndOfStream => "unexpended end of stream",
+			&XgParseError::XmlError(_) => "xml reading error",
 		}
 	}
 
@@ -85,29 +87,25 @@ struct XgTool {
 
 pub fn parse<R: Read>(reader: R) -> Result<Graph<BuildTask, ()>, Error> {
 	let mut parser = EventReader::new(reader);
-	let mut events = parser.events();
 	loop {
-		match events.next() {
-			Some(XmlEvent::StartElement {name, ..}) => {
+		match try! (next_xml_event(&mut parser)) {
+			XmlEvent::StartElement {name, ..} => {
 				return match &name.local_name[..] {
-					"BuildSet" => parse_build_set(&mut events),
+					"BuildSet" => parse_build_set(&mut parser),
 					_ => Err(Error::new(ErrorKind::InvalidInput, XgParseError::InvalidStreamFormat)),
 				}
 			}
-			Some(_) => {}
-			None => {
-				return Err(Error::new(ErrorKind::InvalidInput, XgParseError::EndOfStream));
-			}
+			_ => {}
 		}
 	}
 }
 
-pub fn parse_build_set<R: Read>(events: &mut Events<R>) -> Result<Graph<BuildTask, ()>, Error> {
+pub fn parse_build_set<R: Read>(events: &mut EventReader<R>) -> Result<Graph<BuildTask, ()>, Error> {
 	let mut envs:HashMap<String, XgEnvironment> = HashMap::new();
 	let mut projects:Vec<XgProject> = Vec::new();
 	loop {
-		match events.next() {
-			Some(XmlEvent::StartElement {name, attributes, ..}) => {
+		match try! (next_xml_event(events)) {
+			XmlEvent::StartElement {name, attributes, ..} => {
 				match &name.local_name[..] {
 					"Environments" => {try! (parse_environments(events, &mut envs));}
 					"Project" => {
@@ -120,19 +118,17 @@ pub fn parse_build_set<R: Read>(events: &mut Events<R>) -> Result<Graph<BuildTas
 					_ => {try! (parse_skip(events, ()));}
 				}
 			}
-			Some(_) => {}
-			None => {
-				break;
-			}
+			XmlEvent::EndElement {..} => {break;}
+			_ => {}
 		}
 	}
 	parse_create_graph(envs, projects)
 }
 
-fn parse_environments<R: Read>(events: &mut Events<R>, envs: &mut HashMap<String, XgEnvironment>) -> Result<(), Error> {
+fn parse_environments<R: Read>(events: &mut EventReader<R>, envs: &mut HashMap<String, XgEnvironment>) -> Result<(), Error> {
 	loop {
-		match events.next() {
-			Some(XmlEvent::StartElement {name, attributes, ..}) => {
+		match try! (next_xml_event(events)) {
+			XmlEvent::StartElement {name, attributes, ..} => {
 				match &name.local_name[..] {
 					"Environment" => {
 						let mut attrs = map_attributes(attributes);
@@ -142,28 +138,26 @@ fn parse_environments<R: Read>(events: &mut Events<R>, envs: &mut HashMap<String
 					_ => {try!(parse_skip(events, ()));}
 				}
 			}			
-			Some(XmlEvent::EndElement {..}) => {return Ok(());}
-			Some(_) => {}
-			None => {return Err(Error::new(ErrorKind::InvalidInput, XgParseError::EndOfStream));}
+			XmlEvent::EndElement {..} => {return Ok(());}
+			_ => {}
 		}
 	}
 }
 
-fn parse_environment<R: Read>(events: &mut Events<R>) -> Result<XgEnvironment, Error> {
+fn parse_environment<R: Read>(events: &mut EventReader<R>) -> Result<XgEnvironment, Error> {
 	let mut variables = HashMap::new();
 	let mut tools = HashMap::new();
 	loop {
-		match events.next() {
-			Some(XmlEvent::StartElement {name, ..}) => {
+		match try! (next_xml_event(events)) {
+			XmlEvent::StartElement {name, ..} => {
 				match &name.local_name[..] {
 					"Variables" => try!(parse_variables(events, &mut variables)),
 					"Tools" => try!(parse_tools(events, &mut tools)),
 					_ => try!(parse_skip(events, ())),
 				};
 			}			
-			Some(XmlEvent::EndElement {..}) => {break;}
-			Some(_) => {}
-			None => {return Err(Error::new(ErrorKind::InvalidInput, XgParseError::EndOfStream));}
+			XmlEvent::EndElement {..} => {break;}
+			_ => {}
 		}
 	}
 	Ok(XgEnvironment {
@@ -172,10 +166,10 @@ fn parse_environment<R: Read>(events: &mut Events<R>) -> Result<XgEnvironment, E
 	})
 }
 
-fn parse_variables<R: Read>(events: &mut Events<R>, variables: &mut HashMap<String, String>) -> Result<(), Error> {
+fn parse_variables<R: Read>(events: &mut EventReader<R>, variables: &mut HashMap<String, String>) -> Result<(), Error> {
 	loop {
-		match events.next() {
-			Some(XmlEvent::StartElement {name, attributes, ..}) => {
+		match try! (next_xml_event(events)) {
+			XmlEvent::StartElement {name, attributes, ..} => {
 				match &name.local_name[..] {
 					"Variable" => {
 						let mut attrs = map_attributes(attributes);
@@ -188,21 +182,18 @@ fn parse_variables<R: Read>(events: &mut Events<R>, variables: &mut HashMap<Stri
 				}
 				try!(parse_skip(events, ()));
 			}
-			Some(XmlEvent::EndElement {..}) => {
+			XmlEvent::EndElement {..} => {
 				return Ok(());
 			}
-			Some(_) => {}
-			None => {
-				return Err(Error::new(ErrorKind::InvalidInput, XgParseError::EndOfStream));
-			}
+			_ => {}
 		}
 	}
 }
 
-fn parse_tools<R: Read>(events: &mut Events<R>, tools: &mut HashMap<String, XgTool>) -> Result<(), Error> {
+fn parse_tools<R: Read>(events: &mut EventReader<R>, tools: &mut HashMap<String, XgTool>) -> Result<(), Error> {
 	loop {
-		match events.next() {
-			Some(XmlEvent::StartElement {name, attributes, ..}) => {
+		match try! (next_xml_event(events)) {
+			XmlEvent::StartElement {name, attributes, ..} => {
 				match &name.local_name[..] {
 					"Tool" => {
 						let mut attrs = map_attributes(attributes);
@@ -219,22 +210,19 @@ fn parse_tools<R: Read>(events: &mut Events<R>, tools: &mut HashMap<String, XgTo
 				}
 				try!(parse_skip(events, ()));
 			}
-			Some(XmlEvent::EndElement {..}) => {
+			XmlEvent::EndElement {..} => {
 				return Ok(());
 			}
-			Some(_) => {}
-			None => {
-				return Err(Error::new(ErrorKind::InvalidInput, XgParseError::EndOfStream));
-			}
+			_ => {}
 		}
 	}
 }
 
-fn parse_tasks<R: Read>(events: &mut Events<R>) -> Result<HashMap<String, XgTask>, Error> {
+fn parse_tasks<R: Read>(events: &mut EventReader<R>) -> Result<HashMap<String, XgTask>, Error> {
 	let mut tasks = HashMap::new();
 	loop {
-		match events.next() {
-			Some(XmlEvent::StartElement {name, attributes, ..}) => {
+		match try! (next_xml_event(events)) {
+			XmlEvent::StartElement {name, attributes, ..} => {
 				match &name.local_name[..] {
 					"Task" => {
 						let mut attrs = map_attributes(attributes);
@@ -259,35 +247,33 @@ fn parse_tasks<R: Read>(events: &mut Events<R>) -> Result<HashMap<String, XgTask
 				}
 				try!(parse_skip(events, ()));
 			}
-			Some(XmlEvent::EndElement {..}) => {
+			XmlEvent::EndElement {..} => {
 				return Ok(tasks);
 			}
-			Some(_) => {}
-			None => {
-				return Err(Error::new(ErrorKind::InvalidInput, XgParseError::EndOfStream));
-			}
+			_ => {}
 		}
 	}
 }
 
-fn parse_skip<R: Read, T>(events: &mut Events<R>, result: T) -> Result<T, Error> {
+fn parse_skip<R: Read, T>(events: &mut EventReader<R>, result: T) -> Result<T, Error> {
 	let mut depth: isize = 0;
 	loop {
-		match events.next() {
-			Some(XmlEvent::StartElement {..}) => {
+		match try! (next_xml_event(events)) {
+			XmlEvent::StartElement {..} => {
 				depth += 1;
 			}
-			Some(XmlEvent::EndElement {..}) => {
+			XmlEvent::EndElement {..} => {
 				if depth == 0 {break;}
 				depth -= 1;
 			}
-			Some(_) => {}
-			None => {
-				return Err(Error::new(ErrorKind::InvalidInput, XgParseError::EndOfStream));
-			}
+			_=> {}
 		}
 	}
 	Ok(result)
+}
+
+fn next_xml_event<R: Read>(reader: &mut EventReader<R>) -> Result<XmlEvent, Error> {
+	reader.next().map_err(|e| Error::new(ErrorKind::InvalidInput, XgParseError::XmlError(e)))
 }
 
 fn parse_create_graph(envs:HashMap<String, XgEnvironment>, projects:Vec<XgProject>) -> Result<Graph<BuildTask, ()>, Error> {
@@ -336,4 +322,12 @@ fn map_attributes (attributes: Vec<xml::attribute::OwnedAttribute>) -> HashMap<S
 
 fn take_attr(attrs: &mut HashMap<String, String>, attr: &'static str) -> Result<String, Error> {
 	attrs.remove(attr).ok_or_else(|| Error::new(ErrorKind::InvalidInput, XgParseError::AttributeNotFound(attr)))
+}
+
+#[test]
+fn test_parse_smoke() {
+	use std::fs::File;
+	use std::io::BufReader;
+
+	parse(BufReader::new(File::open("tests/graph-parser.xml").unwrap())).unwrap();
 }
