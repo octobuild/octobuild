@@ -34,8 +34,3 @@ pub fn hash_write_stream(hash: &mut Hasher, stream: &mut Read) -> Result<(), Err
 	}
 	Ok(())
 }
-
-pub fn num_cpus() -> usize {
-	extern { fn rust_get_num_cpus() -> libc::uintptr_t; }
-	unsafe { rust_get_num_cpus() as usize }
-}

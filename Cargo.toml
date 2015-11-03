@@ -26,6 +26,7 @@ petgraph = "*"
 xml-rs = "*"
 uuid = "*"
 tempdir = "*"
+num_cpus = "*"
 
 [target.i686-pc-windows-gnu.dependencies]
 winapi = "*"

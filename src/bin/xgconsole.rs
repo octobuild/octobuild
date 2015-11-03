@@ -1,12 +1,12 @@
 extern crate octobuild;
 extern crate petgraph;
 extern crate tempdir;
+extern crate num_cpus;
 
 use octobuild::common::BuildTask;
 use octobuild::cache::Cache;
 use octobuild::wincmd;
 use octobuild::xg;
-use octobuild::utils;
 use octobuild::version;
 use octobuild::vs::compiler::VsCompiler;
 use octobuild::compiler::*;
@@ -70,7 +70,7 @@ fn execute(args: &[String]) -> Result<Option<i32>, Error> {
 		let (tx_result, rx_result): (Sender<ResultMessage>, Receiver<ResultMessage>) = channel();
 		let (tx_task, rx_task): (Sender<TaskMessage>, Receiver<TaskMessage>) = channel();
 
-		let mutex_rx_task = create_threads(rx_task, tx_result, utils::num_cpus(), |worker_id:usize| {
+		let mutex_rx_task = create_threads(rx_task, tx_result, num_cpus::get(), |worker_id:usize| {
 			let temp_path = temp_dir.path().to_path_buf();
 			let temp_cache = cache.clone();
 			move |task:TaskMessage| -> ResultMessage {
