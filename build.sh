@@ -31,7 +31,9 @@ build() {
 	rm -fR target/release
 	cargo test
 	cargo build --release
-	
+
+	sign target/release/*.exe
+
 	# Prepare for installer
 	if [ "$TARGET" == "i686-pc-windows" ]; then
 		cp $RUST/rustc/bin/libgcc*.dll target/release/
@@ -42,9 +44,17 @@ build() {
 		$WIXSHARP_DIR/cscs wixcs/setup.cs
 		nuget pack target/octobuild.nuspec -OutputDirectory target
 	fi
-	
+
+	sign target/*.msi
+
 	# Restore path
 	export PATH=$_PATH
+}
+
+sign() {
+	for i in $@; do
+		"$PROGRAMFILES (x86)/Windows Kits/8.0/bin/x64/signtool.exe" sign /n "Artem Navrotskiy" /t http://timestamp.verisign.com/scripts/timstamp.dll $i
+	done
 }
 
 if [ "$1" != "" ]; then
