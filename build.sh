@@ -52,8 +52,11 @@ build() {
 }
 
 sign() {
+	bat=.temp.bat
 	for i in $@; do
-		"$PROGRAMFILES (x86)/Windows Kits/8.0/bin/x64/signtool.exe" sign /n "Artem Navrotskiy" /t http://timestamp.verisign.com/scripts/timstamp.dll $i
+		echo "\"$PROGRAMFILES (x86)\\Windows Kits\\8.0\\bin\\x64\\signtool.exe\" sign /v /fd SHA256 /f $PFX_FILE /p %PFX_PASSWORD% /t http://timestamp.verisign.com/scripts/timstamp.dll $(echo $i | sed -e 's/\//\\/g')" > $bat
+		cmd.exe /C $bat
+		rm $bat
 	done
 }
 
