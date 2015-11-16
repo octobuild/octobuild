@@ -42,7 +42,7 @@ struct ResultMessage {
 }
 
 fn main() {
-	println!("XGConsole ({}):", version::full_version());
+	println!("xgConsole ({}):", version::full_version());
 	let args = Vec::from_iter(env::args());
 	for arg in args.iter() {
 		println!("  {}", arg);
