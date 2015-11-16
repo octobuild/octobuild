@@ -70,7 +70,7 @@ class Script
         featureBuilder.AttributesDefinition = @"AllowAdvertise=no";
 
         List<WixEntity> files = new List<WixEntity>();
-        files.Add(new File(featureBuilder, @"target\release\xgconsole.exe"));
+        files.Add(new File(featureBuilder, @"target\release\xgConsole.exe"));
         files.Add(new File(featureBuilder, @"LICENSE"));
         foreach (string file in System.IO.Directory.GetFiles(@"target\release", "*.dll"))
         {

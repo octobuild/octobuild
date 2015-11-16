@@ -11,7 +11,7 @@
     <requireLicenseAcceptance>false</requireLicenseAcceptance>
   </metadata>
   <files>
-    <file src="release\xgconsole.exe" />
+    <file src="release\xgConsole.exe" />
     <file src="release\*.dll" />
   </files>
 </package>

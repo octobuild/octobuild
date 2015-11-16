@@ -12,7 +12,7 @@ name = "octo_cl"
 test = false
 
 [[bin]]
-name = "xgconsole"
+name = "xgConsole"
 test = false
 
 [build-dependencies]
