@@ -299,7 +299,7 @@ fn graph_project(graph: &mut Graph<BuildTask, ()>, project: XgProject, env: &XgE
 				},
 			},
 			exec: tool.exec.clone(),
-			args: cmd::native::parse(&tool.args),
+			args: try! (cmd::native::parse(&tool.args)),
 			env: env.variables.clone(),
 			working_dir : task.working_dir.clone(),
 		});
