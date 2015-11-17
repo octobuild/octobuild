@@ -1,61 +1,75 @@
-use std::io::Error;
+use std::io::{Error, ErrorKind};
+
+#[derive(PartialEq)]
+enum Quote {
+	None,
+	Double,
+	Single,
+}
 
 // Parsing command line arguments from singe line.
-// See also: http://msdn.microsoft.com/en-us/library/17w5ykft.aspx
 pub fn parse(cmd: &str) -> Result<Vec<String>, Error> {
 	let mut args: Vec<String> = Vec::new();
 	let mut arg: String = String::new();
-	let mut slash: usize = 0;
-	let mut quote = false;
+	let mut slash: bool = false;
+	let mut quote = Quote::None;
 	let mut data = false;
 	for c in cmd.chars() {
 		match c {
-			' ' | '\t' => {
-				arg = add_slashes(arg, if quote && ((slash % 2) == 0) {slash / 2} else {slash});
-				slash = 0;
-				if quote {
-					arg.push(c);
-					data = true;
-				} else if data {
+			'\'' if quote == Quote::Single => {
+				quote = Quote::None;
+			}
+			_ if quote == Quote::Single => {
+				arg.push(c);
+			}
+			' ' | '\t' | '"' | '\'' | '\\' if slash => {
+				arg.push(c);
+				slash = false;
+			}
+			_ if slash => {
+				arg.push('\\');
+				arg.push(c);
+				slash = false;
+			}
+			'"' if quote == Quote::Double => {
+				quote = Quote::None;
+			}
+			' ' | '\t' if quote == Quote::None => {
+				if data {
 					args.push(arg);
 					arg = String::new();
 					data = false;
 				}
 			}
 			'\\' => {
-				slash = slash + 1;
+				slash = true;
 				data = true;
 			}
 			'"' => {
-				arg = add_slashes(arg, slash / 2);
-				if (slash & 2) == 0 {
-					quote = !quote;
-				} else {
-					arg.push(c);
-				}
-				slash = 0;
+				quote = Quote::Double;
+				data = true;
+			}
+			'\'' => {
+				quote = Quote::Single;
 				data = true;
 			}
 			_ => {
-				arg = add_slashes(arg, if quote && ((slash % 2) == 0) {slash / 2} else {slash});
-				slash = 0;
 				arg.push(c);
 				data = true;
 			}
 		}
 	}
-	arg = add_slashes(arg, if quote && ((slash % 2) == 0) {slash / 2} else {slash});
 	if data {
 		args.push(arg);
 	}
-	return Ok(args);
-}
-
-fn add_slashes(mut line: String, count: usize) -> String {
-	for _ in 0..count {
-		line.push('\\');
+	if slash {
+		return Err(Error::new(ErrorKind::InvalidInput, "Unexpected line end: escape sequence is not finished"));
 	}
-	line
+	match quote {
+	    Quote::Single => Err(Error::new(ErrorKind::InvalidInput, "Unexpected line end: single quote is not closed")),
+	    Quote::Double => Err(Error::new(ErrorKind::InvalidInput, "Unexpected line end: double quote is not closed")),
+	    Quote::None => Ok(args),
+	}
 }
 
 #[test]
@@ -75,7 +89,7 @@ fn test_parse_3() {
 
 #[test]
 fn test_parse_4() {
-	assert_eq!(parse("a\\\\b d\"e f\"g h").unwrap(), ["a\\\\b", "de fg", "h"]);
+	assert_eq!(parse("a\\\\b d\"e f\"g h").unwrap(), ["a\\b", "de fg", "h"]);
 }
 
 #[test]
@@ -96,4 +110,14 @@ fn test_parse_7() {
 #[test]
 fn test_parse_8() {
 	assert_eq!(parse("/TEST\"C:\\Windows\\System32\" d e").unwrap(), ["/TESTC:\\Windows\\System32", "d", "e"]);
+}
+
+#[test]
+fn test_parse_9() {
+	assert_eq!(parse("begin ' some text \" foo\\ bar\\' end").unwrap(), ["begin", " some text \" foo\\ bar\\", "end"]);
+}
+
+#[test]
+fn test_parse_10() {
+	assert_eq!(parse("begin some\\ text end").unwrap(), ["begin", "some text", "end"]);
 }
