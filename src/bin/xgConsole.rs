@@ -5,7 +5,7 @@ extern crate num_cpus;
 
 use octobuild::common::BuildTask;
 use octobuild::cache::Cache;
-use octobuild::wincmd;
+use octobuild::cmd::wincmd;
 use octobuild::xg;
 use octobuild::version;
 use octobuild::vs::compiler::VsCompiler;

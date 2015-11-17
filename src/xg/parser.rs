@@ -2,7 +2,7 @@ extern crate xml;
 extern crate petgraph;
 
 use common::{BuildTask};
-use wincmd;
+use cmd::wincmd;
 
 use std::fmt::{Display, Formatter};
 use std::io::{Read, Error, ErrorKind};

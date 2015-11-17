@@ -6,7 +6,6 @@ pub mod cache;
 pub mod common;
 pub mod compiler;
 pub mod utils;
-pub mod wincmd;
 pub mod version;
 pub mod io {
 	pub mod tempfile;
@@ -22,4 +21,7 @@ pub mod vs {
 	pub mod compiler;
 	pub mod prepare;
 	pub mod postprocess;
+}
+pub mod cmd {
+	pub mod wincmd;
 }

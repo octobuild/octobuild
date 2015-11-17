@@ -2,9 +2,7 @@ pub use super::super::compiler::*;
 
 use super::super::cache::Cache;
 use super::postprocess;
-use super::super::wincmd;
 use super::super::utils::filter;
-use super::super::utils::hash_text;
 use super::super::io::tempfile::TempFile;
 
 use std::fs::File;
@@ -62,10 +60,9 @@ impl Compiler for VsCompiler {
 		args.push(task.input_source.display().to_string());
 	
 		// Hash data.
-		let mut sip_hash = SipHasher::new();
-		let hash: &mut Hasher = &mut sip_hash;
+		let mut hash = SipHasher::new();
 		hash.write(&[0]);
-		hash.write(wincmd::join(&args).as_bytes());
+		hash_args(&mut hash, &args);
 	
 		let mut command = task.command.to_command();
 		command
@@ -146,9 +143,11 @@ impl Compiler for VsCompiler {
 			}
 			&None => {}
 		}
-	
-		let hash_params = hash_text(&preprocessed.content) + &wincmd::join(&args);
-		self.cache.run_file_cached(&hash_params, &inputs, &outputs, || -> Result<OutputInfo, Error> {
+
+		let mut hash = SipHasher::new();
+		hash.write(&preprocessed.content);
+		hash_args(&mut hash, &args);
+		self.cache.run_file_cached(hash.finish(), &inputs, &outputs, || -> Result<OutputInfo, Error> {
 			// Input file path.
 			let input_temp = TempFile::new_in(&self.temp_dir, ".i");
 			try! (try! (File::create(input_temp.path())).write_all(&preprocessed.content));
@@ -170,6 +169,15 @@ impl Compiler for VsCompiler {
 			command.output().map(|o| OutputInfo::new(o))
 		}, || true)
 	}
+}
+
+fn hash_args(hash: &mut Hasher, args: &Vec<String>) {
+	hash.write(&[0]);
+	for arg in args.iter() {
+		hash.write_usize(arg.len());
+		hash.write(&arg.as_bytes());
+	}
+	hash.write_isize(-1);
 }
 
 pub fn join_flag(flag: &str, path: &Path) -> String {

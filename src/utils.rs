@@ -10,13 +10,6 @@ pub fn filter<T, R, F:Fn(&T) -> Option<R>>(args: &Vec<T>, filter:F) -> Vec<R> {
 	Vec::from_iter(args.iter().filter_map(filter))
 }
 
-pub fn hash_text(data: &[u8]) -> String {
-	let mut sip_hash = SipHasher::new();
-	let hash: &mut Hasher = &mut sip_hash;
-	hash.write(data);
-	format!("{:016x}", hash.finish())
-}
-
 pub fn hash_stream(stream: &mut Read) -> Result<String, Error> {
 	let mut hash = SipHasher::new();
 	try! (hash_write_stream(&mut hash, stream));

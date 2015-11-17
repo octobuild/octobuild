@@ -38,8 +38,8 @@ impl Cache {
 		}
 	}
 	
-	pub fn run_file_cached<F: Fn()->Result<OutputInfo, Error>, C: Fn()->bool>(&self, params: &str, inputs: &Vec<PathBuf>, outputs: &Vec<PathBuf>, worker: F, checker: C) -> Result<OutputInfo, Error> {
-		self.file_cache.run_cached(self, params, inputs, outputs, worker, checker)
+	pub fn run_file_cached<F: Fn()->Result<OutputInfo, Error>, C: Fn()->bool>(&self, hash: u64, inputs: &Vec<PathBuf>, outputs: &Vec<PathBuf>, worker: F, checker: C) -> Result<OutputInfo, Error> {
+		self.file_cache.run_cached(self, hash, inputs, outputs, worker, checker)
 	}
 	
 	pub fn cleanup(&self, max_cache_size: u64) -> Result<(), Error> {

@@ -76,7 +76,7 @@ impl FileCache {
 		}
 	}
 
-	pub fn run_cached<F: Fn()->Result<OutputInfo, Error>, C: Fn()->bool>(&self, file_hasher: &FileHasher, params: &str, inputs: &Vec<PathBuf>, outputs: &Vec<PathBuf>, worker: F, checker: C) -> Result<OutputInfo, Error> {
+	pub fn run_cached<F: Fn()->Result<OutputInfo, Error>, C: Fn()->bool>(&self, file_hasher: &FileHasher, params: u64, inputs: &Vec<PathBuf>, outputs: &Vec<PathBuf>, worker: F, checker: C) -> Result<OutputInfo, Error> {
 		let hash = try! (self.generate_hash(file_hasher, params, inputs));
 		let path = self.cache_dir.join(&hash[0..2]).join(&(hash[2..].to_string() + SUFFIX));
 		// Try to read data from cache.
@@ -106,12 +106,10 @@ impl FileCache {
 		Ok(())
 	}
 
-	fn generate_hash(&self, file_hasher: &FileHasher, params: &str, inputs: &Vec<PathBuf>) -> Result<String, Error> {
-		let mut sip_hash = SipHasher::new();
-		let hash: &mut Hasher = &mut sip_hash;
-		// str
-		hash.write(params.as_bytes());
-		hash.write(&[0]);
+	fn generate_hash(&self, file_hasher: &FileHasher, params: u64, inputs: &Vec<PathBuf>) -> Result<String, Error> {
+		let mut hash = SipHasher::new();
+		// params
+		hash.write_u64(params);
 		// inputs
 		for input in inputs.iter() {
 			let file_hash = try! (file_hasher.file_hash(input));
