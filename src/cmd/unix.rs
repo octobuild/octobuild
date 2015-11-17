@@ -56,69 +56,6 @@ fn add_slashes(mut line: String, count: usize) -> String {
 	line
 }
 
-pub fn expand_arg<F: Fn(&str) -> Option<String>>(arg: &str, resolver: &F) -> String {
-	let mut result = String::new();
-	let mut suffix = arg;
-	loop {
-		match suffix.find("$(") {
-			Some(begin) => {
-				match suffix[begin..].find(")") {
-					Some(end) => {
-						let name = &suffix[begin + 2..begin + end];
-						match resolver(name) {
-							Some(ref value) => {
-								result = result + &suffix[..begin] + &value;
-							}
-							None => {
-								result = result + &suffix[..begin + end + 1];
-							}
-						}
-						suffix = &suffix[begin + end + 1..];
-					}
-					None => {
-						result = result+suffix;
-						break;
-					}
-				}
-			}
-			None => {
-				result = result+ suffix;
-				break;
-			}
-		}
-	}
-	result
-}
-
-pub fn expand_args<F: Fn(&str) -> Option<String>>(args: &Vec<String>, resolver: &F) -> Vec<String> {
-	let mut result:Vec<String> = Vec::new();
-	for arg in args.iter() {
-		result.push(expand_arg(&arg, resolver));
-	}
-	result
-}
-
-#[test]
-fn test_parse_vars() {
-	assert_eq!(expand_arg("A$(test)$(inner)$(none)B", &|name:&str|->Option<String> {
-		match name {
-			"test" => {
-				Some("foo".to_string())
-			}
-			"inner" => {
-				Some("$(bar)".to_string())
-			}
-			"none" => {
-				None
-			}
-			_ => {
-				assert!(false, format!("Unexpected value: {}", name));
-				None
-			}
-		}
-	}), "Afoo$(bar)$(none)B");
-}
-
 #[test]
 fn test_parse_1() {
 	assert_eq!(parse("\"abc\" d e"), ["abc", "d", "e"]);

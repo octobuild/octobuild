@@ -237,10 +237,9 @@ fn has_param_prefix(arg: &String) -> bool {
 
 #[test]
 fn test_parse_argument() {
-	use super::super::wincmd;
-
+	let args = Vec::from_iter("/TP /c /Yusample.h /Fpsample.h.pch /Fosample.cpp.o /DTEST /D TEST2 /arch:AVX sample.cpp".split(" ").map(|x| x.to_string()));
 	assert_eq!(
-		parse_arguments(&wincmd::parse("/TP /c /Yusample.h /Fpsample.h.pch /Fosample.cpp.o /DTEST /D TEST2 /arch:AVX sample.cpp")).unwrap(),
+		parse_arguments(&args).unwrap(),
 		[
 			Arg::Param { scope: Scope::Ignore, flag: "T".to_string(), value: "P".to_string()},
 			Arg::Flag { scope: Scope::Ignore, flag: "c".to_string()},
