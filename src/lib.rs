@@ -22,6 +22,9 @@ pub mod vs {
 	pub mod prepare;
 	pub mod postprocess;
 }
+pub mod clang {
+	pub mod prepare;
+}
 pub mod cmd {
 	pub mod windows;
 	pub mod unix;
