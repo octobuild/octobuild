@@ -9,11 +9,12 @@ debug = true
 
 [[bin]]
 name = "octo_cl"
-test = false
+
+[[bin]]
+name = "octo_clang"
 
 [[bin]]
 name = "xgConsole"
-test = false
 
 [build-dependencies]
 rustc_version = "*"
