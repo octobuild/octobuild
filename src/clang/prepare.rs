@@ -183,13 +183,14 @@ fn parse_argument(iter: &mut  Iter<String>) -> Option<Result<Arg, String>> {
 						};
 						match flag {
 							"o" => Ok(Arg::Output{kind:OutputKind::Object, flag: prefix.to_string(), file: value}),
+							"include-pch" => Ok(Arg::Input{kind: InputKind::Precompiled, flag: prefix.to_string(), file: value}),
 							_ => Ok(Arg::Param{scope: scope, flag: prefix.to_string(), value: value}),
 						}
 					}
 					None => {
 						match flag {
 							"c" => Ok(Arg::Flag{scope: Scope::Ignore, flag:flag.to_string()}),
-							"pipe" | "include-pch" => Ok(Arg::Flag{scope: Scope::Shared, flag:flag.to_string()}),
+							"pipe" => Ok(Arg::Flag{scope: Scope::Shared, flag:flag.to_string()}),
 							s if s.starts_with("f") => Ok(Arg::Flag{scope: Scope::Shared, flag:flag.to_string()}),
 							s if s.starts_with("g") => Ok(Arg::Flag{scope: Scope::Shared, flag:flag.to_string()}),
 							s if s.starts_with("O") => Ok(Arg::Flag{scope: Scope::Shared, flag:flag.to_string()}),
@@ -208,22 +209,27 @@ fn parse_argument(iter: &mut  Iter<String>) -> Option<Result<Arg, String>> {
 }
 
 fn is_spaceable_param(flag: &str) -> Option<(&str, Scope)> {
-	for prefix in ["D", "o"].iter() {
-		if flag.starts_with(*prefix) {
-			return Some((*prefix, Scope::Shared));
+	match flag {
+		"include" | "include-pch" => Some((flag, Scope::Preprocessor)),
+		_=> {
+			for prefix in ["D", "o"].iter() {
+				if flag.starts_with(*prefix) {
+					return Some((*prefix, Scope::Shared));
+				}
+			}
+			for prefix in ["x"].iter() {
+				if flag.starts_with(*prefix) {
+					return Some((*prefix, Scope::Ignore));
+				}
+			}
+			for prefix in ["I"].iter() {
+				if flag.starts_with(*prefix) {
+					return Some((*prefix, Scope::Preprocessor));
+				}
+			}
+			None
 		}
 	}
-	for prefix in ["x"].iter() {
-		if flag.starts_with(*prefix) {
-			return Some((*prefix, Scope::Ignore));
-		}
-	}
-	for prefix in ["I", "include"].iter() {
-		if flag.starts_with(*prefix) {
-			return Some((*prefix, Scope::Preprocessor));
-		}
-	}
-	None
 }
 
 fn has_param_prefix(arg: &String) -> bool {
@@ -271,8 +277,7 @@ fn test_parse_argument_compile() {
 		parse_arguments(&args).unwrap(),
 		[
 			Arg::Flag { scope: Scope::Ignore, flag: "c".to_string() },
-			Arg::Param { scope: Scope::Preprocessor, flag: "include".to_string(), value: "-pch".to_string() },
-			Arg::Input { kind: InputKind::Source, flag: "".to_string(), file: "CorePrivatePCH.h.pch".to_string() },
+			Arg::Input { kind: InputKind::Precompiled, flag: "include-pch".to_string(), file: "CorePrivatePCH.h.pch".to_string() },
 			Arg::Flag { scope: Scope::Shared, flag: "pipe".to_string() },
 			Arg::Flag { scope: Scope::Shared, flag: "Wall".to_string() },
 			Arg::Flag { scope: Scope::Shared, flag: "Werror".to_string() },

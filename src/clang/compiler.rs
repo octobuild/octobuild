@@ -1,7 +1,6 @@
 pub use super::super::compiler::*;
 
 use super::super::cache::Cache;
-use super::super::utils::filter;
 use super::super::io::tempfile::TempFile;
 
 use std::fs::File;
@@ -31,8 +30,7 @@ impl Compiler for ClangCompiler {
 
 	fn preprocess_step(&self, task: &CompilationTask) -> Result<PreprocessResult, Error> {
 		let mut args = Vec::new();
-
-		args.push("-c".to_string());
+		args.push("-E".to_string());
 		args.push("-x".to_string());
 		args.push(task.language.clone());
 
@@ -73,7 +71,6 @@ impl Compiler for ClangCompiler {
 		hash_args(&mut hash, &args);
 	
 		let mut command = task.command.to_command();
-		println!("TEST: {:?}", args);
 		command.args(&args);
 		let output = try! (command.output());
 		if output.status.success() {
@@ -96,27 +93,34 @@ impl Compiler for ClangCompiler {
 
 	// Compile preprocessed file.
 	fn compile_step(&self, task: &CompilationTask, preprocessed: PreprocessedSource) -> Result<OutputInfo, Error> {
-		let mut args = filter(&task.args, |arg:&Arg|->Option<String> {
+		let mut args = Vec::new();
+		args.push("-c".to_string());
+		args.push("-x".to_string());
+		args.push(task.language.clone());
+
+		for arg in task.args.iter() {
 			match arg {
 				&Arg::Flag{ref scope, ref flag} => {
 					match scope {
-						&Scope::Compiler | &Scope::Shared => Some("/".to_string() + &flag),
-						&Scope::Preprocessor if task.output_precompiled.is_some() => Some("/".to_string() + &flag),
-						&Scope::Ignore | &Scope::Preprocessor => None
+						&Scope::Compiler | &Scope::Shared => {
+							args.push("-".to_string() + &flag);
+						}
+						&Scope::Ignore | &Scope::Preprocessor => {}
 					}
 				}
 				&Arg::Param{ref scope, ref  flag, ref value} => {
 					match scope {
-						&Scope::Compiler | &Scope::Shared => Some("/".to_string() + &flag + &value),
-						&Scope::Preprocessor if task.output_precompiled.is_some() => Some("/".to_string() + &flag + &value),
-						&Scope::Ignore | &Scope::Preprocessor => None
+						&Scope::Compiler | &Scope::Shared => {
+							args.push("-".to_string() + &flag);
+							args.push(value.clone());
+						}
+						&Scope::Ignore | &Scope::Preprocessor => {}
 					}
 				}
-				&Arg::Input{..} => None,
-				&Arg::Output{..} => None
-			}
-		});
-		args.push("/T".to_string() + &task.language);
+				&Arg::Input{..} => {}
+				&Arg::Output{..} => {}
+			};
+		}
 		match &task.input_precompiled {
 			&Some(ref path) => {
 				args.push("/Yu".to_string());
@@ -155,16 +159,15 @@ impl Compiler for ClangCompiler {
 			command
 				.args(&args)
 				.arg(input_temp.path().to_str().unwrap())
-				.arg("/c")
-				.arg(&join_flag("/Fo", &task.output_object));
+				.arg("-o".to_string())
+				.arg(task.output_object.display().to_string());
 			match &task.input_precompiled {
-				&Some(ref path) => {command.arg(&join_flag("/Fp", path));}
+				&Some(ref path) => {
+					command.arg("-include-pch".to_string());
+					command.arg(path.display().to_string());
+				}
 				&None => {}
 			}
-			match &task.output_precompiled {
-				&Some(ref path) => {command.arg(&join_flag("/Fp", path));}
-				&None => {}
-			}		
 			command.output().map(|o| OutputInfo::new(o))
 		}, || true)
 	}

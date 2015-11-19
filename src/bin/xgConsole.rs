@@ -8,6 +8,7 @@ use octobuild::cache::Cache;
 use octobuild::xg;
 use octobuild::version;
 use octobuild::vs::compiler::VsCompiler;
+use octobuild::clang::compiler::ClangCompiler;
 use octobuild::compiler::*;
 
 use petgraph::{Graph, EdgeDirection};
@@ -155,8 +156,12 @@ fn execute_compiler(cache: &Cache, temp_dir: &Path, task: &BuildTask, args: &[St
 		current_dir: Some(Path::new(&task.working_dir).to_path_buf()),
 		env: task.env.clone(),
 	};
-	if Path::new(&task.exec).ends_with("cl.exe") {
+	let exec = Path::new(&task.exec);
+	if exec.ends_with("cl.exe") {
 		let compiler = VsCompiler::new(cache, temp_dir);
+		compiler.compile(command, args)
+	} else if exec.file_name().map_or(None, |name| name.to_str()).map_or(false, |name| name.starts_with("clang")) {
+		let compiler = ClangCompiler::new(cache, temp_dir);
 		compiler.compile(command, args)
 	} else {
 		command.to_command()
