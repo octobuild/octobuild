@@ -36,7 +36,7 @@ fn compile() -> Result<OutputInfo, Error> {
 	let compiler = ClangCompiler::new(&Cache::new(), temp_dir.path());
 	let args = Vec::from_iter(env::args());
 	let output = try! (compiler.compile(CommandInfo {
-		program: Path::new("cl.exe").to_path_buf(),
+		program: Path::new("clang").to_path_buf(),
 		current_dir: None,
 		env: Arc::new(HashMap::new()),
 	}, &args[1..]));

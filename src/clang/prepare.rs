@@ -38,7 +38,7 @@ pub fn create_task(command: CommandInfo, args: &[String]) -> Result<CompilationT
 				ParamValue::Many(v) => {return Err(format!("Found too many precompiled header files: {:?}", v));}
 			};
 			// Precompiled header file name.
-			let marker_precompiled;
+			/*let marker_precompiled;
 			let input_precompiled;
 			let output_precompiled;
 			match find_param(&parsed_args, |arg:&Arg|->Option<(bool, String)>{
@@ -70,7 +70,10 @@ pub fn create_task(command: CommandInfo, args: &[String]) -> Result<CompilationT
 				ParamValue::Many(v) => {
 					return Err(format!("Found too many precompiled header markers: {:?}", v));
 				}
-			};
+			};*/
+			let marker_precompiled = None;
+			let input_precompiled = None;
+			let output_precompiled = None;
 			// Output object file name.
 			let output_object = match find_param(&parsed_args, |arg:&Arg|->Option<PathBuf> {
 				match *arg {
@@ -78,7 +81,7 @@ pub fn create_task(command: CommandInfo, args: &[String]) -> Result<CompilationT
 					_ => None
 				}
 			}) {
-				ParamValue::None => input_source.with_extension("obj"),
+				ParamValue::None => input_source.with_extension("o"),
 				ParamValue::Single(v) => v,
 				ParamValue::Many(v) => {
 					return Err(format!("Found too many output object files: {:?}", v));
@@ -88,7 +91,7 @@ pub fn create_task(command: CommandInfo, args: &[String]) -> Result<CompilationT
 			let language: String;
 			match find_param(&parsed_args, |arg:&Arg|->Option<String>{
 				match arg {
-					&Arg::Param{ref flag, ref value, ..} if *flag == "T" => Some(value.clone()),
+					&Arg::Param{ref flag, ref value, ..} if *flag == "x" => Some(value.clone()),
 					_ => None
 				}
 			}) {
@@ -96,8 +99,8 @@ pub fn create_task(command: CommandInfo, args: &[String]) -> Result<CompilationT
 					match input_source.extension() {
 						Some(extension) => {
 							match extension.to_str() {
-								Some(e) if e.eq_ignore_ascii_case("cpp") => {language = "P".to_string();}
-								Some(e) if e.eq_ignore_ascii_case("c") => {language = "C".to_string();}
+								Some(e) if e.eq_ignore_ascii_case("cpp") => {language = "c++".to_string();}
+								Some(e) if e.eq_ignore_ascii_case("c") => {language = "c".to_string();}
 								_ => {return Err(format!("Can't detect file language by extension: {:?}", input_source));}
 							}
 						}
@@ -106,7 +109,7 @@ pub fn create_task(command: CommandInfo, args: &[String]) -> Result<CompilationT
 				}
 				ParamValue::Single(v) => {
 					match &v[..] {
-						"P" | "C" => {language = v.clone();}
+						"c" | "c++" | "c-header" | "c++-header" => {language = v.clone();}
 						_ => { return Err(format!("Unknown source language type: {}", v));}
 					}
 				}
@@ -205,9 +208,14 @@ fn parse_argument(iter: &mut  Iter<String>) -> Option<Result<Arg, String>> {
 }
 
 fn is_spaceable_param(flag: &str) -> Option<(&str, Scope)> {
-	for prefix in ["x", "D", "o"].iter() {
+	for prefix in ["D", "o"].iter() {
 		if flag.starts_with(*prefix) {
 			return Some((*prefix, Scope::Shared));
+		}
+	}
+	for prefix in ["x"].iter() {
+		if flag.starts_with(*prefix) {
+			return Some((*prefix, Scope::Ignore));
 		}
 	}
 	for prefix in ["I", "include"].iter() {
@@ -224,11 +232,11 @@ fn has_param_prefix(arg: &String) -> bool {
 
 #[test]
 fn test_parse_argument_precompile() {
-	let args = Vec::from_iter("-x c++-header -pipe -Wall -Werror -funwind-tables -Wsequence-point -mmmx -msse -msse2 -fno-math-errno -fno-rtti -g3 -gdwarf-3 -O2 -D_LINUX64 -IEngine/Source -IDeveloper/Public -I Runtime/Core/Private -D IS_PROGRAM=1 -D UNICODE -DIS_MONOLITHIC=1 -x c++-header -std=c++11 -o CorePrivatePCH.h.pch CorePrivatePCH.h".split(" ").map(|x| x.to_string()));
+	let args = Vec::from_iter("-x c++-header -pipe -Wall -Werror -funwind-tables -Wsequence-point -mmmx -msse -msse2 -fno-math-errno -fno-rtti -g3 -gdwarf-3 -O2 -D_LINUX64 -IEngine/Source -IDeveloper/Public -I Runtime/Core/Private -D IS_PROGRAM=1 -D UNICODE -DIS_MONOLITHIC=1 -std=c++11 -o CorePrivatePCH.h.pch CorePrivatePCH.h".split(" ").map(|x| x.to_string()));
 	assert_eq!(
 		parse_arguments(&args).unwrap(),
 		[
-			Arg::Param { scope: Scope::Shared, flag: "x".to_string(), value: "c++-header".to_string()},
+			Arg::Param { scope: Scope::Ignore, flag: "x".to_string(), value: "c++-header".to_string()},
 			Arg::Flag { scope: Scope::Shared, flag: "pipe".to_string() },
 			Arg::Flag { scope: Scope::Shared, flag: "Wall".to_string() },
 			Arg::Flag { scope: Scope::Shared, flag: "Werror".to_string() },
@@ -249,7 +257,6 @@ fn test_parse_argument_precompile() {
 			Arg::Param { scope: Scope::Shared, flag: "D".to_string(), value: "IS_PROGRAM=1".to_string() },
 			Arg::Param { scope: Scope::Shared, flag: "D".to_string(), value: "UNICODE".to_string() },
 			Arg::Param { scope: Scope::Shared, flag: "D".to_string(), value: "IS_MONOLITHIC=1".to_string() },
-			Arg::Param { scope: Scope::Shared, flag: "x".to_string(), value: "c++-header".to_string() },
 			Arg::Flag { scope: Scope::Shared, flag: "std=c++11".to_string() },
 			Arg::Output { kind: OutputKind::Object, flag: "o".to_string(), file: "CorePrivatePCH.h.pch".to_string() },
 			Arg::Input { kind: InputKind::Source, flag: "".to_string(), file: "CorePrivatePCH.h".to_string() },
@@ -282,7 +289,7 @@ fn test_parse_argument_compile() {
 			Arg::Param { scope: Scope::Shared, flag: "D".to_string(), value: "IS_PROGRAM=1".to_string() },
 			Arg::Param { scope: Scope::Shared, flag: "D".to_string(), value: "UNICODE".to_string() },
 			Arg::Param { scope: Scope::Shared, flag: "D".to_string(), value: "IS_MONOLITHIC=1".to_string() },
-			Arg::Param { scope: Scope::Shared, flag: "x".to_string(), value: "c++".to_string() },
+			Arg::Param { scope: Scope::Ignore, flag: "x".to_string(), value: "c++".to_string() },
 			Arg::Flag { scope: Scope::Shared, flag: "std=c++11".to_string() },
 			Arg::Param { scope: Scope::Preprocessor, flag: "include".to_string(), value: "CorePrivatePCH.h".to_string() },
 			Arg::Output { kind: OutputKind::Object, flag: "o".to_string(), file: "Module.Core.cpp.o".to_string() },

@@ -30,33 +30,42 @@ impl Compiler for ClangCompiler {
 	}
 
 	fn preprocess_step(&self, task: &CompilationTask) -> Result<PreprocessResult, Error> {
+		let mut args = Vec::new();
+
+		args.push("-c".to_string());
+		args.push("-x".to_string());
+		args.push(task.language.clone());
+
 		// Make parameters list for preprocessing.
-		let mut args = filter(&task.args, |arg:&Arg|->Option<String> {
+		for arg in task.args.iter() {
 			match arg {
 				&Arg::Flag{ref scope, ref flag} => {
 					match scope {
-						&Scope::Preprocessor | &Scope::Shared => Some("/".to_string() + &flag),
-						&Scope::Ignore | &Scope::Compiler => None
+						&Scope::Preprocessor | &Scope::Shared => {
+							args.push("-".to_string() + &flag);
+						}
+						&Scope::Ignore | &Scope::Compiler => {}
 					}
 				}
 				&Arg::Param{ref scope, ref  flag, ref value} => {
 					match scope {
-						&Scope::Preprocessor | &Scope::Shared => Some("/".to_string() + &flag + &value),
-						&Scope::Ignore | &Scope::Compiler => None
+						&Scope::Preprocessor | &Scope::Shared => {
+							args.push("-".to_string() + &flag);
+							args.push(value.clone());
+						}
+						&Scope::Ignore | &Scope::Compiler => {}
 					}
 				}
-				&Arg::Input{..} => None,
-				&Arg::Output{..} => None,
-			}
-		});
+				&Arg::Input{..} => {}
+				&Arg::Output{..} => {}
+			};
+		}
 	
 		// Add preprocessor paramters.
 		let temp_file = TempFile::new_in(&self.temp_dir, ".i");
-		args.push("/nologo".to_string());
-		args.push("/T".to_string() + &task.language);
-		args.push("/P".to_string());
-		args.push("/we4002".to_string()); // C4002: too many actual parameters for macro 'identifier'
 		args.push(task.input_source.display().to_string());
+		args.push("-o".to_string());
+		args.push(temp_file.path().display().to_string());
 	
 		// Hash data.
 		let mut hash = SipHasher::new();
@@ -64,10 +73,8 @@ impl Compiler for ClangCompiler {
 		hash_args(&mut hash, &args);
 	
 		let mut command = task.command.to_command();
-		command
-			.args(&args)
-			.arg(&join_flag("/Fi", &temp_file.path()))
-			.arg(&join_flag("/Fo", &task.output_object)); // /Fo option also set output path for #import directive
+		println!("TEST: {:?}", args);
+		command.args(&args);
 		let output = try! (command.output());
 		if output.status.success() {
 			match File::open(temp_file.path()) {

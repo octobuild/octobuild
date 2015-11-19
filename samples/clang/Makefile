@@ -7,7 +7,7 @@ clean:
 	rm -f *.cpp.o
 
 sample.h.pch: sample.h
-	clang -x c++-header sample.h -o sample.h.pch
+	clang -x c++-header -c sample.h -o sample.h.pch
 
 sample.h.i: sample.h
 	clang -x c++-header sample.h -E -frewrite-includes -o sample.h.i
