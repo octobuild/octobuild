@@ -17,8 +17,8 @@ pub fn create_task(command: CommandInfo, args: &[String]) -> Result<CompilationT
 		Ok(parsed_args) => {
 			// Source file name.
 			let input_source = match find_param(&parsed_args, |arg:&Arg|->Option<PathBuf> {
-				match *arg {
-					Arg::Input{ref kind, ref file, ..} if *kind == InputKind::Source => {Some(Path::new(file).to_path_buf())}
+				match arg {
+					&Arg::Input{ref kind, ref file, ..} if *kind == InputKind::Source => {Some(Path::new(file).to_path_buf())}
 					_ => {None}
 				}
 			}) {
@@ -27,9 +27,9 @@ pub fn create_task(command: CommandInfo, args: &[String]) -> Result<CompilationT
 				ParamValue::Many(v) => {return Err(format!("Found too many source files: {:?}", v));}
 			};
 			// Precompiled header file name.
-			let precompiled_file = match find_param(&parsed_args, |arg:&Arg|->Option<PathBuf> {
-				match *arg {
-					Arg::Input{ref kind, ref file, ..} if *kind == InputKind::Precompiled => {Some(Path::new(file).to_path_buf())}
+			let input_precompiled = match find_param(&parsed_args, |arg:&Arg|->Option<PathBuf> {
+				match arg {
+					&Arg::Input{ref kind, ref file, ..} if *kind == InputKind::Precompiled => {Some(Path::new(file).to_path_buf())}
 					_ => {None}
 				}
 			}) {
@@ -38,46 +38,14 @@ pub fn create_task(command: CommandInfo, args: &[String]) -> Result<CompilationT
 				ParamValue::Many(v) => {return Err(format!("Found too many precompiled header files: {:?}", v));}
 			};
 			// Precompiled header file name.
-			/*let marker_precompiled;
-			let input_precompiled;
-			let output_precompiled;
-			match find_param(&parsed_args, |arg:&Arg|->Option<(bool, String)>{
-				match *arg {
-					Arg::Input{ref kind, ref file, ..} if *kind == InputKind::Marker => Some((true, file.clone())),
-					Arg::Output{ref kind, ref file, ..} if *kind == OutputKind::Marker => Some((false, file.clone())),
-					_ => None
-				}
-			}) {
-				ParamValue::None => {
-					marker_precompiled=None;
-					input_precompiled=None;
-					output_precompiled=None;
-				}
-				ParamValue::Single((input, path)) => {
-					let precompiled_path = match precompiled_file {
-						Some(v) => v,
-						None => Path::new(&path).with_extension(".pch").to_path_buf()
-					};
-					marker_precompiled = if path.len() > 0 {Some(path)} else {None};
-					if input {
-						output_precompiled=None;
-						input_precompiled=Some(precompiled_path);
-					} else {
-						input_precompiled=None;
-						output_precompiled=Some(precompiled_path);
-					}
-				}
-				ParamValue::Many(v) => {
-					return Err(format!("Found too many precompiled header markers: {:?}", v));
-				}
-			};*/
-			let marker_precompiled = None;
-			let input_precompiled = None;
-			let output_precompiled = None;
+			let marker_precompiled = parsed_args.iter().filter_map(|arg| match arg {
+				&Arg::Param{ref flag, ref value, ..} if *flag == "include" => Some(value.clone()),
+				_ => None,
+			}).next();
 			// Output object file name.
 			let output_object = match find_param(&parsed_args, |arg:&Arg|->Option<PathBuf> {
-				match *arg {
-					Arg::Output{ref kind, ref file, ..} if *kind == OutputKind::Object => Some(Path::new(file).to_path_buf()),
+				match arg {
+					&Arg::Output{ref kind, ref file, ..} if *kind == OutputKind::Object => Some(Path::new(file).to_path_buf()),
 					_ => None
 				}
 			}) {
@@ -125,7 +93,7 @@ pub fn create_task(command: CommandInfo, args: &[String]) -> Result<CompilationT
 				input_source: input_source,
 				input_precompiled: input_precompiled,
 				output_object: output_object,
-				output_precompiled: output_precompiled,
+				output_precompiled: None,
 				marker_precompiled: marker_precompiled,
 			})
 		}

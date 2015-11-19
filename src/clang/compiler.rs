@@ -3,11 +3,12 @@ pub use super::super::compiler::*;
 use super::super::cache::Cache;
 use super::super::io::tempfile::TempFile;
 
+use std::fs;
 use std::fs::File;
 use std::io::{Error, Read, Write};
 use std::hash::{SipHasher, Hasher};
 use std::path::{Path, PathBuf};
-use std::process::Output;
+use std::process::{Output, Stdio};
 
 pub struct ClangCompiler {
 	cache: Cache,
@@ -33,6 +34,28 @@ impl Compiler for ClangCompiler {
 		args.push("-E".to_string());
 		args.push("-x".to_string());
 		args.push(task.language.clone());
+
+		let precompied = task.input_precompiled.clone().or_else(|| {
+			let marker = task.marker_precompiled.clone().or_else(|| None);
+			marker.and_then(|path| {
+				let file_path = Path::new(&(path + ".gch")).to_path_buf();
+				match fs::metadata(&file_path).map(|meta| meta.is_file()).unwrap_or(false) {
+					true => Some(file_path),
+					false => None,
+				}
+			})
+		});
+
+		match precompied {
+			Some(ref path) => {
+				args.push("-Xclang".to_string());
+				args.push("-fno-validate-pch".to_string());
+				args.push("-include-pch".to_string());
+				args.push(path.display().to_string());
+			},
+			None => {},
+		}
+		println!("PRECOMPILED: {:?}", precompied);
 
 		// Make parameters list for preprocessing.
 		for arg in task.args.iter() {
@@ -71,6 +94,7 @@ impl Compiler for ClangCompiler {
 		hash_args(&mut hash, &args);
 	
 		let mut command = task.command.to_command();
+		println!("PREPROCESSOR: {:?}", args);
 		command.args(&args);
 		let output = try! (command.output());
 		if output.status.success() {
@@ -152,13 +176,14 @@ impl Compiler for ClangCompiler {
 		hash_args(&mut hash, &args);
 		self.cache.run_file_cached(hash.finish(), &inputs, &outputs, || -> Result<OutputInfo, Error> {
 			// Input file path.
-			let input_temp = TempFile::new_in(&self.temp_dir, ".i");
-			try! (try! (File::create(input_temp.path())).write_all(&preprocessed.content));
+			let input_temp = Path::new("test.i");
+			try! (try! (File::create(input_temp)).write_all(&preprocessed.content));
 			// Run compiler.
 			let mut command = task.command.to_command();
+			println!("COMPILE: {:?}", args);
 			command
 				.args(&args)
-				.arg(input_temp.path().to_str().unwrap())
+				.arg("-".to_string())
 				.arg("-o".to_string())
 				.arg(task.output_object.display().to_string());
 			match &task.input_precompiled {
@@ -168,7 +193,14 @@ impl Compiler for ClangCompiler {
 				}
 				&None => {}
 			}
-			command.output().map(|o| OutputInfo::new(o))
+			command
+				.stdin(Stdio::piped())
+				.spawn()
+				.and_then(|mut child| {
+					try! (child.stdin.as_mut().unwrap().write_all(&preprocessed.content));
+					child.wait_with_output()
+				})
+				.map(|o| OutputInfo::new(o))
 		}, || true)
 	}
 }
