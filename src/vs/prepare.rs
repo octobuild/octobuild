@@ -12,7 +12,7 @@ enum ParamValue<T> {
 	Many(Vec<T>),
 }
 
-pub fn create_task(command: CommandInfo, args: &[String]) -> Result<CompilationTask, String> {
+pub fn create_task(command: CommandInfo, args: &[String]) -> Result<Option<CompilationTask>, String> {
 	match parse_arguments(args) {
 		Ok(parsed_args) => {
 			// Source file name.
@@ -115,7 +115,7 @@ pub fn create_task(command: CommandInfo, args: &[String]) -> Result<CompilationT
 				}
 			};
 
-			Ok(CompilationTask{
+			Ok(Some(CompilationTask{
 				command: command,
 				args: parsed_args,
 				language: language,
@@ -124,7 +124,7 @@ pub fn create_task(command: CommandInfo, args: &[String]) -> Result<CompilationT
 				output_object: output_object,
 				output_precompiled: output_precompiled,
 				marker_precompiled: marker_precompiled,
-			})
+			}))
 		}
 			Err(e) => {Err(e)}
 		}
@@ -237,10 +237,9 @@ fn has_param_prefix(arg: &String) -> bool {
 
 #[test]
 fn test_parse_argument() {
-	use super::super::wincmd;
-
+	let args = Vec::from_iter("/TP /c /Yusample.h /Fpsample.h.pch /Fosample.cpp.o /DTEST /D TEST2 /arch:AVX sample.cpp".split(" ").map(|x| x.to_string()));
 	assert_eq!(
-		parse_arguments(&wincmd::parse("/TP /c /Yusample.h /Fpsample.h.pch /Fosample.cpp.o /DTEST /D TEST2 /arch:AVX sample.cpp")).unwrap(),
+		parse_arguments(&args).unwrap(),
 		[
 			Arg::Param { scope: Scope::Ignore, flag: "T".to_string(), value: "P".to_string()},
 			Arg::Flag { scope: Scope::Ignore, flag: "c".to_string()},

@@ -5,12 +5,11 @@ extern crate num_cpus;
 
 use octobuild::common::BuildTask;
 use octobuild::cache::Cache;
-use octobuild::cmd::wincmd;
 use octobuild::xg;
 use octobuild::version;
 use octobuild::vs::compiler::VsCompiler;
+use octobuild::clang::compiler::ClangCompiler;
 use octobuild::compiler::*;
-
 
 use petgraph::{Graph, EdgeDirection};
 use petgraph::graph::NodeIndex;
@@ -141,7 +140,7 @@ fn validate_graph(graph: Graph<BuildTask, ()>) -> Result<Graph<BuildTask, ()>, E
 }
 
 fn execute_task(cache: &Cache, temp_dir: &Path, worker: usize, message: TaskMessage) -> ResultMessage {
-	let args = wincmd::expand_args(&message.task.args, &|name:&str|->Option<String>{env::var(name).ok()});
+	let args = expand_args(&message.task.args, &|name:&str|->Option<String>{env::var(name).ok()});
 	let output = execute_compiler(cache, temp_dir, &message.task, &args);
 	ResultMessage {
 		index: message.index,
@@ -157,8 +156,12 @@ fn execute_compiler(cache: &Cache, temp_dir: &Path, task: &BuildTask, args: &[St
 		current_dir: Some(Path::new(&task.working_dir).to_path_buf()),
 		env: task.env.clone(),
 	};
-	if Path::new(&task.exec).ends_with("cl.exe") {
+	let exec = Path::new(&task.exec);
+	if exec.ends_with("cl.exe") {
 		let compiler = VsCompiler::new(cache, temp_dir);
+		compiler.compile(command, args)
+	} else if exec.file_name().map_or(None, |name| name.to_str()).map_or(false, |name| name.starts_with("clang")) {
+		let compiler = ClangCompiler::new(cache, temp_dir);
 		compiler.compile(command, args)
 	} else {
 		command.to_command()
@@ -228,4 +231,67 @@ fn is_ready(graph: &Graph<BuildTask, ()>, completed: &Vec<bool>, source: &NodeIn
 		}
 	}
 	true
+}
+
+fn expand_arg<F: Fn(&str) -> Option<String>>(arg: &str, resolver: &F) -> String {
+	let mut result = String::new();
+	let mut suffix = arg;
+	loop {
+		match suffix.find("$(") {
+			Some(begin) => {
+				match suffix[begin..].find(")") {
+					Some(end) => {
+						let name = &suffix[begin + 2..begin + end];
+						match resolver(name) {
+							Some(ref value) => {
+								result = result + &suffix[..begin] + &value;
+							}
+							None => {
+								result = result + &suffix[..begin + end + 1];
+							}
+						}
+						suffix = &suffix[begin + end + 1..];
+					}
+					None => {
+						result = result+suffix;
+						break;
+					}
+				}
+			}
+			None => {
+				result = result+ suffix;
+				break;
+			}
+		}
+	}
+	result
+}
+
+fn expand_args<F: Fn(&str) -> Option<String>>(args: &Vec<String>, resolver: &F) -> Vec<String> {
+	let mut result:Vec<String> = Vec::new();
+	for arg in args.iter() {
+		result.push(expand_arg(&arg, resolver));
+	}
+	result
+}
+
+#[test]
+fn test_parse_vars() {
+	assert_eq!(expand_arg("A$(test)$(inner)$(none)B", &|name:&str|->Option<String> {
+		match name {
+			"test" => {
+				Some("foo".to_string())
+			}
+			"inner" => {
+				Some("$(bar)".to_string())
+			}
+			"none" => {
+				None
+			}
+			_ => {
+				assert!(false, format!("Unexpected value: {}", name));
+				None
+			}
+		}
+	}), "Afoo$(bar)$(none)B");
 }

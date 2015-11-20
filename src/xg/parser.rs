@@ -2,7 +2,7 @@ extern crate xml;
 extern crate petgraph;
 
 use common::{BuildTask};
-use cmd::wincmd;
+use cmd;
 
 use std::fmt::{Display, Formatter};
 use std::io::{Read, Error, ErrorKind};
@@ -299,7 +299,7 @@ fn graph_project(graph: &mut Graph<BuildTask, ()>, project: XgProject, env: &XgE
 				},
 			},
 			exec: tool.exec.clone(),
-			args: wincmd::parse(&tool.args),
+			args: try! (cmd::native::parse(&tool.args)),
 			env: env.variables.clone(),
 			working_dir : task.working_dir.clone(),
 		});
