@@ -137,17 +137,16 @@ impl Compiler for ClangCompiler {
 		hash_args(&mut hash, &args);
 		self.cache.run_file_cached(hash.finish(), &Vec::new(), &outputs, || -> Result<OutputInfo, Error> {
 			// Run compiler.
-			let mut command = task.command.to_command();
-			command
+			task.command.to_command()
 				.args(&args)
 				.arg("-".to_string())
 				.arg("-o".to_string())
-				.arg(task.output_object.display().to_string());
-			command
+				.arg(task.output_object.display().to_string())
 				.stdin(Stdio::piped())
 				.spawn()
 				.and_then(|mut child| {
 					try! (child.stdin.as_mut().unwrap().write_all(&preprocessed.content));
+					let _ = preprocessed.content;
 					child.wait_with_output()
 				})
 				.map(|o| OutputInfo::new(o))
