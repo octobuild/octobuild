@@ -69,6 +69,8 @@ pub fn create_task(command: CommandInfo, args: &[String]) -> Result<CompilationT
 							match extension.to_str() {
 								Some(e) if e.eq_ignore_ascii_case("cpp") => {language = "c++".to_string();}
 								Some(e) if e.eq_ignore_ascii_case("c") => {language = "c".to_string();}
+								Some(e) if e.eq_ignore_ascii_case("hpp") => {language = "c++-header".to_string();}
+								Some(e) if e.eq_ignore_ascii_case("h") => {language = "c-header".to_string();}
 								_ => {return Err(format!("Can't detect file language by extension: {:?}", input_source));}
 							}
 						}
@@ -77,7 +79,8 @@ pub fn create_task(command: CommandInfo, args: &[String]) -> Result<CompilationT
 				}
 				ParamValue::Single(v) => {
 					match &v[..] {
-						"c" | "c++" | "c-header" | "c++-header" => {language = v.clone();}
+						"c" | "c++" => {language = v.clone();}
+						"c-header" | "c++-header" => {return Err(format!("Precompiled headers must build locally"));}
 						_ => { return Err(format!("Unknown source language type: {}", v));}
 					}
 				}
@@ -151,7 +154,6 @@ fn parse_argument(iter: &mut  Iter<String>) -> Option<Result<Arg, String>> {
 						};
 						match flag {
 							"o" => Ok(Arg::Output{kind:OutputKind::Object, flag: prefix.to_string(), file: value}),
-							"include-pch" => Ok(Arg::Input{kind: InputKind::Precompiled, flag: prefix.to_string(), file: value}),
 							_ => Ok(Arg::Param{scope: scope, flag: prefix.to_string(), value: value}),
 						}
 					}
@@ -245,7 +247,7 @@ fn test_parse_argument_compile() {
 		parse_arguments(&args).unwrap(),
 		[
 			Arg::Flag { scope: Scope::Ignore, flag: "c".to_string() },
-			Arg::Input { kind: InputKind::Precompiled, flag: "include-pch".to_string(), file: "CorePrivatePCH.h.pch".to_string() },
+			Arg::Param { scope: Scope::Preprocessor, flag: "include-pch".to_string(), value: "CorePrivatePCH.h.pch".to_string() },
 			Arg::Flag { scope: Scope::Shared, flag: "pipe".to_string() },
 			Arg::Flag { scope: Scope::Shared, flag: "Wall".to_string() },
 			Arg::Flag { scope: Scope::Shared, flag: "Werror".to_string() },

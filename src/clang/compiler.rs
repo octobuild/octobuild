@@ -3,7 +3,6 @@ pub use super::super::compiler::*;
 use super::super::cache::Cache;
 use super::super::io::tempfile::TempFile;
 
-use std::fs;
 use std::fs::File;
 use std::io::{Error, Read, Write};
 use std::hash::{SipHasher, Hasher};
@@ -34,28 +33,7 @@ impl Compiler for ClangCompiler {
 		args.push("-E".to_string());
 		args.push("-x".to_string());
 		args.push(task.language.clone());
-
-		let precompied = task.input_precompiled.clone().or_else(|| {
-			let marker = task.marker_precompiled.clone().or_else(|| None);
-			marker.and_then(|path| {
-				let file_path = Path::new(&(path + ".gch")).to_path_buf();
-				match fs::metadata(&file_path).map(|meta| meta.is_file()).unwrap_or(false) {
-					true => Some(file_path),
-					false => None,
-				}
-			})
-		});
-
-		match precompied {
-			Some(ref path) => {
-				args.push("-Xclang".to_string());
-				args.push("-fno-validate-pch".to_string());
-				args.push("-include-pch".to_string());
-				args.push(path.display().to_string());
-			},
-			None => {},
-		}
-		println!("PRECOMPILED: {:?}", precompied);
+		args.push("-frewrite-includes".to_string());
 
 		// Make parameters list for preprocessing.
 		for arg in task.args.iter() {
@@ -94,8 +72,8 @@ impl Compiler for ClangCompiler {
 		hash_args(&mut hash, &args);
 	
 		let mut command = task.command.to_command();
-		println!("PREPROCESSOR: {:?}", args);
-		command.args(&args);
+		command
+			.args(&args);
 		let output = try! (command.output());
 		if output.status.success() {
 			match File::open(temp_file.path()) {
@@ -121,7 +99,6 @@ impl Compiler for ClangCompiler {
 		args.push("-c".to_string());
 		args.push("-x".to_string());
 		args.push(task.language.clone());
-
 		for arg in task.args.iter() {
 			match arg {
 				&Arg::Flag{ref scope, ref flag} => {
@@ -145,22 +122,6 @@ impl Compiler for ClangCompiler {
 				&Arg::Output{..} => {}
 			};
 		}
-		match &task.input_precompiled {
-			&Some(ref path) => {
-				args.push("/Yu".to_string());
-				args.push("/Fp".to_string() + &path.display().to_string());
-			}
-			&None => {}
-		}
-		if task.output_precompiled.is_some() {
-			args.push("/Yc".to_string());
-		}
-		// Input data, stored in files.
-		let mut inputs: Vec<PathBuf> = Vec::new();
-		match &task.input_precompiled {
-				&Some(ref path) => {inputs.push(path.clone());}
-				&None => {}
-			}
 		// Output files.
 		let mut outputs: Vec<PathBuf> = Vec::new();
 		outputs.push(task.output_object.clone());
@@ -174,25 +135,14 @@ impl Compiler for ClangCompiler {
 		let mut hash = SipHasher::new();
 		hash.write(&preprocessed.content);
 		hash_args(&mut hash, &args);
-		self.cache.run_file_cached(hash.finish(), &inputs, &outputs, || -> Result<OutputInfo, Error> {
-			// Input file path.
-			let input_temp = Path::new("test.i");
-			try! (try! (File::create(input_temp)).write_all(&preprocessed.content));
+		self.cache.run_file_cached(hash.finish(), &Vec::new(), &outputs, || -> Result<OutputInfo, Error> {
 			// Run compiler.
 			let mut command = task.command.to_command();
-			println!("COMPILE: {:?}", args);
 			command
 				.args(&args)
 				.arg("-".to_string())
 				.arg("-o".to_string())
 				.arg(task.output_object.display().to_string());
-			match &task.input_precompiled {
-				&Some(ref path) => {
-					command.arg("-include-pch".to_string());
-					command.arg(path.display().to_string());
-				}
-				&None => {}
-			}
 			command
 				.stdin(Stdio::piped())
 				.spawn()
