@@ -12,7 +12,7 @@ enum ParamValue<T> {
 	Many(Vec<T>),
 }
 
-pub fn create_task(command: CommandInfo, args: &[String]) -> Result<CompilationTask, String> {
+pub fn create_task(command: CommandInfo, args: &[String]) -> Result<Option<CompilationTask>, String> {
 	match parse_arguments(args) {
 		Ok(parsed_args) => {
 			// Source file name.
@@ -115,7 +115,7 @@ pub fn create_task(command: CommandInfo, args: &[String]) -> Result<CompilationT
 				}
 			};
 
-			Ok(CompilationTask{
+			Ok(Some(CompilationTask{
 				command: command,
 				args: parsed_args,
 				language: language,
@@ -124,7 +124,7 @@ pub fn create_task(command: CommandInfo, args: &[String]) -> Result<CompilationT
 				output_object: output_object,
 				output_precompiled: output_precompiled,
 				marker_precompiled: marker_precompiled,
-			})
+			}))
 		}
 			Err(e) => {Err(e)}
 		}

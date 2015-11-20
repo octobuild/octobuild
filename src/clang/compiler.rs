@@ -24,7 +24,7 @@ impl ClangCompiler {
 }
 
 impl Compiler for ClangCompiler {
-	fn create_task(&self, command: CommandInfo, args: &[String]) -> Result<CompilationTask, String> {
+	fn create_task(&self, command: CommandInfo, args: &[String]) -> Result<Option<CompilationTask>, String> {
 		super::prepare::create_task(command, args)
 	}
 

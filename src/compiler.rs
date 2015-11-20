@@ -156,7 +156,7 @@ pub struct PreprocessedSource {
 
 pub trait Compiler {
 	// Parse compiler arguments.
-	fn create_task(&self, command: CommandInfo, args: &[String]) -> Result<CompilationTask, String>;
+	fn create_task(&self, command: CommandInfo, args: &[String]) -> Result<Option<CompilationTask>, String>;
 
 	// Preprocessing source file.
 	fn preprocess_step(&self, task: &CompilationTask) -> Result<PreprocessResult, Error>;
@@ -165,14 +165,15 @@ pub trait Compiler {
 	fn compile_step(&self, task: &CompilationTask, preprocessed: PreprocessedSource) -> Result<OutputInfo, Error>;
 	
 	// Run preprocess and compile.
-	fn try_compile(&self, command: CommandInfo, args: &[String]) -> Result<OutputInfo, Error> {
+	fn try_compile(&self, command: CommandInfo, args: &[String]) -> Result<Option<OutputInfo>, Error> {
 		match self.create_task(command, args) {
-			Ok(task) => {
+			Ok(Some(task)) => {
 				match try! (self.preprocess_step(&task)) {
 					PreprocessResult::Success(preprocessed) => self.compile_step(&task, preprocessed),
 					PreprocessResult::Failed(output) => Ok(output),
-				}
+				}.map(|v| Some(v))
 			}
+			Ok(None) => Ok(None),
 			Err(e) => Err(Error::new(ErrorKind::InvalidInput, CompilerError::InvalidArguments(e)))
 		}
 	}
@@ -180,7 +181,10 @@ pub trait Compiler {
 	// Run preprocess and compile.
 	fn compile(&self, command: CommandInfo, args: &[String]) -> Result<OutputInfo, Error> {
 		match self.try_compile(command.clone(), args) {
-			Ok(output) => Ok(output),
+			Ok(Some(output)) => Ok(output),
+			Ok(None) => {
+				command.to_command().args(args).output().map(|o| OutputInfo::new(o))
+			}
 			// todo: log error reason
 			Err(e) => {
 				println! ("Can't use octobuild for compiling file, use failback compilation: {:?}", e);

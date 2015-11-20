@@ -12,7 +12,15 @@ enum ParamValue<T> {
 	Many(Vec<T>),
 }
 
-pub fn create_task(command: CommandInfo, args: &[String]) -> Result<CompilationTask, String> {
+pub fn create_task(command: CommandInfo, args: &[String]) -> Result<Option<CompilationTask>, String> {
+	if args.iter().find(|v| match v as &str {
+		"-c" => true,
+		_ => false,
+		}
+	).is_none() {
+		// Support only compilation steps
+		return Ok(None);
+	}
 	match parse_arguments(args) {
 		Ok(parsed_args) => {
 			// Source file name.
@@ -80,8 +88,13 @@ pub fn create_task(command: CommandInfo, args: &[String]) -> Result<CompilationT
 				ParamValue::Single(v) => {
 					match &v[..] {
 						"c" | "c++" => {language = v.clone();}
-						"c-header" | "c++-header" => {return Err(format!("Precompiled headers must build locally"));}
-						_ => { return Err(format!("Unknown source language type: {}", v));}
+						"c-header" | "c++-header" => {
+							// Precompiled headers must build locally
+							return Ok(None);
+						}
+						_ => {
+							return Err(format!("Unknown source language type: {}", v));
+						}
 					}
 				}
 				ParamValue::Many(v) => {
@@ -89,7 +102,7 @@ pub fn create_task(command: CommandInfo, args: &[String]) -> Result<CompilationT
 				}
 			};
 
-			Ok(CompilationTask{
+			Ok(Some(CompilationTask{
 				command: command,
 				args: parsed_args,
 				language: language,
@@ -98,7 +111,7 @@ pub fn create_task(command: CommandInfo, args: &[String]) -> Result<CompilationT
 				output_object: output_object,
 				output_precompiled: None,
 				marker_precompiled: marker_precompiled,
-			})
+			}))
 		}
 			Err(e) => {Err(e)}
 		}
