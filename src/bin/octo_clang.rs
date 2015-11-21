@@ -1,11 +1,8 @@
 extern crate octobuild;
-extern crate tempdir;
 
 use octobuild::clang::compiler::ClangCompiler;
 use octobuild::compiler::*;
 use octobuild::cache::Cache;
-
-use tempdir::TempDir;
 
 use std::collections::HashMap;
 use std::env;
@@ -32,8 +29,7 @@ fn main() {
 }
 
 fn compile() -> Result<OutputInfo, Error> {
-	let temp_dir = try! (TempDir::new("octobuild"));
-	let compiler = ClangCompiler::new(&Cache::new(), temp_dir.path());
+	let compiler = ClangCompiler::new(&Cache::new());
 	let args = Vec::from_iter(env::args());
 	let output = try! (compiler.compile(CommandInfo {
 		program: Path::new("clang").to_path_buf(),

@@ -161,7 +161,7 @@ fn execute_compiler(cache: &Cache, temp_dir: &Path, task: &BuildTask, args: &[St
 		let compiler = VsCompiler::new(cache, temp_dir);
 		compiler.compile(command, args)
 	} else if exec.file_name().map_or(None, |name| name.to_str()).map_or(false, |name| name.starts_with("clang")) {
-		let compiler = ClangCompiler::new(cache, temp_dir);
+		let compiler = ClangCompiler::new(cache);
 		compiler.compile(command, args)
 	} else {
 		command.to_command()
