@@ -117,6 +117,7 @@ impl Compiler for VsCompiler {
 				&Arg::Output{..} => None
 			}
 		});
+		args.push("/nologo".to_string());
 		args.push("/T".to_string() + &task.language);
 		match &task.input_precompiled {
 			&Some(ref path) => {
@@ -166,8 +167,35 @@ impl Compiler for VsCompiler {
 				&Some(ref path) => {command.arg(&join_flag("/Fp", path));}
 				&None => {}
 			}		
-			command.output().map(|o| OutputInfo::new(o))
+
+			let temp_file = input_temp.path().file_name()
+				.and_then(|o| o.to_str())
+				.map(|o| o.as_bytes())
+				.unwrap_or(b"");
+			command.output().map(|o| OutputInfo {
+				status: o.status.code(),
+				stdout: prepare_output(temp_file, o.stdout),
+				stderr: o.stderr,
+			})
 		}, || true)
+	}
+}
+
+fn prepare_output(line: &[u8], mut buffer: Vec<u8>) -> Vec<u8> {
+	let mut begin = match (line.len() < buffer.len()) && buffer.starts_with(line) && is_eol(buffer[line.len()]) {
+		true => line.len(),
+		false => 0
+	};
+	while begin < buffer.len() && is_eol(buffer[begin]) {
+		begin += 1;
+	}
+	buffer.split_off(begin)
+}
+
+fn is_eol(c: u8) -> bool {
+	match c {
+	    b'\r' | b'\n' => true,
+	    _ => false,
 	}
 }
 

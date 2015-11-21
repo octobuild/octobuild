@@ -180,8 +180,8 @@ fn parse_argument(iter: &mut  Iter<String>) -> Option<Result<Arg, String>> {
 					}
 					None => {
 						match flag {
-							"c" => Ok(Arg::Flag{scope: Scope::Ignore, flag:flag.to_string()}),
-							"bigobj" | "nologo" => Ok(Arg::Flag{scope: Scope::Compiler, flag:flag.to_string()}),
+							"c" | "nologo" => Ok(Arg::Flag{scope: Scope::Ignore, flag:flag.to_string()}),
+							"bigobj" => Ok(Arg::Flag{scope: Scope::Compiler, flag:flag.to_string()}),
 							s if s.starts_with("T") => Ok(Arg::Param{scope: Scope::Ignore, flag:"T".to_string(), value: s[1..].to_string()}),
 							s if s.starts_with("O") => Ok(Arg::Flag{scope: Scope::Shared, flag:flag.to_string()}),
 							s if s.starts_with("G") => Ok(Arg::Flag{scope: Scope::Shared, flag:flag.to_string()}),
