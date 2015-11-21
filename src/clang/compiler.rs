@@ -1,24 +1,20 @@
 pub use super::super::compiler::*;
 
 use super::super::cache::Cache;
-use super::super::io::tempfile::TempFile;
 
-use std::fs::File;
-use std::io::{Error, Read, Write};
+use std::io::{Error, Write};
 use std::hash::{SipHasher, Hasher};
 use std::path::{Path, PathBuf};
 use std::process::{Output, Stdio};
 
 pub struct ClangCompiler {
-	cache: Cache,
-	temp_dir: PathBuf
+	cache: Cache
 }
 
 impl ClangCompiler {
-	pub fn new(cache: &Cache, temp_dir: &Path) -> Self {
+	pub fn new(cache: &Cache) -> Self {
 		ClangCompiler {
 			cache: cache.clone(),
-			temp_dir: temp_dir.to_path_buf()
 		}
 	}
 }
@@ -61,10 +57,9 @@ impl Compiler for ClangCompiler {
 		}
 	
 		// Add preprocessor paramters.
-		let temp_file = TempFile::new_in(&self.temp_dir, ".i");
 		args.push(task.input_source.display().to_string());
 		args.push("-o".to_string());
-		args.push(temp_file.path().display().to_string());
+		args.push("-".to_string());
 	
 		// Hash data.
 		let mut hash = SipHasher::new();
@@ -76,20 +71,17 @@ impl Compiler for ClangCompiler {
 			.args(&args);
 		let output = try! (command.output());
 		if output.status.success() {
-			match File::open(temp_file.path()) {
-				Ok(mut stream) => {
-					let mut content = Vec::new();
-					try! (stream.read_to_end(&mut content));
-					hash.write(&content);
-					Ok(PreprocessResult::Success(PreprocessedSource {
-						hash: format!("{:016x}", hash.finish()),
-						content: content,
-					}))
-				}
-				Err(e) => Err(e)
-			}
+			hash.write(&output.stdout);
+			Ok(PreprocessResult::Success(PreprocessedSource {
+				hash: format!("{:016x}", hash.finish()),
+				content: output.stdout,
+			}))
 		} else {
-			Ok(PreprocessResult::Failed(OutputInfo::new(output)))
+			Ok(PreprocessResult::Failed(OutputInfo{
+				status: output.status.code(),
+				stdout: Vec::new(),
+				stderr: output.stderr,
+			}))
 		}
 	}
 
