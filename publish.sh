@@ -1,3 +1,10 @@
+#!/bin/bash
+#
+# This script require:
+*
+#  * https://github.com/aktau/github-release
+#
+
 set -ex
 cd `dirname $0`
 
@@ -13,7 +20,7 @@ if [ "$TAGNAME" == "" ]; then
 fi
 
 github-release info --tag $TAGNAME || github-release release --tag $TAGNAME --draft
-	
+
 for i in target/*.msi target/*.nupkg target/*.deb; do
 	github-release upload --tag $TAGNAME --file $i --name `basename $i`
 done
