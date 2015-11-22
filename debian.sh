@@ -12,6 +12,8 @@ rm -fR DEBROOT
 CONTROL=target/release/control.txt
 mkdir -p $DEBROOT/DEBIAN
 mkdir -p $DEBROOT/usr/bin
+mkdir -p $DEBROOT/usr/share/doc/octobuild
+cp *.md $DEBROOT/usr/share/doc/octobuild/
 cp LICENSE $DEBROOT/DEBIAN/license
 cp $CONTROL $DEBROOT/DEBIAN/control
 for i in xgConsole octo_clang; do
