@@ -10,12 +10,16 @@ rm -fR DEBROOT
 
 # Create debian build directory
 CONTROL=target/release/control.txt
-mkdir -p $DEBROOT/DEBIAN
-mkdir -p $DEBROOT/usr/bin
-mkdir -p $DEBROOT/usr/share/doc/octobuild
-cp *.md $DEBROOT/usr/share/doc/octobuild/
-cp LICENSE $DEBROOT/DEBIAN/license
+# Docs
+mkdir -p   $DEBROOT/usr/share/doc/octobuild
+cp *.md    $DEBROOT/usr/share/doc/octobuild/
+cp LICENSE $DEBROOT/usr/share/doc/octobuild/
+# DEBIAN
+mkdir -p    $DEBROOT/DEBIAN
+cp LICENSE  $DEBROOT/DEBIAN/license
 cp $CONTROL $DEBROOT/DEBIAN/control
+# Binaries
+mkdir -p $DEBROOT/usr/bin
 for i in xgConsole octo_clang; do
     cp target/release/$i $DEBROOT/usr/bin/$i
     strip $DEBROOT/usr/bin/$i
