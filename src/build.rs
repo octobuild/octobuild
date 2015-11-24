@@ -43,22 +43,16 @@ pub const RUSTC: &'static str = "{rustc}";
 fn save_control() -> Result<(), Error> {
     let root_dir = env::var("CARGO_MANIFEST_DIR").unwrap();
     let profile = env::var("PROFILE").unwrap();
-    let dest_path = Path::new(&root_dir).join("target").join(&profile).join("control.txt");
+    let dest_path = Path::new(&root_dir).join("target").join(&profile).join("version.sh");
     let arch = match ARCH {
         "x86_64" => "amd64",
         other => other,
     };
     let mut f = File::create(&dest_path).unwrap();
-    f.write_all(&format!(r#"Package: octobuild
-Source: octobuild
-Version: {version}
-Section: devel
-Priority: optional
-Architecture: {arch}
-Maintainer: bozaro
-Homepage: https://github.com/bozaro/octobuild
-Commit-ID: {revision}
-Description: Simple distributed compile system for C++
+    f.write_all(&format!(r#"
+VERSION={version}
+ARCH={arch}
+REVISION={revision}
 "#,
 	arch = arch,
         revision = try!(load_revision()),

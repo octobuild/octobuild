@@ -1,0 +1,3 @@
+../release/xgConsole	usr/bin/
+../release/octo_clang	usr/bin/
+../../*.md		usr/share/doc/octobuild/
