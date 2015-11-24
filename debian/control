@@ -1,0 +1,12 @@
+Source: octobuild
+Section: devel
+Priority: optional
+Maintainer: Artem V. Navrotskiy <bozaro@yandex.ru>
+Build-Depends: debhelper (>= 9)
+Standards-Version: 3.9.6
+Homepage: https://github.com/bozaro/octobuild
+Vcs-Git: https://github.com/bozaro/octobuild.git
+
+Package: octobuild
+Architecture: any
+Description: Simple distributed compile system for C++
