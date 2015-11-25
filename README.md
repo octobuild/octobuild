@@ -13,6 +13,20 @@ This program uses UBT extension point for IncrediBuild.
 
 It speeds up recompilation by caching previous compilations and detecting when the same compilation is being done again.
 
+## Installation
+
+### Ubuntu/Debian
+
+You can install octobuild by commands:
+```
+# Add package source
+echo "deb https://dist.bozaro.ru/ unstable/" > /etc/apt/sources.list.d/dist.bozaro.ru.list
+curl -s https://dist.bozaro.ru/signature.gpg | apt-key add -
+# Install package
+apt-get update
+apt-get install octobuild
+```
+
 ## Known issues
 
 On Windows you can't mix compilation with and without octobuild.
