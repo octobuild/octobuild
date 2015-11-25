@@ -25,6 +25,10 @@ for i in target/*.msi target/*.nupkg target/*.deb; do
 	github-release upload --tag $TAGNAME --file $i --name `basename $i`
 done
 
+for i in target/*.changes; do
+	dput -u local $i
+done
+
 #for i in target/*.nupkg; do
 #	nuget push $i -Source "$NUGET_REPO" -ApiKey "$NUGET_TOKEN"
 #done
