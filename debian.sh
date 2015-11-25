@@ -20,5 +20,5 @@ for i in $DEBROOT/debian/*; do
 done
 
 pushd $DEBROOT
-dpkg-buildpackage
+dpkg-buildpackage -uc -us
 popd

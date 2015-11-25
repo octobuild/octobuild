@@ -20,11 +20,11 @@ It speeds up recompilation by caching previous compilations and detecting when t
 You can install octobuild by commands:
 ```
 # Add package source
-echo "deb https://dist.bozaro.ru/ unstable/" > /etc/apt/sources.list.d/dist.bozaro.ru.list
-curl -s https://dist.bozaro.ru/signature.gpg | apt-key add -
+echo "deb https://dist.bozaro.ru/ unstable/" | sudo tee /etc/apt/sources.list.d/dist.bozaro.ru.list
+curl -s https://dist.bozaro.ru/signature.gpg | sudo apt-key add -
 # Install package
-apt-get update
-apt-get install octobuild
+sudo apt-get update
+sudo apt-get install octobuild
 ```
 
 ## Known issues
