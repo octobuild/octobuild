@@ -9,4 +9,4 @@ Vcs-Git: https://github.com/bozaro/octobuild.git
 
 Package: octobuild
 Architecture: any
-Description: Simple distributed compile system for C++
+Description: Boost Unreal Engine compilation
