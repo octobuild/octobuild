@@ -1,4 +1,4 @@
-octobuild (#VERSION#) unstable; urgency=low
+octobuild (#VERSION#) debian; urgency=low
 
   * See CHANGELOG.md for more details.
 
