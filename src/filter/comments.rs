@@ -1,11 +1,20 @@
-	use std::io::{Read, Error};
+use std::io::{Read, Error};
+
+#[derive(Copy, Clone, Eq, PartialEq)]
+enum MultiLineMark {
+	None,
+	Space,
+	NewLine,
+	Cr,
+	Lf,
+}
 
 enum State {
-	Code,
+	Code(MultiLineMark),
 	Quote(u8),
 	Escape(u8),
-	SingleLineComment,
-	MultLineComment,
+	SingleLineComment(MultiLineMark),
+	MultLineComment(MultiLineMark),
 }
 
 /**
@@ -21,7 +30,7 @@ impl<R: Read> CommentsRemover<R> {
 	pub fn new(r: R) -> CommentsRemover<R> {
 		CommentsRemover {
 			r: r,
-			state: State::Code,
+			state: State::Code(MultiLineMark::None),
 			last: None,
 		}
 	}
@@ -37,18 +46,18 @@ impl<R: Read> Read for CommentsRemover<R> {
 		for index in 0..size {	
 			let c = buf[index];
 			match self.state {
-				State::Code => {
+				State::Code(multiline) => {
 					match c {
 						b'"' | b'\'' => {
 							self.state = State::Quote(c);
 						}
 						b'/' if self.last == Some(b'/') => {
 							self.last = None;
-							self.state = State::SingleLineComment;
+							self.state = State::SingleLineComment(multiline);
 						}
 						b'*' if self.last == Some(b'/') => {
 							self.last = None;
-							self.state = State::MultLineComment;
+							self.state = State::MultLineComment(multiline);
 						}
 						c => {
 							match self.last {
@@ -60,6 +69,17 @@ impl<R: Read> Read for CommentsRemover<R> {
 								}
 							}
 							self.last = Some(c);
+							self.state = State::Code(match c {
+								b'/' => multiline,
+								b'\\' => MultiLineMark::Space,
+								b'\t' | b' ' if multiline == MultiLineMark::Space => MultiLineMark::Space,
+								b'\t' | b' ' => MultiLineMark::NewLine,
+								b'\n' if multiline == MultiLineMark::Space => MultiLineMark::Lf,
+								b'\n' if multiline == MultiLineMark::Cr => MultiLineMark::Cr,
+								b'\r' if multiline == MultiLineMark::Space => MultiLineMark::Cr,
+								b'\r' if multiline == MultiLineMark::Lf => MultiLineMark::Lf,
+								_ => MultiLineMark::None,
+							});
 							continue;
 						}
 					};
@@ -73,26 +93,26 @@ impl<R: Read> Read for CommentsRemover<R> {
 							self.state = State::Escape(q);
 						}
 						c if c == q => {
-							self.state = State::Code;
+							self.state = State::Code(MultiLineMark::None);
 						}
 						_ => {
 						}
 					}
 				}
-				State::SingleLineComment => {
+				State::SingleLineComment(multiline) => {
 					match c {
 						b'\n' | b'\r' => {
-							self.state = State::Code;
+							self.state = State::Code(multiline);
 						}
 						_ => {
 						}
 					}
 				}
-				State::MultLineComment => {
+				State::MultLineComment(multiline) => {
 					match c {
 						b'/' if self.last == Some(b'*') => {
 							self.last = None;
-							self.state = State::Code;
+							self.state = State::Code(multiline);
 							continue;
 						}
 						v => {
@@ -102,7 +122,7 @@ impl<R: Read> Read for CommentsRemover<R> {
 				}
 			}
 			match self.state {
-				State::Code | State::Quote(_) | State::Escape(_) => {
+				State::Code(_) | State::Quote(_) | State::Escape(_) => {
 					match self.last {
 						Some(c) => {
 							buf[offset] = c;
@@ -113,9 +133,37 @@ impl<R: Read> Read for CommentsRemover<R> {
 					}
 					self.last = Some(c);
 				}
-				State::MultLineComment => {
+				State::MultLineComment(multiline) => {
 					match c {
 						b'\n' | b'\r' => {
+							match multiline {
+								MultiLineMark::NewLine => {
+									self.state = State::MultLineComment(match c {
+										b'\n' => MultiLineMark::Lf,
+										b'\r' => MultiLineMark::Cr,
+										_ => MultiLineMark::None,
+									});
+									buf[offset] = b'\\';
+									offset += 1;
+								}
+								MultiLineMark::Space => {
+									self.state = State::MultLineComment(match c {
+										b'\n' => MultiLineMark::Lf,
+										b'\r' => MultiLineMark::Cr,
+										_ => MultiLineMark::None,
+									});
+								}
+								MultiLineMark::Lf if c == b'\n' => {
+									buf[offset] = b'\\';
+									offset += 1;
+								}
+								MultiLineMark::Cr if c == b'\r' => {
+									buf[offset] = b'\\';
+									offset += 1;
+								}
+							    _ => {							    	
+							    }
+							}
 							buf[offset] = c;
 							offset += 1;
 						}
@@ -123,13 +171,13 @@ impl<R: Read> Read for CommentsRemover<R> {
 						}
 					}
 				}
-				State::SingleLineComment => {
+				State::SingleLineComment(_) => {
 				}
 			}
 		}
 		if offset < buf.len() {
 			match self.state {
-				State::Code | State::Quote(_) | State::Escape(_) => {
+				State::Code(_) | State::Quote(_) | State::Escape(_) => {
 					match self.last {
 						Some(c) if c == b'/' => {
 						}
@@ -142,7 +190,7 @@ impl<R: Read> Read for CommentsRemover<R> {
 						}
 					}
 				}
-				State::SingleLineComment | State::MultLineComment => {
+				State::SingleLineComment(_) | State::MultLineComment(_) => {
 				}
 			}
 		}
@@ -174,18 +222,18 @@ mod test {
 				break;
 			}
 			actual.write(&buffer[0..size]).unwrap();
-//			assert!(actual.len() <= expected.len());
+			assert!(actual.len() <= expected.len());
 		}
 		assert_eq!(expected, String::from_utf8(actual).unwrap());
 	}
 
 	fn check_filter(original: &str, expected: &str) {
+		check_filter_pass(original, expected, expected.len());
+		check_filter_pass(original, expected, original.len());
 		check_filter_pass(original, expected, 1);
 		check_filter_pass(original, expected, 10);
 		check_filter_pass(original, expected, expected.len() - 1);
 		check_filter_pass(original, expected, original.len() - 1);
-		check_filter_pass(original, expected, expected.len());
-		check_filter_pass(original, expected, original.len());
 	}
 
 	#[test]
@@ -230,6 +278,38 @@ int main(int argc, char **argv ) {
 
 
 	return 0;
+}
+"#
+		);
+	}
+
+	#[test]
+	fn test_filter_define_comments() {
+		check_filter(
+r#"#define A "A1" \ 
+   /* Foo
+Bar */ \
+          "A2"
+
+#define B "B1" \  /* Buzz */ /*X*//* Foo
+Bar */ \
+          "B2"
+
+int main() {
+    return 0;
+}
+"#,
+r#"#define A "A1" \ 
+   \
+ \
+          "A2"
+
+#define B "B1" \   
+ \
+          "B2"
+
+int main() {
+    return 0;
 }
 "#
 		);
