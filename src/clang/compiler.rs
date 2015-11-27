@@ -1,6 +1,7 @@
 pub use super::super::compiler::*;
 
 use super::super::cache::Cache;
+use super::super::filter::comments::CommentsRemover;
 
 use std::io::{Error, Read, Write};
 use std::hash::{SipHasher, Hasher};
@@ -156,9 +157,9 @@ fn execute<H: Hasher>(mut command: Command, mut hash: H) -> Result<PreprocessRes
 		.spawn());
 	drop(child.stdin.take());
 
-	fn read<T: Read + Send + 'static>(stream: Option<T>) -> Receiver<Result<Vec<u8>, Error>> {
+	fn read<T: Read + Send + 'static, F: FnOnce(T) -> O, O: Read + Send + 'static>(stream: Option<T>, filter: F) -> Receiver<Result<Vec<u8>, Error>> {
 		let (tx, rx) = channel();
-		match stream {
+		match stream.map(filter) {
 			Some(stream) => {
 				thread::spawn(move || {
 					let mut stream = stream;
@@ -176,8 +177,8 @@ fn execute<H: Hasher>(mut command: Command, mut hash: H) -> Result<PreprocessRes
 		stream.recv().unwrap().unwrap_or(Vec::new())
 	}
 
-	let stdout = read(child.stdout.take());
-	let stderr = read(child.stderr.take());
+	let stdout = read(child.stdout.take(), |f| CommentsRemover::new(f));
+	let stderr = read(child.stderr.take(), |f| f);
 	let status = try!(child.wait());
 
 	if status.success() {
