@@ -1,11 +1,14 @@
 pub use super::super::compiler::*;
 
 use super::super::cache::Cache;
+use super::super::filter::comments::CommentsRemover;
 
-use std::io::{Error, Write};
+use std::io::{Error, Read, Write};
 use std::hash::{SipHasher, Hasher};
 use std::path::{Path, PathBuf};
-use std::process::{Output, Stdio};
+use std::process::{Command, Output, Stdio};
+use std::sync::mpsc::{channel, Receiver};
+use std::thread;
 
 pub struct ClangCompiler {
 	cache: Cache
@@ -69,20 +72,7 @@ impl Compiler for ClangCompiler {
 		let mut command = task.command.to_command();
 		command
 			.args(&args);
-		let output = try! (command.output());
-		if output.status.success() {
-			hash.write(&output.stdout);
-			Ok(PreprocessResult::Success(PreprocessedSource {
-				hash: format!("{:016x}", hash.finish()),
-				content: output.stdout,
-			}))
-		} else {
-			Ok(PreprocessResult::Failed(OutputInfo{
-				status: output.status.code(),
-				stdout: Vec::new(),
-				stderr: output.stderr,
-			}))
-		}
+		execute(command, hash)
 	}
 
 	// Compile preprocessed file.
@@ -157,4 +147,52 @@ fn hash_args(hash: &mut Hasher, args: &Vec<String>) {
 
 pub fn join_flag(flag: &str, path: &Path) -> String {
 	flag.to_string() + &path.to_str().unwrap()
+}
+
+fn execute<H: Hasher>(mut command: Command, mut hash: H) -> Result<PreprocessResult, Error> {
+	let mut child = try! (command
+		.stdin(Stdio::piped())
+		.stdout(Stdio::piped())
+		.stderr(Stdio::piped())
+		.spawn());
+	drop(child.stdin.take());
+
+	fn read<T: Read + Send + 'static, F: FnOnce(T) -> O, O: Read + Send + 'static>(stream: Option<T>, filter: F) -> Receiver<Result<Vec<u8>, Error>> {
+		let (tx, rx) = channel();
+		match stream.map(filter) {
+			Some(stream) => {
+				thread::spawn(move || {
+					let mut stream = stream;
+					let mut ret = Vec::new();
+					let res = stream.read_to_end(&mut ret);
+					tx.send(res.map(|_| ret)).unwrap();
+				});
+			}
+			None => tx.send(Ok(Vec::new())).unwrap()
+		}
+		rx
+	}
+
+	fn bytes(stream: Receiver<Result<Vec<u8>, Error>>) -> Vec<u8> {
+		stream.recv().unwrap().unwrap_or(Vec::new())
+	}
+
+	let stdout = read(child.stdout.take(), |f| CommentsRemover::new(f));
+	let stderr = read(child.stderr.take(), |f| f);
+	let status = try!(child.wait());
+
+	if status.success() {
+		let out = bytes(stdout);
+		hash.write(&out);
+		Ok(PreprocessResult::Success(PreprocessedSource {
+			hash: format!("{:016x}", hash.finish()),
+			content: out,
+		}))
+	} else {
+		Ok(PreprocessResult::Failed(OutputInfo{
+			status: status.code(),
+			stdout: Vec::new(),
+			stderr: bytes(stderr),
+		}))
+	}
 }
