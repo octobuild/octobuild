@@ -113,7 +113,17 @@ impl<R: Read> Read for CommentsRemover<R> {
 					}
 					self.last = Some(c);
 				}
-				State::SingleLineComment | State::MultLineComment => {
+				State::MultLineComment => {
+					match c {
+						b'\n' | b'\r' => {
+							buf[offset] = c;
+							offset += 1;
+						}
+						_ => {
+						}
+					}
+				}
+				State::SingleLineComment => {
 				}
 			}
 		}
@@ -203,6 +213,9 @@ void hello();
 //#line 2 "sample.cpp"
 
 int main(int argc, char **argv /* // Arguments */) {
+/*
+ * Multiline
+ */
 	return 0;
 }
 "#,
@@ -213,6 +226,9 @@ void hello();
 
 
 int main(int argc, char **argv ) {
+
+
+
 	return 0;
 }
 "#
