@@ -13,6 +13,7 @@ pub mod io {
 	pub mod filecache;
 	pub mod hashwriter;
 	pub mod memcache;
+	pub mod memstream;
 }
 pub mod xg {
 	pub mod parser;
