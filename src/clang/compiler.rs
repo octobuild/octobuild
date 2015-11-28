@@ -157,15 +157,20 @@ fn execute<H: Hasher>(mut command: Command, mut hash: H) -> Result<PreprocessRes
 		.spawn());
 	drop(child.stdin.take());
 
-	fn read<T: Read + Send + 'static, F: FnOnce(T) -> O, O: Read + Send + 'static>(stream: Option<T>, filter: F) -> Receiver<Result<Vec<u8>, Error>> {
+	fn read_this_thread<T: Read>(stream: Option<T>) -> Result<Vec<u8>, Error> {
+		stream.map_or(Ok(Vec::new()), |mut stream| {
+			let mut ret = Vec::new();
+			let res = stream.read_to_end(&mut ret);
+			res.map(|_| ret)
+		})
+	}
+
+	fn read_in_thread<T: Read + Send + 'static>(stream: Option<T>) -> Receiver<Result<Vec<u8>, Error>> {
 		let (tx, rx) = channel();
-		match stream.map(filter) {
+		match stream {
 			Some(stream) => {
 				thread::spawn(move || {
-					let mut stream = stream;
-					let mut ret = Vec::new();
-					let res = stream.read_to_end(&mut ret);
-					tx.send(res.map(|_| ret)).unwrap();
+					tx.send(read_this_thread(Some(stream))).unwrap();
 				});
 			}
 			None => tx.send(Ok(Vec::new())).unwrap()
@@ -177,22 +182,22 @@ fn execute<H: Hasher>(mut command: Command, mut hash: H) -> Result<PreprocessRes
 		stream.recv().unwrap().unwrap_or(Vec::new())
 	}
 
-	let stdout = read(child.stdout.take(), |f| CommentsRemover::new(f));
-	let stderr = read(child.stderr.take(), |f| f);
+	let rx_out = read_in_thread(child.stdout.take().map(|f| CommentsRemover::new(f)));
+	let stderr = read_this_thread(child.stderr.take()).unwrap_or(Vec::new());
 	let status = try!(child.wait());
+	let stdout = bytes(rx_out);
 
 	if status.success() {
-		let out = bytes(stdout);
-		hash.write(&out);
+		hash.write(&stdout);
 		Ok(PreprocessResult::Success(PreprocessedSource {
 			hash: format!("{:016x}", hash.finish()),
-			content: out,
+			content: stdout,
 		}))
 	} else {
 		Ok(PreprocessResult::Failed(OutputInfo{
 			status: status.code(),
 			stdout: Vec::new(),
-			stderr: bytes(stderr),
+			stderr: stderr,
 		}))
 	}
 }

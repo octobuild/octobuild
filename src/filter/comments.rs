@@ -93,7 +93,7 @@ impl<R: Read> Read for CommentsRemover<R> {
 					continue;
 				}
 				match self.state {
-					State::Code(_, None) => {
+					State::Code(_, None) | State::SingleLineComment(_) => {
 						break;
 					}
 					State::Code(_, Some(last)) => {
