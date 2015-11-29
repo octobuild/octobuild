@@ -1,7 +1,7 @@
 [package]
 name = "octobuild"
 build = "src/build.rs"
-version = "0.1.2"
+version = "0.1.3"
 authors = [ "Artem V. Navrotskiy <bozaro@users.noreply.github.com>" ]
 
 [profile.bench]
