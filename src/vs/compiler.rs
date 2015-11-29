@@ -3,9 +3,11 @@ pub use super::super::compiler::*;
 use super::super::cache::Cache;
 use super::postprocess;
 use super::super::utils::filter;
+use super::super::io::memstream::MemStream;
 use super::super::io::tempfile::TempFile;
 
 use std::fs::File;
+use std::io;
 use std::io::{Error, Cursor, Read, Write};
 use std::hash::{SipHasher, Hasher};
 use std::path::{Path, PathBuf};
@@ -80,9 +82,9 @@ impl Compiler for VsCompiler {
 					} else {
 						Box::new(stream)
 					};
-					let mut content = Vec::new();
-					try! (output.read_to_end(&mut content));
-					hash.write(&content);
+					let mut content = MemStream::new();
+					try! (io::copy(&mut output, &mut content));
+					content.hash(&mut hash);
 					Ok(PreprocessResult::Success(PreprocessedSource {
 						hash: format!("{:016x}", hash.finish()),
 						content: content,
@@ -146,12 +148,12 @@ impl Compiler for VsCompiler {
 		}
 
 		let mut hash = SipHasher::new();
-		hash.write(&preprocessed.content);
+		preprocessed.content.hash(&mut hash);
 		hash_args(&mut hash, &args);
 		self.cache.run_file_cached(hash.finish(), &inputs, &outputs, || -> Result<OutputInfo, Error> {
 			// Input file path.
 			let input_temp = TempFile::new_in(&self.temp_dir, ".i");
-			try! (try! (File::create(input_temp.path())).write_all(&preprocessed.content));
+			try! (File::create(input_temp.path()).and_then(|mut s| preprocessed.content.copy(&mut s)));
 			// Run compiler.
 			let mut command = task.command.to_command();
 			command

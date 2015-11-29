@@ -5,6 +5,8 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use std::process::{Command, Output};
 
+use super::io::memstream::MemStream;
+
 #[derive(Debug)]
 pub enum CompilerError {
 	InvalidArguments(String),
@@ -151,7 +153,7 @@ pub struct PreprocessedSource {
 	// Hash
 	pub hash: String,
 	// Preprocessed file
-	pub content: Vec<u8>,
+	pub content: MemStream,
 }
 
 pub trait Compiler {

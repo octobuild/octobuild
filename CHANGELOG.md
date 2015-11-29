@@ -1,5 +1,9 @@
 # Changes
 
+## 0.1.3
+
+ * Minor performance improvement.
+
 ## 0.1.2
 
  * Remove comments from clang preprocessed output for more cache hits.

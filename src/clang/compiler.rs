@@ -2,7 +2,9 @@ pub use super::super::compiler::*;
 
 use super::super::cache::Cache;
 use super::super::filter::comments::CommentsRemover;
+use super::super::io::memstream::MemStream;
 
+use std::io;
 use std::io::{Error, Read, Write};
 use std::hash::{SipHasher, Hasher};
 use std::path::{Path, PathBuf};
@@ -115,7 +117,7 @@ impl Compiler for ClangCompiler {
 		}
 
 		let mut hash = SipHasher::new();
-		hash.write(&preprocessed.content);
+		preprocessed.content.hash(&mut hash);
 		hash_args(&mut hash, &args);
 		self.cache.run_file_cached(hash.finish(), &Vec::new(), &outputs, || -> Result<OutputInfo, Error> {
 			// Run compiler.
@@ -127,7 +129,7 @@ impl Compiler for ClangCompiler {
 				.stdin(Stdio::piped())
 				.spawn()
 				.and_then(|mut child| {
-					try! (child.stdin.as_mut().unwrap().write_all(&preprocessed.content));
+					try! (preprocessed.content.copy(child.stdin.as_mut().unwrap()));
 					let _ = preprocessed.content;
 					child.wait_with_output()
 				})
@@ -157,20 +159,21 @@ fn execute<H: Hasher>(mut command: Command, mut hash: H) -> Result<PreprocessRes
 		.spawn());
 	drop(child.stdin.take());
 
-	fn read_this_thread<T: Read>(stream: Option<T>) -> Result<Vec<u8>, Error> {
-		stream.map_or(Ok(Vec::new()), |mut stream| {
-			let mut ret = Vec::new();
-			let res = stream.read_to_end(&mut ret);
-			res.map(|_| ret)
-		})
+	fn read_stdout<T: Read>(stream: Option<T>) -> MemStream {
+		stream.map_or(Ok(MemStream::new()), |mut stream| {
+			let mut ret = MemStream::new();
+			io::copy(&mut stream, &mut ret).map(|_| ret)
+		}).unwrap_or(MemStream::new())
 	}
 
-	fn read_in_thread<T: Read + Send + 'static>(stream: Option<T>) -> Receiver<Result<Vec<u8>, Error>> {
+	fn read_stderr<T: Read + Send + 'static>(stream: Option<T>) -> Receiver<Result<Vec<u8>, Error>> {
 		let (tx, rx) = channel();
 		match stream {
-			Some(stream) => {
+			Some(mut stream) => {
 				thread::spawn(move || {
-					tx.send(read_this_thread(Some(stream))).unwrap();
+					let mut ret = Vec::new();
+					let res = stream.read_to_end(&mut ret).map(|_| ret);
+					tx.send(res).unwrap();
 				});
 			}
 			None => tx.send(Ok(Vec::new())).unwrap()
@@ -182,13 +185,13 @@ fn execute<H: Hasher>(mut command: Command, mut hash: H) -> Result<PreprocessRes
 		stream.recv().unwrap().unwrap_or(Vec::new())
 	}
 
-	let rx_out = read_in_thread(child.stdout.take().map(|f| CommentsRemover::new(f)));
-	let stderr = read_this_thread(child.stderr.take()).unwrap_or(Vec::new());
+	let stdout = read_stdout(child.stdout.take().map(|f| CommentsRemover::new(f)));
+	let rx_err = read_stderr(child.stderr.take());
 	let status = try!(child.wait());
-	let stdout = bytes(rx_out);
+	let stderr = bytes(rx_err);
 
 	if status.success() {
-		hash.write(&stdout);
+		stdout.hash(&mut hash);
 		Ok(PreprocessResult::Success(PreprocessedSource {
 			hash: format!("{:016x}", hash.finish()),
 			content: stdout,
