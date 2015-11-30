@@ -2,7 +2,8 @@
 
 ## 0.1.3
 
- * Fix panicked at 'called `Result::unwrap()` on an `Err` value: "SendError(..)"' (fix #8)
+ * Fix panicked at 'called `Result::unwrap()` on an `Err` value: "SendError(..)"' (fix #8).
+ * Minor performance improvement.
 
 ## 0.1.2
 
