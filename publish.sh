@@ -19,6 +19,8 @@ if [ "$TAGNAME" == "" ]; then
 	exit 1
 fi
 
+scp target/*.msi dist.bozaro.ru:htdocs/windows/
+
 github-release info --tag $TAGNAME || github-release release --tag $TAGNAME --draft
 
 for i in target/*.msi target/*.nupkg target/*.deb; do
