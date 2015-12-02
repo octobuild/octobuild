@@ -30,10 +30,10 @@ Install-Package octobuild
 ### Chocolatey
 Chocolatey installation:
 ```bat
-# Add chocolatey source
+rem Add chocolatey source
 choco sources add -name bozaro -source https://www.myget.org/F/bozaro/
 
-# Install package
+rem Install package
 choco install octobuild
 ```
 
