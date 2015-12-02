@@ -27,6 +27,16 @@ Register-PackageSource -Name bozaro -Provider Chocolatey -Location https://www.m
 Install-Package octobuild
 ```
 
+### Chocolatey
+Chocolatey installation:
+```bat
+# Add chocolatey source
+choco sources add -name bozaro -source https://www.myget.org/F/bozaro/
+
+# Install package
+choco install octobuild
+```
+
 ### Ubuntu/Debian
 
 You can install octobuild by commands:
