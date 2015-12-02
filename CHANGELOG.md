@@ -3,6 +3,7 @@
 ## 0.1.4
 
  * Join i686 and x86_64 builds to single .nupkg Chocolatey package (fix #4).
+ * Don't require reboot for apply PATH environment variable (fix #9).
 
 ## 0.1.3
 
