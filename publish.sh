@@ -23,7 +23,7 @@ scp target/*.msi dist.bozaro.ru:htdocs/windows/
 
 github-release info --tag $TAGNAME || github-release release --tag $TAGNAME --draft
 
-for i in target/*.msi target/*.nupkg target/*.deb; do
+for i in target/*.msi target/*.deb; do
 	github-release upload --tag $TAGNAME --file $i --name `basename $i`
 done
 
