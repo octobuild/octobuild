@@ -1,5 +1,9 @@
 # Changes
 
+## 0.1.4
+
+ * Join i686 and x86_64 builds to single .nupkg Chocolatey package (fix #4).
+
 ## 0.1.3
 
  * Fix panicked at 'called `Result::unwrap()` on an `Err` value: "SendError(..)"' (fix #8).

@@ -3,8 +3,6 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Text;
 using System.Text.RegularExpressions;
-using System.Xml;
-using System.Xml.Linq;
 using WixSharp;
 
 class Script
@@ -52,11 +50,11 @@ class Script
         }
     }
 
-    static void CreateNuspec(string template, string output, string version, Platform target)
+    static void CreateNuspec(string template, string output, string version)
     {
         string content = System.IO.File.ReadAllText(template, Encoding.UTF8);
         content = content.Replace("$version$", version);
-        content = content.Replace("$target$", PlatformName(target));
+        System.IO.Directory.CreateDirectory(System.IO.Path.GetDirectoryName(output));
         System.IO.File.WriteAllText(output, content, Encoding.UTF8);
     }
 
@@ -132,6 +130,7 @@ class Script
 
         Compiler.BuildMsi(project);
         Compiler.BuildWxs(project);
-        CreateNuspec(@"wixcs\octobuild.nuspec", @"target\octobuild.nuspec", version, platform);
+        CreateNuspec(@"choco\octobuild.nuspec", @"target\choco\octobuild.nuspec", version);
+        CreateNuspec(@"choco\tools\chocolateyInstall.ps1", @"target\choco\tools\chocolateyInstall.ps1", version);
     }
 }
