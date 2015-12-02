@@ -1,10 +1,13 @@
+//css_dir %WIXSHARP_DIR%;
+//css_ref Wix_bin\SDK\Microsoft.Deployment.WindowsInstaller.dll";
+//css_ref System.Core.dll;
+using Microsoft.Deployment.WindowsInstaller;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.RegularExpressions;
-using System.Xml;
-using System.Xml.Linq;
 using WixSharp;
 
 class Script
@@ -52,11 +55,11 @@ class Script
         }
     }
 
-    static void CreateNuspec(string template, string output, string version, Platform target)
+    static void CreateNuspec(string template, string output, string version)
     {
         string content = System.IO.File.ReadAllText(template, Encoding.UTF8);
         content = content.Replace("$version$", version);
-        content = content.Replace("$target$", PlatformName(target));
+        System.IO.Directory.CreateDirectory(System.IO.Path.GetDirectoryName(output));
         System.IO.File.WriteAllText(output, content, Encoding.UTF8);
     }
 
@@ -116,6 +119,7 @@ class Script
                 );
             }
         }
+	projectEntries.Add(new ManagedAction(@"BroadcastSettingChange", Return.ignore, When.After, Step.InstallFinalize, Condition.Always));
 
         Project project = new Project("Octobuild", projectEntries.ToArray());
         project.ControlPanelInfo.Manufacturer = "Artem V. Navrotskiy";
@@ -131,7 +135,29 @@ class Script
         project.MajorUpgradeStrategy = MajorUpgradeStrategy.Default;
 
         Compiler.BuildMsi(project);
-        Compiler.BuildWxs(project);
-        CreateNuspec(@"wixcs\octobuild.nuspec", @"target\octobuild.nuspec", version, platform);
+        //Compiler.BuildWxs(project);
+        CreateNuspec(@"choco\octobuild.nuspec", @"target\choco\octobuild.nuspec", version);
+        CreateNuspec(@"choco\tools\chocolateyInstall.ps1", @"target\choco\tools\chocolateyInstall.ps1", version);
+    }
+}
+
+public class CustomActions
+{
+	[DllImport("user32.dll", SetLastError = true, CharSet = CharSet.Auto)]
+	static extern IntPtr SendMessageTimeout(IntPtr hWnd, uint Msg, UIntPtr wParam, string lParam, SendMessageTimeoutFlags fuFlags, uint uTimeout, out UIntPtr lpdwResult);
+
+	public enum SendMessageTimeoutFlags : uint
+{
+   SMTO_NORMAL = 0x0, SMTO_BLOCK = 0x1, SMTO_ABORTIFHUNG = 0x2, SMTO_NOTIMEOUTIFNOTHUNG = 0x8
+}
+
+    [CustomAction]
+    public static ActionResult BroadcastSettingChange(Session session)
+    {
+		IntPtr HWND_BROADCAST = (IntPtr)0xffff;
+		const UInt32 WM_SETTINGCHANGE = 0x001A;
+		UIntPtr result;
+		SendMessageTimeout(HWND_BROADCAST, WM_SETTINGCHANGE, (UIntPtr)0, "Environment", SendMessageTimeoutFlags.SMTO_ABORTIFHUNG, 5000, out result);
+        return ActionResult.Success;
     }
 }

@@ -42,7 +42,7 @@ build() {
 	# Build installer
 	if [ "$WIXSHARP_DIR" != "" ]; then
 		$WIXSHARP_DIR/cscs wixcs/setup.cs
-		nuget pack target/octobuild.nuspec -OutputDirectory target
+		nuget pack target/choco/octobuild.nuspec -OutputDirectory target
 	fi
 
 	sign target/*.msi

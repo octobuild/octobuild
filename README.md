@@ -15,6 +15,28 @@ It speeds up recompilation by caching previous compilations and detecting when t
 
 ## Installation
 
+### Windows 10
+You can install octobuild by PowerShell commands:
+```ps1
+# First, you have to set the execution policy to allow scripts, otherwise it'll silently fail
+# while reporting success (https://github.com/OneGet/oneget/issues/97#issuecomment-139331418):
+Set-ExecutionPolicy RemoteSigned
+# Add package source
+Register-PackageSource -Name bozaro -Provider Chocolatey -Location https://www.myget.org/F/bozaro/
+# Install package
+Install-Package octobuild
+```
+
+### Chocolatey
+Chocolatey installation:
+```bat
+# Add chocolatey source
+choco sources add -name bozaro -source https://www.myget.org/F/bozaro/
+
+# Install package
+choco install octobuild
+```
+
 ### Ubuntu/Debian
 
 You can install octobuild by commands:
