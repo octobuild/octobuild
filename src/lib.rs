@@ -10,10 +10,12 @@ pub mod version;
 pub mod io {
 	pub mod tempfile;
 	pub mod binary;
+	pub mod counter;
 	pub mod filecache;
 	pub mod hashwriter;
 	pub mod memcache;
 	pub mod memstream;
+	pub mod statistic;
 }
 pub mod xg {
 	pub mod parser;

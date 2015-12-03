@@ -11,6 +11,7 @@ use self::filetime::FileTime;
 use super::compiler::OutputInfo;
 use super::io::memcache::MemCache;
 use super::io::filecache::FileCache;
+use super::io::statistic::Statistic;
 use super::utils::hash_write_stream;
 
 #[derive(Clone)]
@@ -39,7 +40,10 @@ impl Cache {
 	}
 	
 	pub fn run_file_cached<F: Fn()->Result<OutputInfo, Error>, C: Fn()->bool>(&self, hash: u64, inputs: &Vec<PathBuf>, outputs: &Vec<PathBuf>, worker: F, checker: C) -> Result<OutputInfo, Error> {
-		self.file_cache.run_cached(self, hash, inputs, outputs, worker, checker)
+		let mut statistic = Statistic::new();
+		let result = self.file_cache.run_cached(self, &mut statistic, hash, inputs, outputs, worker, checker);
+		println!("stat: hit {} / {}, miss {} / {}", statistic.hit_count, statistic.hit_bytes, statistic.miss_count, statistic.miss_bytes);
+		result
 	}
 	
 	pub fn cleanup(&self, max_cache_size: u64) -> Result<(), Error> {
