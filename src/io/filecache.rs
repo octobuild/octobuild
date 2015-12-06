@@ -8,6 +8,7 @@ use std::fs::{File, PathExt, OpenOptions};
 use std::io::{Error, ErrorKind, Read, Write, Seek, SeekFrom};
 use std::hash::{Hasher, SipHasher};
 use std::path::{Path, PathBuf};
+use std::sync::RwLock;
 
 use self::filetime::FileTime;
 
@@ -78,7 +79,7 @@ impl FileCache {
 		}
 	}
 
-	pub fn run_cached<F: Fn()->Result<OutputInfo, Error>, C: Fn()->bool>(&self, file_hasher: &FileHasher, statistic: &mut Statistic, params: u64, inputs: &Vec<PathBuf>, outputs: &Vec<PathBuf>, worker: F, checker: C) -> Result<OutputInfo, Error> {
+	pub fn run_cached<F: Fn()->Result<OutputInfo, Error>, C: Fn()->bool>(&self, file_hasher: &FileHasher, statistic: &RwLock<Statistic>, params: u64, inputs: &Vec<PathBuf>, outputs: &Vec<PathBuf>, worker: F, checker: C) -> Result<OutputInfo, Error> {
 		let hash = try! (self.generate_hash(file_hasher, params, inputs));
 		let path = self.cache_dir.join(&hash[0..2]).join(&(hash[2..].to_string() + SUFFIX));
 		// Try to read data from cache.
@@ -140,7 +141,7 @@ fn find_cache_files(dir: &Path, mut files: Vec<CacheFile>) -> Result<Vec<CacheFi
 	Ok(files)
 }
 
-fn write_cache(statistic: &mut Statistic, path: &Path, paths: &Vec<PathBuf>, output: &OutputInfo) -> Result<(), Error> {
+fn write_cache(statistic: &RwLock<Statistic>, path: &Path, paths: &Vec<PathBuf>, output: &OutputInfo) -> Result<(), Error> {
 	if !output.success() {
 		return Ok(());
 	}
@@ -168,14 +169,13 @@ fn write_cache(statistic: &mut Statistic, path: &Path, paths: &Vec<PathBuf>, out
 	try! (stream.write_all(FOOTER));
 	match stream.finish() {
 		(writer, result) => {
-			statistic.miss_count += 1;
-			statistic.miss_bytes += writer.len();
+			statistic.write().unwrap().add_miss(writer.len());
 			result
 		}
 	}
 }
 
-fn read_cache(statistic: &mut Statistic, path: &Path, paths: &Vec<PathBuf>) -> Result<OutputInfo, Error> {
+fn read_cache(statistic: &RwLock<Statistic>, path: &Path, paths: &Vec<PathBuf>) -> Result<OutputInfo, Error> {
 	let mut file = try! (OpenOptions::new().read(true).write(true).open(Path::new(path)));
 	try! (file.write(&[4]));
 	try! (file.seek(SeekFrom::Start(0)));
@@ -203,8 +203,7 @@ fn read_cache(statistic: &mut Statistic, path: &Path, paths: &Vec<PathBuf>) -> R
 	if try! (stream.read(&mut eof)) != 0 {
 		return Err(Error::new(ErrorKind::InvalidInput, CacheError::InvalidFooter(path.to_path_buf())));
 	}
-	statistic.hit_count += 1;
-	statistic.hit_bytes += stream.finish().0.len();
+	statistic.write().unwrap().add_hit(stream.finish().0.len());
 	Ok(output)
 }
 

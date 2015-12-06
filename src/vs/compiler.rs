@@ -5,6 +5,7 @@ use super::postprocess;
 use super::super::utils::filter;
 use super::super::io::memstream::MemStream;
 use super::super::io::tempfile::TempFile;
+use super::super::io::statistic::Statistic;
 
 use std::fs::File;
 use std::io;
@@ -12,6 +13,7 @@ use std::io::{Error, Cursor, Read, Write};
 use std::hash::{SipHasher, Hasher};
 use std::path::{Path, PathBuf};
 use std::process::Output;
+use std::sync::RwLock;
 
 pub struct VsCompiler {
 	cache: Cache,
@@ -98,7 +100,7 @@ impl Compiler for VsCompiler {
 	}
 
 	// Compile preprocessed file.
-	fn compile_step(&self, task: &CompilationTask, preprocessed: PreprocessedSource) -> Result<OutputInfo, Error> {
+	fn compile_step(&self, task: &CompilationTask, preprocessed: PreprocessedSource, statistic: &RwLock<Statistic>) -> Result<OutputInfo, Error> {
 		let mut args = filter(&task.args, |arg:&Arg|->Option<String> {
 			match arg {
 				&Arg::Flag{ref scope, ref flag} => {
@@ -150,7 +152,7 @@ impl Compiler for VsCompiler {
 		let mut hash = SipHasher::new();
 		preprocessed.content.hash(&mut hash);
 		hash_args(&mut hash, &args);
-		self.cache.run_file_cached(hash.finish(), &inputs, &outputs, || -> Result<OutputInfo, Error> {
+		self.cache.run_file_cached(statistic, hash.finish(), &inputs, &outputs, || -> Result<OutputInfo, Error> {
 			// Input file path.
 			let input_temp = TempFile::new_in(&self.temp_dir, ".i");
 			try! (File::create(input_temp.path()).and_then(|mut s| preprocessed.content.copy(&mut s)));

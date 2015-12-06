@@ -5,6 +5,7 @@ use std::path::{Path, PathBuf};
 use std::fs;
 use std::fs::File;
 use std::io::{Error, ErrorKind};
+use std::sync::RwLock;
 
 use self::filetime::FileTime;
 
@@ -39,11 +40,8 @@ impl Cache {
 		}
 	}
 	
-	pub fn run_file_cached<F: Fn()->Result<OutputInfo, Error>, C: Fn()->bool>(&self, hash: u64, inputs: &Vec<PathBuf>, outputs: &Vec<PathBuf>, worker: F, checker: C) -> Result<OutputInfo, Error> {
-		let mut statistic = Statistic::new();
-		let result = self.file_cache.run_cached(self, &mut statistic, hash, inputs, outputs, worker, checker);
-		println!("stat: hit {} / {}, miss {} / {}", statistic.hit_count, statistic.hit_bytes, statistic.miss_count, statistic.miss_bytes);
-		result
+	pub fn run_file_cached<F: Fn()->Result<OutputInfo, Error>, C: Fn()->bool>(&self, statistic: &RwLock<Statistic>, hash: u64, inputs: &Vec<PathBuf>, outputs: &Vec<PathBuf>, worker: F, checker: C) -> Result<OutputInfo, Error> {
+		self.file_cache.run_cached(self, statistic, hash, inputs, outputs, worker, checker)
 	}
 	
 	pub fn cleanup(&self, max_cache_size: u64) -> Result<(), Error> {

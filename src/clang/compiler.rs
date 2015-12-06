@@ -3,6 +3,7 @@ pub use super::super::compiler::*;
 use super::super::cache::Cache;
 use super::super::filter::comments::CommentsRemover;
 use super::super::io::memstream::MemStream;
+use super::super::io::statistic::Statistic;
 
 use std::io;
 use std::io::{Error, Read, Write};
@@ -10,6 +11,7 @@ use std::hash::{SipHasher, Hasher};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output, Stdio};
 use std::sync::mpsc::{channel, Receiver};
+use std::sync::RwLock;
 use std::thread;
 
 pub struct ClangCompiler {
@@ -78,7 +80,7 @@ impl Compiler for ClangCompiler {
 	}
 
 	// Compile preprocessed file.
-	fn compile_step(&self, task: &CompilationTask, preprocessed: PreprocessedSource) -> Result<OutputInfo, Error> {
+	fn compile_step(&self, task: &CompilationTask, preprocessed: PreprocessedSource, statistic: &RwLock<Statistic>) -> Result<OutputInfo, Error> {
 		let mut args = Vec::new();
 		args.push("-c".to_string());
 		args.push("-x".to_string());
@@ -119,7 +121,7 @@ impl Compiler for ClangCompiler {
 		let mut hash = SipHasher::new();
 		preprocessed.content.hash(&mut hash);
 		hash_args(&mut hash, &args);
-		self.cache.run_file_cached(hash.finish(), &Vec::new(), &outputs, || -> Result<OutputInfo, Error> {
+		self.cache.run_file_cached(statistic, hash.finish(), &Vec::new(), &outputs, || -> Result<OutputInfo, Error> {
 			// Run compiler.
 			task.command.to_command()
 				.args(&args)
