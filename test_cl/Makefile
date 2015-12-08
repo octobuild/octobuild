@@ -1,9 +1,8 @@
-all: sample.cpp.o sample2.cpp.o sample.obj
+all: sample.cpp.o sample2.cpp.o
 
 clean:
 	del *.h.pch
 	del *.cpp.o
-	del *.obj
 	del *.i
 
 sample.h.pch: sample.h
@@ -15,6 +14,3 @@ sample.cpp.o: sample.h.pch
 sample2.cpp.o: sample.h.pch
 	octo_cl /c /DTEST /Yusample.h /Fpsample.h.pch /FIsample.h /Fosample2.cpp.o sample2.cpp
 	
-sample.obj: sample.h.pch
-	cl /c /DTEST /Yusample.h /Fpsample.h.pch sample.cpp
-

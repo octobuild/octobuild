@@ -3,6 +3,7 @@ extern crate filetime;
 
 use std::env;
 use std::fmt::{Display, Formatter};
+use std::ffi::OsString;
 use std::fs;
 use std::fs::{File, PathExt, OpenOptions};
 use std::io::{Error, ErrorKind, Read, Write, Seek, SeekFrom};
@@ -138,6 +139,21 @@ fn find_cache_files(dir: &Path, mut files: Vec<CacheFile>) -> Result<Vec<CacheFi
 	Ok(files)
 }
 
+fn write_cached_file<W: Write>(stream: &mut W, path: &PathBuf) -> Result<(), Error> {
+	let mut buf: [u8; DEFAULT_BUF_SIZE] = [0; DEFAULT_BUF_SIZE];
+	let mut file = try! (File::open(path));
+	loop {
+		let size = try! (file.read(&mut buf));
+		if size <= 0 {
+			break;
+		}
+		try! (write_usize(stream, size));
+		try! (stream.write_all(&buf[0..size]));
+	}
+	try! (write_usize(stream, 0));
+	Ok(())
+}
+
 fn write_cache(path: &Path, paths: &Vec<PathBuf>, output: &OutputInfo) -> Result<(), Error> {
 	if !output.success() {
 		return Ok(());
@@ -149,24 +165,25 @@ fn write_cache(path: &Path, paths: &Vec<PathBuf>, output: &OutputInfo) -> Result
 	let mut stream = try! (lz4::EncoderBuilder::new().level(1).build(try! (File::create(path))));
 	try! (stream.write_all(HEADER));
 	try! (write_usize(&mut stream, paths.len()));
-	let mut buf: [u8; DEFAULT_BUF_SIZE] = [0; DEFAULT_BUF_SIZE];
 	for path in paths.iter() {
-		let mut file = try! (File::open(path));
-		loop {
-			let size = try! (file.read(&mut buf));
-			if size <= 0 {
-				break;
-			}
-			try! (write_usize(&mut stream, size));
-			try! (stream.write_all(&buf[0..size]));
-		}
-		try! (write_usize(&mut stream, 0));
+		try! (write_cached_file(&mut stream, path));
 	}
 	try! (write_output(&mut stream, output));
 	try! (stream.write_all(FOOTER));
 	match stream.finish() {
 		(_, result) => result
 	}
+}
+
+fn read_cached_file<R: Read>(stream: &mut R, path: &PathBuf) -> Result<(), Error> {
+	let mut file = try! (File::create(path));
+	loop {
+		let size = try! (read_usize(stream));
+		if size == 0 {break;}
+		let block = try! (read_exact(stream, size));
+		try! (file.write_all(&block));
+	}
+	Ok(())
 }
 
 fn read_cache(path: &Path, paths: &Vec<PathBuf>) -> Result<OutputInfo, Error> {
@@ -181,13 +198,18 @@ fn read_cache(path: &Path, paths: &Vec<PathBuf>) -> Result<OutputInfo, Error> {
 		return Err(Error::new(ErrorKind::InvalidInput, CacheError::PackedFilesMismatch(path.to_path_buf())));
 	} 
 	for path in paths.iter() {
-		let mut file = try! (File::create(path));
-		loop {
-			let size = try! (read_usize(&mut stream));
-			if size == 0 {break;}
-			let block = try! (read_exact(&mut stream, size));
-			try! (file.write_all(&block));
-		}
+		let mut temp_name = OsString::from("~tmp~");
+		temp_name.push(path.file_name().unwrap());
+		let temp = path.with_file_name(temp_name);
+		drop(fs::remove_file(&path));
+		match read_cached_file(&mut stream, &temp).and_then(|_| fs::rename(&temp, &path)) {
+			Ok(_) => {
+			}
+			Err(e) => {
+				drop(fs::remove_file(&temp));
+				return Err(e);
+			}
+		};
 	}
 	let output = try! (read_output(&mut stream));
 	if try! (read_exact(&mut stream, FOOTER.len())) != FOOTER {
