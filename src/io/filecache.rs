@@ -5,7 +5,7 @@ use std::env;
 use std::fmt::{Display, Formatter};
 use std::ffi::OsString;
 use std::fs;
-use std::fs::{File, PathExt, OpenOptions};
+use std::fs::{File, OpenOptions};
 use std::io::{Error, ErrorKind, Read, Write, Seek, SeekFrom};
 use std::hash::{Hasher, SipHasher};
 use std::path::{Path, PathBuf};
