@@ -1,5 +1,6 @@
 extern crate octobuild;
 
+use octobuild::io::statistic::Statistic;
 use octobuild::clang::compiler::ClangCompiler;
 use octobuild::compiler::*;
 use octobuild::cache::Cache;
@@ -10,7 +11,7 @@ use std::io;
 use std::io::{Error, Write};
 use std::iter::FromIterator;
 use std::path::Path;
-use std::sync::Arc;
+use std::sync::{Arc, RwLock};
 use std::process;
 
 fn main() {
@@ -29,15 +30,17 @@ fn main() {
 }
 
 fn compile() -> Result<OutputInfo, Error> {
+	let statistic = RwLock::new(Statistic::new());
 	let compiler = ClangCompiler::new(&Cache::new());
 	let args = Vec::from_iter(env::args());
 	let output = try! (compiler.compile(CommandInfo {
 		program: Path::new("clang").to_path_buf(),
 		current_dir: None,
 		env: Arc::new(HashMap::new()),
-	}, &args[1..]));
+	}, &args[1..], &statistic));
 
 	try !(io::stdout().write_all(&output.stdout));
 	try !(io::stderr().write_all(&output.stderr));
+	println!("{}", statistic.read().unwrap().to_string());
 	Ok(output)
 }

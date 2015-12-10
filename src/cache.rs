@@ -5,12 +5,14 @@ use std::path::{Path, PathBuf};
 use std::fs;
 use std::fs::File;
 use std::io::{Error, ErrorKind};
+use std::sync::RwLock;
 
 use self::filetime::FileTime;
 
 use super::compiler::OutputInfo;
 use super::io::memcache::MemCache;
 use super::io::filecache::FileCache;
+use super::io::statistic::Statistic;
 use super::utils::hash_write_stream;
 
 #[derive(Clone)]
@@ -38,8 +40,8 @@ impl Cache {
 		}
 	}
 	
-	pub fn run_file_cached<F: Fn()->Result<OutputInfo, Error>, C: Fn()->bool>(&self, hash: u64, inputs: &Vec<PathBuf>, outputs: &Vec<PathBuf>, worker: F, checker: C) -> Result<OutputInfo, Error> {
-		self.file_cache.run_cached(self, hash, inputs, outputs, worker, checker)
+	pub fn run_file_cached<F: Fn()->Result<OutputInfo, Error>, C: Fn()->bool>(&self, statistic: &RwLock<Statistic>, hash: u64, inputs: &Vec<PathBuf>, outputs: &Vec<PathBuf>, worker: F, checker: C) -> Result<OutputInfo, Error> {
+		self.file_cache.run_cached(self, statistic, hash, inputs, outputs, worker, checker)
 	}
 	
 	pub fn cleanup(&self, max_cache_size: u64) -> Result<(), Error> {

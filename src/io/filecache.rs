@@ -9,6 +9,7 @@ use std::fs::{File, PathExt, OpenOptions};
 use std::io::{Error, ErrorKind, Read, Write, Seek, SeekFrom};
 use std::hash::{Hasher, SipHasher};
 use std::path::{Path, PathBuf};
+use std::sync::RwLock;
 
 use self::filetime::FileTime;
 
@@ -16,6 +17,8 @@ use super::super::cache::FileHasher;
 use super::super::compiler::OutputInfo;
 use super::super::utils::DEFAULT_BUF_SIZE;
 use super::binary::*;
+use super::statistic::Statistic;
+use super::counter::Counter;
 
 const HEADER: &'static [u8] = b"OBCF\x00\x02";
 const FOOTER: &'static [u8] = b"END\x00";
@@ -57,7 +60,7 @@ impl ::std::error::Error for CacheError {
 
 #[derive(Clone)]
 pub struct FileCache {
-	cache_dir: PathBuf
+	cache_dir: PathBuf,
 }
 
 struct CacheFile {
@@ -73,22 +76,22 @@ impl FileCache {
 			Err(_) => env::home_dir().unwrap().join(".octobuild").join("cache")
 		};
 		FileCache {
-			cache_dir: cache_dir
+			cache_dir: cache_dir,
 		}
 	}
 
-	pub fn run_cached<F: Fn()->Result<OutputInfo, Error>, C: Fn()->bool>(&self, file_hasher: &FileHasher, params: u64, inputs: &Vec<PathBuf>, outputs: &Vec<PathBuf>, worker: F, checker: C) -> Result<OutputInfo, Error> {
+	pub fn run_cached<F: Fn()->Result<OutputInfo, Error>, C: Fn()->bool>(&self, file_hasher: &FileHasher, statistic: &RwLock<Statistic>, params: u64, inputs: &Vec<PathBuf>, outputs: &Vec<PathBuf>, worker: F, checker: C) -> Result<OutputInfo, Error> {
 		let hash = try! (self.generate_hash(file_hasher, params, inputs));
 		let path = self.cache_dir.join(&hash[0..2]).join(&(hash[2..].to_string() + SUFFIX));
 		// Try to read data from cache.
-		match read_cache(&path, outputs) {
+		match read_cache(statistic, &path, outputs) {
 			Ok(output) => {return Ok(output)}
 			Err(_) => {}
 		}
 		// Run task and save result to cache.
 		let output = try !(worker());
 		if checker() {
-			try !(write_cache(&path, outputs, &output));
+			try !(write_cache(statistic, &path, outputs, &output));
 		}
 		Ok(output)
 	}
@@ -154,7 +157,7 @@ fn write_cached_file<W: Write>(stream: &mut W, path: &PathBuf) -> Result<(), Err
 	Ok(())
 }
 
-fn write_cache(path: &Path, paths: &Vec<PathBuf>, output: &OutputInfo) -> Result<(), Error> {
+fn write_cache(statistic: &RwLock<Statistic>, path: &Path, paths: &Vec<PathBuf>, output: &OutputInfo) -> Result<(), Error> {
 	if !output.success() {
 		return Ok(());
 	}
@@ -162,7 +165,7 @@ fn write_cache(path: &Path, paths: &Vec<PathBuf>, output: &OutputInfo) -> Result
 		Some(parent) => try! (fs::create_dir_all(&parent)),
 		None => ()
 	}
-	let mut stream = try! (lz4::EncoderBuilder::new().level(1).build(try! (File::create(path))));
+	let mut stream = try! (lz4::EncoderBuilder::new().level(1).build(Counter::writer(try! (File::create(path)))));
 	try! (stream.write_all(HEADER));
 	try! (write_usize(&mut stream, paths.len()));
 	for path in paths.iter() {
@@ -171,7 +174,10 @@ fn write_cache(path: &Path, paths: &Vec<PathBuf>, output: &OutputInfo) -> Result
 	try! (write_output(&mut stream, output));
 	try! (stream.write_all(FOOTER));
 	match stream.finish() {
-		(_, result) => result
+		(writer, result) => {
+			statistic.write().unwrap().add_miss(writer.len());
+			result
+		}
 	}
 }
 
@@ -186,11 +192,11 @@ fn read_cached_file<R: Read>(stream: &mut R, path: &PathBuf) -> Result<(), Error
 	Ok(())
 }
 
-fn read_cache(path: &Path, paths: &Vec<PathBuf>) -> Result<OutputInfo, Error> {
+fn read_cache(statistic: &RwLock<Statistic>, path: &Path, paths: &Vec<PathBuf>) -> Result<OutputInfo, Error> {
 	let mut file = try! (OpenOptions::new().read(true).write(true).open(Path::new(path)));
 	try! (file.write(&[4]));
 	try! (file.seek(SeekFrom::Start(0)));
-	let mut stream = try! (lz4::Decoder::new (file));
+	let mut stream = try! (lz4::Decoder::new (Counter::reader(file)));
 	if try! (read_exact(&mut stream, HEADER.len())) != HEADER {
 		return Err(Error::new(ErrorKind::InvalidInput, CacheError::InvalidHeader(path.to_path_buf())));
 	}
@@ -215,6 +221,11 @@ fn read_cache(path: &Path, paths: &Vec<PathBuf>) -> Result<OutputInfo, Error> {
 	if try! (read_exact(&mut stream, FOOTER.len())) != FOOTER {
 		return Err(Error::new(ErrorKind::InvalidInput, CacheError::InvalidFooter(path.to_path_buf())));
 	}
+	let mut eof = [0];
+	if try! (stream.read(&mut eof)) != 0 {
+		return Err(Error::new(ErrorKind::InvalidInput, CacheError::InvalidFooter(path.to_path_buf())));
+	}
+	statistic.write().unwrap().add_hit(stream.finish().0.len());
 	Ok(output)
 }
 

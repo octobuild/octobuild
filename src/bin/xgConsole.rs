@@ -8,6 +8,7 @@ use octobuild::cache::Cache;
 use octobuild::xg;
 use octobuild::version;
 use octobuild::vs::compiler::VsCompiler;
+use octobuild::io::statistic::Statistic;
 use octobuild::clang::compiler::ClangCompiler;
 use octobuild::compiler::*;
 
@@ -21,7 +22,7 @@ use std::io::{BufReader, Error, ErrorKind, Write};
 use std::io;
 use std::iter::FromIterator;
 use std::path::Path;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, RwLock};
 use std::sync::mpsc::{channel, Sender, Receiver};
 use std::process;
 use std::thread;
@@ -61,7 +62,8 @@ fn main() {
 }
 
 fn execute(args: &[String]) -> Result<Option<i32>, Error> {
-	let cache = Cache::new();
+	let statistic = Arc::new(RwLock::new(Statistic::new()));
+	let cache = Cache::new();	
 	let temp_dir = try! (TempDir::new("octobuild"));
 	for arg in args.iter() {
 		if arg.starts_with("/") {continue}
@@ -72,8 +74,9 @@ fn execute(args: &[String]) -> Result<Option<i32>, Error> {
 		let mutex_rx_task = create_threads(rx_task, tx_result, num_cpus::get(), |worker_id:usize| {
 			let temp_path = temp_dir.path().to_path_buf();
 			let temp_cache = cache.clone();
+			let temp_statistic = statistic.clone();
 			move |task:TaskMessage| -> ResultMessage {
-				execute_task(&temp_cache, &temp_path, worker_id, task)
+				execute_task(&temp_cache, &temp_path, worker_id, task, &temp_statistic)
 			}
 		});	
 
@@ -87,6 +90,7 @@ fn execute(args: &[String]) -> Result<Option<i32>, Error> {
 		}
 	}
 	cache.cleanup(16 * 1024 * 1024 * 1024);
+	println!("{}", statistic.read().unwrap().to_string());
 	Ok(Some(0))
 }
 
@@ -139,9 +143,9 @@ fn validate_graph(graph: Graph<BuildTask, ()>) -> Result<Graph<BuildTask, ()>, E
 	Err(Error::new(ErrorKind::InvalidInput, "Found cycles in build dependencies"))
 }
 
-fn execute_task(cache: &Cache, temp_dir: &Path, worker: usize, message: TaskMessage) -> ResultMessage {
+fn execute_task(cache: &Cache, temp_dir: &Path, worker: usize, message: TaskMessage, statistic: &RwLock<Statistic>) -> ResultMessage {
 	let args = expand_args(&message.task.args, &|name:&str|->Option<String>{env::var(name).ok()});
-	let output = execute_compiler(cache, temp_dir, &message.task, &args);
+	let output = execute_compiler(cache, temp_dir, &message.task, &args, statistic);
 	ResultMessage {
 		index: message.index,
 		task: message.task,
@@ -150,7 +154,7 @@ fn execute_task(cache: &Cache, temp_dir: &Path, worker: usize, message: TaskMess
 	}
 }
 
-fn execute_compiler(cache: &Cache, temp_dir: &Path, task: &BuildTask, args: &[String]) -> Result<OutputInfo, Error> {
+fn execute_compiler(cache: &Cache, temp_dir: &Path, task: &BuildTask, args: &[String], statistic: &RwLock<Statistic>) -> Result<OutputInfo, Error> {
 	let command = CommandInfo {
 		program: Path::new(&task.exec).to_path_buf(),
 		current_dir: Some(Path::new(&task.working_dir).to_path_buf()),
@@ -159,10 +163,10 @@ fn execute_compiler(cache: &Cache, temp_dir: &Path, task: &BuildTask, args: &[St
 	let exec = Path::new(&task.exec);
 	if exec.ends_with("cl.exe") {
 		let compiler = VsCompiler::new(cache, temp_dir);
-		compiler.compile(command, args)
+		compiler.compile(command, args, statistic)
 	} else if exec.file_name().map_or(None, |name| name.to_str()).map_or(false, |name| name.starts_with("clang")) {
 		let compiler = ClangCompiler::new(cache);
-		compiler.compile(command, args)
+		compiler.compile(command, args, statistic)
 	} else {
 		command.to_command()
 			.args(&args)

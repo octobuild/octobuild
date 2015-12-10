@@ -2,10 +2,11 @@ use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
 use std::io::{Error, ErrorKind};
 use std::path::PathBuf;
-use std::sync::Arc;
+use std::sync::{Arc, RwLock};
 use std::process::{Command, Output};
 
 use super::io::memstream::MemStream;
+use super::io::statistic::Statistic;
 
 #[derive(Debug)]
 pub enum CompilerError {
@@ -164,14 +165,14 @@ pub trait Compiler {
 	fn preprocess_step(&self, task: &CompilationTask) -> Result<PreprocessResult, Error>;
 
 	// Compile preprocessed file.
-	fn compile_step(&self, task: &CompilationTask, preprocessed: PreprocessedSource) -> Result<OutputInfo, Error>;
+	fn compile_step(&self, task: &CompilationTask, preprocessed: PreprocessedSource, statistic: &RwLock<Statistic>) -> Result<OutputInfo, Error>;
 	
 	// Run preprocess and compile.
-	fn try_compile(&self, command: CommandInfo, args: &[String]) -> Result<Option<OutputInfo>, Error> {
+	fn try_compile(&self, command: CommandInfo, args: &[String], statistic: &RwLock<Statistic>) -> Result<Option<OutputInfo>, Error> {
 		match self.create_task(command, args) {
 			Ok(Some(task)) => {
 				match try! (self.preprocess_step(&task)) {
-					PreprocessResult::Success(preprocessed) => self.compile_step(&task, preprocessed),
+					PreprocessResult::Success(preprocessed) => self.compile_step(&task, preprocessed, statistic),
 					PreprocessResult::Failed(output) => Ok(output),
 				}.map(|v| Some(v))
 			}
@@ -181,8 +182,8 @@ pub trait Compiler {
 	}
 
 	// Run preprocess and compile.
-	fn compile(&self, command: CommandInfo, args: &[String]) -> Result<OutputInfo, Error> {
-		match self.try_compile(command.clone(), args) {
+	fn compile(&self, command: CommandInfo, args: &[String], statistic: &RwLock<Statistic>) -> Result<OutputInfo, Error> {
+		match self.try_compile(command.clone(), args, statistic) {
 			Ok(Some(output)) => Ok(output),
 			Ok(None) => {
 				command.to_command().args(args).output().map(|o| OutputInfo::new(o))

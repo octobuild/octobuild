@@ -2,6 +2,7 @@ extern crate octobuild;
 extern crate tempdir;
 
 use octobuild::vs::compiler::VsCompiler;
+use octobuild::io::statistic::Statistic;
 use octobuild::compiler::*;
 use octobuild::cache::Cache;
 
@@ -13,7 +14,7 @@ use std::io;
 use std::io::{Error, Write};
 use std::iter::FromIterator;
 use std::path::Path;
-use std::sync::Arc;
+use std::sync::{Arc, RwLock};
 use std::process;
 
 fn main() {
@@ -32,6 +33,7 @@ fn main() {
 }
 
 fn compile() -> Result<OutputInfo, Error> {
+	let statistic = RwLock::new(Statistic::new());
 	let temp_dir = try! (TempDir::new("octobuild"));
 	let compiler = VsCompiler::new(&Cache::new(), temp_dir.path());
 	let args = Vec::from_iter(env::args());
@@ -39,9 +41,10 @@ fn compile() -> Result<OutputInfo, Error> {
 		program: Path::new("cl.exe").to_path_buf(),
 		current_dir: None,
 		env: Arc::new(HashMap::new()),
-	}, &args[1..]));
+	}, &args[1..], &statistic));
 
 	try !(io::stdout().write_all(&output.stdout));
 	try !(io::stderr().write_all(&output.stderr));
+	println!("{}", statistic.read().unwrap().to_string());
 	Ok(output)
 }
