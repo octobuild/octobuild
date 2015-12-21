@@ -14,6 +14,14 @@ enum ParamValue<T> {
 
 pub fn create_task(command: CommandInfo, args: &[String]) -> Result<Option<CompilationTask>, String> {
 	if args.iter().find(|v| match v as &str {
+		"--analyze" => true,
+		_ => false,
+		}
+	).is_some() {
+		// Support only compilation steps
+		return Ok(None);
+	}
+	if args.iter().find(|v| match v as &str {
 		"-c" => true,
 		_ => false,
 		}
