@@ -1,5 +1,11 @@
 # Changes
 
+## 0.1.5
+
+ * Add show some cache statistics after build finish.
+ * Fix partically saved files from cache on IO-errors (like out-disk-space).
+ * Don't use octobuild on --analyze
+
 ## 0.1.4
 
  * Join i686 and x86_64 builds to single .nupkg Chocolatey package (fix #4).
