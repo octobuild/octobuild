@@ -160,13 +160,29 @@ fn parse_arguments(args: &[String]) -> Result<Vec<Arg>, String> {
 fn parse_argument(iter: &mut  Iter<String>) -> Option<Result<Arg, String>> {
 	match iter.next() {
 		Some(arg) => Some(
-			if has_param_prefix(arg) {
+			if arg.starts_with("--") {
+				let (key, value) = match arg.find("=") {
+					Some(position) => (&arg[1..position], arg[position + 1..].to_string()),
+					None => {
+						match iter.next() {
+							Some(v) => (&arg[1..], v.clone()),
+							_ => {
+								return Some(Err(arg.to_string()));
+							}
+						}
+					}
+				};
+				match &key[1..] {
+					"sysroot" => Ok(Arg::Flag{scope: Scope::Shared, flag:key.to_string() + "=" + &value}),
+					_ => Err(key.to_string()),
+				}
+			} else if has_param_prefix(arg) {
 				let flag = &arg[1..];
 				match is_spaceable_param(flag) {
-					Some((prefix, scope)) => {
+					Some((prefix, scope, next_flag)) => {
 						let value = match flag == prefix {
 							true => match iter.next() {
-								Some(v) if !has_param_prefix(v) => v.to_string(),
+								Some(v) if next_flag == has_param_prefix(v) => v.to_string(),
 								_ => {
 									return Some(Err(arg.to_string()));
 								}
@@ -194,28 +210,30 @@ fn parse_argument(iter: &mut  Iter<String>) -> Option<Result<Arg, String>> {
 				}
 			} else {
 				Ok(Arg::Input{kind:InputKind::Source, flag:String::new(), file:arg.to_string()})
-		}),
+			}
+		),
 		None => None
 	}
 }
 
-fn is_spaceable_param(flag: &str) -> Option<(&str, Scope)> {
+fn is_spaceable_param(flag: &str) -> Option<(&str, Scope, bool)> {
 	match flag {
-		"include" | "include-pch" => Some((flag, Scope::Preprocessor)),
+		"include" | "include-pch" => Some((flag, Scope::Preprocessor, false)),
+		"target" => Some((flag, Scope::Shared, false)),
 		_=> {
 			for prefix in ["D", "o"].iter() {
 				if flag.starts_with(*prefix) {
-					return Some((*prefix, Scope::Shared));
+					return Some((*prefix, Scope::Shared, false));
 				}
 			}
 			for prefix in ["x"].iter() {
 				if flag.starts_with(*prefix) {
-					return Some((*prefix, Scope::Ignore));
+					return Some((*prefix, Scope::Ignore, false));
 				}
 			}
 			for prefix in ["I"].iter() {
 				if flag.starts_with(*prefix) {
-					return Some((*prefix, Scope::Preprocessor));
+					return Some((*prefix, Scope::Preprocessor, false));
 				}
 			}
 			None

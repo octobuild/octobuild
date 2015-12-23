@@ -4,7 +4,8 @@
 
  * Add show some cache statistics after build finish.
  * Fix partically saved files from cache on IO-errors (like out-disk-space).
- * Don't use octobuild on --analyze
+ * Clang: Don't use octobuild on --analyze
+ * Clang: Add support cache for cross-compiler
 
 ## 0.1.4
 
