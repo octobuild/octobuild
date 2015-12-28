@@ -49,7 +49,7 @@ pub fn write_u8(stream: &mut Write, n: u8) -> Result<()> {
 }
 
 #[inline]
-fn write_u64(stream: &mut Write, i: u64) -> Result<()> {
+pub fn write_u64(stream: &mut Write, i: u64) -> Result<()> {
     stream.write_all(&unsafe { mem::transmute::<_, [u8; 8]>(i) })
 }
 
@@ -64,7 +64,7 @@ pub fn read_u8(stream: &mut Read) -> Result<u8> {
 }
 
 #[inline]
-fn read_u64(stream: &mut Read) -> Result<u64> {
+pub fn read_u64(stream: &mut Read) -> Result<u64> {
     let mut buf: [u8; 8] = [0; 8];
     try! (read_array(stream, &mut buf));
     Ok(unsafe { 

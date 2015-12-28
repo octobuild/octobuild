@@ -1,6 +1,7 @@
 extern crate lz4;
 extern crate filetime;
 
+use std::cmp::min;
 use std::env;
 use std::fmt::{Display, Formatter};
 use std::ffi::OsString;
@@ -20,7 +21,7 @@ use super::binary::*;
 use super::statistic::Statistic;
 use super::counter::Counter;
 
-const HEADER: &'static [u8] = b"OBCF\x00\x02";
+const HEADER: &'static [u8] = b"OBCF\x00\x03";
 const FOOTER: &'static [u8] = b"END\x00";
 const SUFFIX: &'static str = ".lz4";
 
@@ -145,15 +146,24 @@ fn find_cache_files(dir: &Path, mut files: Vec<CacheFile>) -> Result<Vec<CacheFi
 fn write_cached_file<W: Write>(stream: &mut W, path: &PathBuf) -> Result<(), Error> {
 	let mut buf: [u8; DEFAULT_BUF_SIZE] = [0; DEFAULT_BUF_SIZE];
 	let mut file = try! (File::open(path));
+	let total_size = try! (file.seek(SeekFrom::End(0)));
+	try! (file.seek(SeekFrom::Start(0)));
+	try! (write_u64(stream, total_size));
+	let mut need_size = total_size;
 	loop {
 		let size = try! (file.read(&mut buf));
-		if size <= 0 {
+		if size == 0 && need_size == 0 {
 			break;
 		}
-		try! (write_usize(stream, size));
+		if size <= 0 {
+			return Err(Error::new(ErrorKind::BrokenPipe, "Unexpected end of stream"));
+		}
+		if need_size < size as u64 {
+			return Err(Error::new(ErrorKind::BrokenPipe, "Expected end of stream"));
+		}
 		try! (stream.write_all(&buf[0..size]));
+		need_size = need_size - (size as u64);
 	}
-	try! (write_usize(stream, 0));
 	Ok(())
 }
 
@@ -182,12 +192,20 @@ fn write_cache(statistic: &RwLock<Statistic>, path: &Path, paths: &Vec<PathBuf>,
 }
 
 fn read_cached_file<R: Read>(stream: &mut R, path: &PathBuf) -> Result<(), Error> {
+	let mut buf: [u8; DEFAULT_BUF_SIZE] = [0; DEFAULT_BUF_SIZE];
+	let total_size = try! (read_u64(stream));
+	let mut need_size = total_size;
+
 	let mut file = try! (File::create(path));
-	loop {
-		let size = try! (read_usize(stream));
-		if size == 0 {break;}
-		let block = try! (read_exact(stream, size));
-		try! (file.write_all(&block));
+	try! (file.set_len(total_size as u64));
+	while  need_size > 0 {
+		let need = min(buf.len() as u64, need_size) as usize;
+		let size = try! (stream.read(&mut buf[0..need]));
+		if size == 0 {
+			return Err(Error::new(ErrorKind::BrokenPipe, "Expected end of stream"));
+		}
+		try! (file.write_all(&buf[0..size]));
+		need_size = need_size - (size as u64);
 	}
 	Ok(())
 }

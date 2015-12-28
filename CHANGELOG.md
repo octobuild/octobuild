@@ -1,11 +1,15 @@
 # Changes
 
+## 0.1.6
+
+ * Preallocate extracted from cache file for reducing disk fragmentation.
+
 ## 0.1.5
 
  * Add show some cache statistics after build finish.
  * Fix partically saved files from cache on IO-errors (like out-disk-space).
- * Clang: Don't use octobuild on --analyze
- * Clang: Add support cache for cross-compiler
+ * Clang: Don't use octobuild on --analyze.
+ * Clang: Add support cache for cross-compiler.
 
 ## 0.1.4
 
