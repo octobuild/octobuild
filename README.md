@@ -52,3 +52,10 @@ sudo apt-get install octobuild
 ## Known issues
 
 On Windows you can't mix compilation with and without octobuild.
+
+## Unreal Engine patches
+
+This project require some patches for Unreal Engine:
+
+ * [#1825](https://github.com/EpicGames/UnrealEngine/pull/1825) Don't disable XGE for building UnrealHeaderTool
+ * [#1789](https://github.com/EpicGames/UnrealEngine/pull/1789) Allow use xgConsole on Linux
