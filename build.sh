@@ -7,12 +7,12 @@ build() {
 	_PATH=$PATH
 	case "$TARGET" in
 		"i686-pc-windows" ) 
-			RUST=$TOOLS/rust-1.5.0-$TARGET-gnu
+			RUST=$TOOLS/rust-1.6.0-$TARGET-gnu
 			export PATH=$PATH:/mingw32/bin/
 			export OPENSSL_LIBS=crypto:ssl
 			;;
 		"x86_64-pc-windows" ) 
-			RUST=$TOOLS/rust-1.5.0-$TARGET-gnu
+			RUST=$TOOLS/rust-1.6.0-$TARGET-gnu
 			export PATH=$PATH:/mingw64/bin/
 			export OPENSSL_LIBS=crypto:ssl
 			;;
