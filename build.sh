@@ -6,13 +6,11 @@ build() {
 	# Set path
 	_PATH=$PATH
 	case "$TARGET" in
-		"i686-pc-windows" ) 
-			RUST=$TOOLS/rust-1.6.0-$TARGET-gnu
+		"i686-gnu-stable" ) 
 			export PATH=$PATH:/mingw32/bin/
 			export OPENSSL_LIBS=crypto:ssl
 			;;
-		"x86_64-pc-windows" ) 
-			RUST=$TOOLS/rust-1.6.0-$TARGET-gnu
+		"x86_64-gnu-stable" ) 
 			export PATH=$PATH:/mingw64/bin/
 			export OPENSSL_LIBS=crypto:ssl
 			;;
@@ -21,8 +19,9 @@ build() {
 			;;
 	esac
 	
-	if [ "$RUST" != "" ] && [ -d "$RUST" ]; then
-		export PATH=$PATH:$RUST/rustc/bin/:$RUST/cargo/bin/
+	if [ "$TARGET" != "" ]; then
+		multirust override $TARGET
+		multirust update $TARGET
 	fi
 
 	# Build
@@ -35,8 +34,8 @@ build() {
 	sign target/release/*.exe
 
 	# Prepare for installer
-	if [ "$TARGET" == "i686-pc-windows" ]; then
-		cp $RUST/rustc/bin/libgcc*.dll target/release/
+	if [ "$TARGET" == "i686-gnu-stable" ]; then
+		cp ${MULTIRUST_HOME//\\/\/}/toolchains/$TARGET/bin/libgcc*.dll target/release/
 	fi
 	
 	# Build installer
@@ -64,15 +63,15 @@ if [ "$1" != "" ]; then
 	# User defined target
 	case $1 in
 		"i686" )
-			build i686-pc-windows
+			build i686-gnu-stable
 			;;
 		"x86_64" )
-			build x86_64-pc-windows
+			build x86_64-gnu-stable
 			;;
 		"windows" )
 			# Windows build
-			build i686-pc-windows
-			build x86_64-pc-windows
+			build i686-gnu-stable
+			build x86_64-gnu-stable
 			;;
 		* )
 			build $1
@@ -80,10 +79,10 @@ if [ "$1" != "" ]; then
 	esac
 elif [ "$ProgramW6432" != "" ]; then
 	# Windows build
-	build x86_64-pc-windows
+	build x86_64-gnu-stable
 elif [ "$ProgramData" != "" ]; then
 	# Windows build
-	build i686-pc-windows
+	build i686-gnu-stable
 else 
 	# Linux build
 	build x86_64-unknown-linux
