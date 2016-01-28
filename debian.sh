@@ -9,7 +9,7 @@ cargo build --release
 DATE=`date -R`
 
 # Copy debian config files
-DEBROOT=target/octobuild-${VERSION}
+DEBROOT=target/octobuild
 rm -fR $DEBROOT
 mkdir -p $DEBROOT/
 cp -r  debian $DEBROOT/
