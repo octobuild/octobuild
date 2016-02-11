@@ -177,17 +177,19 @@ fn execute_compiler(cache: &Cache, temp_dir: &Path, task: &BuildTask, args: &[St
 
 fn execute_graph(graph: &Graph<BuildTask, ()>, tx_task: Sender<TaskMessage>, mutex_rx_task: Arc<Mutex<Receiver<TaskMessage>>>, rx_result: Receiver<ResultMessage>) -> Result<Option<i32>, Error> {
 	// Run all tasks.
-	let result = execute_until_failed(graph, tx_task, &rx_result);
+	let mut count: usize = 0;
+	let result = execute_until_failed(graph, tx_task, &rx_result, &mut count);
 	// Cleanup task queue.
 	for _ in mutex_rx_task.lock().unwrap().iter() {
 	}
 	// Wait for in progress task completion.
-	for _ in rx_result.iter() {
+	for message in rx_result.iter() {
+		try! (print_task_result(&message, &mut count, graph.node_count()));
 	}
 	result
 }
 
-fn execute_until_failed(graph: &Graph<BuildTask, ()>, tx_task: Sender<TaskMessage>, rx_result: &Receiver<ResultMessage>) -> Result<Option<i32>, Error> {
+fn execute_until_failed(graph: &Graph<BuildTask, ()>, tx_task: Sender<TaskMessage>, rx_result: &Receiver<ResultMessage>, count: &mut usize) -> Result<Option<i32>, Error> {
 	let mut completed:Vec<bool> = Vec::new();
 	for _ in 0 .. graph.node_count() {
 		completed.push(false);
@@ -199,14 +201,10 @@ fn execute_until_failed(graph: &Graph<BuildTask, ()>, tx_task: Sender<TaskMessag
 		}).map_err(|e| Error::new(ErrorKind::Other, e)));
 	}
 
-	let mut count:usize = 0;
 	for message in rx_result.iter() {
 		assert!(!completed[message.index.index()]);
-		count += 1;
-		println!("#{} {}/{}: {}", message.worker, count, completed.len(), message.task.title);
+		try! (print_task_result(&message, count, graph.node_count()));
 		let result = try! (message.result);
-		try! (io::stdout().write_all(&result.stdout));
-		try! (io::stderr().write_all(&result.stderr));
 		if !result.success() {
 			return Ok(result.status);
 		}
@@ -221,11 +219,25 @@ fn execute_until_failed(graph: &Graph<BuildTask, ()>, tx_task: Sender<TaskMessag
 			}
 		}
 
-		if count == completed.len() {
+		if *count == completed.len() {
 			return Ok(Some(0));
 		}
 	}
 	panic! ("Unexpected end of result pipe");
+}
+
+fn print_task_result(message: &ResultMessage, completed: &mut usize, total: usize) -> Result<(), Error> {
+	*completed += 1;
+	println!("#{} {}/{}: {}", message.worker, completed, total, message.task.title);
+	match message.result {
+		Ok(ref output) => {
+			try! (io::stdout().write_all(&output.stdout));
+			try! (io::stderr().write_all(&output.stderr));
+		}
+		Err(_) => {
+		}
+	}
+	Ok(())
 }
 
 fn is_ready(graph: &Graph<BuildTask, ()>, completed: &Vec<bool>, source: &NodeIndex) -> bool {

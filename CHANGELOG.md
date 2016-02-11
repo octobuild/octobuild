@@ -1,5 +1,9 @@
 # Changes
 
+## 0.1.7 (unreleased)
+
+ * xgConsole: Show result already runnging task after first failure.
+
 ## 0.1.6
 
  * Preallocate extracted from cache file for reducing disk fragmentation.
