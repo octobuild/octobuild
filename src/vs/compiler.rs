@@ -8,8 +8,7 @@ use super::super::io::tempfile::TempFile;
 use super::super::io::statistic::Statistic;
 
 use std::fs::File;
-use std::io;
-use std::io::{Error, Cursor, Read, Write};
+use std::io::{Error, Cursor, Write};
 use std::hash::{SipHasher, Hasher};
 use std::path::{Path, PathBuf};
 use std::process::Output;
@@ -56,10 +55,9 @@ impl Compiler for VsCompiler {
 		});
 	
 		// Add preprocessor paramters.
-		let temp_file = TempFile::new_in(&self.temp_dir, ".i");
 		args.push("/nologo".to_string());
 		args.push("/T".to_string() + &task.language);
-		args.push("/P".to_string());
+		args.push("/E".to_string());
 		args.push("/we4002".to_string()); // C4002: too many actual parameters for macro 'identifier'
 		args.push(task.input_source.display().to_string());
 	
@@ -71,29 +69,20 @@ impl Compiler for VsCompiler {
 		let mut command = task.command.to_command();
 		command
 			.args(&args)
-			.arg(&join_flag("/Fi", &temp_file.path()))
 			.arg(&join_flag("/Fo", &task.output_object)); // /Fo option also set output path for #import directive
 		let output = try! (command.output());
 		if output.status.success() {
-			match File::open(temp_file.path()) {
-				Ok(mut stream) => {
-					let mut output: Box<Read> = if task.input_precompiled.is_some() || task.output_precompiled.is_some() {
-						let mut buffer: Vec<u8> = Vec::new();
-						try! (postprocess::filter_preprocessed(&mut stream, &mut buffer, &task.marker_precompiled, task.output_precompiled.is_some()));
-						Box::new(Cursor::new(buffer))
-					} else {
-						Box::new(stream)
-					};
-					let mut content = MemStream::new();
-					try! (io::copy(&mut output, &mut content));
-					content.hash(&mut hash);
-					Ok(PreprocessResult::Success(PreprocessedSource {
-						hash: format!("{:016x}", hash.finish()),
-						content: content,
-					}))
-				}
-				Err(e) => Err(e)
-			}
+			let mut content = MemStream::new();
+			if task.input_precompiled.is_some() || task.output_precompiled.is_some() {
+				try! (postprocess::filter_preprocessed(&mut Cursor::new(output.stdout), &mut content, &task.marker_precompiled, task.output_precompiled.is_some()));
+			} else {				
+				try! (content.write(&output.stdout));
+			};
+			content.hash(&mut hash);
+			Ok(PreprocessResult::Success(PreprocessedSource {
+				hash: format!("{:016x}", hash.finish()),
+				content: content,
+			}))
 		} else {
 			Ok(PreprocessResult::Failed(OutputInfo::new(output)))
 		}

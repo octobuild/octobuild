@@ -3,6 +3,7 @@
 ## 0.1.7 (unreleased)
 
  * xgConsole: Show result already runnging task after first failure.
+ * VC: Reduce disk IO.
 
 ## 0.1.6
 
