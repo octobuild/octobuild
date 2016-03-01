@@ -1,6 +1,10 @@
 # Changes
 
-## 0.1.7 (unreleased)
+## 0.1.8
+
+ * VC: Fix error reporting on preprocessor errors.
+
+## 0.1.7
 
  * xgConsole: Show result already runnging task after first failure.
  * VC: Reduce disk IO.

@@ -84,7 +84,11 @@ impl Compiler for VsCompiler {
 				content: content,
 			}))
 		} else {
-			Ok(PreprocessResult::Failed(OutputInfo::new(output)))
+			Ok(PreprocessResult::Failed(OutputInfo{
+				status: output.status.code(),
+				stdout: Vec::new(),
+				stderr: output.stderr,
+			}))
 		}
 	}
 
