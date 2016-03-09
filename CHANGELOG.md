@@ -1,5 +1,9 @@
 # Changes
 
+## 0.1.9
+
+ * xgConsole: Add support for tasks file starting from slash.
+
 ## 0.1.8
 
  * VC: Fix error reporting on preprocessor errors.

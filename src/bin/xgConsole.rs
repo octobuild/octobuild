@@ -66,7 +66,7 @@ fn execute(args: &[String]) -> Result<Option<i32>, Error> {
 	let cache = Cache::new();	
 	let temp_dir = try! (TempDir::new("octobuild"));
 	for arg in args.iter() {
-		if arg.starts_with("/") {continue}
+		if arg.starts_with("/") && !Path::new(arg).exists() {continue}
 
 		let (tx_result, rx_result): (Sender<ResultMessage>, Receiver<ResultMessage>) = channel();
 		let (tx_task, rx_task): (Sender<TaskMessage>, Receiver<TaskMessage>) = channel();
@@ -78,7 +78,7 @@ fn execute(args: &[String]) -> Result<Option<i32>, Error> {
 			move |task:TaskMessage| -> ResultMessage {
 				execute_task(&temp_cache, &temp_path, worker_id, task, &temp_statistic)
 			}
-		});	
+		});
 
 		let path = Path::new(arg);
 		let file = try! (File::open(&path));
