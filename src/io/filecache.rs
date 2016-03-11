@@ -2,7 +2,6 @@ extern crate lz4;
 extern crate filetime;
 
 use std::cmp::min;
-use std::env;
 use std::fmt::{Display, Formatter};
 use std::ffi::OsString;
 use std::fs;
@@ -15,6 +14,7 @@ use std::sync::RwLock;
 use self::filetime::FileTime;
 
 use super::super::cache::FileHasher;
+use super::super::config::Config;
 use super::super::compiler::OutputInfo;
 use super::super::utils::DEFAULT_BUF_SIZE;
 use super::binary::*;
@@ -62,6 +62,7 @@ impl ::std::error::Error for CacheError {
 #[derive(Clone)]
 pub struct FileCache {
 	cache_dir: PathBuf,
+	cache_limit: u64,
 }
 
 struct CacheFile {
@@ -71,13 +72,10 @@ struct CacheFile {
 }
 
 impl FileCache {
-	pub fn new() -> Self {
-		let cache_dir = match env::var("OCTOBUILD_CACHE") {
-			Ok(value) => Path::new(&value).to_path_buf(),
-			Err(_) => env::home_dir().unwrap().join(".octobuild").join("cache")
-		};
+	pub fn new(config: &Config) -> Self {
 		FileCache {
-			cache_dir: cache_dir,
+			cache_dir: config.cache_dir.clone(),
+			cache_limit: config.cache_limit_mb as u64 * 1024 * 1024,
 		}
 	}
 
@@ -97,14 +95,14 @@ impl FileCache {
 		Ok(output)
 	}
 
-	pub fn cleanup(&self, max_cache_size: u64) -> Result<(), Error> {
+	pub fn cleanup(&self) -> Result<(), Error> {
 		let mut files = try! (find_cache_files(&self.cache_dir, Vec::new()));
 		files.sort_by(|a, b| b.accessed.cmp(&a.accessed));
 		
 		let mut cache_size: u64 = 0;
 		for item in files.into_iter() {
 			cache_size += item.size;
-			if cache_size > max_cache_size {
+			if cache_size > self.cache_limit {
 				let _ = try!(fs::remove_file(&item.path));
 			}
 		}

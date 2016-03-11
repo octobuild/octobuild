@@ -9,6 +9,7 @@ use std::sync::RwLock;
 
 use self::filetime::FileTime;
 
+use super::config::Config;
 use super::compiler::OutputInfo;
 use super::io::memcache::MemCache;
 use super::io::filecache::FileCache;
@@ -33,9 +34,9 @@ pub trait FileHasher {
 }
 
 impl Cache {
-	pub fn new() -> Self {
+	pub fn new(config: &Config) -> Self {
 		Cache {
-			file_cache: FileCache::new(),
+			file_cache: FileCache::new(config),
 			file_hash_cache: MemCache::new(),
 		}
 	}
@@ -44,8 +45,8 @@ impl Cache {
 		self.file_cache.run_cached(self, statistic, hash, inputs, outputs, worker, checker)
 	}
 	
-	pub fn cleanup(&self, max_cache_size: u64) -> Result<(), Error> {
-		self.file_cache.cleanup(max_cache_size)
+	pub fn cleanup(&self) -> Result<(), Error> {
+		self.file_cache.cleanup()
 	}
 }
 
