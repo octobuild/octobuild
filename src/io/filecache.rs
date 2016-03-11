@@ -75,7 +75,7 @@ impl FileCache {
 	pub fn new(config: &Config) -> Self {
 		FileCache {
 			cache_dir: config.cache_dir.clone(),
-			cache_limit: config.cache_limit,
+			cache_limit: config.cache_limit_mb as u64 * 1024 * 1024,
 		}
 	}
 
