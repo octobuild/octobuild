@@ -1,9 +1,9 @@
 extern crate octobuild;
 extern crate petgraph;
 extern crate tempdir;
-extern crate num_cpus;
 
 use octobuild::common::BuildTask;
+use octobuild::config::Config;
 use octobuild::cache::Cache;
 use octobuild::xg;
 use octobuild::version;
@@ -63,7 +63,8 @@ fn main() {
 
 fn execute(args: &[String]) -> Result<Option<i32>, Error> {
 	let statistic = Arc::new(RwLock::new(Statistic::new()));
-	let cache = Cache::new();	
+	let config = try! (Config::new());
+	let cache = Cache::new(&config);
 	let temp_dir = try! (TempDir::new("octobuild"));
 	for arg in args.iter() {
 		if arg.starts_with("/") && !Path::new(arg).exists() {continue}
@@ -71,7 +72,7 @@ fn execute(args: &[String]) -> Result<Option<i32>, Error> {
 		let (tx_result, rx_result): (Sender<ResultMessage>, Receiver<ResultMessage>) = channel();
 		let (tx_task, rx_task): (Sender<TaskMessage>, Receiver<TaskMessage>) = channel();
 
-		let mutex_rx_task = create_threads(rx_task, tx_result, num_cpus::get(), |worker_id:usize| {
+		let mutex_rx_task = create_threads(rx_task, tx_result, config.process_limit, |worker_id:usize| {
 			let temp_path = temp_dir.path().to_path_buf();
 			let temp_cache = cache.clone();
 			let temp_statistic = statistic.clone();
@@ -89,7 +90,7 @@ fn execute(args: &[String]) -> Result<Option<i32>, Error> {
 			v => {return Ok(v)}
 		}
 	}
-	cache.cleanup(16 * 1024 * 1024 * 1024);
+	cache.cleanup();
 	println!("{}", statistic.read().unwrap().to_string());
 	Ok(Some(0))
 }
