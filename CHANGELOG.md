@@ -1,5 +1,9 @@
 # Changes
 
+## 0.1.10
+
+ * Add configuration file support.
+
 ## 0.1.9
 
  * xgConsole: Add support for tasks file starting from slash.
