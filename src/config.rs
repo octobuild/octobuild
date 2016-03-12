@@ -58,7 +58,7 @@ impl Config {
 	fn show(&self) {
 		println!("  {} = {};", PARAM_PROCESS_LIMIT, self.process_limit);
 		println!("  {} = {};", PARAM_CACHE_LIMIT, self.cache_limit_mb);
-		println!("  {} = \"{}\";", PARAM_CACHE_PATH, self.cache_dir.to_str().unwrap());
+		println!("  {} = \"{}\";", PARAM_CACHE_PATH, self.cache_dir.to_str().unwrap().replace("\\", "\\\\"));
 	}
 
 	pub fn help() {
@@ -90,7 +90,9 @@ impl Config {
 }
 
 fn get_config<F, T>(local: &Option<types::Config>, global: &Option<types::Config>, op: F) -> Option<T> where F: Fn(&types::Config) -> Option<T> {
-	local.as_ref().and_then(&op).or_else(|| global.as_ref().and_then(&op))
+	None
+		.or_else(|| local.as_ref().and_then(&op))
+		.or_else(|| global.as_ref().and_then(&op))
 }
 
 fn get_local_config_path() -> Option<PathBuf> {
