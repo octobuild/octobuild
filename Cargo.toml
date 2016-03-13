@@ -14,9 +14,6 @@ name = "octo_cl"
 name = "octo_clang"
 
 [[bin]]
-name = "octo_config"
-
-[[bin]]
 name = "xgConsole"
 
 [build-dependencies]

@@ -47,6 +47,12 @@ fn main() {
 	for arg in args.iter() {
 		println!("  {}", arg);
 	}
+	if args.len() == 1 {
+		println!("");
+		Config::help();
+		return;
+	}
+
 	process::exit(match execute(&args[1..]) {
 		Ok(result) => {
 			match result {
