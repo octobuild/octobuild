@@ -49,6 +49,10 @@ sudo apt-get update
 sudo apt-get install octobuild
 ```
 
+## Configuration files
+
+You can get configuration files and show default and actual configuration by running ```xgConsole``` without parameters.
+
 ## Known issues
 
 On Windows you can't mix compilation with and without octobuild.
