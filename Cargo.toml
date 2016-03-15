@@ -1,7 +1,7 @@
 [package]
 name = "octobuild"
 build = "src/build.rs"
-version = "0.1.10"
+version = "0.1.11"
 authors = [ "Artem V. Navrotskiy <bozaro@users.noreply.github.com>" ]
 
 [profile.bench]
@@ -30,6 +30,8 @@ rand = "*"
 uuid = "*"
 tempdir = "*"
 num_cpus = "*"
+regex = "*"
+lazy_static = "*"
 
 [target.i686-pc-windows-gnu.dependencies]
 winapi = "*"

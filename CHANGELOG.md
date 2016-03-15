@@ -1,5 +1,10 @@
 # Changes
 
+## 0.1.11
+
+ * xgConsole: Add expand path masks on Windows.
+ * xgConsole: Allow multiple task files.
+
 ## 0.1.10
 
  * Add configuration file support.

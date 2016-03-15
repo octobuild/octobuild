@@ -1,6 +1,9 @@
 extern crate octobuild;
 extern crate petgraph;
 extern crate tempdir;
+extern crate regex;
+#[macro_use]
+extern crate lazy_static;
 
 use octobuild::common::BuildTask;
 use octobuild::config::Config;
@@ -15,13 +18,14 @@ use octobuild::compiler::*;
 use petgraph::{Graph, EdgeDirection};
 use petgraph::graph::NodeIndex;
 use tempdir::TempDir;
+use regex::Regex;
 
 use std::fs::File;
 use std::env;
 use std::io::{BufReader, Error, ErrorKind, Write};
 use std::io;
 use std::iter::FromIterator;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex, RwLock};
 use std::sync::mpsc::{channel, Sender, Receiver};
 use std::process;
@@ -67,34 +71,104 @@ fn main() {
 	})
 }
 
+fn is_flag(arg: &str) -> bool {
+	lazy_static! {
+		static ref RE: Regex = Regex::new(r"^/\w+([=].*)?$").unwrap();
+	}
+	RE.is_match(arg)
+}
+
+#[cfg(unix)]
+fn expand_files(mut files: Vec<PathBuf>, arg: &str) -> Vec<PathBuf> {
+	files.push(Path::new(arg).to_path_buf());
+	files
+}
+
+#[cfg(windows)]
+fn expand_files(mut files: Vec<PathBuf>, arg: &str) -> Vec<PathBuf> {
+	use std::fs;
+
+	fn mask_to_regex(mask: &str) -> Regex {
+		let mut result = String::new();
+		let mut begin = 0;
+		result.push_str("^");
+		for (index, separator) in mask.match_indices(|c| c == '?' || c == '*') {
+			result.push_str(&regex::quote(&mask[begin..index]));
+			result.push_str(match separator {
+				"?" => ".",
+				"*" => ".*",
+				unknown => panic!("Unexpected separator: {}", unknown),
+			});
+			begin = index + separator.len()
+		}
+		result.push_str(&regex::quote(&mask[begin..]));
+		result.push_str("$");
+		return Regex::new(&result).unwrap();
+	}
+
+	fn find_files(dir: &Path, mask: &str) -> Result<Vec<PathBuf>, Error> {
+		let mut result = Vec::new();
+		let expr = mask_to_regex(&mask.to_lowercase());
+		for entry in try!(fs::read_dir(dir)) {
+			let entry = try!(entry);
+			if entry.file_name().to_str().map_or(false, |s| expr.is_match(&s.to_lowercase())) {
+				result.push(entry.path());
+			}
+		}
+		Ok(result)
+	}
+
+	let path = Path::new(arg).to_path_buf();
+	let mask = path.file_name().map_or(None, |name| name.to_str()).map_or(None, |s| Some(s.to_string()));
+	match mask {
+		Some(ref mask) if mask.contains(|c| c == '?' || c == '*') => {
+			match find_files(path.parent().unwrap_or(Path::new(".")), mask) {
+				Ok(ref mut found) if found.len() > 0 => {
+					files.append(found);
+				}
+				_ => {
+					files.push(path);
+				}
+			}
+		}
+		_ => {
+			files.push(path);
+		}
+	}
+	files
+}
+
 fn execute(args: &[String]) -> Result<Option<i32>, Error> {
 	let statistic = Arc::new(RwLock::new(Statistic::new()));
 	let config = try! (Config::new());
 	let cache = Cache::new(&config);
 	let temp_dir = try! (TempDir::new("octobuild"));
-	for arg in args.iter() {
-		if arg.starts_with("/") && !Path::new(arg).exists() {continue}
+	let files = args.iter().filter(|a| !is_flag(a)).fold(Vec::new(), |state, a| expand_files(state, &a));
+	if files.len() == 0 {
+		return Err(Error::new(ErrorKind::InvalidInput, "Build task files not found"));
+	}
 
-		let (tx_result, rx_result): (Sender<ResultMessage>, Receiver<ResultMessage>) = channel();
-		let (tx_task, rx_task): (Sender<TaskMessage>, Receiver<TaskMessage>) = channel();
+	let mut graph = Graph::new();
+	for arg in files.iter() {
+		let file = try! (File::open(&Path::new(arg)));
+		try! (xg::parser::parse(&mut graph, BufReader::new(file)));
+	}
+	let validated_graph = try! (validate_graph(graph));
 
-		let mutex_rx_task = create_threads(rx_task, tx_result, config.process_limit, |worker_id:usize| {
-			let temp_path = temp_dir.path().to_path_buf();
-			let temp_cache = cache.clone();
-			let temp_statistic = statistic.clone();
-			move |task:TaskMessage| -> ResultMessage {
-				execute_task(&temp_cache, &temp_path, worker_id, task, &temp_statistic)
-			}
-		});
-
-		let path = Path::new(arg);
-		let file = try! (File::open(&path));
-		let graph = try! (xg::parser::parse(BufReader::new(file)));
-		let validated_graph = try! (validate_graph(graph));
-		match try! (execute_graph(&validated_graph, tx_task, mutex_rx_task, rx_result)) {
-			Some(v) if v == 0 => {}
-			v => {return Ok(v)}
+	let (tx_result, rx_result): (Sender<ResultMessage>, Receiver<ResultMessage>) = channel();
+	let (tx_task, rx_task): (Sender<TaskMessage>, Receiver<TaskMessage>) = channel();
+	let mutex_rx_task = create_threads(rx_task, tx_result, config.process_limit, |worker_id:usize| {
+		let temp_path = temp_dir.path().to_path_buf();
+		let temp_cache = cache.clone();
+		let temp_statistic = statistic.clone();
+		move |task:TaskMessage| -> ResultMessage {
+			execute_task(&temp_cache, &temp_path, worker_id, task, &temp_statistic)
 		}
+	});
+
+	match try! (execute_graph(&validated_graph, tx_task, mutex_rx_task, rx_result)) {
+		Some(v) if v == 0 => {}
+		v => {return Ok(v)}
 	}
 	cache.cleanup();
 	println!("{}", statistic.read().unwrap().to_string());
@@ -141,7 +215,7 @@ fn validate_graph(graph: Graph<BuildTask, ()>) -> Result<Graph<BuildTask, ()>, E
 				queue.push(neighbor);
 			}
 			count += 1;
-			if count ==completed.len() {
+			if count == completed.len() {
 				return Ok(graph);
 			}
 		}
@@ -317,4 +391,17 @@ fn test_parse_vars() {
 			}
 		}
 	}), "Afoo$(bar)$(none)B");
+}
+
+#[test]
+fn test_is_flag() {
+	assert_eq!(is_flag("/Wait"), true);
+	assert_eq!(is_flag("/out=/foo/bar"), true);
+	assert_eq!(is_flag("/out/foo/bar"), false);
+	assert_eq!(is_flag("foo/bar"), false);
+	assert_eq!(is_flag("/Wait.xml"), false);
+	assert_eq!(is_flag("/Wait/foo=bar"), false);
+	assert_eq!(is_flag("/WaitFoo=bar"), true);
+	assert_eq!(is_flag("/Wait.Foo=bar"), false);
+	assert_eq!(is_flag("/Wait=/foo/bar"), true);
 }

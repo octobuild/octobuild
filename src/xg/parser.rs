@@ -85,13 +85,13 @@ struct XgTool {
 	output: Option<String>,
 }
 
-pub fn parse<R: Read>(reader: R) -> Result<Graph<BuildTask, ()>, Error> {
+pub fn parse<R: Read>(graph: &mut Graph<BuildTask, ()>, reader: R) -> Result<(), Error> {
 	let mut parser = EventReader::new(reader);
 	loop {
 		match try! (next_xml_event(&mut parser)) {
 			XmlEvent::StartElement {name, ..} => {
 				return match &name.local_name[..] {
-					"BuildSet" => parse_build_set(&mut parser),
+					"BuildSet" => parse_build_set(graph, &mut parser),
 					_ => Err(Error::new(ErrorKind::InvalidInput, XgParseError::InvalidStreamFormat)),
 				}
 			}
@@ -100,7 +100,7 @@ pub fn parse<R: Read>(reader: R) -> Result<Graph<BuildTask, ()>, Error> {
 	}
 }
 
-pub fn parse_build_set<R: Read>(events: &mut EventReader<R>) -> Result<Graph<BuildTask, ()>, Error> {
+pub fn parse_build_set<R: Read>(graph: &mut Graph<BuildTask, ()>, events: &mut EventReader<R>) -> Result<(), Error> {
 	let mut envs:HashMap<String, XgEnvironment> = HashMap::new();
 	let mut projects:Vec<XgProject> = Vec::new();
 	loop {
@@ -122,7 +122,7 @@ pub fn parse_build_set<R: Read>(events: &mut EventReader<R>) -> Result<Graph<Bui
 			_ => {}
 		}
 	}
-	parse_create_graph(envs, projects)
+	parse_create_graph(graph, envs, projects)
 }
 
 fn parse_environments<R: Read>(events: &mut EventReader<R>, envs: &mut HashMap<String, XgEnvironment>) -> Result<(), Error> {
@@ -276,13 +276,12 @@ fn next_xml_event<R: Read>(reader: &mut EventReader<R>) -> Result<XmlEvent, Erro
 	reader.next().map_err(|e| Error::new(ErrorKind::InvalidInput, XgParseError::XmlError(e)))
 }
 
-fn parse_create_graph(envs:HashMap<String, XgEnvironment>, projects:Vec<XgProject>) -> Result<Graph<BuildTask, ()>, Error> {
-	let mut graph: Graph<BuildTask, ()> = Graph::new();
+fn parse_create_graph(graph: &mut Graph<BuildTask, ()>, envs:HashMap<String, XgEnvironment>, projects:Vec<XgProject>) -> Result<(), Error> {
 	for project in projects.into_iter() {
 		let env = try!(envs.get(&project.env).ok_or_else(|| Error::new(ErrorKind::InvalidInput, XgParseError::EnvironmentNotFound(project.env.clone()))));
-		try!(graph_project(&mut graph, project, env));
+		try!(graph_project(graph, project, env));
 	}
-	Ok(graph)
+	Ok(())
 }
 
 fn graph_project(graph: &mut Graph<BuildTask, ()>, project: XgProject, env: &XgEnvironment) -> Result<(), Error> {
@@ -329,5 +328,5 @@ fn test_parse_smoke() {
 	use std::fs::File;
 	use std::io::BufReader;
 
-	parse(BufReader::new(File::open("tests/graph-parser.xml").unwrap())).unwrap();
+	parse(&mut Graph::new(), BufReader::new(File::open("tests/graph-parser.xml").unwrap())).unwrap();
 }
