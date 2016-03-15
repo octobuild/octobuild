@@ -25,7 +25,7 @@ use std::env;
 use std::io::{BufReader, Error, ErrorKind, Write};
 use std::io;
 use std::iter::FromIterator;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex, RwLock};
 use std::sync::mpsc::{channel, Sender, Receiver};
 use std::process;
@@ -72,10 +72,70 @@ fn main() {
 }
 
 fn is_flag(arg: &str) -> bool {
-  lazy_static! {
-    static ref RE: Regex = Regex::new(r"^/\w+([=].*)?$").unwrap();
-  }
-  RE.is_match(arg)
+	lazy_static! {
+		static ref RE: Regex = Regex::new(r"^/\w+([=].*)?$").unwrap();
+	}
+	RE.is_match(arg)
+}
+
+#[cfg(unix)]
+fn expand_files(mut files: Vec<PathBuf>, arg: &str) -> Vec<PathBuf> {
+	files.push(Path::new(arg).to_path_buf());
+	files
+}
+
+#[cfg(windows)]
+fn expand_files(mut files: Vec<PathBuf>, arg: &str) -> Vec<PathBuf> {
+	use std::fs;
+
+	fn mask_to_regex(mask: &str) -> Regex {
+		let mut result = String::new();
+		let mut begin = 0;
+		result.push_str("^");
+		for (index, separator) in mask.match_indices(|c| c == '?' || c == '*') {
+			result.push_str(&regex::quote(&mask[begin..index]));
+			result.push_str(match separator {
+				"?" => ".",
+				"*" => ".*",
+				unknown => panic!("Unexpected separator: {}", unknown),
+			});
+			begin = index + separator.len()
+		}
+		result.push_str(&regex::quote(&mask[begin..]));
+		result.push_str("$");
+		return Regex::new(&result).unwrap();
+	}
+
+	fn find_files(dir: &Path, mask: &str) -> Result<Vec<PathBuf>, Error> {
+		let mut result = Vec::new();
+		let expr = mask_to_regex(&mask.to_lowercase());
+		for entry in try!(fs::read_dir(dir)) {
+			let entry = try!(entry);
+			if entry.file_name().to_str().map_or(false, |s| expr.is_match(&s.to_lowercase())) {
+				result.push(entry.path());
+			}
+		}
+		Ok(result)
+	}
+
+	let path = Path::new(arg).to_path_buf();
+	let mask = path.file_name().map_or(None, |name| name.to_str()).map_or(None, |s| Some(s.to_string()));
+	match mask {
+		Some(ref mask) if mask.contains(|c| c == '?' || c == '*') => {
+			match find_files(path.parent().unwrap_or(Path::new(".")), mask) {
+				Ok(ref mut found) if found.len() > 0 => {
+					files.append(found);
+				}
+				_ => {
+					files.push(path);
+				}
+			}
+		}
+		_ => {
+			files.push(path);
+		}
+	}
+	files
 }
 
 fn execute(args: &[String]) -> Result<Option<i32>, Error> {
@@ -83,7 +143,7 @@ fn execute(args: &[String]) -> Result<Option<i32>, Error> {
 	let config = try! (Config::new());
 	let cache = Cache::new(&config);
 	let temp_dir = try! (TempDir::new("octobuild"));
-	let files = Vec::from_iter(args.iter().filter(|a| !is_flag(a)));
+	let files = args.iter().filter(|a| !is_flag(a)).fold(Vec::new(), |state, a| expand_files(state, &a));
 	if files.len() == 0 {
 		return Err(Error::new(ErrorKind::InvalidInput, "Build task files not found"));
 	}
@@ -335,13 +395,13 @@ fn test_parse_vars() {
 
 #[test]
 fn test_is_flag() {
-  assert_eq!(is_flag("/Wait"), true);
-  assert_eq!(is_flag("/out=/foo/bar"), true);
-  assert_eq!(is_flag("/out/foo/bar"), false);
-  assert_eq!(is_flag("foo/bar"), false);
-  assert_eq!(is_flag("/Wait.xml"), false);
-  assert_eq!(is_flag("/Wait/foo=bar"), false);
-  assert_eq!(is_flag("/WaitFoo=bar"), true);
-  assert_eq!(is_flag("/Wait.Foo=bar"), false);
-  assert_eq!(is_flag("/Wait=/foo/bar"), true);
+	assert_eq!(is_flag("/Wait"), true);
+	assert_eq!(is_flag("/out=/foo/bar"), true);
+	assert_eq!(is_flag("/out/foo/bar"), false);
+	assert_eq!(is_flag("foo/bar"), false);
+	assert_eq!(is_flag("/Wait.xml"), false);
+	assert_eq!(is_flag("/Wait/foo=bar"), false);
+	assert_eq!(is_flag("/WaitFoo=bar"), true);
+	assert_eq!(is_flag("/Wait.Foo=bar"), false);
+	assert_eq!(is_flag("/Wait=/foo/bar"), true);
 }
