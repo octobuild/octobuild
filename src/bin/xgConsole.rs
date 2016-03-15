@@ -166,13 +166,10 @@ fn execute(args: &[String]) -> Result<Option<i32>, Error> {
 		}
 	});
 
-	match try! (execute_graph(&validated_graph, tx_task, mutex_rx_task, rx_result)) {
-		Some(v) if v == 0 => {}
-		v => {return Ok(v)}
-	}
+	let result = execute_graph(&validated_graph, tx_task, mutex_rx_task, rx_result);
 	cache.cleanup();
 	println!("{}", statistic.read().unwrap().to_string());
-	Ok(Some(0))
+	result
 }
 
 fn create_threads<R: 'static + Send, T: 'static + Send, Worker:'static + Fn(T) -> R + Send, Factory:Fn(usize) -> Worker>(rx_task: Receiver<T>, tx_result: Sender<R>, num_cpus: usize, factory: Factory) ->  Arc<Mutex<Receiver<T>>> {
