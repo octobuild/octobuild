@@ -72,29 +72,32 @@ fn execute(args: &[String]) -> Result<Option<i32>, Error> {
 	let config = try! (Config::new());
 	let cache = Cache::new(&config);
 	let temp_dir = try! (TempDir::new("octobuild"));
-	for arg in args.iter() {
-		if arg.starts_with("/") && !Path::new(arg).exists() {continue}
+	let files = Vec::from_iter(args.iter().filter(|a| !a.starts_with("/") || Path::new(a).exists()));
+	if files.len() == 0 {
+		return Err(Error::new(ErrorKind::InvalidInput, "Build task files not found"));
+	}
 
-		let (tx_result, rx_result): (Sender<ResultMessage>, Receiver<ResultMessage>) = channel();
-		let (tx_task, rx_task): (Sender<TaskMessage>, Receiver<TaskMessage>) = channel();
+	let mut graph = Graph::new();
+	for arg in files.iter() {
+		let file = try! (File::open(&Path::new(arg)));
+		try! (xg::parser::parse(&mut graph, BufReader::new(file)));
+	}
+	let validated_graph = try! (validate_graph(graph));
 
-		let mutex_rx_task = create_threads(rx_task, tx_result, config.process_limit, |worker_id:usize| {
-			let temp_path = temp_dir.path().to_path_buf();
-			let temp_cache = cache.clone();
-			let temp_statistic = statistic.clone();
-			move |task:TaskMessage| -> ResultMessage {
-				execute_task(&temp_cache, &temp_path, worker_id, task, &temp_statistic)
-			}
-		});
-
-		let path = Path::new(arg);
-		let file = try! (File::open(&path));
-		let graph = try! (xg::parser::parse(BufReader::new(file)));
-		let validated_graph = try! (validate_graph(graph));
-		match try! (execute_graph(&validated_graph, tx_task, mutex_rx_task, rx_result)) {
-			Some(v) if v == 0 => {}
-			v => {return Ok(v)}
+	let (tx_result, rx_result): (Sender<ResultMessage>, Receiver<ResultMessage>) = channel();
+	let (tx_task, rx_task): (Sender<TaskMessage>, Receiver<TaskMessage>) = channel();
+	let mutex_rx_task = create_threads(rx_task, tx_result, config.process_limit, |worker_id:usize| {
+		let temp_path = temp_dir.path().to_path_buf();
+		let temp_cache = cache.clone();
+		let temp_statistic = statistic.clone();
+		move |task:TaskMessage| -> ResultMessage {
+			execute_task(&temp_cache, &temp_path, worker_id, task, &temp_statistic)
 		}
+	});
+
+	match try! (execute_graph(&validated_graph, tx_task, mutex_rx_task, rx_result)) {
+		Some(v) if v == 0 => {}
+		v => {return Ok(v)}
 	}
 	cache.cleanup();
 	println!("{}", statistic.read().unwrap().to_string());
@@ -141,7 +144,7 @@ fn validate_graph(graph: Graph<BuildTask, ()>) -> Result<Graph<BuildTask, ()>, E
 				queue.push(neighbor);
 			}
 			count += 1;
-			if count ==completed.len() {
+			if count == completed.len() {
 				return Ok(graph);
 			}
 		}
