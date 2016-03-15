@@ -1,6 +1,9 @@
 extern crate octobuild;
 extern crate petgraph;
 extern crate tempdir;
+extern crate regex;
+#[macro_use]
+extern crate lazy_static;
 
 use octobuild::common::BuildTask;
 use octobuild::config::Config;
@@ -15,6 +18,7 @@ use octobuild::compiler::*;
 use petgraph::{Graph, EdgeDirection};
 use petgraph::graph::NodeIndex;
 use tempdir::TempDir;
+use regex::Regex;
 
 use std::fs::File;
 use std::env;
@@ -67,12 +71,19 @@ fn main() {
 	})
 }
 
+fn is_flag(arg: &str) -> bool {
+  lazy_static! {
+    static ref RE: Regex = Regex::new(r"^/\w+([=].*)?$").unwrap();
+  }
+  RE.is_match(arg)
+}
+
 fn execute(args: &[String]) -> Result<Option<i32>, Error> {
 	let statistic = Arc::new(RwLock::new(Statistic::new()));
 	let config = try! (Config::new());
 	let cache = Cache::new(&config);
 	let temp_dir = try! (TempDir::new("octobuild"));
-	let files = Vec::from_iter(args.iter().filter(|a| !a.starts_with("/") || Path::new(a).exists()));
+	let files = Vec::from_iter(args.iter().filter(|a| !is_flag(a)));
 	if files.len() == 0 {
 		return Err(Error::new(ErrorKind::InvalidInput, "Build task files not found"));
 	}
@@ -320,4 +331,17 @@ fn test_parse_vars() {
 			}
 		}
 	}), "Afoo$(bar)$(none)B");
+}
+
+#[test]
+fn test_is_flag() {
+  assert_eq!(is_flag("/Wait"), true);
+  assert_eq!(is_flag("/out=/foo/bar"), true);
+  assert_eq!(is_flag("/out/foo/bar"), false);
+  assert_eq!(is_flag("foo/bar"), false);
+  assert_eq!(is_flag("/Wait.xml"), false);
+  assert_eq!(is_flag("/Wait/foo=bar"), false);
+  assert_eq!(is_flag("/WaitFoo=bar"), true);
+  assert_eq!(is_flag("/Wait.Foo=bar"), false);
+  assert_eq!(is_flag("/Wait=/foo/bar"), true);
 }

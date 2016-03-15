@@ -30,6 +30,8 @@ rand = "*"
 uuid = "*"
 tempdir = "*"
 num_cpus = "*"
+regex = "*"
+lazy_static = "*"
 
 [target.i686-pc-windows-gnu.dependencies]
 winapi = "*"
