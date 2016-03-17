@@ -1,5 +1,9 @@
 # Changes
 
+## 0.1.12
+
+ * Change configuration format to YAML.
+
 ## 0.1.11
 
  * xgConsole: Add expand path masks on Windows.

@@ -1,7 +1,7 @@
 [package]
 name = "octobuild"
 build = "src/build.rs"
-version = "0.1.11"
+version = "0.1.12"
 authors = [ "Artem V. Navrotskiy <bozaro@users.noreply.github.com>" ]
 
 [profile.bench]
@@ -20,7 +20,7 @@ name = "xgConsole"
 rustc_version = "*"
 
 [dependencies]
-config = "*"
+yaml-rust = "*"
 filetime = "*"
 lz4 = "*"
 libc = "*"
