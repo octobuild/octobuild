@@ -167,7 +167,7 @@ fn execute(args: &[String]) -> Result<Option<i32>, Error> {
 	});
 
 	let result = execute_graph(&validated_graph, tx_task, mutex_rx_task, rx_result);
-	cache.cleanup();
+	let _ = cache.cleanup();
 	println!("{}", statistic.read().unwrap().to_string());
 	result
 }

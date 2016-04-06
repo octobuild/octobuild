@@ -27,7 +27,7 @@ libc = "*"
 petgraph = "*"
 xml-rs = "*"
 rand = "*"
-uuid = "*"
+uuid = { version = "*", features = ["v4"] }
 tempdir = "*"
 num_cpus = "*"
 regex = "*"

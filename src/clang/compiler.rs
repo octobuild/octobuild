@@ -9,7 +9,7 @@ use std::io;
 use std::io::{Error, Read, Write};
 use std::hash::{SipHasher, Hasher};
 use std::path::{Path, PathBuf};
-use std::process::{Command, Output, Stdio};
+use std::process::{Command, Stdio};
 use std::sync::mpsc::{channel, Receiver};
 use std::sync::RwLock;
 use std::thread;

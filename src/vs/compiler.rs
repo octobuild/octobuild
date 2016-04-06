@@ -11,7 +11,6 @@ use std::fs::File;
 use std::io::{Error, Cursor, Write};
 use std::hash::{SipHasher, Hasher};
 use std::path::{Path, PathBuf};
-use std::process::Output;
 use std::sync::RwLock;
 
 pub struct VsCompiler {
