@@ -28,9 +28,8 @@ class Script
         return null;
     }
 
-    static Platform ReadPlatform(string path)
+    static Platform GetPlatform(string target)
     {
-        String target = System.IO.File.ReadAllText(path);
         switch (target)
         {
             case "x86_64-pc-windows-gnu":
@@ -67,15 +66,16 @@ class Script
     {
         Console.WriteLine("WixSharp version: " + FileVersionInfo.GetVersionInfo(typeof(WixSharp.Project).Assembly.Location).FileVersion);
 
-        Platform platform = ReadPlatform(@"target\release\target.txt");
+        String target = System.IO.File.ReadAllText(@"target\release\target.txt");
+        Platform platform = GetPlatform(target);
         String version = ReadVersion(@"Cargo.toml");
         Feature featureBuilder = new Feature("Octobuild Builder", true, false);
         featureBuilder.AttributesDefinition = @"AllowAdvertise=no";
 
         List<WixEntity> files = new List<WixEntity>();
-        files.Add(new File(featureBuilder, @"target\release\xgConsole.exe"));
+        files.Add(new File(featureBuilder, @"target\" + target + @"\release\xgConsole.exe"));
         files.Add(new File(featureBuilder, @"LICENSE"));
-        foreach (string file in System.IO.Directory.GetFiles(@"target\release", "*.dll"))
+        foreach (string file in System.IO.Directory.GetFiles(@"target\" + target + @"\release", "*.dll"))
         {
             files.Add(new File(featureBuilder, file));
         }
@@ -119,7 +119,7 @@ class Script
                 );
             }
         }
-	projectEntries.Add(new ManagedAction(@"BroadcastSettingChange", Return.ignore, When.After, Step.InstallFinalize, Condition.Always));
+        projectEntries.Add(new ManagedAction(@"BroadcastSettingChange", Return.ignore, When.After, Step.InstallFinalize, Condition.Always));
 
         Project project = new Project("Octobuild", projectEntries.ToArray());
         project.ControlPanelInfo.Manufacturer = "Artem V. Navrotskiy";
@@ -144,21 +144,21 @@ class Script
 
 public class CustomActions
 {
-	[DllImport("user32.dll", SetLastError = true, CharSet = CharSet.Auto)]
-	static extern IntPtr SendMessageTimeout(IntPtr hWnd, uint Msg, UIntPtr wParam, string lParam, SendMessageTimeoutFlags fuFlags, uint uTimeout, out UIntPtr lpdwResult);
+    [DllImport("user32.dll", SetLastError = true, CharSet = CharSet.Auto)]
+    static extern IntPtr SendMessageTimeout(IntPtr hWnd, uint Msg, UIntPtr wParam, string lParam, SendMessageTimeoutFlags fuFlags, uint uTimeout, out UIntPtr lpdwResult);
 
-	public enum SendMessageTimeoutFlags : uint
-{
-   SMTO_NORMAL = 0x0, SMTO_BLOCK = 0x1, SMTO_ABORTIFHUNG = 0x2, SMTO_NOTIMEOUTIFNOTHUNG = 0x8
-}
+    public enum SendMessageTimeoutFlags : uint
+    {
+        SMTO_NORMAL = 0x0, SMTO_BLOCK = 0x1, SMTO_ABORTIFHUNG = 0x2, SMTO_NOTIMEOUTIFNOTHUNG = 0x8
+    }
 
     [CustomAction]
     public static ActionResult BroadcastSettingChange(Session session)
     {
-		IntPtr HWND_BROADCAST = (IntPtr)0xffff;
-		const UInt32 WM_SETTINGCHANGE = 0x001A;
-		UIntPtr result;
-		SendMessageTimeout(HWND_BROADCAST, WM_SETTINGCHANGE, (UIntPtr)0, "Environment", SendMessageTimeoutFlags.SMTO_ABORTIFHUNG, 5000, out result);
+        IntPtr HWND_BROADCAST = (IntPtr)0xffff;
+        const UInt32 WM_SETTINGCHANGE = 0x001A;
+        UIntPtr result;
+        SendMessageTimeout(HWND_BROADCAST, WM_SETTINGCHANGE, (UIntPtr)0, "Environment", SendMessageTimeoutFlags.SMTO_ABORTIFHUNG, 5000, out result);
         return ActionResult.Success;
     }
 }

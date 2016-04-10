@@ -29,13 +29,13 @@ build() {
 	cargo version
 	rm -fR target/release
 	cargo test
-	cargo build --release
+	cargo build --release --target $TARGET
 
-	sign target/release/*.exe
+	sign target/release/$TARGET/*.exe
 
 	# Prepare for installer
 	if [ "$TARGET" == "i686-gnu-stable" ]; then
-		cp ${MULTIRUST_HOME//\\/\/}/toolchains/$TARGET/bin/libgcc*.dll target/release/
+		cp ${MULTIRUST_HOME//\\/\/}/toolchains/$TARGET/bin/libgcc*.dll target/release/$TARGET
 	fi
 	
 	# Build installer

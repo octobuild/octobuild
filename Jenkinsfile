@@ -1,3 +1,13 @@
+/*
+sudo apt install mingw-w64
+sudo apt install wine-1.8
+
+export WINEARCH=win32
+export WINEPREFIX=/home/bozaro/.wine-i686/
+
+winetricks dotnet40
+wine reg add "HKLM\\Software\\Microsoft\\Windows NT\\CurrentVersion\\ProfileList\\S-1-5-21-0-0-0-1000"
+*/
 parallel 'Linux': {
   node ('linux') {
     stage 'Linux: Checkout'
@@ -18,7 +28,7 @@ parallel 'Linux': {
 
     stage 'Linux: Build'
     withRustEnv {
-      sh 'cargo build --release'
+      sh 'cargo build --release --target x86_64-unknown-linux-gnu'
     }
   }
 },
