@@ -133,6 +133,7 @@ class Script
         project.Platform = Platform.x64;
         project.Package.AttributesDefinition = @"InstallPrivileges=elevated;InstallScope=perMachine";
         project.MajorUpgradeStrategy = MajorUpgradeStrategy.Default;
+        project.LightOptions = "-sval";
 
         Compiler.BuildMsi(project);
         //Compiler.BuildWxs(project);
