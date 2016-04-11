@@ -22,7 +22,7 @@ const CONFIG_FILE_NAME: &'static str = "octobuild.conf";
 #[cfg(windows)]
 const DEFAULT_CACHE_DIR: &'static str = "~/.octobuild";
 #[cfg(unix)]
-const DEFAULT_CACHE_DIR: &'static str = "~/.cache/.octobuild";
+const DEFAULT_CACHE_DIR: &'static str = "~/.cache/octobuild";
 
 const PARAM_CACHE_LIMIT: &'static str = "cache_limit_mb";
 const PARAM_CACHE_PATH: &'static str = "cache_path";

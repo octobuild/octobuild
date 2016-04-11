@@ -1,5 +1,9 @@
 # Changes
 
+## Unreleased
+
+ * Linux: Change default cache location from ~/.cache/.octobuild to ~/.cache/octobuild.
+
 ## 0.1.12
 
  * Change configuration format to YAML.
