@@ -2,7 +2,7 @@
 cd `pwd $0`
 
 # Build system
-cargo build --release
+cargo build --release --target x86_64-unknown-linux-gnu
 
 # Create package
 . target/release/version.sh
