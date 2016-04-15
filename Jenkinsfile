@@ -5,7 +5,7 @@ sudo apt install p7zip-full
 sudo apt install mono-devel
 
 export WINEARCH=win32
-export WINEPREFIX=/home/bozaro/.wine-i686/
+export WINEPREFIX=$HOME/.wine-i686/
 
 winetricks dotnet40
 wine reg add "HKLM\\Software\\Microsoft\\Windows NT\\CurrentVersion\\ProfileList\\S-1-5-21-0-0-0-1000"
@@ -32,6 +32,40 @@ parallel 'Linux': {
     withRustEnv {
       sh 'cargo build --release --target x86_64-unknown-linux-gnu'
     }
+
+    stage 'Linux: Installer'
+    sh '''#!/bin/bash
+# Create package
+. target/release/version.sh
+DATE=`date -R`
+
+# Check tag and version
+if [ "$TAGNAME" != "" ]; then
+    if [ "$TAGNAME" != "$VERSION" ]; then
+	echo "Tag name is not same as version: $TAGNAME != $VERSION"
+        exit 1
+    fi
+fi
+
+# Copy debian config files
+DEBROOT=target/octobuild
+rm -fR $DEBROOT
+mkdir -p $DEBROOT/
+cp -r  debian $DEBROOT/
+
+for i in $DEBROOT/debian/*; do
+    sed -i -e "s/#VERSION#/$VERSION/" $i
+    sed -i -e "s/#DATE#/$DATE/" $i
+done
+
+pushd $DEBROOT
+dpkg-buildpackage -uc -us
+popd
+'''
+    archive 'target/*.deb'
+    archive 'target/*.dsc'
+    archive 'target/*.tar.gz'
+    archive 'target/*.changes'
   }
 },
 'Win64': {
