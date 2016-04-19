@@ -54,9 +54,7 @@ parallel 'Linux': {
     }
 
     stage 'Win64: Installer'
-    sh '7z x -y -otarget/wixsharp/ .jenkins/distrib/WixSharp.1.0.34.0.7z'
-    sh '7z x -y -otarget/ .jenkins/distrib/cs-script.7z'
-    sh 'mv -f target/cs-script/cscs.exe target/wixsharp/'
+    sh '7z x -y -otarget/wixsharp/ .jenkins/distrib/WixSharp.1.0.35.0.7z'
     withEnv([
       'WIXSHARP_DIR=Z:$WORKSPACE/target/wixsharp',
       'WIXSHARP_WIXDIR=Z:$WORKSPACE/target/wixsharp/Wix_bin/bin',

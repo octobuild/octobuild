@@ -119,7 +119,7 @@ class Script
                 );
             }
         }
-        projectEntries.Add(new ManagedAction(@"BroadcastSettingChange", Return.ignore, When.After, Step.InstallFinalize, Condition.Always));
+        projectEntries.Add(new ManagedAction(CustomActions.BroadcastSettingChange, Return.ignore, When.After, Step.InstallFinalize, Condition.Always));
 
         Project project = new Project("Octobuild", projectEntries.ToArray());
         project.ControlPanelInfo.Manufacturer = "Artem V. Navrotskiy";
