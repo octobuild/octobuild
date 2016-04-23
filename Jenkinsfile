@@ -68,6 +68,43 @@ popd
     archive 'target/*.changes'
   }
 },
+'Win32': {
+  node ('linux') {
+    stage 'Win32: Checkout'
+    checkout scm
+    sh 'git reset --hard'
+    sh 'git clean -ffdx'
+
+    stage 'Win32: Prepare rust'
+    withRustEnv {
+      sh 'rustup update'
+      sh 'rustup override add stable'
+      sh 'rustup target add i686-pc-windows-gnu'
+    }
+
+    stage 'Win32: Build'
+    withRustEnv {
+      sh 'cargo build --release --target i686-pc-windows-gnu'
+    }
+
+    stage 'Win32: Installer'
+    sh '7z x -y -otarget/wixsharp/ .jenkins/distrib/WixSharp.1.0.35.0.7z'
+    withEnv([
+      'WIXSHARP_DIR=Z:$WORKSPACE/target/wixsharp',
+      'WIXSHARP_WIXDIR=Z:$WORKSPACE/target/wixsharp/Wix_bin/bin',
+    ]) {
+      sh '''
+env | sort
+export WORKSPACE=`pwd`
+export WIXSHARP_DIR=Z:$WORKSPACE/target/wixsharp
+export WIXSHARP_WIXDIR=Z:$WORKSPACE/target/wixsharp/Wix_bin/bin
+env | sort
+wine target/wixsharp/cscs.exe wixcs/setup.cs
+'''
+    }
+    archive 'target/*.msi'
+  }
+},
 'Win64': {
   node ('linux') {
     stage 'Win64: Checkout'
