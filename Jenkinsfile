@@ -3,6 +3,7 @@ sudo apt install mingw-w64
 sudo apt install wine-1.8
 sudo apt install p7zip-full
 sudo apt install mono-devel
+sudo apt install osslsigncode
 
 export WINEARCH=win32
 export WINEPREFIX=$HOME/.wine-i686/
@@ -39,14 +40,6 @@ parallel 'Linux': {
 . target/release/version.sh
 DATE=`date -R`
 
-# Check tag and version
-if [ "$TAGNAME" != "" ]; then
-    if [ "$TAGNAME" != "$VERSION" ]; then
-	echo "Tag name is not same as version: $TAGNAME != $VERSION"
-        exit 1
-    fi
-fi
-
 # Copy debian config files
 DEBROOT=target/octobuild
 rm -fR $DEBROOT
@@ -68,78 +61,58 @@ popd
     archive 'target/*.changes'
   }
 },
-'Win32': {
-  node ('linux') {
-    stage 'Win32: Checkout'
-    checkout scm
-    sh 'git reset --hard'
-    sh 'git clean -ffdx'
+'Win32': windowsBuild('Win32', 'i686'),
+'Win64': windowsBuild('Win64', 'x86_64')
 
-    stage 'Win32: Prepare rust'
-    withRustEnv {
-      sh 'rustup update'
-      sh 'rustup override add stable'
-      sh 'rustup target add i686-pc-windows-gnu'
-    }
+def windowsBuild(String stageName, String arch) {
+  return {
+    node ('linux') {
+      stage "$stageName: Checkout"
+      checkout scm
+      sh "git reset --hard"
+      sh "git clean -ffdx"
 
-    stage 'Win32: Build'
-    withRustEnv {
-      sh 'cargo build --release --target i686-pc-windows-gnu'
-    }
+      stage "$stageName: Prepare rust"
+      withRustEnv {
+        sh "rustup update"
+        sh "rustup override add stable"
+        sh "rustup target add $arch-pc-windows-gnu"
+      }
 
-    stage 'Win32: Installer'
-    sh '7z x -y -otarget/wixsharp/ .jenkins/distrib/WixSharp.1.0.35.0.7z'
-    withEnv([
-      'WIXSHARP_DIR=Z:$WORKSPACE/target/wixsharp',
-      'WIXSHARP_WIXDIR=Z:$WORKSPACE/target/wixsharp/Wix_bin/bin',
-    ]) {
-      sh '''
-env | sort
+      stage "$stageName: Build"
+      withRustEnv {
+        sh "cargo build --release --target $arch-pc-windows-gnu"
+      }
+      withCredentials([[$class: 'FileBinding', credentialsId: '54b693ef-b304-4d3d-a53b-6efd64dd76f4', variable: 'PEM_FILE']]) {
+        sh """
+for i in target/$arch-pc-windows-gnu/release/*.exe; do
+  osslsigncode sign -certs \$PEM_FILE -key \$PEM_FILE -in \$i -h sha256 -t http://timestamp.verisign.com/scripts/timstamp.dll -out \$i.signed && mv \$i.signed \$i
+done
+"""
+      }
+
+      stage "$stageName: Installer"
+      sh "7z x -y -otarget/wixsharp/ .jenkins/distrib/WixSharp.1.0.35.0.7z"
+      withEnv([
+        'WIXSHARP_DIR=Z:$WORKSPACE/target/wixsharp',
+        'WIXSHARP_WIXDIR=Z:$WORKSPACE/target/wixsharp/Wix_bin/bin',
+      ]) {
+        sh """
 export WORKSPACE=`pwd`
-export WIXSHARP_DIR=Z:$WORKSPACE/target/wixsharp
-export WIXSHARP_WIXDIR=Z:$WORKSPACE/target/wixsharp/Wix_bin/bin
-env | sort
+export WIXSHARP_DIR=Z:\$WORKSPACE/target/wixsharp
+export WIXSHARP_WIXDIR=Z:\$WORKSPACE/target/wixsharp/Wix_bin/bin
 wine target/wixsharp/cscs.exe wixcs/setup.cs
-'''
+"""
+      }
+      withCredentials([[$class: 'FileBinding', credentialsId: '54b693ef-b304-4d3d-a53b-6efd64dd76f4', variable: 'PEM_FILE']]) {
+        sh """
+for i in target/*.msi; do
+  osslsigncode sign -certs \$PEM_FILE -key \$PEM_FILE -in \$i -h sha256 -t http://timestamp.verisign.com/scripts/timstamp.dll -out \$i.signed && mv \$i.signed \$i
+done
+"""
+      }
+      archive "target/*.msi"
     }
-    archive 'target/*.msi'
-  }
-},
-'Win64': {
-  node ('linux') {
-    stage 'Win64: Checkout'
-    checkout scm
-    sh 'git reset --hard'
-    sh 'git clean -ffdx'
-
-    stage 'Win64: Prepare rust'
-    withRustEnv {
-      sh 'rustup update'
-      sh 'rustup override add stable'
-      sh 'rustup target add x86_64-pc-windows-gnu'
-    }
-
-    stage 'Win64: Build'
-    withRustEnv {
-      sh 'cargo build --release --target x86_64-pc-windows-gnu'
-    }
-
-    stage 'Win64: Installer'
-    sh '7z x -y -otarget/wixsharp/ .jenkins/distrib/WixSharp.1.0.35.0.7z'
-    withEnv([
-      'WIXSHARP_DIR=Z:$WORKSPACE/target/wixsharp',
-      'WIXSHARP_WIXDIR=Z:$WORKSPACE/target/wixsharp/Wix_bin/bin',
-    ]) {
-      sh '''
-env | sort
-export WORKSPACE=`pwd`
-export WIXSHARP_DIR=Z:$WORKSPACE/target/wixsharp
-export WIXSHARP_WIXDIR=Z:$WORKSPACE/target/wixsharp/Wix_bin/bin
-env | sort
-wine target/wixsharp/cscs.exe wixcs/setup.cs
-'''
-    }
-    archive 'target/*.msi'
   }
 }
 
