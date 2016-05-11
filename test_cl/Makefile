@@ -1,4 +1,4 @@
-all: sample.cpp.o sample2.cpp.o
+all: sample.cpp.o sample2.cpp.o issue-12.cpp.o
 
 clean:
 	del *.h.pch
@@ -14,3 +14,5 @@ sample.cpp.o: sample.h.pch
 sample2.cpp.o: sample.h.pch
 	octo_cl /c /DTEST /Yusample.h /Fpsample.h.pch /FIsample.h /Fosample2.cpp.o sample2.cpp
 	
+issue-12.cpp.o: issue-12.cpp
+	octo_cl /c /EHsc /Foissue-12.cpp.o issue-12.cpp
