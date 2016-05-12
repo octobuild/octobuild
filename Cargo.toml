@@ -17,26 +17,26 @@ name = "octo_clang"
 name = "xgConsole"
 
 [build-dependencies]
-rustc_version = "*"
+rustc_version = "0.1.7"
 
 [dependencies]
-yaml-rust = "*"
-filetime = "*"
-lz4 = "*"
-libc = "*"
-petgraph = "*"
-xml-rs = "*"
-rand = "*"
-uuid = { version = "*", features = ["v4"] }
-tempdir = "*"
-num_cpus = "*"
-regex = "*"
-lazy_static = "*"
+yaml-rust = "0.3.2"
+filetime = "0.1.10"
+lz4 = "1.16.131"
+libc = "0.2.11"
+petgraph = "0.2.7"
+xml-rs = "0.3.2"
+rand = "0.3.14"
+uuid = { version = "0.2.2", features = ["v4"] }
+tempdir = "0.3.4"
+num_cpus = "0.2.12"
+regex = "0.1.69"
+lazy_static = "0.2.1"
 
 [target.i686-pc-windows-gnu.dependencies]
-winapi = "*"
-kernel32-sys = "*"
+winapi = "0.2.7"
+kernel32-sys = "0.2.2"
 
 [target.x86_64-pc-windows-gnu.dependencies]
-winapi = "*"
-kernel32-sys = "*"
+winapi = "0.2.7"
+kernel32-sys = "0.2.2"

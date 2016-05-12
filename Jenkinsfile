@@ -11,6 +11,8 @@ export WINEPREFIX=$HOME/.wine-i686/
 winetricks dotnet40
 wine reg add "HKLM\\Software\\Microsoft\\Windows NT\\CurrentVersion\\ProfileList\\S-1-5-21-0-0-0-1000"
 */
+rustVersion = "1.8.0"
+
 parallel 'Linux': {
   node ('linux') {
     stage 'Linux: Checkout'
@@ -20,8 +22,8 @@ parallel 'Linux': {
 
     stage 'Linux: Prepare rust'
     withRustEnv {
-      sh 'rustup update'
-      sh 'rustup override add stable'
+      sh "rustup toolchain install $rustVersion"
+      sh "rustup override add $rustVersion"
     }
 
     stage 'Linux: Test'
@@ -74,8 +76,7 @@ def windowsBuild(String stageName, String arch) {
 
       stage "$stageName: Prepare rust"
       withRustEnv {
-        sh "rustup update"
-        sh "rustup override add stable"
+        sh "rustup override add $rustVersion"
         sh "rustup target add $arch-pc-windows-gnu"
       }
 
