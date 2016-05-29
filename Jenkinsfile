@@ -11,7 +11,7 @@ export WINEPREFIX=$HOME/.wine-i686/
 winetricks dotnet40
 wine reg add "HKLM\\Software\\Microsoft\\Windows NT\\CurrentVersion\\ProfileList\\S-1-5-21-0-0-0-1000"
 */
-rustVersion = "1.8.0"
+rustVersion = "1.9.0"
 
 parallel 'Linux': {
   node ('linux') {
