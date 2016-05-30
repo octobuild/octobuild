@@ -13,30 +13,31 @@ wine reg add "HKLM\\Software\\Microsoft\\Windows NT\\CurrentVersion\\ProfileList
 */
 rustVersion = "1.9.0"
 
+stage 'Build'
 parallel 'Linux': {
   node ('linux') {
-    stage 'Linux: Checkout'
+    //stage 'Linux: Checkout'
     checkout scm
     sh 'git reset --hard'
     sh 'git clean -ffdx'
 
-    stage 'Linux: Prepare rust'
+    //stage 'Linux: Prepare rust'
     withRustEnv {
       sh "rustup toolchain install $rustVersion"
       sh "rustup override add $rustVersion"
     }
 
-    stage 'Linux: Test'
+    //stage 'Linux: Test'
     withRustEnv {
       sh 'cargo test'
     }
 
-    stage 'Linux: Build'
+    //stage 'Linux: Build'
     withRustEnv {
       sh 'cargo build --release --target x86_64-unknown-linux-gnu'
     }
 
-    stage 'Linux: Installer'
+    //stage 'Linux: Installer'
     sh '''#!/bin/bash
 # Create package
 . target/release/version.sh
@@ -69,18 +70,18 @@ popd
 def windowsBuild(String stageName, String arch) {
   return {
     node ('linux') {
-      stage "$stageName: Checkout"
+      //stage "$stageName: Checkout"
       checkout scm
       sh "git reset --hard"
       sh "git clean -ffdx"
 
-      stage "$stageName: Prepare rust"
+      //stage "$stageName: Prepare rust"
       withRustEnv {
         sh "rustup override add $rustVersion"
         sh "rustup target add $arch-pc-windows-gnu"
       }
 
-      stage "$stageName: Build"
+      //stage "$stageName: Build"
       withRustEnv {
         sh "cargo build --release --target $arch-pc-windows-gnu"
       }
@@ -92,7 +93,7 @@ done
 """
       }
 
-      stage "$stageName: Installer"
+      //stage "$stageName: Installer"
       sh "7z x -y -otarget/wixsharp/ .jenkins/distrib/WixSharp.1.0.35.0.7z"
       withEnv([
         'WIXSHARP_DIR=Z:$WORKSPACE/target/wixsharp',
