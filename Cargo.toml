@@ -14,6 +14,9 @@ name = "octo_cl"
 name = "octo_clang"
 
 [[bin]]
+name = "octo_coordinator"
+
+[[bin]]
 name = "xgConsole"
 
 [build-dependencies]
@@ -34,3 +37,9 @@ regex = "0.1.69"
 lazy_static = "0.2.1"
 winapi = "0.2.7"
 kernel32-sys = "0.2.2"
+
+log = "*"
+fern = "*"
+daemon = "*"
+iron = "*"
+time = "*"
