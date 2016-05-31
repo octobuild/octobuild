@@ -3,6 +3,7 @@
 ## Unreleased
 
  * Linux: Change default cache location from ~/.cache/.octobuild to ~/.cache/octobuild.
+ * xgConsole: Add file arguments support (fix #13).
 
 ## 0.1.12
 
