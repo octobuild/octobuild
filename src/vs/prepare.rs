@@ -1,5 +1,4 @@
 use std::iter::FromIterator;
-use std::slice::Iter;
 use std::ascii::AsciiExt;
 use std::path::{Path, PathBuf};
 
@@ -13,7 +12,7 @@ enum ParamValue<T> {
 }
 
 pub fn create_task(command: CommandInfo, args: &[String]) -> Result<Option<CompilationTask>, String> {
-	match parse_arguments(args) {
+	match parse_arguments(args.iter()) {
 		Ok(parsed_args) => {
 			// Source file name.
 			let input_source = match find_param(&parsed_args, |arg:&Arg|->Option<PathBuf> {
@@ -139,10 +138,9 @@ fn find_param<T, R, F:Fn(&T) -> Option<R>>(args: &Vec<T>, filter:F) -> ParamValu
 	}
 }
 
-fn parse_arguments(args: &[String]) -> Result<Vec<Arg>, String> {
+fn parse_arguments<S: AsRef<str>, I: Iterator<Item=S>>(mut iter: I) -> Result<Vec<Arg>, String> {
 	let mut result: Vec<Arg> = Vec::new();
 	let mut errors: Vec<String> = Vec::new();
-	let mut iter = args.iter();
 	loop {
 		match parse_argument(&mut iter) {
 			Some(parse_result) => {
@@ -162,17 +160,21 @@ fn parse_arguments(args: &[String]) -> Result<Vec<Arg>, String> {
 	Ok(result)
 }
 
-fn parse_argument(iter: &mut  Iter<String>) -> Option<Result<Arg, String>> {
+fn parse_argument<S: AsRef<str>, I: Iterator<Item=S>>(iter: &mut I) -> Option<Result<Arg, String>> {
 	match iter.next() {
 		Some(arg) => Some(
-			if has_param_prefix(arg) {
-				let flag = &arg[1..];
+			if has_param_prefix(arg.as_ref()) {
+				let flag = &arg.as_ref()[1..];
 				match is_spaceable_param(flag) {
 					Some((prefix, scope)) => {
 						if flag == prefix {
 							match iter.next() {
-								Some(value) if !has_param_prefix(value) => Ok(Arg::Param{scope: scope, flag:prefix.to_string(), value:value.to_string()}),
-								_ => Err(arg.to_string())
+								Some(value) => if !has_param_prefix(value.as_ref()) {
+									Ok(Arg::Param { scope: scope, flag: prefix.to_string(), value: value.as_ref().to_string() })
+								} else {
+									Err(arg.as_ref().to_string())
+								},
+								_ => Err(arg.as_ref().to_string())
 							}
 						} else {
 							Ok(Arg::Param{scope: scope, flag:prefix.to_string(), value:flag[prefix.len()..].to_string()})
@@ -200,12 +202,12 @@ fn parse_argument(iter: &mut  Iter<String>) -> Option<Result<Arg, String>> {
 							s if s.starts_with("Yu") => Ok(Arg::Input{kind:InputKind::Marker, flag:"Yu".to_string(), file:s[2..].to_string()}),
 							s if s.starts_with("Yl") => Ok(Arg::Flag{scope: Scope::Shared, flag:flag.to_string()}),
 							s if s.starts_with("FI") => Ok(Arg::Param{scope: Scope::Preprocessor, flag:"FI".to_string(), value:s[2..].to_string()}),
-							_ => Err(arg.to_string())
+							_ => Err(arg.as_ref().to_string())
 						}
 					}
 				}
 			} else {
-				Ok(Arg::Input{kind:InputKind::Source, flag:String::new(), file:arg.to_string()})
+				Ok(Arg::Input{kind:InputKind::Source, flag:String::new(), file:arg.as_ref().to_string()})
 		}),
 		None => None
 	}
@@ -230,7 +232,7 @@ fn is_spaceable_param(flag: &str) -> Option<(&str, Scope)> {
 	None
 }
 
-fn has_param_prefix(arg: &String) -> bool {
+fn has_param_prefix(arg: &str) -> bool {
 	arg.starts_with("/") || arg.starts_with("-")
 }
 
@@ -239,7 +241,7 @@ fn has_param_prefix(arg: &String) -> bool {
 fn test_parse_argument() {
 	let args = Vec::from_iter("/TP /c /Yusample.h /Fpsample.h.pch /Fosample.cpp.o /DTEST /D TEST2 /arch:AVX sample.cpp".split(" ").map(|x| x.to_string()));
 	assert_eq!(
-		parse_arguments(&args).unwrap(),
+		parse_arguments(args.iter()).unwrap(),
 		[
 			Arg::Param { scope: Scope::Ignore, flag: "T".to_string(), value: "P".to_string()},
 			Arg::Flag { scope: Scope::Ignore, flag: "c".to_string()},
