@@ -1,7 +1,9 @@
 extern crate daemon;
 extern crate iron;
+extern crate router;
 extern crate fern;
 extern crate time;
+extern crate rustc_serialize;
 #[macro_use]
 extern crate log;
 
@@ -10,12 +12,72 @@ use daemon::Daemon;
 use daemon::DaemonRunner;
 use iron::prelude::*;
 use iron::status;
-use std::env;
-use std::fs::OpenOptions;
-use std::io::Error;
-use std::io::Write;
+use router::Router;
+use rustc_serialize::{Decodable, Decoder, Encodable, Encoder};
+use rustc_serialize::json;
+use std::io::Read;
+use std::net::IpAddr;
+use std::net::SocketAddr;
 use std::path::Path;
 use std::sync::mpsc::Receiver;
+use std::sync::{Mutex, Arc};
+
+#[derive(RustcEncodable, RustcDecodable)]
+struct BuilderInfo {
+    pub id: String,
+    pub endpoints: Vec<String>,
+}
+
+struct CoordinatorService {
+    pub builders: Mutex<Vec<BuilderInfo>>,
+}
+
+macro_rules! service_router {
+    ($service:expr,$($method:ident $glob:expr => $handler:ident),+ $(,)*) => ({
+        let mut router = router::Router::new();
+        let service = Arc::new($service);
+        $({
+            let service_clone = service.clone();
+            router.$method($glob, move |r: &mut Request| service_clone.$handler(r) );
+        })*
+        router
+    });
+}
+
+impl CoordinatorService {
+    pub fn new() -> CoordinatorService {
+        let mut builders: Vec<BuilderInfo> = Vec::new();
+        builders.push(BuilderInfo {
+            id: "builder-1".to_string(),
+            endpoints: vec!("127.0.0.1:1234".to_string(), "[::1]:1234".to_string()),
+        });
+        builders.push(BuilderInfo {
+            id: "builder-2".to_string(),
+            endpoints: vec!("127.0.0.2:1234".to_string(), "[::1]:1235".to_string()),
+        });
+        CoordinatorService {
+            builders: Mutex::new(builders),
+        }
+    }
+
+    pub fn rpc_agent_list(&self, _: &mut Request) -> IronResult<Response> {
+        let holder = self.builders.lock().unwrap();
+        let builders: &Vec<BuilderInfo> = &holder;
+        let payload = json::encode(builders).unwrap();
+        Ok(Response::with((status::Ok, payload)))
+    }
+
+    pub fn rpc_agent_updaet(&self, request: &mut Request) -> IronResult<Response> {
+        let mut payload = String::new();
+        request.body.read_to_string(&mut payload).unwrap();
+        let builder: BuilderInfo = json::decode(&payload).unwrap();
+        {
+            let mut holder = self.builders.lock().unwrap();
+            holder.push(builder);
+        }
+        Ok(Response::with((status::Ok, "Foo")))
+    }
+}
 
 fn hello_world(_: &mut Request) -> IronResult<Response> {
     Ok(Response::with((status::Ok, "Hello World!")))
@@ -25,6 +87,7 @@ fn main() {
     let daemon = Daemon {
         name: "octobuild_coordinator".to_string()
     };
+
     daemon.run(move |rx: Receiver<State>| {
         init_logger();
 
@@ -34,7 +97,11 @@ fn main() {
             match signal {
                 State::Start => {
                     info!("Coordinator: Starting on 3000");
-                    web = Some(Iron::new(hello_world).http("localhost:3000").unwrap());
+                    let router = service_router!(CoordinatorService::new(),
+                        get "/rpc/v1/agent/list" => rpc_agent_list,
+                        post "/rpc/v1/agent/update" => rpc_agent_list,
+                    );
+                    web = Some(Iron::new(router).http("localhost:3000").unwrap());
                     info!("Coordinator: Readly");
                 },
                 State::Reload => {
