@@ -12,9 +12,9 @@ use daemon::Daemon;
 use daemon::DaemonRunner;
 use iron::prelude::*;
 use iron::status;
-use router::Router;
 use rustc_serialize::{Decodable, Decoder, Encodable, Encoder};
 use rustc_serialize::json;
+use time::{Duration, Timespec};
 use std::io::Read;
 use std::net::IpAddr;
 use std::net::SocketAddr;
@@ -26,6 +26,7 @@ use std::sync::{Mutex, Arc};
 struct BuilderInfo {
     pub id: String,
     pub endpoints: Vec<String>,
+    pub timeout: i64,
 }
 
 struct CoordinatorService {
@@ -50,10 +51,12 @@ impl CoordinatorService {
         builders.push(BuilderInfo {
             id: "builder-1".to_string(),
             endpoints: vec!("127.0.0.1:1234".to_string(), "[::1]:1234".to_string()),
+            timeout: 0,
         });
         builders.push(BuilderInfo {
             id: "builder-2".to_string(),
             endpoints: vec!("127.0.0.2:1234".to_string(), "[::1]:1235".to_string()),
+            timeout: 0,
         });
         CoordinatorService {
             builders: Mutex::new(builders),
@@ -61,26 +64,26 @@ impl CoordinatorService {
     }
 
     pub fn rpc_agent_list(&self, _: &mut Request) -> IronResult<Response> {
-        let holder = self.builders.lock().unwrap();
-        let builders: &Vec<BuilderInfo> = &holder;
-        let payload = json::encode(builders).unwrap();
-        Ok(Response::with((status::Ok, payload)))
+        let mut holder = self.builders.lock().unwrap();
+        let builders: &mut Vec<BuilderInfo> = &mut holder;
+        let now = time::get_time().sec;
+        builders.retain(|e| e.timeout >= now);
+        Ok(Response::with((status::Ok, json::encode(builders).unwrap())))
     }
 
-    pub fn rpc_agent_updaet(&self, request: &mut Request) -> IronResult<Response> {
+    pub fn rpc_agent_update(&self, request: &mut Request) -> IronResult<Response> {
         let mut payload = String::new();
         request.body.read_to_string(&mut payload).unwrap();
-        let builder: BuilderInfo = json::decode(&payload).unwrap();
+        let mut builder: BuilderInfo = json::decode(&payload).unwrap();
         {
             let mut holder = self.builders.lock().unwrap();
+            holder.retain(|e| e.id != builder.id);
+            builder.timeout = (time::get_time() + Duration::seconds(5)).sec;
+            payload = json::encode(&builder).unwrap();
             holder.push(builder);
         }
-        Ok(Response::with((status::Ok, "Foo")))
+        Ok(Response::with((status::Ok, payload)))
     }
-}
-
-fn hello_world(_: &mut Request) -> IronResult<Response> {
-    Ok(Response::with((status::Ok, "Hello World!")))
 }
 
 fn main() {
@@ -99,7 +102,7 @@ fn main() {
                     info!("Coordinator: Starting on 3000");
                     let router = service_router!(CoordinatorService::new(),
                         get "/rpc/v1/agent/list" => rpc_agent_list,
-                        post "/rpc/v1/agent/update" => rpc_agent_list,
+                        post "/rpc/v1/agent/update" => rpc_agent_update,
                     );
                     web = Some(Iron::new(router).http("localhost:3000").unwrap());
                     info!("Coordinator: Readly");
