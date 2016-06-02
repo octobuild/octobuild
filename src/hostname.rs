@@ -27,12 +27,12 @@ fn get_host_name_native() -> Result<String, ()> {
     }
 }
 
-#[cfg(linux)]
-fn get_host_name() -> Result<String, ()> {
+#[cfg(unix)]
+fn get_host_name_native() -> Result<String, ()> {
     extern crate libc;
 
     extern {
-       pub fn gethostname(name: *mut libc::c_char, size: libc::size_t) -> libc::c_int;
+       fn gethostname(name: *mut libc::c_char, size: libc::size_t) -> libc::c_int;
     }
 
     let mut buf = Vec::<u8>::with_capacity(0x100);

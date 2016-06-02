@@ -1,5 +1,5 @@
 #[cfg(windows)]
 pub use super::windows::*;
 
-#[cfg(linux)]
+#[cfg(unix)]
 pub use super::unix::*;
