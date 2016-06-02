@@ -1,3 +1,5 @@
+extern crate regex;
+
 pub use super::super::compiler::*;
 
 use super::super::cache::Cache;
@@ -12,6 +14,7 @@ use std::io::{Error, Cursor, Write};
 use std::hash::{SipHasher, Hasher};
 use std::path::{Path, PathBuf};
 use std::sync::RwLock;
+use self::regex::bytes::{Regex, NoExpand};
 
 pub struct VsCompiler {
 	cache: Cache,
@@ -52,19 +55,19 @@ impl Compiler for VsCompiler {
 				&Arg::Output{..} => None,
 			}
 		});
-	
+
 		// Add preprocessor paramters.
 		args.push("/nologo".to_string());
 		args.push("/T".to_string() + &task.language);
 		args.push("/E".to_string());
 		args.push("/we4002".to_string()); // C4002: too many actual parameters for macro 'identifier'
 		args.push(task.input_source.display().to_string());
-	
+
 		// Hash data.
 		let mut hash = SipHasher::new();
 		hash.write(&[0]);
 		hash_args(&mut hash, &args);
-	
+
 		let mut command = task.command.to_command();
 		command
 			.args(&args)
@@ -74,7 +77,7 @@ impl Compiler for VsCompiler {
 			let mut content = MemStream::new();
 			if task.input_precompiled.is_some() || task.output_precompiled.is_some() {
 				try! (postprocess::filter_preprocessed(&mut Cursor::new(output.stdout), &mut content, &task.marker_precompiled, task.output_precompiled.is_some()));
-			} else {				
+			} else {
 				try! (content.write(&output.stdout));
 			};
 			content.hash(&mut hash);
@@ -162,7 +165,7 @@ impl Compiler for VsCompiler {
 			match &task.output_precompiled {
 				&Some(ref path) => {command.arg(&join_flag("/Fp", path));}
 				&None => {}
-			}		
+			}
 
 			let temp_file = input_temp.path().file_name()
 				.and_then(|o| o.to_str())
@@ -170,14 +173,15 @@ impl Compiler for VsCompiler {
 				.unwrap_or(b"");
 			command.output().map(|o| OutputInfo {
 				status: o.status.code(),
-				stdout: prepare_output(temp_file, o.stdout),
+				stdout: prepare_output(temp_file, o.stdout, o.status.code() == Some(0)),
 				stderr: o.stderr,
 			})
 		}, || true)
 	}
 }
 
-fn prepare_output(line: &[u8], mut buffer: Vec<u8>) -> Vec<u8> {
+fn prepare_output(line: &[u8], mut buffer: Vec<u8>, success: bool) -> Vec<u8> {
+	// Remove strage file name from output
 	let mut begin = match (line.len() < buffer.len()) && buffer.starts_with(line) && is_eol(buffer[line.len()]) {
 		true => line.len(),
 		false => 0
@@ -185,7 +189,13 @@ fn prepare_output(line: &[u8], mut buffer: Vec<u8>) -> Vec<u8> {
 	while begin < buffer.len() && is_eol(buffer[begin]) {
 		begin += 1;
 	}
-	buffer.split_off(begin)
+	buffer = buffer.split_off(begin);
+	if success {
+		// Remove some redundant lines
+		let re = Regex::new(r"(?m)^\S+[^:]*\(\d+\) : warning C4628: .*$\n?").unwrap();
+		buffer = re.replace_all(&buffer, NoExpand(b""))
+	}
+	buffer
 }
 
 fn is_eol(c: u8) -> bool {
@@ -206,4 +216,55 @@ fn hash_args(hash: &mut Hasher, args: &Vec<String>) {
 
 pub fn join_flag(flag: &str, path: &Path) -> String {
 	flag.to_string() + &path.to_str().unwrap()
+}
+
+
+#[cfg(test)]
+mod test {
+    use std::io::Write;
+
+    fn check_prepare_output(original: &str, expected: &str, line: &str, success: bool) {
+        let mut stream: Vec<u8> = Vec::new();
+        stream.write(&original.as_bytes()[..]).unwrap();
+
+        let result = super::prepare_output(line.as_bytes(), stream, success);
+        assert_eq!(String::from_utf8_lossy(&result), expected);
+    }
+
+    #[test]
+    fn test_prepare_output_simple() {
+        check_prepare_output(
+            r#"BLABLABLA
+foo.c : warning C4411: foo bar
+"#,
+            r#"foo.c : warning C4411: foo bar
+"#, "BLABLABLA", true);
+    }
+
+    #[test]
+    fn test_prepare_output_c4628_remove() {
+        check_prepare_output(
+            r#"BLABLABLA
+foo.c(41) : warning C4411: foo bar
+foo.c(42) : warning C4628: foo bar
+foo.c(43) : warning C4433: foo bar
+"#,
+            r#"foo.c(41) : warning C4411: foo bar
+foo.c(43) : warning C4433: foo bar
+"#, "BLABLABLA", true);
+    }
+
+    #[test]
+    fn test_prepare_output_c4628_keep() {
+        check_prepare_output(
+            r#"BLABLABLA
+foo.c(41) : warning C4411: foo bar
+foo.c(42) : warning C4628: foo bar
+foo.c(43) : warning C4433: foo bar
+"#,
+            r#"foo.c(41) : warning C4411: foo bar
+foo.c(42) : warning C4628: foo bar
+foo.c(43) : warning C4433: foo bar
+"#, "BLABLABLA", false);
+    }
 }
