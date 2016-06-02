@@ -1,10 +1,40 @@
-extern crate libc;
-
-extern {
-    pub fn gethostname(name: *mut libc::c_char, size: libc::size_t) -> libc::c_int;
+pub fn get_host_name() -> Result<String, ()> {
+    get_host_name_native() 
 }
 
-pub fn get_host_name() -> Result<String, ()> {
+#[cfg(windows)]
+fn get_host_name_native() -> Result<String, ()> {
+    extern crate winapi;
+    extern crate kernel32;
+
+    const MAX_COMPUTERNAME_LENGTH: usize = 31;
+
+    let mut buf = Vec::<u16>::with_capacity(MAX_COMPUTERNAME_LENGTH + 1);
+    unsafe {
+        let capacity = buf.capacity();
+        buf.set_len(capacity);
+
+        let mut len: winapi::DWORD = buf.capacity() as winapi::DWORD - 1;
+        if kernel32::GetComputerNameW(buf.as_mut_ptr(), &mut len as *mut winapi::DWORD) == winapi::FALSE
+        {
+            return Err(());
+        }
+        buf.set_len(len as usize);
+    };
+    match String::from_utf16(&buf) {
+        Ok(s) => Ok(s),
+        Err(_) => Err(()),
+    }
+}
+
+#[cfg(linux)]
+fn get_host_name() -> Result<String, ()> {
+    extern crate libc;
+
+    extern {
+       pub fn gethostname(name: *mut libc::c_char, size: libc::size_t) -> libc::c_int;
+    }
+
     let mut buf = Vec::<u8>::with_capacity(0x100);
     unsafe {
         let capacity = buf.capacity();
