@@ -17,6 +17,9 @@ name = "octo_clang"
 name = "octo_coordinator"
 
 [[bin]]
+name = "octo_agent"
+
+[[bin]]
 name = "xgConsole"
 
 [build-dependencies]
@@ -41,7 +44,10 @@ kernel32-sys = "0.2.2"
 log = "*"
 fern = "*"
 daemon = "*"
+hyper = { version = "*", default-features = false, features = [""] }
 iron = "*"
 router = "*"
 time = "*"
 rustc-serialize = "*"
+protobuf = "*"
+mio = "*"
