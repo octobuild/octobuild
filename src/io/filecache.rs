@@ -79,7 +79,7 @@ impl FileCache {
 		}
 	}
 
-	pub fn run_cached<F: Fn()->Result<OutputInfo, Error>, C: Fn()->bool>(&self, file_hasher: &FileHasher, statistic: &RwLock<Statistic>, params: u64, inputs: &Vec<PathBuf>, outputs: &Vec<PathBuf>, worker: F, checker: C) -> Result<OutputInfo, Error> {
+	pub fn run_cached<F: FnOnce()->Result<OutputInfo, Error>, C: Fn()->bool>(&self, file_hasher: &FileHasher, statistic: &RwLock<Statistic>, params: u64, inputs: &Vec<PathBuf>, outputs: &Vec<PathBuf>, worker: F, checker: C) -> Result<OutputInfo, Error> {
 		let hash = try! (self.generate_hash(file_hasher, params, inputs));
 		let path = self.cache_dir.join(&hash[0..2]).join(&(hash[2..].to_string() + SUFFIX));
 		// Try to read data from cache.

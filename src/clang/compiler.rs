@@ -122,21 +122,25 @@ impl Compiler for ClangCompiler {
 		preprocessed.content.hash(&mut hash);
 		hash_args(&mut hash, &args);
 		self.cache.run_file_cached(statistic, hash.finish(), &Vec::new(), &outputs, || -> Result<OutputInfo, Error> {
-			// Run compiler.
-			task.command.to_command()
-				.args(&args)
-				.arg("-".to_string())
-				.arg("-o".to_string())
-				.arg(task.output_object.display().to_string())
-				.stdin(Stdio::piped())
-				.spawn()
-				.and_then(|mut child| {
-					try! (preprocessed.content.copy(child.stdin.as_mut().unwrap()));
-					let _ = preprocessed.content;
-					child.wait_with_output()
-				})
-				.map(|o| OutputInfo::new(o))
+			self.compile_task(&task, preprocessed, args)
 		}, || true)
+	}
+
+	fn compile_task(&self, task: &CompilationTask, preprocessed: PreprocessedSource, args: Vec<String>) -> Result<OutputInfo, Error> {
+		// Run compiler.
+		task.command.to_command()
+		.args(&args)
+		.arg("-".to_string())
+		.arg("-o".to_string())
+		.arg(task.output_object.display().to_string())
+		.stdin(Stdio::piped())
+		.spawn()
+		.and_then(|mut child| {
+			try! (preprocessed.content.copy(child.stdin.as_mut().unwrap()));
+			let _ = preprocessed.content;
+			child.wait_with_output()
+		})
+		.map(|o| OutputInfo::new(o))
 	}
 }
 

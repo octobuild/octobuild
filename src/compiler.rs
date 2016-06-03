@@ -166,6 +166,9 @@ pub trait Compiler {
 
 	// Compile preprocessed file.
 	fn compile_step(&self, task: &CompilationTask, preprocessed: PreprocessedSource, statistic: &RwLock<Statistic>) -> Result<OutputInfo, Error>;
+
+	// Compile preprocessed file.
+	fn compile_task(&self, task: &CompilationTask, preprocessed: PreprocessedSource, args: Vec<String>) -> Result<OutputInfo, Error>;
 	
 	// Run preprocess and compile.
 	fn try_compile(&self, command: CommandInfo, args: &[String], statistic: &RwLock<Statistic>) -> Result<Option<OutputInfo>, Error> {

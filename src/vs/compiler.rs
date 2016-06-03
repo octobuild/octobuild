@@ -145,35 +145,39 @@ impl Compiler for VsCompiler {
 		preprocessed.content.hash(&mut hash);
 		hash_args(&mut hash, &args);
 		self.cache.run_file_cached(statistic, hash.finish(), &inputs, &outputs, || -> Result<OutputInfo, Error> {
-			// Input file path.
-			let input_temp = TempFile::new_in(&self.temp_dir, ".i");
-			try! (File::create(input_temp.path()).and_then(|mut s| preprocessed.content.copy(&mut s)));
-			// Run compiler.
-			let mut command = task.command.to_command();
-			command
-				.args(&args)
-				.arg(input_temp.path().to_str().unwrap())
-				.arg("/c")
-				.arg(&join_flag("/Fo", &task.output_object));
-			match &task.input_precompiled {
-				&Some(ref path) => {command.arg(&join_flag("/Fp", path));}
-				&None => {}
-			}
-			match &task.output_precompiled {
-				&Some(ref path) => {command.arg(&join_flag("/Fp", path));}
-				&None => {}
-			}		
-
-			let temp_file = input_temp.path().file_name()
-				.and_then(|o| o.to_str())
-				.map(|o| o.as_bytes())
-				.unwrap_or(b"");
-			command.output().map(|o| OutputInfo {
-				status: o.status.code(),
-				stdout: prepare_output(temp_file, o.stdout),
-				stderr: o.stderr,
-			})
+			self.compile_task(task, preprocessed, args)
 		}, || true)
+	}
+
+	fn compile_task(&self, task: &CompilationTask, preprocessed: PreprocessedSource, args: Vec<String>) -> Result<OutputInfo, Error> {
+		// Input file path.
+		let input_temp = TempFile::new_in(&self.temp_dir, ".i");
+		try! (File::create(input_temp.path()).and_then(|mut s| preprocessed.content.copy(&mut s)));
+		// Run compiler.
+		let mut command = task.command.to_command();
+		command
+		.args(&args)
+		.arg(input_temp.path().to_str().unwrap())
+		.arg("/c")
+		.arg(&join_flag("/Fo", &task.output_object));
+		match &task.input_precompiled {
+			&Some(ref path) => {command.arg(&join_flag("/Fp", path));}
+			&None => {}
+		}
+		match &task.output_precompiled {
+			&Some(ref path) => {command.arg(&join_flag("/Fp", path));}
+			&None => {}
+		}
+
+		let temp_file = input_temp.path().file_name()
+		.and_then(|o| o.to_str())
+		.map(|o| o.as_bytes())
+		.unwrap_or(b"");
+		command.output().map(|o| OutputInfo {
+			status: o.status.code(),
+			stdout: prepare_output(temp_file, o.stdout),
+			stderr: o.stderr,
+		})
 	}
 }
 
