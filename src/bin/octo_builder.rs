@@ -25,15 +25,15 @@ use std::time::Duration;
 use std::thread;
 use std::thread::JoinHandle;
 
-struct AgentService {
+struct BuilderService {
     done: Arc<AtomicBool>,
     listener: Option<TcpListener>,
     accepter: Option<JoinHandle<()>>,
     anoncer: Option<JoinHandle<()>>,
 }
 
-impl AgentService {
-    fn new() -> AgentService {
+impl BuilderService {
+    fn new() -> BuilderService {
         let addr: SocketAddr = FromStr::from_str("127.0.0.1:0").ok().expect("Failed to parse host:port string");
         let listener = TcpListener::bind(&addr).ok().expect("Failed to bind address");
 
@@ -43,9 +43,9 @@ impl AgentService {
             endpoints: vec!(endpoint),
         });
         let done = Arc::new(AtomicBool::new(false));
-        AgentService {
-            accepter: Some(AgentService::thread_accepter(listener.try_clone().unwrap())),
-            anoncer: Some(AgentService::thread_anoncer(info, done.clone())),
+        BuilderService {
+            accepter: Some(BuilderService::thread_accepter(listener.try_clone().unwrap())),
+            anoncer: Some(BuilderService::thread_anoncer(info, done.clone())),
             done: done,
             listener: Some(listener),
         }
@@ -59,7 +59,7 @@ impl AgentService {
                     Ok(stream) => {
                         thread::spawn(move || {
                             // connection succeeded
-                            AgentService::handle_client(stream)
+                            BuilderService::handle_client(stream)
                         });
                     }
                     Err(e) => { /* connection failed */ }
@@ -73,13 +73,13 @@ impl AgentService {
             let client = Client::new();
             while !done.load(Ordering::Relaxed) {
                 match client
-                .post("http://localhost:3000/rpc/v1/agent/update")
+                .post("http://localhost:3000/rpc/v1/Builder/update")
                 .body(&json::encode(&info).unwrap())
                 .send()
                 {
                     Ok(_) => {}
                     Err(e) => {
-                        info!("Agent: can't send info to coordinator: {}", e.description());
+                        info!("Builder: can't send info to coordinator: {}", e.description());
                     }
                 }
                 thread::sleep(Duration::from_secs(1));
@@ -94,7 +94,7 @@ impl AgentService {
     }
 }
 
-impl Drop for AgentService {
+impl Drop for BuilderService {
     fn drop(&mut self) {
         println!("drop begin");
         self.done.store(true, Ordering::Relaxed);
@@ -118,31 +118,31 @@ fn get_name() -> String {
 
 fn main() {
     let daemon = Daemon {
-        name: "octobuild_agent".to_string()
+        name: "octobuild_Builder".to_string()
     };
 
     daemon.run(move |rx: Receiver<State>| {
         octobuild::utils::init_logger();
 
-        info!("Agent started.");
-        let mut agent = None;
+        info!("Builder started.");
+        let mut Builder = None;
         for signal in rx.iter() {
             match signal {
                 State::Start => {
-                    info!("Agent: Starting");
-                    agent = Some(AgentService::new());
-                    info!("Agent: Readly");
+                    info!("Builder: Starting");
+                    Builder = Some(BuilderService::new());
+                    info!("Builder: Readly");
                 },
                 State::Reload => {
-                    info!("Agent: Reload");
+                    info!("Builder: Reload");
                 }
                 State::Stop => {
-                    info!("Agent: Stoping");
-                    agent.take();
-                    info!("Agent: Stoped");
+                    info!("Builder: Stoping");
+                    Builder.take();
+                    info!("Builder: Stoped");
                 }
             };
         }
-        info!("Agent shutdowned.");
+        info!("Builder shutdowned.");
     }).unwrap();
 }
