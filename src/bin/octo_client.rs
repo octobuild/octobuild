@@ -24,7 +24,9 @@ use std::io;
 use std::io::{Read, Write};
 use std::iter::FromIterator;
 use std::path::Path;
+use std::str::FromStr;
 use std::sync::{Arc, RwLock};
+use std::net::{SocketAddr, TcpStream};
 use std::process;
 
 fn main() {
@@ -41,7 +43,13 @@ fn main() {
 
             let builders: Vec<BuilderInfo> = json::decode(&payload).unwrap();
             let builder = get_random_builder(&builders).unwrap();
-            info!("  builder: {} {}", builder.name, builder.endpoint);
+            info!("Builder: {} {}", builder.name, builder.endpoint);
+            let addr = SocketAddr::from_str(&builder.endpoint).unwrap();
+
+            let mut stream = TcpStream::connect(addr).unwrap();
+            let mut payload = String::new();
+            stream.read_to_string(&mut payload).unwrap();
+            info!("{}", payload);
         }
         Err(e) => {
             info!("Builder: can't send info to coordinator: {}", e.description());
