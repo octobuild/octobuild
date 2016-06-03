@@ -95,8 +95,8 @@ fn main() {
                 State::Start => {
                     info!("Coordinator: Starting on 3000");
                     let router = service_router!(CoordinatorService::new(),
-                        get "/rpc/v1/agent/list" => rpc_agent_list,
-                        post "/rpc/v1/agent/update" => rpc_agent_update,
+                        get "/rpc/v1/builder/list" => rpc_agent_list,
+                        post "/rpc/v1/builder/update" => rpc_agent_update,
                     );
                     web = Some(Iron::new(router).http("localhost:3000").unwrap());
                     info!("Coordinator: Readly");

@@ -73,7 +73,7 @@ impl BuilderService {
             let client = Client::new();
             while !done.load(Ordering::Relaxed) {
                 match client
-                .post("http://localhost:3000/rpc/v1/Builder/update")
+                .post("http://localhost:3000/rpc/v1/builder/update")
                 .body(&json::encode(&info).unwrap())
                 .send()
                 {
