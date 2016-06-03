@@ -8,7 +8,7 @@ extern crate rustc_serialize;
 #[macro_use]
 extern crate log;
 
-use octobuild::cluster::common::{BuilderInfo, BuilderInfoUpdate};
+use octobuild::cluster::common::{BuilderInfo, BuilderInfoUpdate, RPC_BUILDER_LIST, RPC_BUILDER_UPDATE};
 use daemon::State;
 use daemon::Daemon;
 use daemon::DaemonRunner;
@@ -95,8 +95,8 @@ fn main() {
                 State::Start => {
                     info!("Coordinator: Starting on 3000");
                     let router = service_router!(CoordinatorService::new(),
-                        get "/rpc/v1/builder/list" => rpc_agent_list,
-                        post "/rpc/v1/builder/update" => rpc_agent_update,
+                        get RPC_BUILDER_LIST => rpc_agent_list,
+                        post RPC_BUILDER_UPDATE => rpc_agent_update,
                     );
                     web = Some(Iron::new(router).http("localhost:3000").unwrap());
                     info!("Coordinator: Readly");

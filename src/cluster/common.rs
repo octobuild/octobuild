@@ -1,12 +1,15 @@
 use rustc_serialize::{Decoder, Encodable, Encoder};
 use uuid::Uuid;
 
+pub const RPC_BUILDER_UPDATE: &'static str = "/rpc/v1/builder/update";
+pub const RPC_BUILDER_LIST: &'static str = "/rpc/v1/builder/list";
+
 #[derive(RustcEncodable, RustcDecodable)]
 pub struct BuilderInfo {
     // Agent name
     pub name: String,
-    // Agent endpoints
-    pub endpoints: Vec<String>,
+    // Agent endpoint
+    pub endpoint: String,
 }
 
 #[derive(RustcEncodable, RustcDecodable)]

@@ -11,6 +11,9 @@ debug = true
 name = "octo_builder"
 
 [[bin]]
+name = "octo_client"
+
+[[bin]]
 name = "octo_cl"
 
 [[bin]]

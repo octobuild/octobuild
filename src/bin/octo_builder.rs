@@ -7,11 +7,11 @@ extern crate rustc_serialize;
 #[macro_use]
 extern crate log;
 
-use octobuild::cluster::common::{BuilderInfo, BuilderInfoUpdate};
+use octobuild::cluster::common::{BuilderInfo, BuilderInfoUpdate, RPC_BUILDER_UPDATE};
 use daemon::State;
 use daemon::Daemon;
 use daemon::DaemonRunner;
-use hyper::Client;
+use hyper::{Client, Url};
 use rustc_serialize::json;
 use std::error::Error;
 use std::io;
@@ -37,11 +37,11 @@ impl BuilderService {
         let addr: SocketAddr = FromStr::from_str("127.0.0.1:0").ok().expect("Failed to parse host:port string");
         let listener = TcpListener::bind(&addr).ok().expect("Failed to bind address");
 
-        let endpoint = listener.local_addr().unwrap().to_string();
         let info = BuilderInfoUpdate::new(BuilderInfo {
             name: get_name(),
-            endpoints: vec!(endpoint),
+            endpoint: listener.local_addr().unwrap().to_string(),
         });
+
         let done = Arc::new(AtomicBool::new(false));
         BuilderService {
             accepter: Some(BuilderService::thread_accepter(listener.try_clone().unwrap())),
@@ -73,7 +73,7 @@ impl BuilderService {
             let client = Client::new();
             while !done.load(Ordering::Relaxed) {
                 match client
-                .post("http://localhost:3000/rpc/v1/builder/update")
+                .post(Url::parse("http://localhost:3000").unwrap().join(RPC_BUILDER_UPDATE).unwrap())
                 .body(&json::encode(&info).unwrap())
                 .send()
                 {
@@ -125,12 +125,12 @@ fn main() {
         octobuild::utils::init_logger();
 
         info!("Builder started.");
-        let mut Builder = None;
+        let mut builder = None;
         for signal in rx.iter() {
             match signal {
                 State::Start => {
                     info!("Builder: Starting");
-                    Builder = Some(BuilderService::new());
+                    builder = Some(BuilderService::new());
                     info!("Builder: Readly");
                 },
                 State::Reload => {
@@ -138,7 +138,7 @@ fn main() {
                 }
                 State::Stop => {
                     info!("Builder: Stoping");
-                    Builder.take();
+                    builder.take();
                     info!("Builder: Stoped");
                 }
             };
