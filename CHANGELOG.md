@@ -1,6 +1,6 @@
 # Changes
 
-## Unreleased
+## 0.1.13
 
  * Linux: Change default cache location from ~/.cache/.octobuild to ~/.cache/octobuild.
  * xgConsole: Remove redundant C4628 warning from output (fix #12).
