@@ -1,27 +1,21 @@
 pub use super::super::compiler::*;
 
-use super::super::cache::Cache;
 use super::postprocess;
 use super::super::utils::filter;
 use super::super::io::memstream::MemStream;
 use super::super::io::tempfile::TempFile;
-use super::super::io::statistic::Statistic;
 
 use std::fs::File;
 use std::io::{Error, Cursor, Write};
-use std::hash::{SipHasher, Hasher};
 use std::path::{Path, PathBuf};
-use std::sync::RwLock;
 
 pub struct VsCompiler {
-	cache: Cache,
 	temp_dir: PathBuf
 }
 
 impl VsCompiler {
-	pub fn new(cache: &Cache, temp_dir: &Path) -> Self {
+	pub fn new(temp_dir: &Path) -> Self {
 		VsCompiler {
-			cache: cache.clone(),
 			temp_dir: temp_dir.to_path_buf()
 		}
 	}
@@ -59,12 +53,7 @@ impl Compiler for VsCompiler {
 		args.push("/E".to_string());
 		args.push("/we4002".to_string()); // C4002: too many actual parameters for macro 'identifier'
 		args.push(task.input_source.display().to_string());
-	
-		// Hash data.
-		let mut hash = SipHasher::new();
-		hash.write(&[0]);
-		hash_args(&mut hash, &args);
-	
+
 		let mut command = task.command.to_command();
 		command
 			.args(&args)
@@ -77,11 +66,7 @@ impl Compiler for VsCompiler {
 			} else {				
 				try! (content.write(&output.stdout));
 			};
-			content.hash(&mut hash);
-			Ok(PreprocessResult::Success(PreprocessedSource {
-				hash: format!("{:016x}", hash.finish()),
-				content: content,
-			}))
+			Ok(PreprocessResult::Success(content))
 		} else {
 			Ok(PreprocessResult::Failed(OutputInfo{
 				status: output.status.code(),
@@ -92,7 +77,7 @@ impl Compiler for VsCompiler {
 	}
 
 	// Compile preprocessed file.
-	fn compile_step(&self, task: &CompilationTask, preprocessed: PreprocessedSource, statistic: &RwLock<Statistic>) -> Result<OutputInfo, Error> {
+	fn compile_prepare_step(&self, task: CompilationTask, preprocessed: MemStream) -> Result<CompileStep, Error> {
 		let mut args = filter(&task.args, |arg:&Arg|->Option<String> {
 			match arg {
 				&Arg::Flag{ref scope, ref flag} => {
@@ -137,37 +122,28 @@ impl Compiler for VsCompiler {
 		match &task.output_precompiled {
 			&Some(ref path) => {
 				outputs.push(path.clone());
+				args.push(join_flag("/Fp", path));
 			}
 			&None => {}
 		}
-
-		let mut hash = SipHasher::new();
-		preprocessed.content.hash(&mut hash);
-		hash_args(&mut hash, &args);
-		self.cache.run_file_cached(statistic, hash.finish(), &inputs, &outputs, || -> Result<OutputInfo, Error> {
-			self.compile_task(task, preprocessed, args)
-		}, || true)
+		match &task.input_precompiled {
+			&Some(ref path) => {args.push(join_flag("/Fp", path));}
+			&None => {}
+		}
+		Ok(CompileStep::new(task, preprocessed, args, inputs, outputs))
 	}
 
-	fn compile_task(&self, task: &CompilationTask, preprocessed: PreprocessedSource, args: Vec<String>) -> Result<OutputInfo, Error> {
+	fn compile_task(&self, task: CompileStep) -> Result<OutputInfo, Error> {
 		// Input file path.
 		let input_temp = TempFile::new_in(&self.temp_dir, ".i");
-		try! (File::create(input_temp.path()).and_then(|mut s| preprocessed.content.copy(&mut s)));
+		try! (File::create(input_temp.path()).and_then(|mut s| task.preprocessed.copy(&mut s)));
 		// Run compiler.
 		let mut command = task.command.to_command();
 		command
-		.args(&args)
-		.arg(input_temp.path().to_str().unwrap())
 		.arg("/c")
+		.args(&task.args)
+		.arg(input_temp.path().to_str().unwrap())
 		.arg(&join_flag("/Fo", &task.output_object));
-		match &task.input_precompiled {
-			&Some(ref path) => {command.arg(&join_flag("/Fp", path));}
-			&None => {}
-		}
-		match &task.output_precompiled {
-			&Some(ref path) => {command.arg(&join_flag("/Fp", path));}
-			&None => {}
-		}
 
 		let temp_file = input_temp.path().file_name()
 		.and_then(|o| o.to_str())
@@ -199,15 +175,6 @@ fn is_eol(c: u8) -> bool {
 	}
 }
 
-fn hash_args(hash: &mut Hasher, args: &Vec<String>) {
-	hash.write(&[0]);
-	for arg in args.iter() {
-		hash.write_usize(arg.len());
-		hash.write(&arg.as_bytes());
-	}
-	hash.write_isize(-1);
-}
-
-pub fn join_flag(flag: &str, path: &Path) -> String {
+fn join_flag(flag: &str, path: &Path) -> String {
 	flag.to_string() + &path.to_str().unwrap()
 }

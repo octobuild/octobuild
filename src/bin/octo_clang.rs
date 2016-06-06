@@ -32,13 +32,14 @@ fn main() {
 
 fn compile() -> Result<OutputInfo, Error> {
 	let statistic = RwLock::new(Statistic::new());
-	let compiler = ClangCompiler::new(&Cache::new(&try! (Config::new())));
+	let cache = Cache::new(&try! (Config::new()));
+	let compiler = ClangCompiler::new();
 	let args = Vec::from_iter(env::args());
 	let output = try! (compiler.compile(CommandInfo {
 		program: Path::new("clang").to_path_buf(),
 		current_dir: None,
 		env: Arc::new(HashMap::new()),
-	}, &args[1..], &statistic));
+	}, &args[1..], &cache, &statistic));
 
 	try !(io::stdout().write_all(&output.stdout));
 	try !(io::stderr().write_all(&output.stderr));

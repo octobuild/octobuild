@@ -1,27 +1,21 @@
 pub use super::super::compiler::*;
 
-use super::super::cache::Cache;
 use super::super::filter::comments::CommentsRemover;
 use super::super::io::memstream::MemStream;
-use super::super::io::statistic::Statistic;
 
 use std::io;
-use std::io::{Error, Read, Write};
-use std::hash::{SipHasher, Hasher};
-use std::path::{Path, PathBuf};
+use std::io::{Error, Read};
+use std::path::PathBuf;
 use std::process::{Command, Stdio};
 use std::sync::mpsc::{channel, Receiver};
-use std::sync::RwLock;
 use std::thread;
 
 pub struct ClangCompiler {
-	cache: Cache
 }
 
 impl ClangCompiler {
-	pub fn new(cache: &Cache) -> Self {
+	pub fn new() -> Self {
 		ClangCompiler {
-			cache: cache.clone(),
 		}
 	}
 }
@@ -67,20 +61,12 @@ impl Compiler for ClangCompiler {
 		args.push(task.input_source.display().to_string());
 		args.push("-o".to_string());
 		args.push("-".to_string());
-	
-		// Hash data.
-		let mut hash = SipHasher::new();
-		hash.write(&[0]);
-		hash_args(&mut hash, &args);
-	
-		let mut command = task.command.to_command();
-		command
-			.args(&args);
-		execute(command, hash)
+
+		execute(task.command.to_command().args(&args))
 	}
 
 	// Compile preprocessed file.
-	fn compile_step(&self, task: &CompilationTask, preprocessed: PreprocessedSource, statistic: &RwLock<Statistic>) -> Result<OutputInfo, Error> {
+	fn compile_prepare_step(&self, task: CompilationTask, preprocessed: MemStream) -> Result<CompileStep, Error> {
 		let mut args = Vec::new();
 		args.push("-c".to_string());
 		args.push("-x".to_string());
@@ -118,46 +104,28 @@ impl Compiler for ClangCompiler {
 			&None => {}
 		}
 
-		let mut hash = SipHasher::new();
-		preprocessed.content.hash(&mut hash);
-		hash_args(&mut hash, &args);
-		self.cache.run_file_cached(statistic, hash.finish(), &Vec::new(), &outputs, || -> Result<OutputInfo, Error> {
-			self.compile_task(&task, preprocessed, args)
-		}, || true)
+		Ok(CompileStep::new(task, preprocessed, args, Vec::new(), outputs))
 	}
 
-	fn compile_task(&self, task: &CompilationTask, preprocessed: PreprocessedSource, args: Vec<String>) -> Result<OutputInfo, Error> {
+	fn compile_task(&self, task: CompileStep) -> Result<OutputInfo, Error> {
 		// Run compiler.
 		task.command.to_command()
-		.args(&args)
+		.args(&task.args)
 		.arg("-".to_string())
 		.arg("-o".to_string())
 		.arg(task.output_object.display().to_string())
 		.stdin(Stdio::piped())
 		.spawn()
 		.and_then(|mut child| {
-			try! (preprocessed.content.copy(child.stdin.as_mut().unwrap()));
-			let _ = preprocessed.content;
+			try! (task.preprocessed.copy(child.stdin.as_mut().unwrap()));
+			let _ = task.preprocessed;
 			child.wait_with_output()
 		})
 		.map(|o| OutputInfo::new(o))
 	}
 }
 
-fn hash_args(hash: &mut Hasher, args: &Vec<String>) {
-	hash.write(&[0]);
-	for arg in args.iter() {
-		hash.write_usize(arg.len());
-		hash.write(&arg.as_bytes());
-	}
-	hash.write_isize(-1);
-}
-
-pub fn join_flag(flag: &str, path: &Path) -> String {
-	flag.to_string() + &path.to_str().unwrap()
-}
-
-fn execute<H: Hasher>(mut command: Command, mut hash: H) -> Result<PreprocessResult, Error> {
+fn execute(command: &mut Command) -> Result<PreprocessResult, Error> {
 	let mut child = try! (command
 		.stdin(Stdio::piped())
 		.stdout(Stdio::piped())
@@ -197,11 +165,7 @@ fn execute<H: Hasher>(mut command: Command, mut hash: H) -> Result<PreprocessRes
 	let stderr = bytes(rx_err);
 
 	if status.success() {
-		stdout.hash(&mut hash);
-		Ok(PreprocessResult::Success(PreprocessedSource {
-			hash: format!("{:016x}", hash.finish()),
-			content: stdout,
-		}))
+		Ok(PreprocessResult::Success(stdout))
 	} else {
 		Ok(PreprocessResult::Failed(OutputInfo{
 			status: status.code(),

@@ -36,13 +36,14 @@ fn main() {
 fn compile() -> Result<OutputInfo, Error> {
 	let statistic = RwLock::new(Statistic::new());
 	let temp_dir = try! (TempDir::new("octobuild"));
-	let compiler = VsCompiler::new(&Cache::new(&try! (Config::new())), temp_dir.path());
+	let cache = Cache::new(&try! (Config::new()));
+	let compiler = VsCompiler::new(temp_dir.path());
 	let args = Vec::from_iter(env::args());
 	let output = try! (compiler.compile(CommandInfo {
 		program: Path::new("cl.exe").to_path_buf(),
 		current_dir: None,
 		env: Arc::new(HashMap::new()),
-	}, &args[1..], &statistic));
+	}, &args[1..], &cache, &statistic));
 
 	try !(io::stdout().write_all(&output.stdout));
 	try !(io::stderr().write_all(&output.stderr));

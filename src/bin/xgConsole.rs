@@ -240,11 +240,11 @@ fn execute_compiler(cache: &Cache, temp_dir: &Path, task: &BuildTask, args: &[St
 	};
 	let exec = Path::new(&task.exec);
 	if exec.ends_with("cl.exe") {
-		let compiler = VsCompiler::new(cache, temp_dir);
-		compiler.compile(command, args, statistic)
+		let compiler = VsCompiler::new(temp_dir);
+		compiler.compile(command, args, cache, statistic)
 	} else if exec.file_name().map_or(None, |name| name.to_str()).map_or(false, |name| name.starts_with("clang")) {
-		let compiler = ClangCompiler::new(cache);
-		compiler.compile(command, args, statistic)
+		let compiler = ClangCompiler::new();
+		compiler.compile(command, args, cache, statistic)
 	} else {
 		command.to_command()
 			.args(&args)
