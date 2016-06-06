@@ -1,6 +1,8 @@
 # Overview
 
-[![Join the chat at https://gitter.im/bozaro/octobuild](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/bozaro/octobuild?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge) [![Build Status](https://travis-ci.org/bozaro/octobuild.svg?branch=master)](https://travis-ci.org/bozaro/octobuild) [![Build Status](https://builder.bozaro.ru/buildStatus/icon?job=octobuild-win/master)](https://builder.bozaro.ru/job/octobuild-win/branch/master/)
+[![Join the chat at https://gitter.im/bozaro/octobuild](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/bozaro/octobuild?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
+[![Build Status](https://travis-ci.org/bozaro/octobuild.svg?branch=master)](https://travis-ci.org/bozaro/octobuild)
+[![Build Status](https://builder.bozaro.ru/buildStatus/icon?job=octobuild/master)](https://builder.bozaro.ru/job/octobuild/job/master/)
 
 This project allows you to cache the compilation on Unreal Engine building (like ccache).
 
