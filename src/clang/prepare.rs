@@ -2,8 +2,9 @@ use std::iter::FromIterator;
 use std::slice::Iter;
 use std::ascii::AsciiExt;
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
-use super::super::compiler::{Arg, CommandInfo, CompilationTask, Scope, InputKind, OutputKind};
+use super::super::compiler::{Arg, CommandInfo, CompilationTask, Scope, InputKind, OutputKind, Toolchain};
 use super::super::utils::filter;
 
 enum ParamValue<T> {
@@ -12,7 +13,7 @@ enum ParamValue<T> {
 	Many(Vec<T>),
 }
 
-pub fn create_task(command: CommandInfo, args: &[String]) -> Result<Option<CompilationTask>, String> {
+pub fn create_task(toolchain: Arc<Toolchain>, command: CommandInfo, args: &[String]) -> Result<Option<CompilationTask>, String> {
 	if args.iter().find(|v| match v as &str {
 		"--analyze" => true,
 		_ => false,
@@ -113,6 +114,7 @@ pub fn create_task(command: CommandInfo, args: &[String]) -> Result<Option<Compi
 			};
 
 			Ok(Some(CompilationTask{
+				toolchain: toolchain,
 				command: command,
 				args: parsed_args,
 				language: language,

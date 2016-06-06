@@ -10,23 +10,36 @@ use super::super::io::tempfile::TempFile;
 use std::fs::File;
 use std::io::{Error, Cursor, Write};
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 use self::regex::bytes::{Regex, NoExpand};
 
 pub struct VsCompiler {
-	temp_dir: PathBuf
+	toolchain: Arc<Toolchain>,
 }
 
 impl VsCompiler {
 	pub fn new(temp_dir: &Path) -> Self {
 		VsCompiler {
-			temp_dir: temp_dir.to_path_buf()
+			toolchain: Arc::new(VsToolchainLocal::new(temp_dir)),
+		}
+	}
+}
+
+struct VsToolchainLocal {
+	temp_dir: PathBuf,
+}
+
+impl VsToolchainLocal {
+	pub fn new(temp_dir: &Path) -> Self {
+		VsToolchainLocal {
+			temp_dir: temp_dir.to_path_buf(),
 		}
 	}
 }
 
 impl Compiler for VsCompiler {
 	fn create_task(&self, command: CommandInfo, args: &[String]) -> Result<Option<CompilationTask>, String> {
-		super::prepare::create_task(command, args)
+		super::prepare::create_task(self.toolchain.clone(), command, args)
 	}
 
 	fn preprocess_step(&self, task: &CompilationTask) -> Result<PreprocessResult, Error> {
@@ -117,7 +130,7 @@ impl Compiler for VsCompiler {
 	}
 }
 
-impl Toolchain for VsCompiler {
+impl Toolchain for VsToolchainLocal {
 	fn compile_step(&self, task: CompileStep) -> Result<OutputInfo, Error> {
 		// Input file path.
 		let input_temp = TempFile::new_in(&self.temp_dir, ".i");

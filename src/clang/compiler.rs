@@ -6,22 +6,35 @@ use super::super::io::memstream::MemStream;
 use std::io;
 use std::io::{Error, Read};
 use std::process::{Command, Stdio};
+use std::sync::Arc;
 use std::sync::mpsc::{channel, Receiver};
 use std::thread;
 
 pub struct ClangCompiler {
+	toolchain: Arc<Toolchain>,
 }
 
 impl ClangCompiler {
 	pub fn new() -> Self {
 		ClangCompiler {
+			toolchain: Arc::new(ClangToolchainLocal::new())
+		}
+	}
+}
+
+struct ClangToolchainLocal {
+}
+
+impl ClangToolchainLocal {
+	pub fn new() -> Self {
+		ClangToolchainLocal {
 		}
 	}
 }
 
 impl Compiler for ClangCompiler {
 	fn create_task(&self, command: CommandInfo, args: &[String]) -> Result<Option<CompilationTask>, String> {
-		super::prepare::create_task(command, args)
+		super::prepare::create_task(self.toolchain.clone(), command, args)
 	}
 
 	fn preprocess_step(&self, task: &CompilationTask) -> Result<PreprocessResult, Error> {
@@ -97,7 +110,7 @@ impl Compiler for ClangCompiler {
 	}
 }
 
-impl Toolchain for ClangCompiler {
+impl Toolchain for ClangToolchainLocal {
 	fn compile_step(&self, task: CompileStep) -> Result<OutputInfo, Error> {
 		// Run compiler.
 		task.command.to_command()

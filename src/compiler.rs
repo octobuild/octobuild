@@ -128,6 +128,8 @@ impl OutputInfo {
 }
 
 pub struct CompilationTask {
+	// Compilation toolchain.
+	pub toolchain: Arc<Toolchain>,
 	// Original compiler executable.
 	pub command: CommandInfo,
 	// Parsed arguments.
@@ -188,7 +190,7 @@ pub trait Toolchain {
 	fn compile_step(&self, task: CompileStep) -> Result<OutputInfo, Error>;
 }
 
-pub trait Compiler : Toolchain + Sized {
+pub trait Compiler {
 	// Parse compiler arguments.
 	fn create_task(&self, command: CommandInfo, args: &[String]) -> Result<Option<CompilationTask>, String>;
 
@@ -202,11 +204,10 @@ pub trait Compiler : Toolchain + Sized {
 	fn try_compile(&self, command: CommandInfo, args: &[String], cache: &Cache, statistic: &RwLock<Statistic>) -> Result<Option<OutputInfo>, Error> {
 		match self.create_task(command, args) {
 			Ok(Some(task)) => {
+				let toolchain = task.toolchain.clone();
 				match try!(self.preprocess_step(&task)) {
-					PreprocessResult::Success(preprocessed) => match self.compile_prepare_step(task, preprocessed) {
-						Ok(task) => compile_step_cached(task, cache, statistic, self as &Toolchain),
-						Err(e) => Err(e),
-					},
+					PreprocessResult::Success(preprocessed) => self.compile_prepare_step(task, preprocessed)
+					.and_then(|task| compile_step_cached(task, cache, statistic, toolchain)),
 					PreprocessResult::Failed(output) => Ok(output),
 				}.map(|v| Some(v))
 			}
@@ -231,7 +232,7 @@ pub trait Compiler : Toolchain + Sized {
 	}
 }
 
-fn compile_step_cached(task: CompileStep, cache: &Cache, statistic: &RwLock<Statistic>, toolchain: &Toolchain) -> Result<OutputInfo, Error>	{
+fn compile_step_cached(task: CompileStep, cache: &Cache, statistic: &RwLock<Statistic>, toolchain: Arc<Toolchain>) -> Result<OutputInfo, Error>	{
 	let mut hasher = SipHasher::new();
 	// Get hash from preprocessed data
 	task.preprocessed.hash(&mut hasher);
