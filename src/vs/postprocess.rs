@@ -206,30 +206,28 @@ impl <'a> ScannerState<'a> {
 	fn next_line(&mut self) -> Result<&'static [u8], Error> {
 		loop {
 			for i in self.buf_read..self.buf_size {
-				let c = self.buf_data[i];
-				if c | (b'\n' | b'\r') != (b'\n' | b'\r') {
-					continue;
-				}
-				if c == b'\r' {
-					self.buf_read = i + 1;
-					if self.buf_read == self.buf_size {
-						if try! (self.read()) == 0 {
-							return Ok(b"\r");
+				match self.buf_data[i] {
+					b'\r' => {
+						self.buf_read = i + 1;
+						if self.buf_read == self.buf_size {
+							if try!(self.read()) == 0 {
+								return Ok(b"\r");
+							}
 						}
-
+						if self.buf_data[self.buf_read] == b'\n' {
+							self.buf_read += 1;
+							return Ok(b"\r\n");
+						}
+						// end-of-line ::= newline | carriage-return | carriage-return newline
+						return Ok(b"\r");
 					}
-					if self.buf_data[self.buf_read] == b'\n' {
-						self.buf_read += 1;
-						return Ok(b"\r\n");
+					b'\n' => {
+						// end-of-line ::= newline | carriage-return | carriage-return newline
+						self.buf_read = i + 1;
+						return Ok(b"\n");
 					}
-					// end-of-line ::= newline | carriage-return | carriage-return newline
-					return Ok(b"\r");
-
-				}
-				if c == b'\n' {
-					// end-of-line ::= newline | carriage-return | carriage-return newline
-					self.buf_read = i + 1;
-					return Ok(b"\n");
+					_ => {
+					}
 				}
 			}
 			self.buf_read = self.buf_size;

@@ -1,4 +1,4 @@
-﻿$packageName = "Octobuild"
+$packageName = "Octobuild"
 $fileType = "msi"
 $silentArgs = "/quiet ADDLOCAL=ALL"
 $url   = "http://dist.bozaro.ru/windows/octobuild-$version$-i686.msi"

@@ -1,3 +1,5 @@
+extern crate regex;
+
 pub use super::super::compiler::*;
 
 use super::postprocess;
@@ -8,6 +10,7 @@ use super::super::io::tempfile::TempFile;
 use std::fs::File;
 use std::io::{Error, Cursor, Write};
 use std::path::{Path, PathBuf};
+use self::regex::bytes::{Regex, NoExpand};
 
 pub struct VsCompiler {
 	temp_dir: PathBuf
@@ -143,13 +146,14 @@ impl Toolchain for VsCompiler {
 		// Execute.
 		command.output().map(|o| OutputInfo {
 			status: o.status.code(),
-			stdout: prepare_output(temp_file, o.stdout),
+			stdout: prepare_output(temp_file, o.stdout, o.status.code() == Some(0)),
 			stderr: o.stderr,
 		})
 	}
 }
 
-fn prepare_output(line: &[u8], mut buffer: Vec<u8>) -> Vec<u8> {
+fn prepare_output(line: &[u8], mut buffer: Vec<u8>, success: bool) -> Vec<u8> {
+	// Remove strage file name from output
 	let mut begin = match (line.len() < buffer.len()) && buffer.starts_with(line) && is_eol(buffer[line.len()]) {
 		true => line.len(),
 		false => 0
@@ -157,7 +161,13 @@ fn prepare_output(line: &[u8], mut buffer: Vec<u8>) -> Vec<u8> {
 	while begin < buffer.len() && is_eol(buffer[begin]) {
 		begin += 1;
 	}
-	buffer.split_off(begin)
+	buffer = buffer.split_off(begin);
+	if success {
+		// Remove some redundant lines
+		let re = Regex::new(r"(?m)^\S+[^:]*\(\d+\) : warning C4628: .*$\n?").unwrap();
+		buffer = re.replace_all(&buffer, NoExpand(b""))
+	}
+	buffer
 }
 
 fn is_eol(c: u8) -> bool {
@@ -169,4 +179,55 @@ fn is_eol(c: u8) -> bool {
 
 fn join_flag(flag: &str, path: &Path) -> String {
 	flag.to_string() + &path.to_str().unwrap()
+}
+
+
+#[cfg(test)]
+mod test {
+    use std::io::Write;
+
+    fn check_prepare_output(original: &str, expected: &str, line: &str, success: bool) {
+        let mut stream: Vec<u8> = Vec::new();
+        stream.write(&original.as_bytes()[..]).unwrap();
+
+        let result = super::prepare_output(line.as_bytes(), stream, success);
+        assert_eq!(String::from_utf8_lossy(&result), expected);
+    }
+
+    #[test]
+    fn test_prepare_output_simple() {
+        check_prepare_output(
+            r#"BLABLABLA
+foo.c : warning C4411: foo bar
+"#,
+            r#"foo.c : warning C4411: foo bar
+"#, "BLABLABLA", true);
+    }
+
+    #[test]
+    fn test_prepare_output_c4628_remove() {
+        check_prepare_output(
+            r#"BLABLABLA
+foo.c(41) : warning C4411: foo bar
+foo.c(42) : warning C4628: foo bar
+foo.c(43) : warning C4433: foo bar
+"#,
+            r#"foo.c(41) : warning C4411: foo bar
+foo.c(43) : warning C4433: foo bar
+"#, "BLABLABLA", true);
+    }
+
+    #[test]
+    fn test_prepare_output_c4628_keep() {
+        check_prepare_output(
+            r#"BLABLABLA
+foo.c(41) : warning C4411: foo bar
+foo.c(42) : warning C4628: foo bar
+foo.c(43) : warning C4433: foo bar
+"#,
+            r#"foo.c(41) : warning C4411: foo bar
+foo.c(42) : warning C4628: foo bar
+foo.c(43) : warning C4433: foo bar
+"#, "BLABLABLA", false);
+    }
 }

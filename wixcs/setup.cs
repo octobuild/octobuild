@@ -54,14 +54,6 @@ class Script
         }
     }
 
-    static void CreateNuspec(string template, string output, string version)
-    {
-        string content = System.IO.File.ReadAllText(template, Encoding.UTF8);
-        content = content.Replace("$version$", version);
-        System.IO.Directory.CreateDirectory(System.IO.Path.GetDirectoryName(output));
-        System.IO.File.WriteAllText(output, content, Encoding.UTF8);
-    }
-
     static public void Main(string[] args)
     {
         Console.WriteLine("WixSharp version: " + FileVersionInfo.GetVersionInfo(typeof(WixSharp.Project).Assembly.Location).FileVersion);
@@ -137,8 +129,6 @@ class Script
 
         Compiler.BuildMsi(project);
         //Compiler.BuildWxs(project);
-        CreateNuspec(@"choco\octobuild.nuspec", @"target\choco\octobuild.nuspec", version);
-        CreateNuspec(@"choco\tools\chocolateyInstall.ps1", @"target\choco\tools\chocolateyInstall.ps1", version);
     }
 }
 
