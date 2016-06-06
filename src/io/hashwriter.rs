@@ -4,7 +4,7 @@ use std::hash::Hasher;
 pub struct HashWriter<T: Hasher> (T);
 
 impl <T: Hasher> HashWriter<T> {
-	pub fn new(hasher: T) -> HashWriter<T> {
+	pub fn new(hasher: T) -> Self {
 		HashWriter(hasher)
 	}
 

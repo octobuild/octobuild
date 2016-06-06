@@ -43,7 +43,7 @@ macro_rules! service_router {
 }
 
 impl CoordinatorService {
-    pub fn new() -> CoordinatorService {
+    pub fn new() -> Self {
         CoordinatorService {
             builders: Mutex::new(Vec::new()),
         }

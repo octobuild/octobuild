@@ -8,7 +8,7 @@ pub struct Statistic {
 }
 
 impl Statistic {
-	pub fn new() -> Statistic {
+	pub fn new() -> Self {
 		Statistic {
 			hit_count: 0,
 			hit_bytes: 0,

@@ -4,10 +4,10 @@ use std::io::{Error, ErrorKind};
 use std::path::PathBuf;
 use std::sync::{Arc, RwLock};
 use std::process::{Command, Output};
-use std::hash::{SipHasher, Hasher};
+use std::hash::{SipHasher, Hash, Hasher};
 use super::io::memstream::MemStream;
 use super::io::statistic::Statistic;
-use super::cache::Cache;
+use super::cache::{Cache, FileHasher};
 
 #[derive(Debug)]
 pub enum CompilerError {
@@ -111,7 +111,7 @@ pub struct OutputInfo {
 }
 
 impl OutputInfo {
-	pub fn new(output: Output) -> OutputInfo {
+	pub fn new(output: Output) -> Self {
 		OutputInfo {
 			status: output.status.code(),
 			stdout: output.stdout,
@@ -151,10 +151,8 @@ pub struct CompileStep {
 	pub command: CommandInfo,
 	// Compiler arguments.
 	pub args: Vec<String>,
-	// Input files.
-	pub inputs: Vec<PathBuf>,
-	// Output files.
-	pub outputs: Vec<PathBuf>,
+	// Input precompiled header file name.
+	pub input_precompiled: Option<PathBuf>,
 	// Output object file name.
 	pub output_object: PathBuf,
 	// Output precompiled header file name.
@@ -164,15 +162,18 @@ pub struct CompileStep {
 }
 
 impl CompileStep {
-	pub fn new(task: CompilationTask, preprocessed: MemStream, args: Vec<String>, inputs: Vec<PathBuf>, outputs: Vec<PathBuf>) -> CompileStep {
+	pub fn new(task: CompilationTask, preprocessed: MemStream, args: Vec<String>, use_precompiled: bool) -> Self {
+		assert!(use_precompiled || task.input_precompiled.is_none());
 		CompileStep {
 			command: task.command,
 			output_object: task.output_object,
 			output_precompiled: task.output_precompiled,
+			input_precompiled: match use_precompiled {
+				true => task.input_precompiled,
+				false => None,
+			},
 			args: args,
 			preprocessed: preprocessed,
-			inputs: inputs,
-			outputs: outputs,
 		}
 	}
 }
@@ -182,7 +183,12 @@ pub enum PreprocessResult {
 	Failed(OutputInfo)
 }
 
-pub trait Compiler {
+pub trait Toolchain {
+	// Compile preprocessed file.
+	fn compile_step(&self, task: CompileStep) -> Result<OutputInfo, Error>;
+}
+
+pub trait Compiler : Toolchain + Sized {
 	// Parse compiler arguments.
 	fn create_task(&self, command: CommandInfo, args: &[String]) -> Result<Option<CompilationTask>, String>;
 
@@ -192,33 +198,22 @@ pub trait Compiler {
 	// Compile preprocessed file.
 	fn compile_prepare_step(&self, task: CompilationTask, preprocessed: MemStream) -> Result<CompileStep, Error>;
 
-	// Compile preprocessed file.
-	fn compile_task(&self, task: CompileStep) -> Result<OutputInfo, Error>;
-
 	// Run preprocess and compile.
 	fn try_compile(&self, command: CommandInfo, args: &[String], cache: &Cache, statistic: &RwLock<Statistic>) -> Result<Option<OutputInfo>, Error> {
-        match self.create_task(command, args) {
-            Ok(Some(task)) => {
-                match try!(self.preprocess_step(&task)) {
-                    PreprocessResult::Success(preprocessed) => match self.compile_prepare_step(task, preprocessed) {
-                        Ok(task) => {
-                            let mut hash = SipHasher::new();
-                            task.preprocessed.hash(&mut hash);
-                            hash_args(&mut hash, &task.args);
-
-                            cache.run_file_cached(statistic, hash.finish(), &task.inputs.clone(), &task.outputs.clone(), || -> Result<OutputInfo, Error> {
-                                self.compile_task(task)
-                            }, || true)
-                        },
-                        Err(e) => Err(e),
-                    },
-                    PreprocessResult::Failed(output) => Ok(output),
-                }.map(|v| Some(v))
-            }
-            Ok(None) => Ok(None),
-            Err(e) => Err(Error::new(ErrorKind::InvalidInput, CompilerError::InvalidArguments(e)))
-        }
-    }
+		match self.create_task(command, args) {
+			Ok(Some(task)) => {
+				match try!(self.preprocess_step(&task)) {
+					PreprocessResult::Success(preprocessed) => match self.compile_prepare_step(task, preprocessed) {
+						Ok(task) => compile_step_cached(task, cache, statistic, self as &Toolchain),
+						Err(e) => Err(e),
+					},
+					PreprocessResult::Failed(output) => Ok(output),
+				}.map(|v| Some(v))
+			}
+			Ok(None) => Ok(None),
+			Err(e) => Err(Error::new(ErrorKind::InvalidInput, CompilerError::InvalidArguments(e)))
+		}
+	}
 
 	// Run preprocess and compile.
 	fn compile(&self, command: CommandInfo, args: &[String], cache: &Cache, statistic: &RwLock<Statistic>) -> Result<OutputInfo, Error> {
@@ -236,11 +231,42 @@ pub trait Compiler {
 	}
 }
 
-fn hash_args(hash: &mut Hasher, args: &[String]) {
-	hash.write(&[0]);
-	for arg in args.iter() {
-		hash.write_usize(arg.len());
-		hash.write(&arg.as_bytes());
+fn compile_step_cached(task: CompileStep, cache: &Cache, statistic: &RwLock<Statistic>, toolchain: &Toolchain) -> Result<OutputInfo, Error>	{
+	let mut hasher = SipHasher::new();
+	// Get hash from preprocessed data
+	task.preprocessed.hash(&mut hasher);
+	// Hash arguments
+	hasher.write_usize(task.args.len());
+	for arg in task.args.iter() {
+		hash_bytes(&mut hasher, &arg.as_bytes());
 	}
-	hash.write_isize(-1);
+	// Hash input files
+	match task.input_precompiled {
+		Some(ref path) => {
+			hash_bytes(&mut hasher, try!(cache.file_hash(&path)).as_bytes());
+		},
+		None => {
+			hasher.write_usize(0);
+		}
+	}
+	// Store output precompiled flag
+	task.output_precompiled.is_some().hash(&mut hasher);
+
+	// Output files list
+	let mut outputs: Vec<PathBuf> = Vec::new();
+	outputs.push(task.output_object.clone());
+	match task.output_precompiled {
+		Some(ref path) => { outputs.push(path.clone()); }
+		None => {}
+	}
+
+	// Try to get files from cache or run
+	cache.run_file_cached(statistic, hasher.finish(), &outputs, || -> Result<OutputInfo, Error> {
+		toolchain.compile_step(task)
+	}, || true)
+}
+
+fn hash_bytes<H: Hasher>(hasher: &mut H, bytes: &[u8]) {
+	hasher.write_usize(bytes.len());
+	hasher.write(&bytes);
 }

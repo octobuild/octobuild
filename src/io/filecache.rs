@@ -7,13 +7,11 @@ use std::ffi::OsString;
 use std::fs;
 use std::fs::{File, OpenOptions};
 use std::io::{Error, ErrorKind, Read, Write, Seek, SeekFrom};
-use std::hash::{Hasher, SipHasher};
 use std::path::{Path, PathBuf};
 use std::sync::RwLock;
 
 use self::filetime::FileTime;
 
-use super::super::cache::FileHasher;
 use super::super::config::Config;
 use super::super::compiler::OutputInfo;
 use super::super::utils::DEFAULT_BUF_SIZE;
@@ -79,8 +77,8 @@ impl FileCache {
 		}
 	}
 
-	pub fn run_cached<F: FnOnce()->Result<OutputInfo, Error>, C: Fn()->bool>(&self, file_hasher: &FileHasher, statistic: &RwLock<Statistic>, params: u64, inputs: &Vec<PathBuf>, outputs: &Vec<PathBuf>, worker: F, checker: C) -> Result<OutputInfo, Error> {
-		let hash = try! (self.generate_hash(file_hasher, params, inputs));
+	pub fn run_cached<F: FnOnce()->Result<OutputInfo, Error>, C: Fn()->bool>(&self, statistic: &RwLock<Statistic>, hash: u64, outputs: &Vec<PathBuf>, worker: F, checker: C) -> Result<OutputInfo, Error> {
+		let hash = format!("{:016x}", hash);
 		let path = self.cache_dir.join(&hash[0..2]).join(&(hash[2..].to_string() + SUFFIX));
 		// Try to read data from cache.
 		match read_cache(statistic, &path, outputs) {
@@ -107,18 +105,6 @@ impl FileCache {
 			}
 		}
 		Ok(())
-	}
-
-	fn generate_hash(&self, file_hasher: &FileHasher, params: u64, inputs: &Vec<PathBuf>) -> Result<String, Error> {
-		let mut hash = SipHasher::new();
-		// params
-		hash.write_u64(params);
-		// inputs
-		for input in inputs.iter() {
-			let file_hash = try! (file_hasher.file_hash(input));
-			hash.write(file_hash.as_bytes());
-		}
-		Ok(format!("{:016x}", hash.finish()))
 	}
 }
 

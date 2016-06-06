@@ -95,7 +95,9 @@ pub fn create_task(command: CommandInfo, args: &[String]) -> Result<Option<Compi
 				}
 				ParamValue::Single(v) => {
 					match &v[..] {
-						"c" | "c++" => {language = v.clone();}
+						"c" | "c++" => {
+							language = v.clone();
+						}
 						"c-header" | "c++-header" => {
 							// Precompiled headers must build locally
 							return Ok(None);

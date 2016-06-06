@@ -41,10 +41,10 @@ impl Cache {
 		}
 	}
 	
-	pub fn run_file_cached<F: FnOnce()->Result<OutputInfo, Error>, C: Fn()->bool>(&self, statistic: &RwLock<Statistic>, hash: u64, inputs: &Vec<PathBuf>, outputs: &Vec<PathBuf>, worker: F, checker: C) -> Result<OutputInfo, Error> {
-		self.file_cache.run_cached(self, statistic, hash, inputs, outputs, worker, checker)
+	pub fn run_file_cached<F: FnOnce()->Result<OutputInfo, Error>, C: Fn()->bool>(&self, statistic: &RwLock<Statistic>, hash: u64, outputs: &Vec<PathBuf>, worker: F, checker: C) -> Result<OutputInfo, Error> {
+		self.file_cache.run_cached(statistic, hash, outputs, worker, checker)
 	}
-	
+
 	pub fn cleanup(&self) -> Result<(), Error> {
 		self.file_cache.cleanup()
 	}

@@ -33,7 +33,7 @@ struct BuilderService {
 }
 
 impl BuilderService {
-    fn new() -> BuilderService {
+    fn new() -> Self {
         let addr: SocketAddr = FromStr::from_str("127.0.0.1:0").ok().expect("Failed to parse host:port string");
         let listener = TcpListener::bind(&addr).ok().expect("Failed to bind address");
 

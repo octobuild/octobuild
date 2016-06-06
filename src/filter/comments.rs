@@ -31,11 +31,11 @@ pub struct CommentsRemover<R> {
 }
 
 impl<R: Read> CommentsRemover<R> {
-	pub fn new(r: R) -> CommentsRemover<R> {
+	pub fn new(r: R) -> Self {
 		CommentsRemover::new_with_buffer(r, 4096)
 	}
 
-	pub fn new_with_buffer(r: R, buffer_size: usize) -> CommentsRemover<R> {
+	pub fn new_with_buffer(r: R, buffer_size: usize) -> Self {
 		assert!(buffer_size > 0);
 		CommentsRemover {
 			r: r,

@@ -28,7 +28,7 @@ pub struct MemReader<'a> {
 }
 
 impl MemStream {
-	pub fn new() -> MemStream {
+	pub fn new() -> Self {
 		MemStream {
 			size: 0,
 			blocks: VecDeque::new(),

@@ -5,7 +5,6 @@ use super::super::io::memstream::MemStream;
 
 use std::io;
 use std::io::{Error, Read};
-use std::path::PathBuf;
 use std::process::{Command, Stdio};
 use std::sync::mpsc::{channel, Receiver};
 use std::thread;
@@ -35,7 +34,7 @@ impl Compiler for ClangCompiler {
 		// Make parameters list for preprocessing.
 		for arg in task.args.iter() {
 			match arg {
-				&Arg::Flag{ref scope, ref flag} => {
+				&Arg::Flag { ref scope, ref flag } => {
 					match scope {
 						&Scope::Preprocessor | &Scope::Shared => {
 							args.push("-".to_string() + &flag);
@@ -43,7 +42,7 @@ impl Compiler for ClangCompiler {
 						&Scope::Ignore | &Scope::Compiler => {}
 					}
 				}
-				&Arg::Param{ref scope, ref  flag, ref value} => {
+				&Arg::Param { ref scope, ref flag, ref value } => {
 					match scope {
 						&Scope::Preprocessor | &Scope::Shared => {
 							args.push("-".to_string() + &flag);
@@ -52,11 +51,11 @@ impl Compiler for ClangCompiler {
 						&Scope::Ignore | &Scope::Compiler => {}
 					}
 				}
-				&Arg::Input{..} => {}
-				&Arg::Output{..} => {}
+				&Arg::Input { .. } => {}
+				&Arg::Output { .. } => {}
 			};
 		}
-	
+
 		// Add preprocessor paramters.
 		args.push(task.input_source.display().to_string());
 		args.push("-o".to_string());
@@ -73,7 +72,7 @@ impl Compiler for ClangCompiler {
 		args.push(task.language.clone());
 		for arg in task.args.iter() {
 			match arg {
-				&Arg::Flag{ref scope, ref flag} => {
+				&Arg::Flag { ref scope, ref flag } => {
 					match scope {
 						&Scope::Compiler | &Scope::Shared => {
 							args.push("-".to_string() + &flag);
@@ -81,7 +80,7 @@ impl Compiler for ClangCompiler {
 						&Scope::Ignore | &Scope::Preprocessor => {}
 					}
 				}
-				&Arg::Param{ref scope, ref  flag, ref value} => {
+				&Arg::Param { ref scope, ref flag, ref value } => {
 					match scope {
 						&Scope::Compiler | &Scope::Shared => {
 							args.push("-".to_string() + &flag);
@@ -90,24 +89,16 @@ impl Compiler for ClangCompiler {
 						&Scope::Ignore | &Scope::Preprocessor => {}
 					}
 				}
-				&Arg::Input{..} => {}
-				&Arg::Output{..} => {}
+				&Arg::Input { .. } => {}
+				&Arg::Output { .. } => {}
 			};
 		}
-		// Output files.
-		let mut outputs: Vec<PathBuf> = Vec::new();
-		outputs.push(task.output_object.clone());
-		match &task.output_precompiled {
-			&Some(ref path) => {
-				outputs.push(path.clone());
-			}
-			&None => {}
-		}
-
-		Ok(CompileStep::new(task, preprocessed, args, Vec::new(), outputs))
+		Ok(CompileStep::new(task, preprocessed, args, false))
 	}
+}
 
-	fn compile_task(&self, task: CompileStep) -> Result<OutputInfo, Error> {
+impl Toolchain for ClangCompiler {
+	fn compile_step(&self, task: CompileStep) -> Result<OutputInfo, Error> {
 		// Run compiler.
 		task.command.to_command()
 		.args(&task.args)
