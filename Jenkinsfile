@@ -129,8 +129,8 @@ if (TAG_NAME != null) {
   node ('linux') {
     checkout scm
     sh "git reset --hard"
-//    sh "git clean -ffdx"
-	unarchive mapping: ["target/" : "."]
+    sh "git clean -ffdx"
+    unarchive mapping: ["target/" : "."]
 
     stage "Publish: github"
     withEnv([
