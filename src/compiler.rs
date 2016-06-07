@@ -421,23 +421,24 @@ fn fn_find_exec_native(mut path: PathBuf) -> Option<PathBuf> {
 	if path.is_file() {
 		return Some(path.to_path_buf());
 	}
-	let name_with_ext = path.file_name()
-	.map(|n| {
-		let mut name = n.to_os_string();
-		name.push(".exe");
-		name
-	});
-	match name_with_ext {
-		Some(n) => {
-			path.set_file_name(n);
-			if path.is_file() {
-				Some(path)
-			} else {
-				None
-			}
-		},
-		None => None,
+	if path.extension().and_then(|ext| ext.to_str()).map_or(true, |s| s.to_lowercase() != "exe") {
+		let name_with_ext = path.file_name()
+		.map(|n| {
+			let mut name = n.to_os_string();
+			name.push(".exe");
+			name
+		});
+		match name_with_ext {
+			Some(n) => {
+				path.set_file_name(n);
+				if path.is_file() {
+					return Some(path);
+				}
+			},
+			None => {},
+		}
 	}
+	None
 }
 
 #[cfg(unix)]
