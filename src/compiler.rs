@@ -1,5 +1,7 @@
 use std::collections::HashMap;
+use std::collections::hash_map;
 use std::env;
+use std::iter::FromIterator;
 use std::fmt::{Display, Formatter};
 use std::io::{Error, ErrorKind};
 use std::path::{Path, PathBuf};
@@ -79,6 +81,11 @@ pub enum Arg {
 	Output{kind:OutputKind, flag: String, file: String}
 }
 
+#[derive(Debug)]
+pub struct CommandEnv {
+	map: HashMap<String, String>,
+}
+
 #[derive(Clone)]
 #[derive(Debug)]
 pub struct CommandInfo {
@@ -87,7 +94,47 @@ pub struct CommandInfo {
 	// Working directory
 	pub current_dir: Option<PathBuf>,
 	// Environment variables
-	pub env: Arc<HashMap<String, String>>,
+	pub env: Arc<CommandEnv>,
+}
+
+impl CommandEnv {
+	pub fn new() -> Self {
+		CommandEnv {
+			map: HashMap::new(),
+		}
+	}
+
+	pub fn get<K: Into<String>>(&self, key: K) -> Option<&str> {
+		self.map.get(&CommandEnv::normalize_key(key.into())).map(|s| s.as_str())
+	}
+
+	pub fn insert<K: Into<String>, V: Into<String>>(&mut self, key: K, value: V) -> Option<String> {
+		self.map.insert(CommandEnv::normalize_key(key.into()), value.into())
+	}
+
+	pub fn iter(&self) -> hash_map::Iter<String, String> {
+		self.map.iter()
+	}
+
+	#[cfg(unix)]
+	fn normalize_key(key: String) -> String {
+		key.into()
+	}
+
+	#[cfg(windows)]
+	fn normalize_key(key: String) -> String {
+		key.to_uppercase()
+	}
+}
+
+impl FromIterator<(String, String)> for CommandEnv {
+	fn from_iter<T: IntoIterator<Item=(String, String)>>(iter: T) -> Self {
+		let mut result = CommandEnv::new();
+		for (key, value) in iter {
+			result.insert(key, value);
+		}
+		result
+	}
 }
 
 impl CommandInfo {

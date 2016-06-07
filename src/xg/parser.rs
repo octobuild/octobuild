@@ -1,9 +1,11 @@
 extern crate xml;
 extern crate petgraph;
 
-use common::{BuildTask};
 use cmd;
+use common::BuildTask;
+use compiler::CommandEnv;
 
+use std::env;
 use std::fmt::{Display, Formatter};
 use std::io::{Read, Error, ErrorKind};
 use std::collections::{HashSet, HashMap};
@@ -60,7 +62,7 @@ impl ::std::error::Error for XgParseError {
 
 #[derive(Debug)]
 struct XgEnvironment {
-    variables: Arc<HashMap<String, String>>,
+    variables: Arc<CommandEnv>,
     tools: HashMap<String, XgTool>,
 }
 
@@ -145,7 +147,7 @@ fn parse_environments<R: Read>(events: &mut EventReader<R>, envs: &mut HashMap<S
 }
 
 fn parse_environment<R: Read>(events: &mut EventReader<R>) -> Result<XgEnvironment, Error> {
-	let mut variables = HashMap::new();
+	let mut variables = env::vars().collect();
 	let mut tools = HashMap::new();
 	loop {
 		match try! (next_xml_event(events)) {
@@ -166,7 +168,7 @@ fn parse_environment<R: Read>(events: &mut EventReader<R>) -> Result<XgEnvironme
 	})
 }
 
-fn parse_variables<R: Read>(events: &mut EventReader<R>, variables: &mut HashMap<String, String>) -> Result<(), Error> {
+fn parse_variables<R: Read>(events: &mut EventReader<R>, variables: &mut CommandEnv) -> Result<(), Error> {
 	loop {
 		match try! (next_xml_event(events)) {
 			XmlEvent::StartElement {name, attributes, ..} => {
