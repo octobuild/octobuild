@@ -2,39 +2,53 @@ pub use super::super::compiler::*;
 
 use super::super::filter::comments::CommentsRemover;
 use super::super::io::memstream::MemStream;
+use super::super::lazy::Lazy;
+
+use regex::Regex;
 
 use std::io;
 use std::io::{Error, Read};
 use std::process::{Command, Stdio};
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::sync::mpsc::{channel, Receiver};
 use std::thread;
 
 pub struct ClangCompiler {
-	toolchain: Arc<Toolchain>,
+	toolchains: ToolchainHolder,
 }
 
 impl ClangCompiler {
 	pub fn new() -> Self {
 		ClangCompiler {
-			toolchain: Arc::new(ClangToolchainLocal::new())
+			toolchains: ToolchainHolder::new(),
 		}
 	}
 }
 
-struct ClangToolchainLocal {
+struct ClangToolchain {
+	path: PathBuf,
+	identifier: Lazy<Option<String>>,
 }
 
-impl ClangToolchainLocal {
-	pub fn new() -> Self {
-		ClangToolchainLocal {
+impl ClangToolchain {
+	pub fn new(path: PathBuf) -> Self {
+		ClangToolchain {
+			path: path,
+			identifier: Lazy::new(),
 		}
 	}
 }
 
 impl Compiler for ClangCompiler {
+	fn resolve_toolchain(&self, command: &CommandInfo) -> Option<Arc<Toolchain>> {
+		self.toolchains.resolve(command, |path| Arc::new(ClangToolchain::new(path)))
+	}
+
 	fn create_task(&self, command: CommandInfo, args: &[String]) -> Result<Option<CompilationTask>, String> {
-		super::prepare::create_task(self.toolchain.clone(), command, args)
+		self.resolve_toolchain(&command)
+		.ok_or(format!("Can't get toolchain for {}", command.program.display()))
+		.and_then(|toolchain| super::prepare::create_task(toolchain, command, args))
 	}
 
 	fn preprocess_step(&self, task: &CompilationTask) -> Result<PreprocessResult, Error> {
@@ -110,7 +124,11 @@ impl Compiler for ClangCompiler {
 	}
 }
 
-impl Toolchain for ClangToolchainLocal {
+impl Toolchain for ClangToolchain {
+	fn identifier(&self) -> Option<String> {
+		self.identifier.get(|| clang_identifier(&self.path))
+	}
+
 	fn compile_step(&self, task: CompileStep) -> Result<OutputInfo, Error> {
 		// Run compiler.
 		task.command.to_command()
@@ -127,6 +145,25 @@ impl Toolchain for ClangToolchainLocal {
 		})
 		.map(|o| OutputInfo::new(o))
 	}
+}
+
+fn clang_identifier(clang: &Path) -> Option<String> {
+	lazy_static! {
+		static ref RE: Regex = Regex::new(r"^clang.*\((.*)\).*\nTarget:\s*(\S+)").unwrap();
+	}
+
+	Command::new(clang.as_os_str())
+	.arg("--version")
+	.output()
+	.ok()
+	.and_then(|output| 		match output.status.success() {
+			true => Some(String::from_utf8_lossy(&output.stdout).to_string()),
+			false => None,
+	})
+	.and_then(|stdout| 	{
+		RE.captures_iter(&stdout).next()
+		.and_then(|cap | Some(format!("clang {} {}", cap.at(1).unwrap_or(""), cap.at(2).unwrap_or(""))))
+	})
 }
 
 fn execute(command: &mut Command) -> Result<PreprocessResult, Error> {

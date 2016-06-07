@@ -2,11 +2,14 @@ include!(concat!(env!("OUT_DIR"), "/version.rs"));
 
 #[macro_use]
 extern crate log;
+#[macro_use]
+extern crate lazy_static;
 
 extern crate fern;
 extern crate rustc_serialize;
 extern crate time;
 extern crate uuid;
+extern crate regex;
 
 pub const VERSION: &'static str = env!("CARGO_PKG_VERSION");
 
@@ -18,6 +21,7 @@ pub mod common;
 pub mod compiler;
 pub mod config;
 pub mod hostname;
+pub mod lazy;
 pub mod utils;
 pub mod version;
 pub mod io {

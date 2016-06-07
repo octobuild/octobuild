@@ -6,6 +6,7 @@ use super::postprocess;
 use super::super::utils::filter;
 use super::super::io::memstream::MemStream;
 use super::super::io::tempfile::TempFile;
+use super::super::lazy::Lazy;
 
 use std::fs::File;
 use std::io::{Error, Cursor, Write};
@@ -14,32 +15,44 @@ use std::sync::Arc;
 use self::regex::bytes::{Regex, NoExpand};
 
 pub struct VsCompiler {
-	toolchain: Arc<Toolchain>,
+	temp_dir: PathBuf,
+	toolchains: ToolchainHolder,
 }
 
 impl VsCompiler {
 	pub fn new(temp_dir: &Path) -> Self {
 		VsCompiler {
-			toolchain: Arc::new(VsToolchainLocal::new(temp_dir)),
+			temp_dir: temp_dir.to_path_buf(),
+			toolchains: ToolchainHolder::new(),
 		}
 	}
 }
 
-struct VsToolchainLocal {
+struct VsToolchain {
 	temp_dir: PathBuf,
+	path: PathBuf,
+	identifier: Lazy<Option<String>>,
 }
 
-impl VsToolchainLocal {
-	pub fn new(temp_dir: &Path) -> Self {
-		VsToolchainLocal {
-			temp_dir: temp_dir.to_path_buf(),
+impl VsToolchain {
+	pub fn new(path: PathBuf, temp_dir: PathBuf) -> Self {
+		VsToolchain {
+			temp_dir: temp_dir,
+			path: path,
+			identifier: Lazy::new(),
 		}
 	}
 }
 
 impl Compiler for VsCompiler {
+	fn resolve_toolchain(&self, command: &CommandInfo) -> Option<Arc<Toolchain>> {
+		self.toolchains.resolve(command, |path| Arc::new(VsToolchain::new(path, self.temp_dir.clone())))
+	}
+
 	fn create_task(&self, command: CommandInfo, args: &[String]) -> Result<Option<CompilationTask>, String> {
-		super::prepare::create_task(self.toolchain.clone(), command, args)
+		self.resolve_toolchain(&command)
+		.ok_or(format!("Can't get toolchain for {}", command.program.display()))
+		.and_then(|toolchain| super::prepare::create_task(toolchain, command, args))
 	}
 
 	fn preprocess_step(&self, task: &CompilationTask) -> Result<PreprocessResult, Error> {
@@ -130,7 +143,11 @@ impl Compiler for VsCompiler {
 	}
 }
 
-impl Toolchain for VsToolchainLocal {
+impl Toolchain for VsToolchain {
+	fn identifier(&self) -> Option<String> {
+		self.identifier.get(|| vs_identifier(&self.path))
+	}
+
 	fn compile_step(&self, task: CompileStep) -> Result<OutputInfo, Error> {
 		// Input file path.
 		let input_temp = TempFile::new_in(&self.temp_dir, ".i");
@@ -165,6 +182,10 @@ impl Toolchain for VsToolchainLocal {
 	}
 }
 
+fn vs_identifier(clang: &Path) -> Option<String> {
+	panic!("TODO: Not implemented yet")
+}
+
 fn prepare_output(line: &[u8], mut buffer: Vec<u8>, success: bool) -> Vec<u8> {
 	// Remove strage file name from output
 	let mut begin = match (line.len() < buffer.len()) && buffer.starts_with(line) && is_eol(buffer[line.len()]) {
@@ -177,8 +198,10 @@ fn prepare_output(line: &[u8], mut buffer: Vec<u8>, success: bool) -> Vec<u8> {
 	buffer = buffer.split_off(begin);
 	if success {
 		// Remove some redundant lines
-		let re = Regex::new(r"(?m)^\S+[^:]*\(\d+\) : warning C4628: .*$\n?").unwrap();
-		buffer = re.replace_all(&buffer, NoExpand(b""))
+		lazy_static! {
+			static ref RE: Regex = Regex::new(r"(?m)^\S+[^:]*\(\d+\) : warning C4628: .*$\n?").unwrap();
+		}
+		buffer = RE.replace_all(&buffer, NoExpand(b""))
 	}
 	buffer
 }

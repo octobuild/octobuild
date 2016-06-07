@@ -1,7 +1,8 @@
 use std::collections::HashMap;
+use std::env;
 use std::fmt::{Display, Formatter};
 use std::io::{Error, ErrorKind};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::{Arc, RwLock};
 use std::process::{Command, Output};
 use std::hash::{SipHasher, Hash, Hasher};
@@ -90,8 +91,17 @@ pub struct CommandInfo {
 }
 
 impl CommandInfo {
+	pub fn simple(path: &Path) -> Self {
+		CommandInfo {
+			program: path.to_path_buf(),
+			current_dir: env::current_dir().ok(),
+			env: Arc::new(env::vars().collect()),
+		}
+	}
+
 	pub fn to_command(&self) -> Command {
 		let mut command = Command::new(&self.program);
+		command.env_clear();
 		for (key, value) in self.env.iter() {
 			command.env(key.clone(), value.clone());
 		}
@@ -100,6 +110,52 @@ impl CommandInfo {
 			_ => {}
 		};
 		command
+	}
+
+	#[cfg(unix)]
+	pub fn find_executable(&self) -> Option<PathBuf> {
+		self.find_executable_native(false)
+	}
+
+	#[cfg(windows)]
+	pub fn find_executable(&self) -> Option<PathBuf> {
+		self.find_executable_native(true)
+	}
+
+	fn find_executable_native(&self, allow_current_dir: bool) -> Option<PathBuf> {
+		let executable = self.program.clone();
+		// Can't execute directory
+		if executable.file_name().is_none() {
+			return None;
+		}
+		// Check absolute path
+		if executable.is_absolute() {
+			return fn_find_exec(executable);
+		}
+		// Check current catalog
+		if allow_current_dir || executable.parent().map_or(false, |path| path.as_os_str().len() > 0) {
+			match self.current_dir
+			.as_ref()
+			.map(|c| c.join(&executable))
+			.and_then(|c| fn_find_exec(c)) {
+				Some(exe) => { return Some(exe); }
+				None => {},
+			}
+		}
+		// Check path environment variable
+		match self.env.get("PATH")
+		{
+			Some(paths) => {
+				for path in env::split_paths(&paths) {
+					match fn_find_exec(path.join(&executable)) {
+						Some(exe) => { return Some(exe); }
+						None => {}
+					}
+				}
+			}
+			None => {}
+		}
+		None
 	}
 }
 
@@ -186,11 +242,16 @@ pub enum PreprocessResult {
 }
 
 pub trait Toolchain {
+	// Get toolchain identificator.
+	fn identifier(&self) -> Option<String>;
 	// Compile preprocessed file.
 	fn compile_step(&self, task: CompileStep) -> Result<OutputInfo, Error>;
 }
 
 pub trait Compiler {
+	// Resolve toolchain for command execution.
+	fn resolve_toolchain(&self, command: &CommandInfo) -> Option<Arc<Toolchain>>;
+
 	// Parse compiler arguments.
 	fn create_task(&self, command: CommandInfo, args: &[String]) -> Result<Option<CompilationTask>, String>;
 
@@ -232,6 +293,35 @@ pub trait Compiler {
 	}
 }
 
+pub struct ToolchainHolder {
+	toolchains: Arc<RwLock<HashMap<PathBuf, Arc<Toolchain>>>>,
+}
+
+impl ToolchainHolder {
+	pub fn new() -> Self {
+		ToolchainHolder {
+			toolchains: Arc::new(RwLock::new(HashMap::new())),
+		}
+	}
+
+	pub fn resolve<F: FnOnce(PathBuf) -> Arc<Toolchain>>(&self, command: &CommandInfo, factory: F) -> Option<Arc<Toolchain>> {
+		command.find_executable()
+		.and_then(|path| -> Option<Arc<Toolchain>> {
+			{
+				let read_lock = self.toolchains.read().unwrap();
+				match read_lock.get(&path) {
+					Some(t) => { return Some(t.clone()); }
+					None => {}
+				}
+			}
+			{
+				let mut write_lock = self.toolchains.write().unwrap();
+				Some(write_lock.entry(path.clone()).or_insert_with(|| factory(path)).clone())
+			}
+		})
+	}
+}
+
 fn compile_step_cached(task: CompileStep, cache: &Cache, statistic: &RwLock<Statistic>, toolchain: Arc<Toolchain>) -> Result<OutputInfo, Error>	{
 	let mut hasher = SipHasher::new();
 	// Get hash from preprocessed data
@@ -270,4 +360,47 @@ fn compile_step_cached(task: CompileStep, cache: &Cache, statistic: &RwLock<Stat
 fn hash_bytes<H: Hasher>(hasher: &mut H, bytes: &[u8]) {
 	hasher.write_usize(bytes.len());
 	hasher.write(&bytes);
+}
+
+fn fn_find_exec(path: PathBuf) -> Option<PathBuf> {
+	fn_find_exec_native(path).and_then(|path| path.canonicalize().ok())
+}
+
+#[cfg(windows)]
+fn fn_find_exec_native(mut path: PathBuf) -> Option<PathBuf> {
+	if !path.is_absolute() {
+		return None
+	}
+	if path.is_file() {
+		return Some(path.to_path_buf());
+	}
+	let name_with_ext = path.file_name()
+	.map(|n| {
+		let mut name = n.to_os_string();
+		name.push(".exe");
+		name
+	});
+	match name_with_ext {
+		Some(n) => {
+			path.set_file_name(n);
+			if path.is_file() {
+				Some(path)
+			} else {
+				None
+			}
+		},
+		None => None,
+	}
+}
+
+#[cfg(unix)]
+fn fn_find_exec_native(path: PathBuf) -> Option<PathBuf> {
+	use std::os::unix::fs::PermissionsExt;
+	if !path.is_absolute() {
+		return None
+	}
+	match path.metadata() {
+		Ok(ref meta) if meta.is_file() && (meta.permissions().mode() & 0o100 == 0o100) => Some(path),
+		_ => None,
+	}
 }

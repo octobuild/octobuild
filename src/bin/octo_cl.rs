@@ -9,13 +9,12 @@ use octobuild::config::Config;
 
 use tempdir::TempDir;
 
-use std::collections::HashMap;
 use std::env;
 use std::io;
 use std::io::{Error, Write};
 use std::iter::FromIterator;
 use std::path::Path;
-use std::sync::{Arc, RwLock};
+use std::sync::{RwLock};
 use std::process;
 
 fn main() {
@@ -39,11 +38,8 @@ fn compile() -> Result<OutputInfo, Error> {
 	let cache = Cache::new(&try! (Config::new()));
 	let compiler = VsCompiler::new(temp_dir.path());
 	let args = Vec::from_iter(env::args());
-	let output = try! (compiler.compile(CommandInfo {
-		program: Path::new("cl.exe").to_path_buf(),
-		current_dir: None,
-		env: Arc::new(HashMap::new()),
-	}, &args[1..], &cache, &statistic));
+	let command_info = CommandInfo::simple(Path::new("cl.exe"));
+	let output = try! (compiler.compile(command_info, &args[1..], &cache, &statistic));
 
 	try !(io::stdout().write_all(&output.stdout));
 	try !(io::stderr().write_all(&output.stderr));

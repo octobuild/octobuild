@@ -18,7 +18,7 @@ use rustc_serialize::json;
 use time::{Timespec, Duration};
 use std::io::Read;
 use std::sync::mpsc::Receiver;
-use std::sync::{Mutex, Arc};
+use std::sync::{Arc, RwLock};
 
 struct BuilderState {
     pub guid: String,
@@ -27,7 +27,7 @@ struct BuilderState {
 }
 
 struct CoordinatorService {
-    pub builders: Mutex<Vec<BuilderState>>,
+    pub builders: RwLock<Vec<BuilderState>>,
 }
 
 macro_rules! service_router {
@@ -45,12 +45,12 @@ macro_rules! service_router {
 impl CoordinatorService {
     pub fn new() -> Self {
         CoordinatorService {
-            builders: Mutex::new(Vec::new()),
+            builders: RwLock::new(Vec::new()),
         }
     }
 
     pub fn rpc_agent_list(&self, _: &mut Request) -> IronResult<Response> {
-        let holder = self.builders.lock().unwrap();
+        let holder = self.builders.read().unwrap();
         let now = time::get_time();
         let builders: Vec<&BuilderInfo> = holder.iter()
             .filter_map(|e| match e.timeout >= now {
@@ -66,7 +66,7 @@ impl CoordinatorService {
         request.body.read_to_string(&mut payload).unwrap();
         let update: BuilderInfoUpdate = json::decode(&payload).unwrap();
         {
-            let mut holder = self.builders.lock().unwrap();
+            let mut holder = self.builders.write().unwrap();
             let now = time::get_time();
             holder.retain(|e| (e.guid != update.guid) && (e.timeout >= now));
             payload = json::encode(&update.info).unwrap();
