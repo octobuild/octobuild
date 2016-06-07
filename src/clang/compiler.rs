@@ -42,7 +42,11 @@ impl ClangToolchain {
 
 impl Compiler for ClangCompiler {
 	fn resolve_toolchain(&self, command: &CommandInfo) -> Option<Arc<Toolchain>> {
-		self.toolchains.resolve(command, |path| Arc::new(ClangToolchain::new(path)))
+		if command.program.file_name().and_then(|n| n.to_str()).map_or(false, |n| n.starts_with("clang")) {
+			self.toolchains.resolve(command, |path| Arc::new(ClangToolchain::new(path)))
+		} else {
+			None
+		}
 	}
 
 	fn create_task(&self, command: CommandInfo, args: &[String]) -> Result<Option<CompilationTask>, String> {

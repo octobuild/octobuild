@@ -45,6 +45,12 @@ struct ResultMessage {
 	result: Result<OutputInfo, Error>
 }
 
+struct ExecutorState {
+	cache: Cache,
+	statistic: RwLock<Statistic>,
+	compilers: Vec<Box<Compiler + Send + Sync>>,
+}
+
 fn main() {
 	println!("xgConsole ({}):", version::full_version());
 	let args = Vec::from_iter(env::args());
@@ -139,10 +145,16 @@ fn expand_files(mut files: Vec<PathBuf>, arg: &str) -> Vec<PathBuf> {
 }
 
 fn execute(args: &[String]) -> Result<Option<i32>, Error> {
-	let statistic = Arc::new(RwLock::new(Statistic::new()));
-	let config = try! (Config::new());
-	let cache = Cache::new(&config);
-	let temp_dir = try! (TempDir::new("octobuild"));
+	let config = try!(Config::new());
+	let temp_dir = try!(TempDir::new("octobuild"));
+	let state = Arc::new(ExecutorState {
+		statistic: RwLock::new(Statistic::new()),
+		cache: Cache::new(&config),
+		compilers: vec!(
+			Box::new(VsCompiler::new(temp_dir.path())),
+			Box::new(ClangCompiler::new()),
+		),
+	});
 	let files = args.iter().filter(|a| !is_flag(a)).fold(Vec::new(), |state, a| expand_files(state, &a));
 	if files.len() == 0 {
 		return Err(Error::new(ErrorKind::InvalidInput, "Build task files not found"));
@@ -150,25 +162,23 @@ fn execute(args: &[String]) -> Result<Option<i32>, Error> {
 
 	let mut graph = Graph::new();
 	for arg in files.iter() {
-		let file = try! (File::open(&Path::new(arg)));
-		try! (xg::parser::parse(&mut graph, BufReader::new(file)));
+		let file = try!(File::open(&Path::new(arg)));
+		try!(xg::parser::parse(&mut graph, BufReader::new(file)));
 	}
-	let validated_graph = try! (validate_graph(graph));
+	let validated_graph = try!(validate_graph(graph));
 
 	let (tx_result, rx_result): (Sender<ResultMessage>, Receiver<ResultMessage>) = channel();
 	let (tx_task, rx_task): (Sender<TaskMessage>, Receiver<TaskMessage>) = channel();
 	let mutex_rx_task = create_threads(rx_task, tx_result, config.process_limit, |worker_id:usize| {
-		let temp_path = temp_dir.path().to_path_buf();
-		let temp_cache = cache.clone();
-		let temp_statistic = statistic.clone();
+		let state_clone = state.clone();
 		move |task:TaskMessage| -> ResultMessage {
-			execute_task(&temp_cache, &temp_path, worker_id, task, &temp_statistic)
+			execute_task(&state_clone, worker_id, task)
 		}
 	});
 
 	let result = execute_graph(&validated_graph, tx_task, mutex_rx_task, rx_result);
-	let _ = cache.cleanup();
-	println!("{}", statistic.read().unwrap().to_string());
+	let _ = state.cache.cleanup();
+	println!("{}", state.statistic.read().unwrap().to_string());
 	result
 }
 
@@ -221,9 +231,9 @@ fn validate_graph(graph: Graph<BuildTask, ()>) -> Result<Graph<BuildTask, ()>, E
 	Err(Error::new(ErrorKind::InvalidInput, "Found cycles in build dependencies"))
 }
 
-fn execute_task(cache: &Cache, temp_dir: &Path, worker: usize, message: TaskMessage, statistic: &RwLock<Statistic>) -> ResultMessage {
-	let args = expand_args(&message.task.args, &|name:&str|->Option<String>{env::var(name).ok()});
-	let output = execute_compiler(cache, temp_dir, &message.task, &args, statistic);
+fn execute_task(state: &ExecutorState, worker: usize, message: TaskMessage) -> ResultMessage {
+	let args = expand_args(&message.task.args, &|name: &str| -> Option<String>{ env::var(name).ok() });
+	let output = execute_compiler(state, &message.task, &args);
 	ResultMessage {
 		index: message.index,
 		task: message.task,
@@ -232,25 +242,21 @@ fn execute_task(cache: &Cache, temp_dir: &Path, worker: usize, message: TaskMess
 	}
 }
 
-fn execute_compiler(cache: &Cache, temp_dir: &Path, task: &BuildTask, args: &[String], statistic: &RwLock<Statistic>) -> Result<OutputInfo, Error> {
+fn execute_compiler(state: &ExecutorState, task: &BuildTask, args: &[String]) -> Result<OutputInfo, Error> {
 	let command = CommandInfo {
 		program: Path::new(&task.exec).to_path_buf(),
 		current_dir: Some(Path::new(&task.working_dir).to_path_buf()),
 		env: task.env.clone(),
 	};
-	let exec = Path::new(&task.exec);
-	if exec.ends_with("cl.exe") {
-		let compiler = VsCompiler::new(temp_dir);
-		compiler.compile(command, args, cache, statistic)
-	} else if exec.file_name().map_or(None, |name| name.to_str()).map_or(false, |name| name.starts_with("clang")) {
-		let compiler = ClangCompiler::new();
-		compiler.compile(command, args, cache, statistic)
-	} else {
-		command.to_command()
-			.args(&args)
-			.output()
-			.map(|o| OutputInfo::new(o))
+	for compiler in state.compilers.iter() {
+		if compiler.resolve_toolchain(&command).is_some() {
+			return compiler.compile(command, args, &state.cache, &state.statistic);
+		}
 	}
+	command.to_command()
+	.args(&args)
+	.output()
+	.map(|o| OutputInfo::new(o))
 }
 
 fn execute_graph(graph: &Graph<BuildTask, ()>, tx_task: Sender<TaskMessage>, mutex_rx_task: Arc<Mutex<Receiver<TaskMessage>>>, rx_result: Receiver<ResultMessage>) -> Result<Option<i32>, Error> {

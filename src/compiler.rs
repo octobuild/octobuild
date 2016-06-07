@@ -341,7 +341,7 @@ pub trait Compiler {
 }
 
 pub struct ToolchainHolder {
-	toolchains: Arc<RwLock<HashMap<PathBuf, Arc<Toolchain>>>>,
+	toolchains: Arc<RwLock<HashMap<PathBuf, Arc<Toolchain + Send + Sync>>>>,
 }
 
 impl ToolchainHolder {
@@ -351,7 +351,7 @@ impl ToolchainHolder {
 		}
 	}
 
-	pub fn resolve<F: FnOnce(PathBuf) -> Arc<Toolchain>>(&self, command: &CommandInfo, factory: F) -> Option<Arc<Toolchain>> {
+	pub fn resolve<F: FnOnce(PathBuf) -> Arc<Toolchain + Send + Sync>>(&self, command: &CommandInfo, factory: F) -> Option<Arc<Toolchain>> {
 		command.find_executable()
 		.and_then(|path| -> Option<Arc<Toolchain>> {
 			{
