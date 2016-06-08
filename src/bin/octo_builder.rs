@@ -53,11 +53,18 @@ impl BuilderService {
             compiler.discovery()
         }
 
+        let toolchains: Vec<String> = compilers.iter().flat_map(|c| c.toolchains()).filter_map(|t| t.identifier()).collect();
+
+        info!("Found toolchains:");
+        for toolchain in toolchains.iter() {
+            info!("- {}", toolchain);
+        }
+
         let info = BuilderInfoUpdate::new(BuilderInfo {
             name: get_name(),
             version: version::short_version(),
             endpoint: listener.local_addr().unwrap().to_string(),
-            toolchains: compilers.iter().flat_map(|c| c.toolchains()).filter_map(|t| t.identifier()).collect(),
+            toolchains: toolchains,
         });
 
         let done = Arc::new(AtomicBool::new(false));

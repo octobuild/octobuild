@@ -1,4 +1,6 @@
 extern crate regex;
+#[cfg(windows)]
+extern crate winreg;
 
 pub use super::super::compiler::*;
 
@@ -57,8 +59,36 @@ impl Compiler for VsCompiler {
 		self.toolchains.to_vec()
 	}
 
+	#[cfg(unix)]
 	fn discovery(&mut self) {
+	}
 
+	#[cfg(windows)]
+	fn discovery(&mut self) {
+		use self::winreg::RegKey;
+		use self::winreg::enums::*;
+
+		lazy_static!{
+			static ref RE:self::regex::Regex = self::regex::Regex::new(r"^\d+\.\d+$").unwrap();
+		}
+
+		for reg_path in vec!["SOFTWARE\\Wow6432Node\\Microsoft\\VisualStudio\\SxS\\VC7", "SOFTWARE\\Microsoft\\VisualStudio\\SxS\\VC7"] {
+			let paths = RegKey::predef(HKEY_LOCAL_MACHINE)
+			.open_subkey_with_flags(reg_path, KEY_READ)
+			.ok()
+			.map(|key| -> Vec<String> {
+				key.enum_values()
+				.filter_map(|x| x.ok())
+				.map(|(name, _)| name)
+				.filter(|name| RE.is_match(name))
+				.filter_map(|name| -> Option<String> { key.get_value(name).ok() })
+				.collect()
+			})
+			.unwrap_or_else(|| Vec::new());
+			for path in paths.iter().map(|path| Path::new(path).join("bin/cl.exe")) {
+				self.toolchains.resolve(&path, |path| Arc::new(VsToolchain::new(path, self.temp_dir.clone())));
+			}
+		}
 	}
 
 	fn create_task(&self, command: CommandInfo, args: &[String]) -> Result<Option<CompilationTask>, String> {
@@ -194,8 +224,73 @@ impl Toolchain for VsToolchain {
 	}
 }
 
+#[cfg(unix)]
 fn vs_identifier(clang: &Path) -> Option<String> {
-	panic!("TODO: Not implemented yet")
+	None
+}
+
+#[cfg(windows)]
+fn vs_identifier(path: &Path) -> Option<String> {
+	//extern crate winapi;
+	extern crate kernel32;
+	extern crate version;
+
+	use winapi::*;
+	use std::convert::Into;
+	use std::ffi::OsStr;
+	use std::ptr;
+	use std::slice;
+	use std::os::windows::ffi::OsStrExt;
+
+	#[repr(C)]
+	struct LANGANDCODEPAGE {
+		language: WORD,
+		codepage: WORD,
+	};
+
+	fn utf16<'a, T: Into<&'a OsStr>>(value: T) -> Vec<u16> {
+		value.into().encode_wide().chain(Some(0).into_iter()).collect()
+	};
+
+	let path_raw = utf16(path.as_os_str());
+	// Get version info size
+	let size = unsafe {
+		version::GetFileVersionInfoSizeW(path_raw.as_ptr(), ptr::null_mut())
+	};
+	if size == 0 {
+		return None;
+	}
+	// Load version info
+	let mut data: Vec<u8> = Vec::with_capacity(size as usize);
+	unsafe {
+		data.set_len(size as usize);
+		if version::GetFileVersionInfoW(path_raw.as_ptr(), 0, size, data.as_mut_ptr() as *mut c_void) == 0 {
+			return None;
+		}
+	}
+	// Read translation
+	let translation_key = unsafe {
+		let mut value_size: DWORD = 0;
+		let mut value_data: LPVOID = ptr::null_mut();
+		if version::VerQueryValueW(data.as_ptr() as LPCVOID, utf16(OsStr::new("\\VarFileInfo\\Translation")).as_ptr(), &mut value_data, &mut value_size) == 0 {
+			return None;
+		}
+		let codepage = value_data as *const LANGANDCODEPAGE;
+		format!("\\StringFileInfo\\{:04X}{:04X}", (*codepage).language, (*codepage).codepage)
+	};
+	// Read product version
+	let product_version = unsafe {
+		let mut value_size: DWORD = 0;
+		let mut value_data: LPVOID = ptr::null_mut();
+		if version::VerQueryValueW(data.as_ptr() as LPCVOID, utf16(OsStr::new(&(translation_key + "\\ProductVersion"))).as_ptr(), &mut value_data, &mut value_size) == 0 {
+			return None;
+		}
+		if value_size == 0 {
+			return None;
+		}
+		String::from_utf16_lossy(slice::from_raw_parts(value_data as *mut u16, (value_size - 1) as usize))
+	};
+	Some("cl ".to_string() + &product_version)
 }
 
 fn prepare_output(line: &[u8], mut buffer: Vec<u8>, success: bool) -> Vec<u8> {

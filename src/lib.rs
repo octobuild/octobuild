@@ -10,6 +10,8 @@ extern crate rustc_serialize;
 extern crate time;
 extern crate uuid;
 extern crate regex;
+#[cfg(windows)]
+extern crate winapi;
 
 pub const VERSION: &'static str = env!("CARGO_PKG_VERSION");
 
