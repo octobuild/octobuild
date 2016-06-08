@@ -225,7 +225,7 @@ impl Toolchain for VsToolchain {
 }
 
 #[cfg(unix)]
-fn vs_identifier(clang: &Path) -> Option<String> {
+fn vs_identifier(_: &Path) -> Option<String> {
 	None
 }
 
