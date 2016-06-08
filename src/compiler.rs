@@ -299,11 +299,8 @@ pub trait Compiler: Send + Sync {
 	// Resolve toolchain for command execution.
 	fn resolve_toolchain(&self, command: &CommandInfo) -> Option<Arc<Toolchain>>;
 
-	// Return toolchain iterator.
-	fn toolchains(&self) -> Vec<Arc<Toolchain>>;
-
 	// Discovery local toolchains.
-	fn discovery(&mut self);
+	fn discovery_toolchains(&self) -> Vec<Arc<Toolchain>>;
 
 	// Parse compiler arguments.
 	fn create_task(&self, command: CommandInfo, args: &[String]) -> Result<Option<CompilationTask>, String>;

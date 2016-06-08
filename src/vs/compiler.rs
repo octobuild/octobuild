@@ -55,40 +55,36 @@ impl Compiler for VsCompiler {
 		}
 	}
 
-	fn toolchains(&self) -> Vec<Arc<Toolchain>> {
-		self.toolchains.to_vec()
-	}
-
 	#[cfg(unix)]
-	fn discovery(&mut self) {
+	fn discovery_toolchains(&self) -> Vec<Arc<Toolchain>> {
+		Vec::new()
 	}
 
 	#[cfg(windows)]
-	fn discovery(&mut self) {
+	fn discovery_toolchains(&self) -> Vec<Arc<Toolchain>> {
 		use self::winreg::RegKey;
 		use self::winreg::enums::*;
+		use std::ffi::OsString;
 
 		lazy_static!{
 			static ref RE:self::regex::Regex = self::regex::Regex::new(r"^\d+\.\d+$").unwrap();
 		}
-
-		for reg_path in vec!["SOFTWARE\\Wow6432Node\\Microsoft\\VisualStudio\\SxS\\VC7", "SOFTWARE\\Microsoft\\VisualStudio\\SxS\\VC7"] {
-			let paths = RegKey::predef(HKEY_LOCAL_MACHINE)
-			.open_subkey_with_flags(reg_path, KEY_READ)
-			.ok()
-			.map(|key| -> Vec<String> {
-				key.enum_values()
-				.filter_map(|x| x.ok())
-				.map(|(name, _)| name)
-				.filter(|name| RE.is_match(name))
-				.filter_map(|name| -> Option<String> { key.get_value(name).ok() })
-				.collect()
-			})
-			.unwrap_or_else(|| Vec::new());
-			for path in paths.iter().map(|path| Path::new(path).join("bin/cl.exe")) {
-				self.toolchains.resolve(&path, |path| Arc::new(VsToolchain::new(path, self.temp_dir.clone())));
-			}
-		}
+		vec!["SOFTWARE\\Wow6432Node\\Microsoft\\VisualStudio\\SxS\\VC7", "SOFTWARE\\Microsoft\\VisualStudio\\SxS\\VC7"]
+		.iter()
+		.filter_map(|reg_path| RegKey::predef(HKEY_LOCAL_MACHINE).open_subkey_with_flags(reg_path, KEY_READ).ok())
+		.flat_map(|key| -> Vec<OsString> {
+			key.enum_values()
+			.filter_map(|x| x.ok())
+			.map(|(name, _)| name)
+			.filter(|name| RE.is_match(&name))
+			.filter_map(|name: String| -> Option<OsString> { key.get_value(name).ok() })
+			.collect()
+		})
+		.map(|path| -> Arc<Toolchain> {
+			Arc::new(VsToolchain::new(Path::new(&path).join("bin/cl.exe"), self.temp_dir.clone()))
+		})
+		.filter(|toolchain| toolchain.identifier().is_some())
+		.collect()
 	}
 
 	fn create_task(&self, command: CommandInfo, args: &[String]) -> Result<Option<CompilationTask>, String> {

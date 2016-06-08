@@ -8,7 +8,6 @@ use regex;
 use regex::Regex;
 
 use std::env;
-use std::fs::DirEntry;
 use std::io;
 use std::io::{Error, Read};
 use std::process::{Command, Stdio};
@@ -29,18 +28,6 @@ impl ClangCompiler {
 	pub fn new() -> Self {
 		ClangCompiler {
 			toolchains: ToolchainHolder::new(),
-		}
-	}
-
-	fn discovery_at(&mut self, path: &Path) {
-		if !path.is_absolute() { return; }
-		match path.read_dir().map(|dir| -> Vec<DirEntry> { dir.filter_map(|item| item.ok()).collect() }) {
-			Ok(items) => {
-				for item in items.iter().filter(|i| RE_CLANG.is_match(i.file_name().to_string_lossy().as_bytes())) {
-					self.toolchains.resolve(&item.path(), |path| Arc::new(ClangToolchain::new(path)));
-				}
-			},
-			Err(_) => {},
 		}
 	}
 }
@@ -68,20 +55,17 @@ impl Compiler for ClangCompiler {
 		}
 	}
 
-	fn toolchains(&self) -> Vec<Arc<Toolchain>> {
-		self.toolchains.to_vec()
-	}
-
-	fn discovery(&mut self) {
-		match env::var_os("PATH") {
-			Some(paths) => {
-				for path in env::split_paths(&paths) {
-					self.discovery_at(&path);
-				}
-			},
-			None => {
-			},
-		}
+	fn discovery_toolchains(&self) -> Vec<Arc<Toolchain>> {
+		env::var_os("PATH")
+		.map_or(Vec::new(), |paths| env::split_paths(&paths).collect())
+		.iter()
+		.filter(|path| path.is_absolute())
+		.filter_map(|path| path.read_dir().ok())
+		.flat_map(|read_dir| read_dir)
+		.filter_map(|entry| entry.ok())
+		.filter(|entry| RE_CLANG.is_match(entry.file_name().to_string_lossy().as_bytes()))
+		.map(|entry| -> Arc<Toolchain> { Arc::new(ClangToolchain::new(entry.path())) })
+		.collect()
 	}
 
 	fn create_task(&self, command: CommandInfo, args: &[String]) -> Result<Option<CompilationTask>, String> {

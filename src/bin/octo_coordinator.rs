@@ -99,7 +99,7 @@ fn main() {
                         post RPC_BUILDER_UPDATE => rpc_agent_update,
                     );
                     web = Some(Iron::new(router).http("localhost:3000").unwrap());
-                    info!("Coordinator: Readly");
+                    info!("Coordinator: Ready");
                 },
                 State::Reload => {
                     info!("Coordinator: Reload");

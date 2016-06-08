@@ -19,9 +19,11 @@ use daemon::DaemonRunner;
 use hyper::{Client, Url};
 use rustc_serialize::json;
 use tempdir::TempDir;
+use std::collections::HashMap;
 use std::error::Error;
 use std::io;
 use std::io::{Read, Write};
+use std::iter::FromIterator;
 use std::net::{SocketAddr, TcpListener, TcpStream};
 use std::sync::mpsc::Receiver;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -42,21 +44,11 @@ impl BuilderService {
     fn new() -> Self {
         let addr: SocketAddr = FromStr::from_str("127.0.0.1:0").ok().expect("Failed to parse host:port string");
         let listener = TcpListener::bind(&addr).ok().expect("Failed to bind address");
-        let temp_dir = TempDir::new("octobuild").ok().expect("Can't create temporary directory");
 
-        let mut compilers: Vec<Box<Compiler>> = vec!(
-            Box::new(VsCompiler::new(temp_dir.path())),
-            Box::new(ClangCompiler::new()),
-        );
-
-        for mut compiler in compilers.iter_mut() {
-            compiler.discovery()
-        }
-
-        let toolchains: Vec<String> = compilers.iter().flat_map(|c| c.toolchains()).filter_map(|t| t.identifier()).collect();
+        let toolchains = BuilderService::discovery_toolchains();
 
         info!("Found toolchains:");
-        for toolchain in toolchains.iter() {
+        for toolchain in toolchains.keys() {
             info!("- {}", toolchain);
         }
 
@@ -64,7 +56,7 @@ impl BuilderService {
             name: get_name(),
             version: version::short_version(),
             endpoint: listener.local_addr().unwrap().to_string(),
-            toolchains: toolchains,
+            toolchains: toolchains.keys().map(|s| s.clone()).collect(),
         });
 
         let done = Arc::new(AtomicBool::new(false));
@@ -117,6 +109,19 @@ impl BuilderService {
         try!(stream.flush());
         Ok(())
     }
+
+    fn discovery_toolchains() -> HashMap<String, Arc<Toolchain>> {
+        let temp_dir = TempDir::new("octobuild").ok().expect("Can't create temporary directory");
+        let compilers: Vec<Box<Compiler>> = vec!(
+            Box::new(VsCompiler::new(temp_dir.path())),
+            Box::new(ClangCompiler::new()),
+        );
+        HashMap::from_iter(
+            compilers.iter()
+            .flat_map(|compiler| compiler.discovery_toolchains())
+            .filter_map(|toolchain| toolchain.identifier().map(|name| (name, toolchain)))
+        )
+    }
 }
 
 impl Drop for BuilderService {
@@ -156,7 +161,7 @@ fn main() {
                 State::Start => {
                     info!("Builder: Starting");
                     builder = Some(BuilderService::new());
-                    info!("Builder: Readly");
+                    info!("Builder: Ready");
                 },
                 State::Reload => {
                     info!("Builder: Reload");
