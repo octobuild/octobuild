@@ -288,16 +288,22 @@ pub enum PreprocessResult {
 	Failed(OutputInfo)
 }
 
-pub trait Toolchain {
+pub trait Toolchain: Send + Sync {
 	// Get toolchain identificator.
 	fn identifier(&self) -> Option<String>;
 	// Compile preprocessed file.
 	fn compile_step(&self, task: CompileStep) -> Result<OutputInfo, Error>;
 }
 
-pub trait Compiler {
+pub trait Compiler: Send + Sync {
 	// Resolve toolchain for command execution.
 	fn resolve_toolchain(&self, command: &CommandInfo) -> Option<Arc<Toolchain>>;
+
+	// Return toolchain iterator.
+	fn toolchains(&self) -> Vec<Arc<Toolchain>>;
+
+	// Discovery local toolchains.
+	fn discovery(&mut self);
 
 	// Parse compiler arguments.
 	fn create_task(&self, command: CommandInfo, args: &[String]) -> Result<Option<CompilationTask>, String>;
@@ -341,7 +347,7 @@ pub trait Compiler {
 }
 
 pub struct ToolchainHolder {
-	toolchains: Arc<RwLock<HashMap<PathBuf, Arc<Toolchain + Send + Sync>>>>,
+	toolchains: Arc<RwLock<HashMap<PathBuf, Arc<Toolchain>>>>,
 }
 
 impl ToolchainHolder {
@@ -351,21 +357,23 @@ impl ToolchainHolder {
 		}
 	}
 
-	pub fn resolve<F: FnOnce(PathBuf) -> Arc<Toolchain + Send + Sync>>(&self, command: &CommandInfo, factory: F) -> Option<Arc<Toolchain>> {
-		command.find_executable()
-		.and_then(|path| -> Option<Arc<Toolchain>> {
-			{
-				let read_lock = self.toolchains.read().unwrap();
-				match read_lock.get(&path) {
-					Some(t) => { return Some(t.clone()); }
-					None => {}
-				}
+	pub fn to_vec(&self) -> Vec<Arc<Toolchain>> {
+		let read_lock = self.toolchains.read().unwrap();
+		read_lock.values().map(|v| v.clone()).collect()
+	}
+
+	pub fn resolve<F: FnOnce(PathBuf) -> Arc<Toolchain>>(&self, path: &Path, factory: F) -> Option<Arc<Toolchain>> {
+		{
+			let read_lock = self.toolchains.read().unwrap();
+			match read_lock.get(path) {
+				Some(t) => { return Some(t.clone()); }
+				None => {}
 			}
-			{
-				let mut write_lock = self.toolchains.write().unwrap();
-				Some(write_lock.entry(path.clone()).or_insert_with(|| factory(path)).clone())
-			}
-		})
+		}
+		{
+			let mut write_lock = self.toolchains.write().unwrap();
+			Some(write_lock.entry(path.to_path_buf()).or_insert_with(|| factory(path.to_path_buf())).clone())
+		}
 	}
 }
 

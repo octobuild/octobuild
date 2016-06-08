@@ -40,6 +40,3 @@ impl Statistic {
 		)
 	}
 }
-
-unsafe impl Send for Statistic {}
-unsafe impl Sync for Statistic {}

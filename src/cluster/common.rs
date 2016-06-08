@@ -10,6 +10,10 @@ pub struct BuilderInfo {
     pub name: String,
     // Agent endpoint
     pub endpoint: String,
+    // Agent version
+    pub version: String,
+    // Agent toolchain list
+    pub toolchains: Vec<String>,
 }
 
 #[derive(RustcEncodable, RustcDecodable)]

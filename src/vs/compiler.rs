@@ -47,10 +47,18 @@ impl VsToolchain {
 impl Compiler for VsCompiler {
 	fn resolve_toolchain(&self, command: &CommandInfo) -> Option<Arc<Toolchain>> {
 		if command.program.file_name().and_then(|n| n.to_str()).map(|n| n.to_lowercase()).map_or(false, |n| (n == "cl.exe") || (n == "cl")) {
-			self.toolchains.resolve(command, |path| Arc::new(VsToolchain::new(path, self.temp_dir.clone())))
+			command.find_executable().and_then(|path| self.toolchains.resolve(&path, |path| Arc::new(VsToolchain::new(path, self.temp_dir.clone()))))
 		} else {
 			None
 		}
+	}
+
+	fn toolchains(&self) -> Vec<Arc<Toolchain>> {
+		self.toolchains.to_vec()
+	}
+
+	fn discovery(&mut self) {
+
 	}
 
 	fn create_task(&self, command: CommandInfo, args: &[String]) -> Result<Option<CompilationTask>, String> {

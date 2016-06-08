@@ -48,7 +48,7 @@ struct ResultMessage {
 struct ExecutorState {
 	cache: Cache,
 	statistic: RwLock<Statistic>,
-	compilers: Vec<Box<Compiler + Send + Sync>>,
+	compilers: Vec<Box<Compiler>>,
 }
 
 fn main() {

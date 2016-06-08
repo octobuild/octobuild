@@ -4,15 +4,21 @@ extern crate router;
 extern crate fern;
 extern crate hyper;
 extern crate rustc_serialize;
+extern crate tempdir;
 #[macro_use]
 extern crate log;
 
+use octobuild::compiler::*;
 use octobuild::cluster::common::{BuilderInfo, BuilderInfoUpdate, RPC_BUILDER_UPDATE};
+use octobuild::version;
+use octobuild::vs::compiler::VsCompiler;
+use octobuild::clang::compiler::ClangCompiler;
 use daemon::State;
 use daemon::Daemon;
 use daemon::DaemonRunner;
 use hyper::{Client, Url};
 use rustc_serialize::json;
+use tempdir::TempDir;
 use std::error::Error;
 use std::io;
 use std::io::{Read, Write};
@@ -36,10 +42,22 @@ impl BuilderService {
     fn new() -> Self {
         let addr: SocketAddr = FromStr::from_str("127.0.0.1:0").ok().expect("Failed to parse host:port string");
         let listener = TcpListener::bind(&addr).ok().expect("Failed to bind address");
+        let temp_dir = TempDir::new("octobuild").ok().expect("Can't create temporary directory");
+
+        let mut compilers: Vec<Box<Compiler>> = vec!(
+            Box::new(VsCompiler::new(temp_dir.path())),
+            Box::new(ClangCompiler::new()),
+        );
+
+        for mut compiler in compilers.iter_mut() {
+            compiler.discovery()
+        }
 
         let info = BuilderInfoUpdate::new(BuilderInfo {
             name: get_name(),
+            version: version::short_version(),
             endpoint: listener.local_addr().unwrap().to_string(),
+            toolchains: compilers.iter().flat_map(|c| c.toolchains()).filter_map(|t| t.identifier()).collect(),
         });
 
         let done = Arc::new(AtomicBool::new(false));

@@ -7,3 +7,7 @@ pub const VERSION: &'static str = env!("CARGO_PKG_VERSION");
 pub fn full_version() -> String {
     format!("{}-{}-{}, rev: {}, rustc: {}", VERSION, ARCH, OS, &REVISION[0..9], RUSTC)
 }
+
+pub fn short_version() -> String {
+    format!("{}/{}", VERSION, &REVISION[0..9])
+}

@@ -4,8 +4,11 @@ use super::super::filter::comments::CommentsRemover;
 use super::super::io::memstream::MemStream;
 use super::super::lazy::Lazy;
 
+use regex;
 use regex::Regex;
 
+use std::env;
+use std::fs::DirEntry;
 use std::io;
 use std::io::{Error, Read};
 use std::process::{Command, Stdio};
@@ -13,6 +16,10 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::sync::mpsc::{channel, Receiver};
 use std::thread;
+
+lazy_static! {
+	static ref RE_CLANG: regex::bytes::Regex = regex::bytes::Regex::new(r"(?i)^(clang(:?\+\+)?)(-\d+\.\d+)?(?:.exe)?$").unwrap();
+}
 
 pub struct ClangCompiler {
 	toolchains: ToolchainHolder,
@@ -22,6 +29,18 @@ impl ClangCompiler {
 	pub fn new() -> Self {
 		ClangCompiler {
 			toolchains: ToolchainHolder::new(),
+		}
+	}
+
+	fn discovery_at(&mut self, path: &Path) {
+		if !path.is_absolute() { return; }
+		match path.read_dir().map(|dir| -> Vec<DirEntry> { dir.filter_map(|item| item.ok()).collect() }) {
+			Ok(items) => {
+				for item in items.iter().filter(|i| RE_CLANG.is_match(i.file_name().to_string_lossy().as_bytes())) {
+					self.toolchains.resolve(&item.path(), |path| Arc::new(ClangToolchain::new(path)));
+				}
+			},
+			Err(_) => {},
 		}
 	}
 }
@@ -42,10 +61,26 @@ impl ClangToolchain {
 
 impl Compiler for ClangCompiler {
 	fn resolve_toolchain(&self, command: &CommandInfo) -> Option<Arc<Toolchain>> {
-		if command.program.file_name().and_then(|n| n.to_str()).map_or(false, |n| n.starts_with("clang")) {
-			self.toolchains.resolve(command, |path| Arc::new(ClangToolchain::new(path)))
+		if command.program.file_name().map_or(false, |n| RE_CLANG.is_match(n.to_string_lossy().as_bytes())) {
+			command.find_executable().and_then(|path| self.toolchains.resolve(&path, |path| Arc::new(ClangToolchain::new(path))))
 		} else {
 			None
+		}
+	}
+
+	fn toolchains(&self) -> Vec<Arc<Toolchain>> {
+		self.toolchains.to_vec()
+	}
+
+	fn discovery(&mut self) {
+		match env::var_os("PATH") {
+			Some(paths) => {
+				for path in env::split_paths(&paths) {
+					self.discovery_at(&path);
+				}
+			},
+			None => {
+			},
 		}
 	}
 
@@ -151,23 +186,34 @@ impl Toolchain for ClangToolchain {
 	}
 }
 
-fn clang_identifier(clang: &Path) -> Option<String> {
-	lazy_static! {
-		static ref RE: Regex = Regex::new(r"^clang.*\((.*)\).*\nTarget:\s*(\S+)").unwrap();
+fn clang_parse_version(base_name: &str, stdout: &str) -> Option<String> {
+	lazy_static!{
+		static ref RE: Regex = Regex::new(r"^.*clang.*?\((\S+)\).*\nTarget:\s*(\S+)").unwrap();
 	}
 
-	Command::new(clang.as_os_str())
-	.arg("--version")
-	.output()
-	.ok()
-	.and_then(|output| 		match output.status.success() {
-			true => Some(String::from_utf8_lossy(&output.stdout).to_string()),
-			false => None,
-	})
-	.and_then(|stdout| 	{
-		RE.captures_iter(&stdout).next()
-		.and_then(|cap | Some(format!("clang {} {}", cap.at(1).unwrap_or(""), cap.at(2).unwrap_or(""))))
-	})
+	RE.captures_iter(&stdout).next()
+	.and_then(|cap| Some(format!("{} {} {}", base_name, cap.at(1).unwrap_or(""), cap.at(2).unwrap_or(""))))
+}
+
+fn clang_identifier(clang: &Path) -> Option<String> {
+	clang.file_name()
+	.and_then(|file_name|
+			  RE_CLANG.captures_iter(file_name.to_string_lossy().as_bytes())
+			  .next()
+			  .and_then(|cap| cap.at(1))
+			  .map(|base_name| String::from_utf8_lossy(base_name).into_owned())
+	)
+	.and_then(|base_name|
+			  Command::new(clang.as_os_str())
+			  .arg("--version")
+			  .output()
+			  .ok()
+			  .and_then(|output| match output.status.success() {
+				  true => Some(String::from_utf8_lossy(&output.stdout).to_string()),
+				  false => None,
+			  })
+			  .and_then(|stdout| clang_parse_version(&base_name, &stdout))
+	)
 }
 
 fn execute(command: &mut Command) -> Result<PreprocessResult, Error> {
@@ -217,5 +263,56 @@ fn execute(command: &mut Command) -> Result<PreprocessResult, Error> {
 			stdout: Vec::new(),
 			stderr: stderr,
 		}))
+	}
+}
+#[cfg(test)]
+mod test {
+	#[test]
+	fn test_ubuntu_14_04_clang_3_5() {
+		assert_eq!(super::clang_parse_version("prefix", r#"Ubuntu clang version 3.5.0-4ubuntu2~trusty2 (tags/RELEASE_350/final) (based on LLVM 3.5.0)
+Target: x86_64-pc-linux-gnu
+Thread model: posix
+"#), Some("prefix tags/RELEASE_350/final x86_64-pc-linux-gnu".to_string()))
+	}
+
+	#[test]
+	fn test_ubuntu_14_04_clang_3_6() {
+		assert_eq!(super::clang_parse_version("prefix", r#"Ubuntu clang version 3.6.0-2ubuntu1~trusty1 (tags/RELEASE_360/final) (based on LLVM 3.6.0)
+Target: x86_64-pc-linux-gnu
+Thread model: posix
+"#), Some("prefix tags/RELEASE_360/final x86_64-pc-linux-gnu".to_string()))
+	}
+
+	#[test]
+	fn test_ubuntu_16_04_clang_3_5() {
+		assert_eq!(super::clang_parse_version("prefix", r#"Ubuntu clang version 3.5.2-3ubuntu1 (tags/RELEASE_352/final) (based on LLVM 3.5.2)
+Target: x86_64-pc-linux-gnu
+Thread model: posix
+"#), Some("prefix tags/RELEASE_352/final x86_64-pc-linux-gnu".to_string()))
+	}
+
+	#[test]
+	fn test_ubuntu_16_04_clang_3_6() {
+		assert_eq!(super::clang_parse_version("prefix", r#"Ubuntu clang version 3.6.2-3ubuntu2 (tags/RELEASE_362/final) (based on LLVM 3.6.2)
+Target: x86_64-pc-linux-gnu
+Thread model: posix
+"#), Some("prefix tags/RELEASE_362/final x86_64-pc-linux-gnu".to_string()))
+	}
+
+	#[test]
+	fn test_ubuntu_16_04_clang_3_7() {
+		assert_eq!(super::clang_parse_version("prefix", r#"Ubuntu clang version 3.7.1-2ubuntu2 (tags/RELEASE_371/final) (based on LLVM 3.7.1)
+Target: x86_64-pc-linux-gnu
+Thread model: posix
+"#), Some("prefix tags/RELEASE_371/final x86_64-pc-linux-gnu".to_string()))
+	}
+
+	#[test]
+	fn test_ubuntu_16_04_clang_3_8() {
+		assert_eq!(super::clang_parse_version("prefix", r#"clang version 3.8.0-2ubuntu3 (tags/RELEASE_380/final)
+Target: x86_64-pc-linux-gnu
+Thread model: posix
+InstalledDir: /usr/bin
+"#), Some("prefix tags/RELEASE_380/final x86_64-pc-linux-gnu".to_string()))
 	}
 }
