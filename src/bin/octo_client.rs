@@ -33,10 +33,11 @@ fn main() {
     octobuild::utils::init_logger();
 
     let client = Client::new();
-    match client
-    .get(Url::parse("http://localhost:3000").unwrap().join(RPC_BUILDER_LIST).unwrap())
-    .send()
-    {
+    match client.get(Url::parse("http://localhost:3000")
+                         .unwrap()
+                         .join(RPC_BUILDER_LIST)
+                         .unwrap())
+                .send() {
         Ok(mut response) => {
             let mut payload = String::new();
             response.read_to_string(&mut payload).unwrap();
@@ -52,7 +53,8 @@ fn main() {
             info!("{}", payload);
         }
         Err(e) => {
-            info!("Builder: can't send info to coordinator: {}", e.description());
+            info!("Builder: can't send info to coordinator: {}",
+                  e.description());
         }
     };
 }

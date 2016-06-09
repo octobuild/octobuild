@@ -8,44 +8,44 @@ use std::io::{Error, Read};
 
 pub const DEFAULT_BUF_SIZE: usize = 1024 * 64;
 
-pub fn filter<T, R, F:Fn(&T) -> Option<R>>(args: &Vec<T>, filter:F) -> Vec<R> {
-	Vec::from_iter(args.iter().filter_map(filter))
+pub fn filter<T, R, F: Fn(&T) -> Option<R>>(args: &Vec<T>, filter: F) -> Vec<R> {
+    Vec::from_iter(args.iter().filter_map(filter))
 }
 
 pub fn hash_stream(stream: &mut Read) -> Result<String, Error> {
-	let mut hash = SipHasher::new();
-	try! (hash_write_stream(&mut hash, stream));
-	Ok(format!("{:016x}", hash.finish()))
+    let mut hash = SipHasher::new();
+    try!(hash_write_stream(&mut hash, stream));
+    Ok(format!("{:016x}", hash.finish()))
 }
 
 pub fn hash_write_stream(hash: &mut Hasher, stream: &mut Read) -> Result<(), Error> {
-	let mut buf: [u8; DEFAULT_BUF_SIZE] = [0; DEFAULT_BUF_SIZE];
-	loop {
-		let size = try! (stream.read(&mut buf));
-		if size <= 0 {
-			break;
-		}
-		hash.write(&buf[0..size]);
-	}
-	Ok(())
+    let mut buf: [u8; DEFAULT_BUF_SIZE] = [0; DEFAULT_BUF_SIZE];
+    loop {
+        let size = try!(stream.read(&mut buf));
+        if size <= 0 {
+            break;
+        }
+        hash.write(&buf[0..size]);
+    }
+    Ok(())
 }
 
 pub fn init_logger() {
-	let log_file = env::current_exe().unwrap().with_extension("log");
+    let log_file = env::current_exe().unwrap().with_extension("log");
 
-	// Create a basic logger configuration
-	let logger_config = fern::DispatchConfig {
-		format: Box::new(|msg, level, _location| {
-			// This format just displays [{level}] {message}
-			format!("{} [{}] {}", time::now().rfc3339(), level, msg)
-		}),
-		// Output to stdout and the log file in the temporary directory we made above to test
-		output: vec![fern::OutputConfig::stdout(), fern::OutputConfig::file(&log_file)],
-		// Only log messages Info and above
-		level: log::LogLevelFilter::Info,
-	};
+    // Create a basic logger configuration
+    let logger_config = fern::DispatchConfig {
+        format: Box::new(|msg, level, _location| {
+            // This format just displays [{level}] {message}
+            format!("{} [{}] {}", time::now().rfc3339(), level, msg)
+        }),
+        // Output to stdout and the log file in the temporary directory we made above to test
+        output: vec![fern::OutputConfig::stdout(), fern::OutputConfig::file(&log_file)],
+        // Only log messages Info and above
+        level: log::LogLevelFilter::Info,
+    };
 
-	if let Err(e) = fern::init_global_logger(logger_config, log::LogLevelFilter::Trace) {
-		panic!("Failed to initialize global logger: {}", e);
-	}
+    if let Err(e) = fern::init_global_logger(logger_config, log::LogLevelFilter::Trace) {
+        panic!("Failed to initialize global logger: {}", e);
+    }
 }

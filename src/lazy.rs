@@ -7,16 +7,16 @@ pub struct Lazy<T: Clone> {
 
 impl<T: Clone> Lazy<T> {
     pub fn new() -> Self {
-        Lazy {
-            holder: RwLock::new(None),
-        }
+        Lazy { holder: RwLock::new(None) }
     }
 
     pub fn get<F: FnOnce() -> T>(&self, factory: F) -> T {
         {
             let read_lock = self.holder.read().unwrap();
             match *read_lock {
-                Some(ref v) => { return v.clone(); }
+                Some(ref v) => {
+                    return v.clone();
+                }
                 None => {}
             }
         }

@@ -27,7 +27,7 @@ use std::iter::FromIterator;
 use std::net::{SocketAddr, TcpListener, TcpStream};
 use std::sync::mpsc::Receiver;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc};
+use std::sync::Arc;
 use std::str::FromStr;
 use std::time::Duration;
 use std::thread;
@@ -42,7 +42,9 @@ struct BuilderService {
 
 impl BuilderService {
     fn new() -> Self {
-        let addr: SocketAddr = FromStr::from_str("127.0.0.1:0").ok().expect("Failed to parse host:port string");
+        let addr: SocketAddr = FromStr::from_str("127.0.0.1:0")
+                                   .ok()
+                                   .expect("Failed to parse host:port string");
         let listener = TcpListener::bind(&addr).ok().expect("Failed to bind address");
 
         let toolchains = BuilderService::discovery_toolchains();
@@ -79,7 +81,9 @@ impl BuilderService {
                             BuilderService::handle_client(stream)
                         });
                     }
-                    Err(e) => { /* connection failed */ }
+                    Err(e) => {
+                        // connection failed
+                    }
                 }
             }
         })
@@ -89,14 +93,16 @@ impl BuilderService {
         thread::spawn(move || {
             let client = Client::new();
             while !done.load(Ordering::Relaxed) {
-                match client
-                .post(Url::parse("http://localhost:3000").unwrap().join(RPC_BUILDER_UPDATE).unwrap())
-                .body(&json::encode(&info).unwrap())
-                .send()
-                {
+                match client.post(Url::parse("http://localhost:3000")
+                                      .unwrap()
+                                      .join(RPC_BUILDER_UPDATE)
+                                      .unwrap())
+                            .body(&json::encode(&info).unwrap())
+                            .send() {
                     Ok(_) => {}
                     Err(e) => {
-                        info!("Builder: can't send info to coordinator: {}", e.description());
+                        info!("Builder: can't send info to coordinator: {}",
+                              e.description());
                     }
                 }
                 thread::sleep(Duration::from_secs(1));
@@ -116,11 +122,9 @@ impl BuilderService {
             Box::new(VsCompiler::new(temp_dir.path())),
             Box::new(ClangCompiler::new()),
         );
-        HashMap::from_iter(
-            compilers.iter()
-            .flat_map(|compiler| compiler.discovery_toolchains())
-            .filter_map(|toolchain| toolchain.identifier().map(|name| (name, toolchain)))
-        )
+        HashMap::from_iter(compilers.iter()
+                                    .flat_map(|compiler| compiler.discovery_toolchains())
+                                    .filter_map(|toolchain| toolchain.identifier().map(|name| (name, toolchain))))
     }
 }
 
@@ -131,12 +135,16 @@ impl Drop for BuilderService {
         self.listener.take();
 
         match self.anoncer.take() {
-            Some(t) => { t.join().unwrap(); },
-            None => {},
+            Some(t) => {
+                t.join().unwrap();
+            }
+            None => {}
         }
         match self.accepter.take() {
-            Some(t) => { t.join().unwrap(); },
-            None => {},
+            Some(t) => {
+                t.join().unwrap();
+            }
+            None => {}
         }
         println!("drop end");
     }
@@ -147,32 +155,31 @@ fn get_name() -> String {
 }
 
 fn main() {
-    let daemon = Daemon {
-        name: "octobuild_Builder".to_string()
-    };
+    let daemon = Daemon { name: "octobuild_Builder".to_string() };
 
     daemon.run(move |rx: Receiver<State>| {
-        octobuild::utils::init_logger();
+              octobuild::utils::init_logger();
 
-        info!("Builder started.");
-        let mut builder = None;
-        for signal in rx.iter() {
-            match signal {
-                State::Start => {
-                    info!("Builder: Starting");
-                    builder = Some(BuilderService::new());
-                    info!("Builder: Ready");
-                },
-                State::Reload => {
-                    info!("Builder: Reload");
-                }
-                State::Stop => {
-                    info!("Builder: Stoping");
-                    builder.take();
-                    info!("Builder: Stoped");
-                }
-            };
-        }
-        info!("Builder shutdowned.");
-    }).unwrap();
+              info!("Builder started.");
+              let mut builder = None;
+              for signal in rx.iter() {
+                  match signal {
+                      State::Start => {
+                          info!("Builder: Starting");
+                          builder = Some(BuilderService::new());
+                          info!("Builder: Ready");
+                      }
+                      State::Reload => {
+                          info!("Builder: Reload");
+                      }
+                      State::Stop => {
+                          info!("Builder: Stoping");
+                          builder.take();
+                          info!("Builder: Stoped");
+                      }
+                  };
+              }
+              info!("Builder shutdowned.");
+          })
+          .unwrap();
 }

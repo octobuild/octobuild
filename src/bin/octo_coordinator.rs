@@ -15,7 +15,7 @@ use daemon::DaemonRunner;
 use iron::prelude::*;
 use iron::status;
 use rustc_serialize::json;
-use time::{Timespec, Duration};
+use time::{Duration, Timespec};
 use std::io::Read;
 use std::sync::mpsc::Receiver;
 use std::sync::{Arc, RwLock};
@@ -44,20 +44,20 @@ macro_rules! service_router {
 
 impl CoordinatorService {
     pub fn new() -> Self {
-        CoordinatorService {
-            builders: RwLock::new(Vec::new()),
-        }
+        CoordinatorService { builders: RwLock::new(Vec::new()) }
     }
 
     pub fn rpc_agent_list(&self, _: &mut Request) -> IronResult<Response> {
         let holder = self.builders.read().unwrap();
         let now = time::get_time();
         let builders: Vec<&BuilderInfo> = holder.iter()
-            .filter_map(|e| match e.timeout >= now {
-                true => Some(&e.info),
-                false => None,
-            })
-            .collect();
+                                                .filter_map(|e| {
+                                                    match e.timeout >= now {
+                                                        true => Some(&e.info),
+                                                        false => None,
+                                                    }
+                                                })
+                                                .collect();
         Ok(Response::with((status::Ok, json::encode(&builders).unwrap())))
     }
 
@@ -70,7 +70,7 @@ impl CoordinatorService {
             let now = time::get_time();
             holder.retain(|e| (e.guid != update.guid) && (e.timeout >= now));
             payload = json::encode(&update.info).unwrap();
-            holder.push(BuilderState{
+            holder.push(BuilderState {
                 guid: update.guid,
                 info: update.info,
                 timeout: now + Duration::seconds(5),
@@ -81,39 +81,40 @@ impl CoordinatorService {
 }
 
 fn main() {
-    let daemon = Daemon {
-        name: "octobuild_coordinator".to_string()
-    };
+    let daemon = Daemon { name: "octobuild_coordinator".to_string() };
 
     daemon.run(move |rx: Receiver<State>| {
-        octobuild::utils::init_logger();
+              octobuild::utils::init_logger();
 
-        info!("Coordinator started.");
-        let mut web = None;
-        for signal in rx.iter() {
-            match signal {
-                State::Start => {
-                    info!("Coordinator: Starting on 3000");
-                    let router = service_router!(CoordinatorService::new(),
+              info!("Coordinator started.");
+              let mut web = None;
+              for signal in rx.iter() {
+                  match signal {
+                      State::Start => {
+                          info!("Coordinator: Starting on 3000");
+                          let router = service_router!(CoordinatorService::new(),
                         get RPC_BUILDER_LIST => rpc_agent_list,
                         post RPC_BUILDER_UPDATE => rpc_agent_update,
                     );
-                    web = Some(Iron::new(router).http("localhost:3000").unwrap());
-                    info!("Coordinator: Ready");
-                },
-                State::Reload => {
-                    info!("Coordinator: Reload");
-                }
-                State::Stop => {
-                    info!("Coordinator: Stoping");
-                    match web.take() {
-                        Some(mut v) => { v.close().unwrap(); }
-                        None => {}
-                    }
-                    info!("Coordinator: Stoped");
-                }
-            };
-        }
-        info!("Coordinator shutdowned.");
-    }).unwrap();
+                          web = Some(Iron::new(router).http("localhost:3000").unwrap());
+                          info!("Coordinator: Ready");
+                      }
+                      State::Reload => {
+                          info!("Coordinator: Reload");
+                      }
+                      State::Stop => {
+                          info!("Coordinator: Stoping");
+                          match web.take() {
+                              Some(mut v) => {
+                                  v.close().unwrap();
+                              }
+                              None => {}
+                          }
+                          info!("Coordinator: Stoped");
+                      }
+                  };
+              }
+              info!("Coordinator shutdowned.");
+          })
+          .unwrap();
 }

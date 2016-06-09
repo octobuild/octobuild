@@ -1,5 +1,5 @@
 pub fn get_host_name() -> Result<String, ()> {
-    get_host_name_native() 
+    get_host_name_native()
 }
 
 #[cfg(windows)]
@@ -15,8 +15,7 @@ fn get_host_name_native() -> Result<String, ()> {
         buf.set_len(capacity);
 
         let mut len: winapi::DWORD = buf.capacity() as winapi::DWORD - 1;
-        if kernel32::GetComputerNameW(buf.as_mut_ptr(), &mut len as *mut winapi::DWORD) == winapi::FALSE
-        {
+        if kernel32::GetComputerNameW(buf.as_mut_ptr(), &mut len as *mut winapi::DWORD) == winapi::FALSE {
             return Err(());
         }
         buf.set_len(len as usize);
@@ -31,8 +30,8 @@ fn get_host_name_native() -> Result<String, ()> {
 fn get_host_name_native() -> Result<String, ()> {
     extern crate libc;
 
-    extern {
-       fn gethostname(name: *mut libc::c_char, size: libc::size_t) -> libc::c_int;
+    extern "C" {
+        fn gethostname(name: *mut libc::c_char, size: libc::size_t) -> libc::c_int;
     }
 
     let mut buf = Vec::<u8>::with_capacity(0x100);
@@ -41,24 +40,21 @@ fn get_host_name_native() -> Result<String, ()> {
         buf.set_len(capacity);
     }
     let err = unsafe {
-        gethostname(buf.as_mut_ptr() as *mut libc::c_char, buf.len() as libc::size_t)
+        gethostname(buf.as_mut_ptr() as *mut libc::c_char,
+                    buf.len() as libc::size_t)
     } as isize;
     match err {
         0 => {
             let mut i = 0;
-            while i < buf.len()
-            {
-                if buf[i] == 0
-                {
+            while i < buf.len() {
+                if buf[i] == 0 {
                     buf.resize(i, 0);
                     break;
                 }
                 i += 1;
             }
             Ok(String::from_utf8_lossy(&buf).into_owned())
-        },
-        _ => {
-            Err(())
         }
+        _ => Err(()),
     }
 }
