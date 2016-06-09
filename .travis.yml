@@ -2,4 +2,6 @@ language: rust
 sudo: true
 dist: trusty
 before_script:
-  - sudo apt-get install capnproto
+  - wget http://archive.ubuntu.com/ubuntu/pool/universe/c/capnproto/libcapnp-0.5.3_0.5.3-2ubuntu1_amd64.deb
+  - wget http://archive.ubuntu.com/ubuntu/pool/universe/c/capnproto/capnproto_0.5.3-2ubuntu1_amd64.deb
+  - sudo dpkg -i libcapnp-0.5.3_0.5.3-2ubuntu1_amd64.deb capnproto_0.5.3-2ubuntu1_amd64.deb
