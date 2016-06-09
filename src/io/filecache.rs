@@ -174,8 +174,8 @@ fn write_cache(statistic: &RwLock<Statistic>,
         None => (),
     }
     let mut stream = try!(lz4::EncoderBuilder::new()
-                              .level(1)
-                              .build(Counter::writer(try!(File::create(path)))));
+        .level(1)
+        .build(Counter::writer(try!(File::create(path)))));
     try!(stream.write_all(HEADER));
     try!(write_usize(&mut stream, paths.len()));
     for path in paths.iter() {

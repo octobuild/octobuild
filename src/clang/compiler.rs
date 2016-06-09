@@ -47,10 +47,10 @@ impl ClangToolchain {
 impl Compiler for ClangCompiler {
     fn resolve_toolchain(&self, command: &CommandInfo) -> Option<Arc<Toolchain>> {
         if command.program
-                  .file_name()
-                  .map_or(false, |n| RE_CLANG.is_match(n.to_string_lossy().as_bytes())) {
+            .file_name()
+            .map_or(false, |n| RE_CLANG.is_match(n.to_string_lossy().as_bytes())) {
             command.find_executable()
-                   .and_then(|path| self.toolchains.resolve(&path, |path| Arc::new(ClangToolchain::new(path))))
+                .and_then(|path| self.toolchains.resolve(&path, |path| Arc::new(ClangToolchain::new(path))))
         } else {
             None
         }
@@ -87,7 +87,8 @@ impl Compiler for ClangCompiler {
             match arg {
                 &Arg::Flag { ref scope, ref flag } => {
                     match scope {
-                        &Scope::Preprocessor | &Scope::Shared => {
+                        &Scope::Preprocessor |
+                        &Scope::Shared => {
                             args.push("-".to_string() + &flag);
                         }
                         &Scope::Ignore | &Scope::Compiler => {}
@@ -95,7 +96,8 @@ impl Compiler for ClangCompiler {
                 }
                 &Arg::Param { ref scope, ref flag, ref value } => {
                     match scope {
-                        &Scope::Preprocessor | &Scope::Shared => {
+                        &Scope::Preprocessor |
+                        &Scope::Shared => {
                             args.push("-".to_string() + &flag);
                             args.push(value.clone());
                         }
@@ -128,7 +130,8 @@ impl Compiler for ClangCompiler {
                         &Scope::Compiler | &Scope::Shared => {
                             args.push("-".to_string() + &flag);
                         }
-                        &Scope::Ignore | &Scope::Preprocessor => {}
+                        &Scope::Ignore |
+                        &Scope::Preprocessor => {}
                     }
                 }
                 &Arg::Param { ref scope, ref flag, ref value } => {
@@ -137,7 +140,8 @@ impl Compiler for ClangCompiler {
                             args.push("-".to_string() + &flag);
                             args.push(value.clone());
                         }
-                        &Scope::Ignore | &Scope::Preprocessor => {}
+                        &Scope::Ignore |
+                        &Scope::Preprocessor => {}
                     }
                 }
                 &Arg::Input { .. } => {}
@@ -178,51 +182,51 @@ fn clang_parse_version(base_name: &str, stdout: &str) -> Option<String> {
 	}
 
     RE.captures_iter(&stdout)
-      .next()
-      .and_then(|cap| {
-          Some(format!("{} {} {}",
-                       base_name,
-                       cap.at(1).unwrap_or(""),
-                       cap.at(2).unwrap_or("")))
-      })
+        .next()
+        .and_then(|cap| {
+            Some(format!("{} {} {}",
+                         base_name,
+                         cap.at(1).unwrap_or(""),
+                         cap.at(2).unwrap_or("")))
+        })
 }
 
 fn clang_identifier(clang: &Path) -> Option<String> {
     clang.file_name()
-         .and_then(|file_name| {
-             RE_CLANG.captures_iter(file_name.to_string_lossy().as_bytes())
-                     .next()
-                     .and_then(|cap| cap.at(1))
-                     .map(|base_name| String::from_utf8_lossy(base_name).into_owned())
-         })
-         .and_then(|base_name| {
-             Command::new(clang.as_os_str())
-                 .arg("--version")
-                 .output()
-                 .ok()
-                 .and_then(|output| {
-                     match output.status.success() {
-                         true => Some(String::from_utf8_lossy(&output.stdout).to_string()),
-                         false => None,
-                     }
-                 })
-                 .and_then(|stdout| clang_parse_version(&base_name, &stdout))
-         })
+        .and_then(|file_name| {
+            RE_CLANG.captures_iter(file_name.to_string_lossy().as_bytes())
+                .next()
+                .and_then(|cap| cap.at(1))
+                .map(|base_name| String::from_utf8_lossy(base_name).into_owned())
+        })
+        .and_then(|base_name| {
+            Command::new(clang.as_os_str())
+                .arg("--version")
+                .output()
+                .ok()
+                .and_then(|output| {
+                    match output.status.success() {
+                        true => Some(String::from_utf8_lossy(&output.stdout).to_string()),
+                        false => None,
+                    }
+                })
+                .and_then(|stdout| clang_parse_version(&base_name, &stdout))
+        })
 }
 
 fn execute(command: &mut Command) -> Result<PreprocessResult, Error> {
     let mut child = try!(command.stdin(Stdio::piped())
-                                .stdout(Stdio::piped())
-                                .stderr(Stdio::piped())
-                                .spawn());
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn());
     drop(child.stdin.take());
 
     fn read_stdout<T: Read>(stream: Option<T>) -> MemStream {
         stream.map_or(Ok(MemStream::new()), |mut stream| {
-                  let mut ret = MemStream::new();
-                  io::copy(&mut stream, &mut ret).map(|_| ret)
-              })
-              .unwrap_or(MemStream::new())
+                let mut ret = MemStream::new();
+                io::copy(&mut stream, &mut ret).map(|_| ret)
+            })
+            .unwrap_or(MemStream::new())
     }
 
     fn read_stderr<T: Read + Send + 'static>(stream: Option<T>) -> Receiver<Result<Vec<u8>, Error>> {

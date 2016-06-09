@@ -312,8 +312,8 @@ fn has_param_prefix(arg: &str) -> bool {
 fn test_parse_argument() {
     let args = Vec::from_iter("/TP /c /Yusample.h /Fpsample.h.pch /Fosample.cpp.o /DTEST /D TEST2 /arch:AVX \
                                sample.cpp"
-                                  .split(" ")
-                                  .map(|x| x.to_string()));
+        .split(" ")
+        .map(|x| x.to_string()));
     assert_eq!(parse_arguments(args.iter()).unwrap(),
                [Arg::param(Scope::Ignore, "T", "P"),
                 Arg::flag(Scope::Ignore, "c"),

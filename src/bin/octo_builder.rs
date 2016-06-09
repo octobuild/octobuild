@@ -43,8 +43,8 @@ struct BuilderService {
 impl BuilderService {
     fn new() -> Self {
         let addr: SocketAddr = FromStr::from_str("127.0.0.1:0")
-                                   .ok()
-                                   .expect("Failed to parse host:port string");
+            .ok()
+            .expect("Failed to parse host:port string");
         let listener = TcpListener::bind(&addr).ok().expect("Failed to bind address");
 
         let toolchains = BuilderService::discovery_toolchains();
@@ -94,11 +94,11 @@ impl BuilderService {
             let client = Client::new();
             while !done.load(Ordering::Relaxed) {
                 match client.post(Url::parse("http://localhost:3000")
-                                      .unwrap()
-                                      .join(RPC_BUILDER_UPDATE)
-                                      .unwrap())
-                            .body(&json::encode(&info).unwrap())
-                            .send() {
+                        .unwrap()
+                        .join(RPC_BUILDER_UPDATE)
+                        .unwrap())
+                    .body(&json::encode(&info).unwrap())
+                    .send() {
                     Ok(_) => {}
                     Err(e) => {
                         info!("Builder: can't send info to coordinator: {}",
@@ -123,8 +123,8 @@ impl BuilderService {
             Box::new(ClangCompiler::new()),
         );
         HashMap::from_iter(compilers.iter()
-                                    .flat_map(|compiler| compiler.discovery_toolchains())
-                                    .filter_map(|toolchain| toolchain.identifier().map(|name| (name, toolchain))))
+            .flat_map(|compiler| compiler.discovery_toolchains())
+            .filter_map(|toolchain| toolchain.identifier().map(|name| (name, toolchain))))
     }
 }
 
@@ -158,28 +158,28 @@ fn main() {
     let daemon = Daemon { name: "octobuild_Builder".to_string() };
 
     daemon.run(move |rx: Receiver<State>| {
-              octobuild::utils::init_logger();
+            octobuild::utils::init_logger();
 
-              info!("Builder started.");
-              let mut builder = None;
-              for signal in rx.iter() {
-                  match signal {
-                      State::Start => {
-                          info!("Builder: Starting");
-                          builder = Some(BuilderService::new());
-                          info!("Builder: Ready");
-                      }
-                      State::Reload => {
-                          info!("Builder: Reload");
-                      }
-                      State::Stop => {
-                          info!("Builder: Stoping");
-                          builder.take();
-                          info!("Builder: Stoped");
-                      }
-                  };
-              }
-              info!("Builder shutdowned.");
-          })
-          .unwrap();
+            info!("Builder started.");
+            let mut builder = None;
+            for signal in rx.iter() {
+                match signal {
+                    State::Start => {
+                        info!("Builder: Starting");
+                        builder = Some(BuilderService::new());
+                        info!("Builder: Ready");
+                    }
+                    State::Reload => {
+                        info!("Builder: Reload");
+                    }
+                    State::Stop => {
+                        info!("Builder: Stoping");
+                        builder.take();
+                        info!("Builder: Stoped");
+                    }
+                };
+            }
+            info!("Builder shutdowned.");
+        })
+        .unwrap();
 }

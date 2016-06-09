@@ -91,7 +91,7 @@ pub fn parse<R: Read>(graph: &mut Graph<BuildTask, ()>, reader: R) -> Result<(),
     let mut parser = EventReader::new(reader);
     loop {
         match try!(next_xml_event(&mut parser)) {
-            XmlEvent::StartElement {name, ..} => {
+            XmlEvent::StartElement { name, .. } => {
                 return match &name.local_name[..] {
                     "BuildSet" => parse_build_set(graph, &mut parser),
                     _ => Err(Error::new(ErrorKind::InvalidInput, XgParseError::InvalidStreamFormat)),
@@ -107,7 +107,7 @@ pub fn parse_build_set<R: Read>(graph: &mut Graph<BuildTask, ()>, events: &mut E
     let mut projects: Vec<XgProject> = Vec::new();
     loop {
         match try!(next_xml_event(events)) {
-            XmlEvent::StartElement {name, attributes, ..} => {
+            XmlEvent::StartElement { name, attributes, .. } => {
                 match &name.local_name[..] {
                     "Environments" => {
                         try!(parse_environments(events, &mut envs));
@@ -124,7 +124,7 @@ pub fn parse_build_set<R: Read>(graph: &mut Graph<BuildTask, ()>, events: &mut E
                     }
                 }
             }
-            XmlEvent::EndElement {..} => {
+            XmlEvent::EndElement { .. } => {
                 break;
             }
             _ => {}
@@ -138,7 +138,7 @@ fn parse_environments<R: Read>(events: &mut EventReader<R>,
                                -> Result<(), Error> {
     loop {
         match try!(next_xml_event(events)) {
-            XmlEvent::StartElement {name, attributes, ..} => {
+            XmlEvent::StartElement { name, attributes, .. } => {
                 match &name.local_name[..] {
                     "Environment" => {
                         let mut attrs = map_attributes(attributes);
@@ -150,7 +150,7 @@ fn parse_environments<R: Read>(events: &mut EventReader<R>,
                     }
                 }
             }
-            XmlEvent::EndElement {..} => {
+            XmlEvent::EndElement { .. } => {
                 return Ok(());
             }
             _ => {}
@@ -163,14 +163,14 @@ fn parse_environment<R: Read>(events: &mut EventReader<R>) -> Result<XgEnvironme
     let mut tools = HashMap::new();
     loop {
         match try!(next_xml_event(events)) {
-            XmlEvent::StartElement {name, ..} => {
+            XmlEvent::StartElement { name, .. } => {
                 match &name.local_name[..] {
                     "Variables" => try!(parse_variables(events, &mut variables)),
                     "Tools" => try!(parse_tools(events, &mut tools)),
                     _ => try!(parse_skip(events, ())),
                 };
             }
-            XmlEvent::EndElement {..} => {
+            XmlEvent::EndElement { .. } => {
                 break;
             }
             _ => {}
@@ -185,7 +185,7 @@ fn parse_environment<R: Read>(events: &mut EventReader<R>) -> Result<XgEnvironme
 fn parse_variables<R: Read>(events: &mut EventReader<R>, variables: &mut CommandEnv) -> Result<(), Error> {
     loop {
         match try!(next_xml_event(events)) {
-            XmlEvent::StartElement {name, attributes, ..} => {
+            XmlEvent::StartElement { name, attributes, .. } => {
                 match &name.local_name[..] {
                     "Variable" => {
                         let mut attrs = map_attributes(attributes);
@@ -197,7 +197,7 @@ fn parse_variables<R: Read>(events: &mut EventReader<R>, variables: &mut Command
                 }
                 try!(parse_skip(events, ()));
             }
-            XmlEvent::EndElement {..} => {
+            XmlEvent::EndElement { .. } => {
                 return Ok(());
             }
             _ => {}
@@ -208,7 +208,7 @@ fn parse_variables<R: Read>(events: &mut EventReader<R>, variables: &mut Command
 fn parse_tools<R: Read>(events: &mut EventReader<R>, tools: &mut HashMap<String, XgTool>) -> Result<(), Error> {
     loop {
         match try!(next_xml_event(events)) {
-            XmlEvent::StartElement {name, attributes, ..} => {
+            XmlEvent::StartElement { name, attributes, .. } => {
                 match &name.local_name[..] {
                     "Tool" => {
                         let mut attrs = map_attributes(attributes);
@@ -219,14 +219,14 @@ fn parse_tools<R: Read>(events: &mut EventReader<R>, tools: &mut HashMap<String,
                                          exec: exec,
                                          output: attrs.remove("OutputPrefix"),
                                          args: attrs.remove("Params")
-                                                    .unwrap_or_else(|| String::new()),
+                                             .unwrap_or_else(|| String::new()),
                                      });
                     }
                     _ => {}
                 }
                 try!(parse_skip(events, ()));
             }
-            XmlEvent::EndElement {..} => {
+            XmlEvent::EndElement { .. } => {
                 return Ok(());
             }
             _ => {}
@@ -238,7 +238,7 @@ fn parse_tasks<R: Read>(events: &mut EventReader<R>) -> Result<HashMap<String, X
     let mut tasks = HashMap::new();
     loop {
         match try!(next_xml_event(events)) {
-            XmlEvent::StartElement {name, attributes, ..} => {
+            XmlEvent::StartElement { name, attributes, .. } => {
                 match &name.local_name[..] {
                     "Task" => {
                         let mut attrs = map_attributes(attributes);
@@ -257,14 +257,14 @@ fn parse_tasks<R: Read>(events: &mut EventReader<R>) -> Result<HashMap<String, X
                                          tool: tool,
                                          working_dir: working_dir,
                                          depends_on: depends_on.into_iter()
-                                                               .collect::<Vec<String>>(),
+                                             .collect::<Vec<String>>(),
                                      });
                     }
                     _ => {}
                 }
                 try!(parse_skip(events, ()));
             }
-            XmlEvent::EndElement {..} => {
+            XmlEvent::EndElement { .. } => {
                 return Ok(tasks);
             }
             _ => {}
@@ -276,10 +276,10 @@ fn parse_skip<R: Read, T>(events: &mut EventReader<R>, result: T) -> Result<T, E
     let mut depth: isize = 0;
     loop {
         match try!(next_xml_event(events)) {
-            XmlEvent::StartElement {..} => {
+            XmlEvent::StartElement { .. } => {
                 depth += 1;
             }
-            XmlEvent::EndElement {..} => {
+            XmlEvent::EndElement { .. } => {
                 if depth == 0 {
                     break;
                 }

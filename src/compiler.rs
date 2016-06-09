@@ -227,9 +227,9 @@ impl CommandInfo {
         // Check current catalog
         if allow_current_dir || executable.parent().map_or(false, |path| path.as_os_str().len() > 0) {
             match self.current_dir
-                      .as_ref()
-                      .map(|c| c.join(&executable))
-                      .and_then(|c| fn_find_exec(c)) {
+                .as_ref()
+                .map(|c| c.join(&executable))
+                .and_then(|c| fn_find_exec(c)) {
                 Some(exe) => {
                     return Some(exe);
                 }
@@ -370,13 +370,13 @@ pub trait Compiler: Send + Sync {
             Ok(Some(task)) => {
                 let toolchain = task.toolchain.clone();
                 match try!(self.preprocess_step(&task)) {
-                    PreprocessResult::Success(preprocessed) => {
-                        self.compile_prepare_step(task, preprocessed)
-                            .and_then(|task| compile_step_cached(task, cache, statistic, toolchain))
+                        PreprocessResult::Success(preprocessed) => {
+                            self.compile_prepare_step(task, preprocessed)
+                                .and_then(|task| compile_step_cached(task, cache, statistic, toolchain))
+                        }
+                        PreprocessResult::Failed(output) => Ok(output),
                     }
-                    PreprocessResult::Failed(output) => Ok(output),
-                }
-                .map(|v| Some(v))
+                    .map(|v| Some(v))
             }
             Ok(None) => Ok(None),
             Err(e) => Err(Error::new(ErrorKind::InvalidInput, CompilerError::InvalidArguments(e))),
@@ -430,8 +430,8 @@ impl ToolchainHolder {
         {
             let mut write_lock = self.toolchains.write().unwrap();
             Some(write_lock.entry(path.to_path_buf())
-                           .or_insert_with(|| factory(path.to_path_buf()))
-                           .clone())
+                .or_insert_with(|| factory(path.to_path_buf()))
+                .clone())
         }
     }
 }
@@ -498,11 +498,11 @@ fn fn_find_exec_native(mut path: PathBuf) -> Option<PathBuf> {
     }
     if path.extension().and_then(|ext| ext.to_str()).map_or(true, |s| s.to_lowercase() != "exe") {
         let name_with_ext = path.file_name()
-                                .map(|n| {
-                                    let mut name = n.to_os_string();
-                                    name.push(".exe");
-                                    name
-                                });
+            .map(|n| {
+                let mut name = n.to_os_string();
+                name.push(".exe");
+                name
+            });
         match name_with_ext {
             Some(n) => {
                 path.set_file_name(n);

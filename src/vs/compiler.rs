@@ -49,10 +49,10 @@ impl VsToolchain {
 impl Compiler for VsCompiler {
     fn resolve_toolchain(&self, command: &CommandInfo) -> Option<Arc<Toolchain>> {
         if command.program
-                  .file_name()
-                  .and_then(|n| n.to_str())
-                  .map(|n| n.to_lowercase())
-                  .map_or(false, |n| (n == "cl.exe") || (n == "cl")) {
+            .file_name()
+            .and_then(|n| n.to_str())
+            .map(|n| n.to_lowercase())
+            .map_or(false, |n| (n == "cl.exe") || (n == "cl")) {
             command.find_executable().and_then(|path| {
                 self.toolchains.resolve(&path,
                                         |path| Arc::new(VsToolchain::new(path, self.temp_dir.clone())))
@@ -81,11 +81,11 @@ impl Compiler for VsCompiler {
             .filter_map(|reg_path| RegKey::predef(HKEY_LOCAL_MACHINE).open_subkey_with_flags(reg_path, KEY_READ).ok())
             .flat_map(|key| -> Vec<OsString> {
                 key.enum_values()
-                   .filter_map(|x| x.ok())
-                   .map(|(name, _)| name)
-                   .filter(|name| RE.is_match(&name))
-                   .filter_map(|name: String| -> Option<OsString> { key.get_value(name).ok() })
-                   .collect()
+                    .filter_map(|x| x.ok())
+                    .map(|(name, _)| name)
+                    .filter(|name| RE.is_match(&name))
+                    .filter_map(|name: String| -> Option<OsString> { key.get_value(name).ok() })
+                    .collect()
             })
             .map(|path| -> Arc<Toolchain> {
                 Arc::new(VsToolchain::new(Path::new(&path).join("bin/cl.exe"), self.temp_dir.clone()))
@@ -106,13 +106,15 @@ impl Compiler for VsCompiler {
             match arg {
                 &Arg::Flag { ref scope, ref flag } => {
                     match scope {
-                        &Scope::Preprocessor | &Scope::Shared => Some("/".to_string() + &flag),
+                        &Scope::Preprocessor |
+                        &Scope::Shared => Some("/".to_string() + &flag),
                         &Scope::Ignore | &Scope::Compiler => None,
                     }
                 }
                 &Arg::Param { ref scope, ref flag, ref value } => {
                     match scope {
-                        &Scope::Preprocessor | &Scope::Shared => Some("/".to_string() + &flag + &value),
+                        &Scope::Preprocessor |
+                        &Scope::Shared => Some("/".to_string() + &flag + &value),
                         &Scope::Ignore | &Scope::Compiler => None,
                     }
                 }
@@ -130,7 +132,7 @@ impl Compiler for VsCompiler {
 
         let mut command = task.command.to_command();
         command.args(&args)
-               .arg(&join_flag("/Fo", &task.output_object)); // /Fo option also set output path for #import directive
+            .arg(&join_flag("/Fo", &task.output_object)); // /Fo option also set output path for #import directive
         let output = try!(command.output());
         if output.status.success() {
             let mut content = MemStream::new();
@@ -160,7 +162,8 @@ impl Compiler for VsCompiler {
                     match scope {
                         &Scope::Compiler | &Scope::Shared => Some("/".to_string() + &flag),
                         &Scope::Preprocessor if task.output_precompiled.is_some() => Some("/".to_string() + &flag),
-                        &Scope::Ignore | &Scope::Preprocessor => None,
+                        &Scope::Ignore |
+                        &Scope::Preprocessor => None,
                     }
                 }
                 &Arg::Param { ref scope, ref flag, ref value } => {
@@ -169,7 +172,8 @@ impl Compiler for VsCompiler {
                         &Scope::Preprocessor if task.output_precompiled.is_some() => {
                             Some("/".to_string() + &flag + &value)
                         }
-                        &Scope::Ignore | &Scope::Preprocessor => None,
+                        &Scope::Ignore |
+                        &Scope::Preprocessor => None,
                     }
                 }
                 &Arg::Input { .. } => None,
@@ -204,9 +208,9 @@ impl Toolchain for VsToolchain {
         // Run compiler.
         let mut command = task.command.to_command();
         command.arg("/c")
-               .args(&task.args)
-               .arg(input_temp.path().to_str().unwrap())
-               .arg(&join_flag("/Fo", &task.output_object));
+            .args(&task.args)
+            .arg(input_temp.path().to_str().unwrap())
+            .arg(&join_flag("/Fo", &task.output_object));
         // Output files.
         match &task.output_precompiled {
             &Some(ref path) => {
@@ -222,10 +226,10 @@ impl Toolchain for VsToolchain {
         }
         // Save input file name for output filter.
         let temp_file = input_temp.path()
-                                  .file_name()
-                                  .and_then(|o| o.to_str())
-                                  .map(|o| o.as_bytes())
-                                  .unwrap_or(b"");
+            .file_name()
+            .and_then(|o| o.to_str())
+            .map(|o| o.as_bytes())
+            .unwrap_or(b"");
         // Execute.
         command.output().map(|o| {
             OutputInfo {

@@ -44,31 +44,31 @@ impl Config {
                                         global,
                                         PARAM_CACHE_LIMIT,
                                         |v| v.as_i64().map(|v| v as u32))
-                                 .unwrap_or(16 * 1024);
+            .unwrap_or(16 * 1024);
         let cache_path = match defaults {
-                             true => None,
-                             false => {
-                                 env::var("OCTOBUILD_CACHE").ok().and_then(|v| {
-                                     if v == "" {
-                                         None
-                                     } else {
-                                         Some(v)
-                                     }
-                                 })
-                             }
-                         }
-                         .or_else(|| {
-                             get_config(local,
-                                        global,
-                                        PARAM_CACHE_PATH,
-                                        |v| v.as_str().map(|v| v.to_string()))
-                         })
-                         .unwrap_or(DEFAULT_CACHE_DIR.to_string());
+                true => None,
+                false => {
+                    env::var("OCTOBUILD_CACHE").ok().and_then(|v| {
+                        if v == "" {
+                            None
+                        } else {
+                            Some(v)
+                        }
+                    })
+                }
+            }
+            .or_else(|| {
+                get_config(local,
+                           global,
+                           PARAM_CACHE_PATH,
+                           |v| v.as_str().map(|v| v.to_string()))
+            })
+            .unwrap_or(DEFAULT_CACHE_DIR.to_string());
         let process_limit = get_config(local,
                                        global,
                                        PARAM_PROCESS_LIMIT,
                                        |v| v.as_i64().map(|v| v as usize))
-                                .unwrap_or_else(|| num_cpus::get());
+            .unwrap_or_else(|| num_cpus::get());
 
         Ok(Config {
             process_limit: process_limit,

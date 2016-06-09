@@ -18,24 +18,24 @@ pub fn create_task(toolchain: Arc<Toolchain>,
                    args: &[String])
                    -> Result<Option<CompilationTask>, String> {
     if args.iter()
-           .find(|v| {
-               match v as &str {
-                   "--analyze" => true,
-                   _ => false,
-               }
-           })
-           .is_some() {
+        .find(|v| {
+            match v as &str {
+                "--analyze" => true,
+                _ => false,
+            }
+        })
+        .is_some() {
         // Support only compilation steps
         return Ok(None);
     }
     if args.iter()
-           .find(|v| {
-               match v as &str {
-                   "-c" => true,
-                   _ => false,
-               }
-           })
-           .is_none() {
+        .find(|v| {
+            match v as &str {
+                "-c" => true,
+                _ => false,
+            }
+        })
+        .is_none() {
         // Support only compilation steps
         return Ok(None);
     }
@@ -75,16 +75,13 @@ pub fn create_task(toolchain: Arc<Toolchain>,
             };
             // Precompiled header file name.
             let marker_precompiled = parsed_args.iter()
-                                                .filter_map(|arg| {
-                                                    match arg {
-                                                        &Arg::Param { ref flag, ref value, .. } if *flag ==
-                                                                                                   "include" => {
-                                                            Some(value.clone())
-                                                        }
-                                                        _ => None,
-                                                    }
-                                                })
-                                                .next();
+                .filter_map(|arg| {
+                    match arg {
+                        &Arg::Param { ref flag, ref value, .. } if *flag == "include" => Some(value.clone()),
+                        _ => None,
+                    }
+                })
+                .next();
             // Output object file name.
             let output_object = match find_param(&parsed_args, |arg: &Arg| -> Option<PathBuf> {
                 match arg {
@@ -112,16 +109,16 @@ pub fn create_task(toolchain: Arc<Toolchain>,
                     match input_source.extension() {
                         Some(extension) => {
                             language = match extension.to_str() {
-                                           Some(e) if e.eq_ignore_ascii_case("cpp") => "c++",
-                                           Some(e) if e.eq_ignore_ascii_case("c") => "c",
-                                           Some(e) if e.eq_ignore_ascii_case("hpp") => "c++-header",
-                                           Some(e) if e.eq_ignore_ascii_case("h") => "c-header",
-                                           _ => {
-                                               return Err(format!("Can't detect file language by extension: {:?}",
-                                                                  input_source));
-                                           }
-                                       }
-                                       .to_string();
+                                    Some(e) if e.eq_ignore_ascii_case("cpp") => "c++",
+                                    Some(e) if e.eq_ignore_ascii_case("c") => "c",
+                                    Some(e) if e.eq_ignore_ascii_case("hpp") => "c++-header",
+                                    Some(e) if e.eq_ignore_ascii_case("h") => "c-header",
+                                    _ => {
+                                        return Err(format!("Can't detect file language by extension: {:?}",
+                                                           input_source));
+                                    }
+                                }
+                                .to_string();
                         }
                         _ => {
                             return Err(format!("Can't detect file language by extension: {:?}",
@@ -296,8 +293,8 @@ fn test_parse_argument_precompile() {
                                -fno-math-errno -fno-rtti -g3 -gdwarf-3 -O2 -D_LINUX64 -IEngine/Source \
                                -IDeveloper/Public -I Runtime/Core/Private -D IS_PROGRAM=1 -D UNICODE \
                                -DIS_MONOLITHIC=1 -std=c++11 -o CorePrivatePCH.h.pch CorePrivatePCH.h"
-                                  .split(" ")
-                                  .map(|x| x.to_string()));
+        .split(" ")
+        .map(|x| x.to_string()));
     assert_eq!(parse_arguments(&args).unwrap(),
                [Arg::param(Scope::Ignore, "x", "c++-header"),
                 Arg::flag(Scope::Shared, "pipe"),
@@ -331,8 +328,8 @@ fn test_parse_argument_compile() {
                                -Wsequence-point -mmmx -msse -msse2 -fno-math-errno -fno-rtti -g3 -gdwarf-3 -O2 -D \
                                IS_PROGRAM=1 -D UNICODE -DIS_MONOLITHIC=1 -x c++ -std=c++11 -include CorePrivatePCH.h \
                                -o Module.Core.cpp.o Module.Core.cpp"
-                                  .split(" ")
-                                  .map(|x| x.to_string()));
+        .split(" ")
+        .map(|x| x.to_string()));
     assert_eq!(parse_arguments(&args).unwrap(),
                [Arg::flag(Scope::Ignore, "c"),
                 Arg::param(Scope::Preprocessor, "include-pch", "CorePrivatePCH.h.pch"),

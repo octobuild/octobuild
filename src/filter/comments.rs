@@ -97,7 +97,8 @@ impl<R: Read> Read for CommentsRemover<R> {
                     continue;
                 }
                 match self.state {
-                    State::Code(_, None) | State::SingleLineComment(_) => {
+                    State::Code(_, None) |
+                    State::SingleLineComment(_) => {
                         break;
                     }
                     State::Code(_, Some(last)) => {
@@ -136,27 +137,22 @@ impl<R: Read> Read for CommentsRemover<R> {
                                 }
                                 None => {}
                             }
-                            self.state = State::Code(match c {
-                                                         b'/' => multiline,
-                                                         b'\\' => MultiLineMark::Space,
-                                                         b'\t' | b' ' if multiline == MultiLineMark::Space => {
-                                                             MultiLineMark::Space
-                                                         }
-                                                         b'\t' | b' ' if multiline == MultiLineMark::None => {
-                                                             MultiLineMark::None
-                                                         }
-                                                         b'\t' | b' ' => MultiLineMark::NewLine,
-                                                         b'\n' if multiline == MultiLineMark::Space => {
-                                                             MultiLineMark::Lf
-                                                         }
-                                                         b'\n' if multiline == MultiLineMark::Cr => MultiLineMark::Cr,
-                                                         b'\r' if multiline == MultiLineMark::Space => {
-                                                             MultiLineMark::Cr
-                                                         }
-                                                         b'\r' if multiline == MultiLineMark::Lf => MultiLineMark::Lf,
-                                                         _ => MultiLineMark::None,
-                                                     },
-                                                     Some(c));
+                            self.state =
+                                State::Code(match c {
+                                                b'/' => multiline,
+                                                b'\\' => MultiLineMark::Space,
+                                                b'\t' | b' ' if multiline == MultiLineMark::Space => {
+                                                    MultiLineMark::Space
+                                                }
+                                                b'\t' | b' ' if multiline == MultiLineMark::None => MultiLineMark::None,
+                                                b'\t' | b' ' => MultiLineMark::NewLine,
+                                                b'\n' if multiline == MultiLineMark::Space => MultiLineMark::Lf,
+                                                b'\n' if multiline == MultiLineMark::Cr => MultiLineMark::Cr,
+                                                b'\r' if multiline == MultiLineMark::Space => MultiLineMark::Cr,
+                                                b'\r' if multiline == MultiLineMark::Lf => MultiLineMark::Lf,
+                                                _ => MultiLineMark::None,
+                                            },
+                                            Some(c));
                             continue;
                         }
                     }

@@ -60,39 +60,40 @@ impl FileHasher for Cache {
     fn file_hash(&self, path: &Path) -> Result<String, Error> {
         let result = self.file_hash_cache.run_cached(path.to_path_buf(),
                                                      |cached: Option<Result<FileHash, ()>>| -> Result<FileHash, ()> {
-                                                         let stat = match fs::metadata(path) {
-                                                             Ok(value) => value,
-                                                             Err(_) => {
-                                                                 return Err(());
-                                                             }
-                                                         };
-                                                         // Validate cached value.
-                                                         match cached {
-                                                             Some(result) => {
-                                                                 match result {
-                                                                     Ok(value) => {
-							if value.size == stat.len() && value.modified == FileTime::from_last_modification_time(&stat) {
-								return Ok(value);
-							}
-						}
-                                                                     Err(_) => {}
-                                                                 }
-                                                             }
-                                                             None => {}
-                                                         }
-                                                         // Calculate hash value.
-                                                         let hash = match generate_file_hash(path) {
-                                                             Ok(value) => value,
-                                                             Err(_) => {
-                                                                 return Err(());
-                                                             }
-                                                         };
-                                                         Ok(FileHash {
-                                                             hash: hash.clone(),
-                                                             size: stat.len(),
-                                                             modified: FileTime::from_last_modification_time(&stat),
-                                                         })
-                                                     });
+            let stat = match fs::metadata(path) {
+                Ok(value) => value,
+                Err(_) => {
+                    return Err(());
+                }
+            };
+            // Validate cached value.
+            match cached {
+                Some(result) => {
+                    match result {
+                        Ok(value) => {
+                            if value.size == stat.len() &&
+                               value.modified == FileTime::from_last_modification_time(&stat) {
+                                return Ok(value);
+                            }
+                        }
+                        Err(_) => {}
+                    }
+                }
+                None => {}
+            }
+            // Calculate hash value.
+            let hash = match generate_file_hash(path) {
+                Ok(value) => value,
+                Err(_) => {
+                    return Err(());
+                }
+            };
+            Ok(FileHash {
+                hash: hash.clone(),
+                size: stat.len(),
+                modified: FileTime::from_last_modification_time(&stat),
+            })
+        });
         match result {
             Ok(value) => Ok(value.hash),
             Err(_) => Err(Error::new(ErrorKind::Other, "I/O Error")),

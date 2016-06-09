@@ -126,8 +126,8 @@ fn expand_files(mut files: Vec<PathBuf>, arg: &str) -> Vec<PathBuf> {
 
     let path = Path::new(arg).to_path_buf();
     let mask = path.file_name()
-                   .map_or(None, |name| name.to_str())
-                   .map_or(None, |s| Some(s.to_string()));
+        .map_or(None, |name| name.to_str())
+        .map_or(None, |s| Some(s.to_string()));
     match mask {
         Some(ref mask) if mask.contains(|c| c == '?' || c == '*') => {
             match find_files(path.parent().unwrap_or(Path::new(".")), mask) {
@@ -158,8 +158,8 @@ fn execute(args: &[String]) -> Result<Option<i32>, Error> {
 		),
     });
     let files = args.iter()
-                    .filter(|a| !is_flag(a))
-                    .fold(Vec::new(), |state, a| expand_files(state, &a));
+        .filter(|a| !is_flag(a))
+        .fold(Vec::new(), |state, a| expand_files(state, &a));
     if files.len() == 0 {
         return Err(Error::new(ErrorKind::InvalidInput, "Build task files not found"));
     }
@@ -173,15 +173,14 @@ fn execute(args: &[String]) -> Result<Option<i32>, Error> {
 
     let (tx_result, rx_result): (Sender<ResultMessage>, Receiver<ResultMessage>) = channel();
     let (tx_task, rx_task): (Sender<TaskMessage>, Receiver<TaskMessage>) = channel();
-    let mutex_rx_task = create_threads(rx_task,
-                                       tx_result,
-                                       config.process_limit,
-                                       |worker_id: usize| {
-                                           let state_clone = state.clone();
-                                           move |task: TaskMessage| -> ResultMessage {
-                                               execute_task(&state_clone, worker_id, task)
-                                           }
-                                       });
+    let mutex_rx_task =
+        create_threads(rx_task,
+                       tx_result,
+                       config.process_limit,
+                       |worker_id: usize| {
+                           let state_clone = state.clone();
+                           move |task: TaskMessage| -> ResultMessage { execute_task(&state_clone, worker_id, task) }
+                       });
 
     let result = execute_graph(&validated_graph, tx_task, mutex_rx_task, rx_result);
     let _ = state.cache.cleanup();
@@ -277,9 +276,9 @@ fn execute_compiler(state: &ExecutorState, task: &BuildTask, args: &[String]) ->
         }
     }
     command.to_command()
-           .args(&args)
-           .output()
-           .map(|o| OutputInfo::new(o))
+        .args(&args)
+        .output()
+        .map(|o| OutputInfo::new(o))
 }
 
 fn execute_graph(graph: &Graph<BuildTask, ()>,
@@ -311,10 +310,10 @@ fn execute_until_failed(graph: &Graph<BuildTask, ()>,
     }
     for index in graph.externals(EdgeDirection::Outgoing) {
         try!(tx_task.send(TaskMessage {
-                        index: index,
-                        task: graph.node_weight(index).unwrap().clone(),
-                    })
-                    .map_err(|e| Error::new(ErrorKind::Other, e)));
+                index: index,
+                task: graph.node_weight(index).unwrap().clone(),
+            })
+            .map_err(|e| Error::new(ErrorKind::Other, e)));
     }
 
     for message in rx_result.iter() {
@@ -329,10 +328,10 @@ fn execute_until_failed(graph: &Graph<BuildTask, ()>,
         for source in graph.neighbors_directed(message.index, EdgeDirection::Incoming) {
             if is_ready(graph, &completed, &source) {
                 try!(tx_task.send(TaskMessage {
-                                index: source,
-                                task: graph.node_weight(source).unwrap().clone(),
-                            })
-                            .map_err(|e| Error::new(ErrorKind::Other, e)));
+                        index: source,
+                        task: graph.node_weight(source).unwrap().clone(),
+                    })
+                    .map_err(|e| Error::new(ErrorKind::Other, e)));
             }
         }
 
@@ -415,16 +414,16 @@ fn expand_args<F: Fn(&str) -> Option<String>>(args: &Vec<String>, resolver: &F) 
 fn test_parse_vars() {
     assert_eq!(expand_arg("A$(test)$(inner)$(none)B",
                           &|name: &str| -> Option<String> {
-                              match name {
-                                  "test" => Some("foo".to_string()),
-                                  "inner" => Some("$(bar)".to_string()),
-                                  "none" => None,
-                                  _ => {
-                                      assert!(false, format!("Unexpected value: {}", name));
-                                      None
-                                  }
-                              }
-                          }),
+        match name {
+            "test" => Some("foo".to_string()),
+            "inner" => Some("$(bar)".to_string()),
+            "none" => None,
+            _ => {
+                assert!(false, format!("Unexpected value: {}", name));
+                None
+            }
+        }
+    }),
                "Afoo$(bar)$(none)B");
 }
 
