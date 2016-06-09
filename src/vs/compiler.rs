@@ -210,6 +210,7 @@ impl Toolchain for VsToolchain {
         // Run compiler.
         let mut command = Command::new(&self.path);
         command.env_clear()
+            .current_dir(&self.temp_dir)
             .arg("/c")
             .args(&task.args)
             .arg(input_temp.path().to_str().unwrap())

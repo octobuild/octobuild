@@ -1,3 +1,4 @@
+extern crate capnpc;
 extern crate rustc_version;
 
 use std::env;
@@ -61,6 +62,7 @@ REVISION={revision}
 }
 
 fn main() {
+    capnpc::compile(&Path::new("schema"), &[Path::new("src/schema/builder.capnp")]).unwrap();
     save_platform().unwrap();
     save_version().unwrap();
     save_control().unwrap();

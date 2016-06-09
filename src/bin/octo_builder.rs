@@ -24,7 +24,7 @@ use std::error::Error;
 use std::io;
 use std::io::{Read, Write};
 use std::iter::FromIterator;
-use std::net::{SocketAddr, TcpListener, TcpStream};
+use std::net::{Shutdown, SocketAddr, TcpListener, TcpStream};
 use std::sync::mpsc::Receiver;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
@@ -113,6 +113,8 @@ impl BuilderService {
     fn handle_client(mut stream: TcpStream) -> io::Result<()> {
         try!(stream.write("Hello!!!\n".as_bytes()));
         try!(stream.flush());
+        try!(stream.shutdown(Shutdown::Write));
+        let _ = stream.read(&mut [0; 1]);
         Ok(())
     }
 

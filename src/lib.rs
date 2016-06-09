@@ -1,10 +1,10 @@
 include!(concat!(env!("OUT_DIR"), "/version.rs"));
-
 #[macro_use]
 extern crate log;
 #[macro_use]
 extern crate lazy_static;
 
+extern crate capnp;
 extern crate fern;
 extern crate rustc_serialize;
 extern crate time;
@@ -14,6 +14,11 @@ extern crate regex;
 extern crate winapi;
 
 pub const VERSION: &'static str = env!("CARGO_PKG_VERSION");
+
+#[allow(dead_code)]
+pub mod builder_capnp {
+    include!(concat!(env!("OUT_DIR"), "/builder_capnp.rs"));
+}
 
 pub mod cache;
 pub mod cluster {
