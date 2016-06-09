@@ -13,6 +13,7 @@ use super::super::lazy::Lazy;
 use std::fs::File;
 use std::io::{Cursor, Error, Write};
 use std::path::{Path, PathBuf};
+use std::process::Command;
 use std::sync::Arc;
 use self::regex::bytes::{NoExpand, Regex};
 
@@ -206,8 +207,10 @@ impl Toolchain for VsToolchain {
         let input_temp = TempFile::new_in(&self.temp_dir, ".i");
         try!(File::create(input_temp.path()).and_then(|mut s| task.preprocessed.copy(&mut s)));
         // Run compiler.
-        let mut command = task.command.to_command();
-        command.arg("/c")
+
+        let mut command = Command::new(&self.path);
+        command.env_clear()
+            .arg("/c")
             .args(&task.args)
             .arg(input_temp.path().to_str().unwrap())
             .arg(&join_flag("/Fo", &task.output_object));

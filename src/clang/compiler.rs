@@ -159,8 +159,8 @@ impl Toolchain for ClangToolchain {
 
     fn compile_step(&self, task: CompileStep) -> Result<OutputInfo, Error> {
         // Run compiler.
-        task.command
-            .to_command()
+        Command::new(&self.path)
+            .env_clear()
             .args(&task.args)
             .arg("-".to_string())
             .arg("-o".to_string())

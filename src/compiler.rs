@@ -300,8 +300,6 @@ pub struct CompilationTask {
 }
 
 pub struct CompileStep {
-    // Original compiler executable.
-    pub command: CommandInfo,
     // Compiler arguments.
     pub args: Vec<String>,
     // Input precompiled header file name.
@@ -318,7 +316,6 @@ impl CompileStep {
     pub fn new(task: CompilationTask, preprocessed: MemStream, args: Vec<String>, use_precompiled: bool) -> Self {
         assert!(use_precompiled || task.input_precompiled.is_none());
         CompileStep {
-            command: task.command,
             output_object: task.output_object,
             output_precompiled: task.output_precompiled,
             input_precompiled: match use_precompiled {
