@@ -1,2 +1,5 @@
 language: rust
-sudo: false
+sudo: true
+dist: trusty
+before_script:
+  - sudo apt-get install capnproto

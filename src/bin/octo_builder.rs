@@ -1,4 +1,5 @@
 extern crate octobuild;
+extern crate capnp;
 extern crate daemon;
 extern crate router;
 extern crate fern;
@@ -10,6 +11,7 @@ extern crate log;
 
 use octobuild::compiler::*;
 use octobuild::cluster::common::{BuilderInfo, BuilderInfoUpdate, RPC_BUILDER_UPDATE};
+use octobuild::builder_capnp;
 use octobuild::version;
 use octobuild::vs::compiler::VsCompiler;
 use octobuild::clang::compiler::ClangCompiler;
@@ -22,7 +24,7 @@ use tempdir::TempDir;
 use std::collections::HashMap;
 use std::error::Error;
 use std::io;
-use std::io::{Read, Write};
+use std::io::{BufReader, Read, Write};
 use std::iter::FromIterator;
 use std::net::{Shutdown, SocketAddr, TcpListener, TcpStream};
 use std::sync::mpsc::Receiver;
@@ -32,6 +34,9 @@ use std::str::FromStr;
 use std::time::Duration;
 use std::thread;
 use std::thread::JoinHandle;
+
+use capnp::serialize_packed;
+use capnp::message;
 
 struct BuilderService {
     done: Arc<AtomicBool>,
@@ -111,6 +116,15 @@ impl BuilderService {
     }
 
     fn handle_client(mut stream: TcpStream) -> io::Result<()> {
+        {
+            let mut buf = BufReader::new(try!(stream.try_clone()));
+            // Receive compilation request.
+            {
+                let reader = serialize_packed::read_message(&mut buf, ::capnp::message::ReaderOptions::new()).unwrap();
+                let request = reader.get_root::<builder_capnp::compile_request::Reader>().unwrap();
+                println!("{:?}", request.get_toolchain());
+            }
+        }
         try!(stream.write("Hello!!!\n".as_bytes()));
         try!(stream.flush());
         try!(stream.shutdown(Shutdown::Write));

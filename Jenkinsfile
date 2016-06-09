@@ -6,6 +6,7 @@ sudo apt install mono-devel
 sudo apt install osslsigncode
 sudo apt install nuget
 sudo apt install golang
+sudo apt install capnproto
 
 export WINEARCH=win32
 export WINEPREFIX=$HOME/.wine-i686/
