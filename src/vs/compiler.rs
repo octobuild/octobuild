@@ -12,6 +12,7 @@ use super::super::lazy::Lazy;
 
 use std::fs::File;
 use std::io::{Cursor, Error, Write};
+use std::env;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::Arc;
@@ -207,13 +208,18 @@ impl Toolchain for VsToolchain {
         let input_temp = TempFile::new_in(&self.temp_dir, ".i");
         try!(File::create(input_temp.path()).and_then(|mut s| task.preprocessed.copy(&mut s)));
         // Run compiler.
-
         let mut command = Command::new(&self.path);
         command.env_clear()
             .arg("/c")
             .args(&task.args)
             .arg(input_temp.path().to_str().unwrap())
             .arg(&join_flag("/Fo", &task.output_object));
+        // Copy required environment variables.
+        for (name, value) in vec!["SystemDrive", "SystemRoot", "TEMP", "TMP"]
+            .iter()
+            .filter_map(|name| env::var(name).ok().map(|value| (name, value))) {
+            command.env(name, value);
+        }
         // Output files.
         match &task.output_precompiled {
             &Some(ref path) => {
