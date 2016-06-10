@@ -29,7 +29,6 @@ use std::io;
 use std::io::{BufReader, Read, Write};
 use std::iter::FromIterator;
 use std::net::{Shutdown, SocketAddr, TcpListener, TcpStream};
-use std::path::Path;
 use std::sync::mpsc::Receiver;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
@@ -138,7 +137,7 @@ impl BuilderService {
 
                 println!("{:?}", request);
                 let compile_step: CompileStep = CompileStep {
-                    output_object: Path::new("source.o").to_path_buf(),
+                    output_object: None,
                     output_precompiled: None,
                     input_precompiled: None,
                     args: request.args,

@@ -304,8 +304,8 @@ pub struct CompileStep {
     pub args: Vec<String>,
     // Input precompiled header file name.
     pub input_precompiled: Option<PathBuf>,
-    // Output object file name.
-    pub output_object: PathBuf,
+    // Output object file name (None - compile to stdout).
+    pub output_object: Option<PathBuf>,
     // Output precompiled header file name.
     pub output_precompiled: Option<PathBuf>,
     // Preprocessed source file.
@@ -316,7 +316,7 @@ impl CompileStep {
     pub fn new(task: CompilationTask, preprocessed: MemStream, args: Vec<String>, use_precompiled: bool) -> Self {
         assert!(use_precompiled || task.input_precompiled.is_none());
         CompileStep {
-            output_object: task.output_object,
+            output_object: Some(task.output_object),
             output_precompiled: task.output_precompiled,
             input_precompiled: match use_precompiled {
                 true => task.input_precompiled,
@@ -460,7 +460,12 @@ fn compile_step_cached(task: CompileStep,
 
     // Output files list
     let mut outputs: Vec<PathBuf> = Vec::new();
-    outputs.push(task.output_object.clone());
+    match task.output_object {
+        Some(ref path) => {
+            outputs.push(path.clone());
+        }
+        None => {}
+    }
     match task.output_precompiled {
         Some(ref path) => {
             outputs.push(path.clone());

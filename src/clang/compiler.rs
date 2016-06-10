@@ -166,8 +166,10 @@ impl Toolchain for ClangToolchain {
             .args(&task.args)
             .arg("-")
             .arg("-o")
-            .arg(task.output_object.display().to_string())
+            .arg(task.output_object.as_ref().map_or("-".to_string(), |path| path.display().to_string()))
             .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
             .spawn()
             .and_then(|mut child| {
                 try!(task.preprocessed.copy(child.stdin.as_mut().unwrap()));

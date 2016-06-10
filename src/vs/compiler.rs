@@ -11,7 +11,7 @@ use super::super::io::tempfile::TempFile;
 use super::super::lazy::Lazy;
 
 use std::fs::File;
-use std::io::{Cursor, Error, Write};
+use std::io::{Cursor, Error, Read, Write};
 use std::env;
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -198,6 +198,20 @@ impl Compiler for VsCompiler {
     }
 }
 
+enum VsOutput {
+    Temporary(TempFile),
+    Persistent(PathBuf),
+}
+
+impl VsOutput {
+    pub fn path<'a>(&'a self) -> &'a Path {
+        match self {
+            &VsOutput::Temporary(ref temp) => temp.path(),
+            &VsOutput::Persistent(ref path) => &path,
+        }
+    }
+}
+
 impl Toolchain for VsToolchain {
     fn identifier(&self) -> Option<String> {
         self.identifier.get(|| vs_identifier(&self.path))
@@ -207,6 +221,11 @@ impl Toolchain for VsToolchain {
         // Input file path.
         let input_temp = TempFile::new_in(&self.temp_dir, ".i");
         try!(File::create(input_temp.path()).and_then(|mut s| task.preprocessed.copy(&mut s)));
+        // Output file path
+        let output_object: VsOutput = match task.output_object {
+            Some(path) => VsOutput::Persistent(path.clone()),
+            None => VsOutput::Temporary(TempFile::new_in(&self.temp_dir, ".o")),
+        };
         // Run compiler.
         let mut command = Command::new(&self.path);
         command.env_clear()
@@ -214,7 +233,7 @@ impl Toolchain for VsToolchain {
             .arg("/c")
             .args(&task.args)
             .arg(input_temp.path().to_str().unwrap())
-            .arg(&join_flag("/Fo", &task.output_object));
+            .arg(&join_flag("/Fo", output_object.path()));
         // Copy required environment variables.
         for (name, value) in vec!["SystemDrive", "SystemRoot", "TEMP", "TMP"]
             .iter()
@@ -241,12 +260,28 @@ impl Toolchain for VsToolchain {
             .map(|o| o.as_bytes())
             .unwrap_or(b"");
         // Execute.
-        command.output().map(|o| {
-            OutputInfo {
-                status: o.status.code(),
-                stdout: prepare_output(temp_file, o.stdout, o.status.code() == Some(0)),
-                stderr: o.stderr,
-            }
+        command.output().and_then(|o| {
+            match &output_object {
+                    &VsOutput::Persistent(_) => Ok(Vec::new()),
+                    &VsOutput::Temporary(ref temp) => {
+                        match o.status.code() {
+                            Some(0) => {
+                                File::open(temp.path()).and_then(|mut f| {
+                                    let mut buffer = Vec::new();
+                                    f.read_to_end(&mut buffer).map(|_| buffer)
+                                })
+                            }
+                            _ => Ok(Vec::new()),
+                        }
+                    }
+                }
+                .map(|output| {
+                    OutputInfo {
+                        status: o.status.code(),
+                        stdout: output,
+                        stderr: prepare_output(temp_file, o.stdout.clone(), o.status.code() == Some(0)),
+                    }
+                })
         })
     }
 }
