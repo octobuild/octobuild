@@ -1,3 +1,5 @@
+use capnp;
+
 use std::collections::HashMap;
 use std::collections::hash_map;
 use std::env;
@@ -8,9 +10,11 @@ use std::path::{Path, PathBuf};
 use std::sync::{Arc, RwLock};
 use std::process::{Command, Output};
 use std::hash::{Hash, Hasher, SipHasher};
-use super::io::memstream::MemStream;
-use super::io::statistic::Statistic;
-use super::cache::{Cache, FileHasher};
+
+use ::io::memstream::MemStream;
+use ::io::statistic::Statistic;
+use ::cache::{Cache, FileHasher};
+use ::builder_capnp::output_info;
 
 #[derive(Debug)]
 pub enum CompilerError {
@@ -275,6 +279,31 @@ impl OutputInfo {
             Some(e) if e == 0 => true,
             _ => false,
         }
+    }
+
+    pub fn read(reader: output_info::Reader) -> Result<Self, capnp::Error> {
+        Ok(OutputInfo {
+            status: match reader.get_undefined() {
+                true => Some(reader.get_status()),
+                false => None,
+            },
+            stdout: try!(reader.get_stdout()).to_vec(),
+            stderr: try!(reader.get_stderr()).to_vec(),
+        })
+    }
+
+    pub fn write(&self, mut builder: output_info::Builder) {
+        match self.status {
+            Some(v) => {
+                builder.set_undefined(false);
+                builder.set_status(v);
+            }
+            None => {
+                builder.set_undefined(true);
+            }
+        }
+        builder.set_stdout(&self.stdout);
+        builder.set_stderr(&self.stderr);
     }
 }
 

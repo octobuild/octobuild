@@ -8,13 +8,13 @@ extern crate tempdir;
 extern crate log;
 
 use octobuild::cluster::common::{BuilderInfo, RPC_BUILDER_LIST};
-use octobuild::cluster::builder::CompileRequest;
+use octobuild::cluster::builder::{CompileRequest, CompileResponse};
 
 use hyper::{Client, Url};
 use rustc_serialize::json;
 
 use std::error::Error;
-use std::io::{Read, Write};
+use std::io::{BufReader, Read, Write};
 use std::str::FromStr;
 use std::net::{SocketAddr, TcpStream};
 
@@ -49,6 +49,7 @@ fn main() {
 
             // Connect to builder.
             let mut stream = TcpStream::connect(addr).unwrap();
+            let mut buf = BufReader::new(stream.try_clone().unwrap());
 
             CompileRequest {
                     toolchain: toolchain.clone(),
@@ -61,8 +62,11 @@ int main(int argc, char** argv) {
                         .to_vec(),
                     precompiled: None,
                 }
-                .write(&mut stream, &mut message::Builder::new_default())
+                .stream_write(&mut stream, &mut message::Builder::new_default())
                 .unwrap();
+
+            let response = CompileResponse::stream_read(&mut buf, ::capnp::message::ReaderOptions::new()).unwrap();
+            info!("{:?}", response);
 
             let mut payload = String::new();
             stream.read_to_string(&mut payload).unwrap();

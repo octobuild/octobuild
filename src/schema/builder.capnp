@@ -14,14 +14,15 @@ struct CompileRequest {
 struct CompileResponse {
   union {
     success @0 :OutputInfo;
-    error @1: Error;
+    error @1: ErrorInfo;
   }
 }
 
 struct OutputInfo {
   status @0: Int32;
-  stdout @1: Data;
-  stderr @2: Data;
+  undefined @1: Bool;
+  stdout @2: Data;
+  stderr @3: Data;
 }
 
 struct OptionalContent {
@@ -29,5 +30,5 @@ struct OptionalContent {
   data @1 :Data;
 }
 
-struct Error {
+struct ErrorInfo {
 }

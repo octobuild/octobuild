@@ -10,7 +10,7 @@ extern crate tempdir;
 extern crate log;
 
 use octobuild::compiler::*;
-use octobuild::cluster::builder::CompileRequest;
+use octobuild::cluster::builder::{CompileRequest, CompileResponse};
 use octobuild::cluster::common::{BuilderInfo, BuilderInfoUpdate, RPC_BUILDER_UPDATE};
 use octobuild::builder_capnp;
 use octobuild::version;
@@ -133,7 +133,7 @@ impl BuilderService {
             let mut buf = BufReader::new(try!(stream.try_clone()));
             // Receive compilation request.
             {
-                let request = CompileRequest::read(&mut buf, ::capnp::message::ReaderOptions::new()).unwrap();
+                let request = CompileRequest::stream_read(&mut buf, ::capnp::message::ReaderOptions::new()).unwrap();
 
                 println!("{:?}", request);
                 let compile_step: CompileStep = CompileStep {
@@ -145,25 +145,10 @@ impl BuilderService {
                 };
 
                 let toolchain: Arc<Toolchain> = state.toolchains.get(&request.toolchain).unwrap().clone();
-                let output_info: OutputInfo = toolchain.compile_step(compile_step).unwrap();
-
-                // Send compilation request.
-                let mut builder = message::Builder::new_default();
-                {
-                    // Toolchain.
-                    let mut response = builder.init_root::<builder_capnp::compile_response::Builder>();
-                    let mut success = response.borrow().init_success();
-                    match output_info.status {
-                        Some(status) => success.set_status(status),
-                        None => {}
-                    }
-                }
-                serialize_packed::write_message(&mut stream, &mut builder);
-
-
+                let response = CompileResponse::from(toolchain.compile_step(compile_step));
+                response.stream_write(&mut stream, &mut message::Builder::new_default()).unwrap();
             }
         }
-        try!(stream.write("Hello!!!\n".as_bytes()));
         try!(stream.flush());
         try!(stream.shutdown(Shutdown::Write));
         let _ = stream.read(&mut [0; 1]);
