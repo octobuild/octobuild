@@ -20,7 +20,7 @@ pub fn create_task(toolchain: Arc<Toolchain>,
                    args: &[String])
                    -> Result<Option<CompilationTask>, String> {
     load_arguments(&command.current_dir, args.iter())
-        .map_err(|e: Error| format!("IO error: {:?}", e))
+        .map_err(|e: Error| format!("IO error: {}", e))
         .and_then(|a| parse_arguments(a.iter()))
         .and_then(|parsed_args| {
             // Source file name.
@@ -92,7 +92,8 @@ pub fn create_task(toolchain: Arc<Toolchain>,
                     }
                 }
                 ParamValue::Many(v) => {
-                    return Err(format!("Found too many precompiled header markers: {:?}", v));
+                    return Err(format!("Found too many precompiled header markers: {}",
+                                       v.iter().map(|item| item.1.clone()).collect::<String>()));
                 }
             };
             // Output object file name.
@@ -129,14 +130,14 @@ pub fn create_task(toolchain: Arc<Toolchain>,
                                     language = "C".to_string();
                                 }
                                 _ => {
-                                    return Err(format!("Can't detect file language by extension: {:?}",
-                                                       input_source));
+                                    return Err(format!("Can't detect file language by extension: {}",
+                                                       input_source.as_os_str().to_string_lossy()));
                                 }
                             }
                         }
                         _ => {
                             return Err(format!("Can't detect file language by extension: {:?}",
-                                               input_source));
+                                               input_source.as_os_str().to_string_lossy()));
                         }
                     }
                 }

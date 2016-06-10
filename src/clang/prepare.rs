@@ -114,15 +114,15 @@ pub fn create_task(toolchain: Arc<Toolchain>,
                                     Some(e) if e.eq_ignore_ascii_case("hpp") => "c++-header",
                                     Some(e) if e.eq_ignore_ascii_case("h") => "c-header",
                                     _ => {
-                                        return Err(format!("Can't detect file language by extension: {:?}",
-                                                           input_source));
+                                        return Err(format!("Can't detect file language by extension: {}",
+                                                           input_source.as_os_str().to_string_lossy()));
                                     }
                                 }
                                 .to_string();
                         }
                         _ => {
-                            return Err(format!("Can't detect file language by extension: {:?}",
-                                               input_source));
+                            return Err(format!("Can't detect file language by extension: {}",
+                                               input_source.as_os_str().to_string_lossy()));
                         }
                     }
                 }

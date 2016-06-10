@@ -71,7 +71,7 @@ fn main() {
             }
         }
         Err(e) => {
-            println!("FATAL ERROR: {:?}", e);
+            println!("FATAL ERROR: {}", e);
             500
         }
     })
