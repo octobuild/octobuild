@@ -69,17 +69,8 @@ impl MemStream {
             hasher.write(block);
         }
     }
-}
 
-fn memcpy(src: &[u8], dst: &mut [u8]) {
-    assert!(src.len() == dst.len());
-    unsafe {
-        ptr::copy_nonoverlapping(&src[0], &mut dst[0], src.len());
-    }
-}
-
-impl Write for MemStream {
-    fn write(&mut self, buf: &[u8]) -> Result<usize> {
+    fn write_data(&mut self, buf: &[u8]) -> usize {
         let mut src_offset = 0;
         while src_offset < buf.len() {
             let dst_offset = self.size % BLOCK_SIZE;
@@ -93,7 +84,36 @@ impl Write for MemStream {
             self.size += copy_size;
             src_offset += copy_size;
         }
-        Ok(src_offset)
+        src_offset
+    }
+}
+
+fn memcpy(src: &[u8], dst: &mut [u8]) {
+    assert!(src.len() == dst.len());
+    unsafe {
+        ptr::copy_nonoverlapping(&src[0], &mut dst[0], src.len());
+    }
+}
+
+impl From<Vec<u8>> for MemStream {
+    fn from(data: Vec<u8>) -> Self {
+        let mut result = MemStream::new();
+        result.write_data(&data);
+        result
+    }
+}
+
+impl<'a> From<&'a [u8]> for MemStream {
+    fn from(data: &[u8]) -> Self {
+        let mut result = MemStream::new();
+        result.write_data(data);
+        result
+    }
+}
+
+impl Write for MemStream {
+    fn write(&mut self, buf: &[u8]) -> Result<usize> {
+        Ok(self.write_data(buf))
     }
 
     fn flush(&mut self) -> Result<()> {

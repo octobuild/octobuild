@@ -8,7 +8,7 @@ extern crate tempdir;
 extern crate log;
 
 use octobuild::cluster::common::{BuilderInfo, RPC_BUILDER_LIST};
-use octobuild::builder_capnp;
+use octobuild::cluster::builder::CompileRequest;
 
 use hyper::{Client, Url};
 use rustc_serialize::json;
@@ -18,7 +18,6 @@ use std::io::{Read, Write};
 use std::str::FromStr;
 use std::net::{SocketAddr, TcpStream};
 
-use capnp::serialize_packed;
 use capnp::message;
 
 fn main() {
@@ -51,33 +50,19 @@ fn main() {
             // Connect to builder.
             let mut stream = TcpStream::connect(addr).unwrap();
 
-            {
-                // Send compilation request.
-                let mut message = message::Builder::new_default();
-                {
-                    // Toolchain.
-                    let mut request = message.init_root::<builder_capnp::compile_request::Builder>();
-                    request.set_toolchain(toolchain);
-                    // Arguments.
-                    let mut args = request.borrow().init_args(1);
-                    args.borrow().set(0, "-DFOO");
-                }
-                serialize_packed::write_message(&mut stream, &mut message);
-            }
-            {
-                // Send source code.
-                let mut message = message::Builder::new_default();
-                {
-                    // Toolchain.
-                    let mut request = message.init_root::<builder_capnp::source_request::Builder>();
-                    request.set_body(r#"
+            CompileRequest {
+                    toolchain: toolchain.clone(),
+                    args: vec!["-x".to_string(), "c++".to_string()],
+                    preprocessed: br#"
 int main(int argc, char** argv) {
   return 0;
 }
-"#);
+"#
+                        .to_vec(),
+                    precompiled: None,
                 }
-                serialize_packed::write_message(&mut stream, &mut message);
-            }
+                .write(&mut stream, &mut message::Builder::new_default())
+                .unwrap();
 
             let mut payload = String::new();
             stream.read_to_string(&mut payload).unwrap();

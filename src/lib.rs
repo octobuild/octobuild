@@ -23,6 +23,7 @@ pub mod builder_capnp {
 pub mod cache;
 pub mod cluster {
     pub mod common;
+    pub mod builder;
 }
 pub mod common;
 pub mod compiler;

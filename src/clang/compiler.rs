@@ -17,7 +17,9 @@ use std::sync::mpsc::{Receiver, channel};
 use std::thread;
 
 lazy_static! {
-	static ref RE_CLANG: regex::bytes::Regex = regex::bytes::Regex::new(r"(?i)^(clang(:?\+\+)?)(-\d+\.\d+)?(?:.exe)?$").unwrap();
+	static ref RE_CLANG: regex::bytes::Regex = regex::bytes::Regex::new(
+	r"(?i)^(clang(:?\+\+)?)(-\d+\.\d+)?(?:.exe)?$"
+	).unwrap();
 }
 
 pub struct ClangCompiler {
@@ -120,7 +122,6 @@ impl Compiler for ClangCompiler {
     // Compile preprocessed file.
     fn compile_prepare_step(&self, task: CompilationTask, preprocessed: MemStream) -> Result<CompileStep, Error> {
         let mut args = Vec::new();
-        args.push("-c".to_string());
         args.push("-x".to_string());
         args.push(task.language.clone());
         for arg in task.args.iter() {
@@ -161,9 +162,10 @@ impl Toolchain for ClangToolchain {
         // Run compiler.
         Command::new(&self.path)
             .env_clear()
+            .arg("-c")
             .args(&task.args)
-            .arg("-".to_string())
-            .arg("-o".to_string())
+            .arg("-")
+            .arg("-o")
             .arg(task.output_object.display().to_string())
             .stdin(Stdio::piped())
             .spawn()

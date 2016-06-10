@@ -7,9 +7,27 @@ interface Coordinator {
 struct CompileRequest {
   toolchain @0 :Text;
   args @1 :List(Text);
-  precompiledHash @2: Text;
+  preprocessed @2: Data;
+  precompiled @3: OptionalContent;
 }
 
-struct SourceRequest {
-  body @0 :Text;
+struct CompileResponse {
+  union {
+    success @0 :OutputInfo;
+    error @1: Error;
+  }
+}
+
+struct OutputInfo {
+  status @0: Int32;
+  stdout @1: Data;
+  stderr @2: Data;
+}
+
+struct OptionalContent {
+  hash @0 :Text;
+  data @1 :Data;
+}
+
+struct Error {
 }
