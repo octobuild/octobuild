@@ -190,7 +190,7 @@ pub trait Compiler {
 			}
 			// todo: log error reason
 			Err(e) => {
-				println! ("Can't use octobuild for compiling file, use failback compilation: {:?}", e);
+				println! ("Can't use octobuild for compiling file, use fallback compilation: {}", e);
 				command.to_command().args(args).output().map(|o| OutputInfo::new(o))
 			}
 		}

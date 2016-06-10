@@ -87,10 +87,10 @@ pub fn create_task(command: CommandInfo, args: &[String]) -> Result<Option<Compi
 								Some(e) if e.eq_ignore_ascii_case("c") => {language = "c".to_string();}
 								Some(e) if e.eq_ignore_ascii_case("hpp") => {language = "c++-header".to_string();}
 								Some(e) if e.eq_ignore_ascii_case("h") => {language = "c-header".to_string();}
-								_ => {return Err(format!("Can't detect file language by extension: {:?}", input_source));}
+								_ => {return Err(format!("Can't detect file language by extension: {}", input_source.as_os_str().to_string_lossy()));}
 							}
 						}
-						_ => {return Err(format!("Can't detect file language by extension: {:?}", input_source));}
+						_ => {return Err(format!("Can't detect file language by extension: {}", input_source.as_os_str().to_string_lossy()));}
 					}
 				}
 				ParamValue::Single(v) => {

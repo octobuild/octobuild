@@ -16,7 +16,7 @@ enum ParamValue<T> {
 
 pub fn create_task(command: CommandInfo, args: &[String]) -> Result<Option<CompilationTask>, String> {
 	load_arguments(&command.current_dir, args.iter())
-	.map_err(|e: Error| format!("IO error: {:?}", e))
+	.map_err(|e: Error| format!("IO error: {}", e))
 	.and_then(|a| parse_arguments(a.iter()))
 	.and_then(|parsed_args| {
 		// Source file name.
@@ -28,7 +28,7 @@ pub fn create_task(command: CommandInfo, args: &[String]) -> Result<Option<Compi
 		}) {
 			ParamValue::None => { return Err(format!("Can't find source file path.")); }
 			ParamValue::Single(v) => v,
-			ParamValue::Many(v) => { return Err(format!("Found too many source files: {:?}", v)); }
+			ParamValue::Many(v) => { return Err(format!("Found too many source files: {:?}", v));}
 		};
 		// Precompiled header file name.
 		let precompiled_file = match find_param(&parsed_args, |arg: &Arg| -> Option<PathBuf> {
@@ -72,7 +72,7 @@ pub fn create_task(command: CommandInfo, args: &[String]) -> Result<Option<Compi
 				}
 			}
 			ParamValue::Many(v) => {
-				return Err(format!("Found too many precompiled header markers: {:?}", v));
+				return Err(format!("Found too many precompiled header markers: {:?}", v.iter().map(|item| item.1.clone()).collect::<String>()));
 			}
 		};
 		// Output object file name.
@@ -102,10 +102,10 @@ pub fn create_task(command: CommandInfo, args: &[String]) -> Result<Option<Compi
 						match extension.to_str() {
 							Some(e) if e.eq_ignore_ascii_case("cpp") => { language = "P".to_string(); }
 							Some(e) if e.eq_ignore_ascii_case("c") => { language = "C".to_string(); }
-							_ => { return Err(format!("Can't detect file language by extension: {:?}", input_source)); }
+							_ => { return Err(format!("Can't detect file language by extension: {}", input_source.as_os_str().to_string_lossy())); }
 						}
 					}
-					_ => { return Err(format!("Can't detect file language by extension: {:?}", input_source)); }
+					_ => { return Err(format!("Can't detect file language by extension: {}", input_source.as_os_str().to_string_lossy())); }
 				}
 			}
 			ParamValue::Single(v) => {
