@@ -12,7 +12,6 @@ extern crate log;
 use octobuild::compiler::*;
 use octobuild::cluster::builder::{CompileRequest, CompileResponse};
 use octobuild::cluster::common::{BuilderInfo, BuilderInfoUpdate, RPC_BUILDER_UPDATE};
-use octobuild::builder_capnp;
 use octobuild::version;
 use octobuild::vs::compiler::VsCompiler;
 use octobuild::clang::compiler::ClangCompiler;
@@ -37,7 +36,6 @@ use std::time::Duration;
 use std::thread;
 use std::thread::JoinHandle;
 
-use capnp::serialize_packed;
 use capnp::message;
 
 struct BuilderService {
