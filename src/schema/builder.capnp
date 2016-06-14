@@ -23,6 +23,7 @@ struct OutputInfo {
   undefined @1: Bool;
   stdout @2: Data;
   stderr @3: Data;
+  content @4: Data;
 }
 
 struct OptionalContent {

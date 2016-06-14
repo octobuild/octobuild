@@ -97,9 +97,7 @@ impl Compiler for VsCompiler {
     }
 
     fn create_task(&self, command: CommandInfo, args: &[String]) -> Result<Option<CompilationTask>, String> {
-        self.resolve_toolchain(&command)
-            .ok_or(format!("Can't get toolchain for {}", command.program.display()))
-            .and_then(|toolchain| super::prepare::create_task(toolchain, command, args))
+        super::prepare::create_task(command, args)
     }
 
     fn preprocess_step(&self, task: &CompilationTask) -> Result<PreprocessResult, Error> {
@@ -198,20 +196,6 @@ impl Compiler for VsCompiler {
     }
 }
 
-enum VsOutput {
-    Temporary(TempFile),
-    Persistent(PathBuf),
-}
-
-impl VsOutput {
-    pub fn path<'a>(&'a self) -> &'a Path {
-        match self {
-            &VsOutput::Temporary(ref temp) => temp.path(),
-            &VsOutput::Persistent(ref path) => &path,
-        }
-    }
-}
-
 impl Toolchain for VsToolchain {
     fn identifier(&self) -> Option<String> {
         self.identifier.get(|| vs_identifier(&self.path))
@@ -222,10 +206,7 @@ impl Toolchain for VsToolchain {
         let input_temp = TempFile::new_in(&self.temp_dir, ".i");
         try!(File::create(input_temp.path()).and_then(|mut s| task.preprocessed.copy(&mut s)));
         // Output file path
-        let output_object: VsOutput = match task.output_object {
-            Some(path) => VsOutput::Persistent(path.clone()),
-            None => VsOutput::Temporary(TempFile::new_in(&self.temp_dir, ".o")),
-        };
+        let output_object = task.output_object.expect("Visual Studio don't support compilation to stdout.");
         // Run compiler.
         let mut command = Command::new(&self.path);
         command.env_clear()
@@ -233,7 +214,7 @@ impl Toolchain for VsToolchain {
             .arg("/c")
             .args(&task.args)
             .arg(input_temp.path().to_str().unwrap())
-            .arg(&join_flag("/Fo", output_object.path()));
+            .arg(&join_flag("/Fo", &output_object));
         // Copy required environment variables.
         for (name, value) in vec!["SystemDrive", "SystemRoot", "TEMP", "TMP"]
             .iter()
@@ -260,29 +241,26 @@ impl Toolchain for VsToolchain {
             .map(|o| o.as_bytes())
             .unwrap_or(b"");
         // Execute.
-        command.output().and_then(|o| {
-            match &output_object {
-                    &VsOutput::Persistent(_) => Ok(Vec::new()),
-                    &VsOutput::Temporary(ref temp) => {
-                        match o.status.code() {
-                            Some(0) => {
-                                File::open(temp.path()).and_then(|mut f| {
-                                    let mut buffer = Vec::new();
-                                    f.read_to_end(&mut buffer).map(|_| buffer)
-                                })
-                            }
-                            _ => Ok(Vec::new()),
-                        }
-                    }
-                }
-                .map(|output| {
-                    OutputInfo {
-                        status: o.status.code(),
-                        stdout: output,
-                        stderr: prepare_output(temp_file, o.stdout.clone(), o.status.code() == Some(0)),
-                    }
-                })
+        command.output().map(|o| {
+            OutputInfo {
+                status: o.status.code(),
+                stdout: prepare_output(temp_file, o.stdout.clone(), o.status.code() == Some(0)),
+                stderr: o.stderr,
+            }
         })
+    }
+
+    // Compile preprocessed file.
+    fn compile_memory(&self, mut task: CompileStep) -> Result<(OutputInfo, Vec<u8>), Error> {
+        let output_temp = TempFile::new_in(&self.temp_dir, ".o");
+        task.output_object = Some(output_temp.path().to_path_buf());
+        self.compile_step(task)
+            .and_then(|output| {
+                File::open(&output_temp.path()).and_then(|mut f| {
+                    let mut buffer = Vec::new();
+                    f.read_to_end(&mut buffer).map(|_| (output, buffer))
+                })
+            })
     }
 }
 

@@ -6,9 +6,11 @@ extern crate lazy_static;
 
 extern crate capnp;
 extern crate fern;
+extern crate hyper;
 extern crate rustc_serialize;
 extern crate time;
 extern crate uuid;
+extern crate rand;
 extern crate regex;
 #[cfg(windows)]
 extern crate winapi;
@@ -23,6 +25,7 @@ pub mod builder_capnp {
 pub mod cache;
 pub mod cluster {
     pub mod common;
+    pub mod client;
     pub mod builder;
 }
 pub mod common;

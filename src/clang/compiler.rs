@@ -72,9 +72,7 @@ impl Compiler for ClangCompiler {
     }
 
     fn create_task(&self, command: CommandInfo, args: &[String]) -> Result<Option<CompilationTask>, String> {
-        self.resolve_toolchain(&command)
-            .ok_or(format!("Can't get toolchain for {}", command.program.display()))
-            .and_then(|toolchain| super::prepare::create_task(toolchain, command, args))
+        super::prepare::create_task(command, args)
     }
 
     fn preprocess_step(&self, task: &CompilationTask) -> Result<PreprocessResult, Error> {

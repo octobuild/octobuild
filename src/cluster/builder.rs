@@ -26,7 +26,7 @@ pub struct OptionalContent {
 
 #[derive(Debug)]
 pub enum CompileResponse {
-    Success(OutputInfo),
+    Success(OutputInfo, Vec<u8>),
     Err(io::Error),
 }
 
@@ -115,8 +115,12 @@ impl CompileResponse {
 
     pub fn read(reader: compile_response::Reader) -> Result<Self, capnp::Error> {
         Ok(match try!(reader.which()) {
-            compile_response::Which::Success(reader) => CompileResponse::Success(try!(OutputInfo::read(try!(reader)))),
+            compile_response::Which::Success(reader) => {
+                let (output, content) = try!(OutputInfo::read(try!(reader)));
+                CompileResponse::Success(output, content)
+            }
             compile_response::Which::Error(reader) => {
+                // todo: Need good error transfer.
                 CompileResponse::Err(io::Error::new(io::ErrorKind::Other, "oh no!"))
             }
         })
@@ -124,7 +128,9 @@ impl CompileResponse {
 
     pub fn write(&self, mut builder: compile_response::Builder) {
         match self {
-            &CompileResponse::Success(ref success) => success.write(builder.borrow().init_success()),
+            &CompileResponse::Success(ref success, ref content) => {
+                success.write(builder.borrow().init_success(), content)
+            }
             &CompileResponse::Err(ref err) => {
                 builder.borrow().init_error();
             }
@@ -132,10 +138,10 @@ impl CompileResponse {
     }
 }
 
-impl From<Result<OutputInfo, io::Error>> for CompileResponse {
-    fn from(result: Result<OutputInfo, io::Error>) -> Self {
+impl From<Result<(OutputInfo, Vec<u8>), io::Error>> for CompileResponse {
+    fn from(result: Result<(OutputInfo, Vec<u8>), io::Error>) -> Self {
         match result {
-            Ok(v) => CompileResponse::Success(v),
+            Ok((output, content)) => CompileResponse::Success(output, content),
             Err(v) => CompileResponse::Err(v),
         }
     }

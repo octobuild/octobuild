@@ -19,12 +19,14 @@ use ::builder_capnp::output_info;
 #[derive(Debug)]
 pub enum CompilerError {
     InvalidArguments(String),
+    ToolchainNotFound(PathBuf),
 }
 
 impl Display for CompilerError {
     fn fmt(&self, f: &mut Formatter) -> Result<(), ::std::fmt::Error> {
         match self {
             &CompilerError::InvalidArguments(ref arg) => write!(f, "can't parse command line arguments: {}", arg),
+            &CompilerError::ToolchainNotFound(ref arg) => write!(f, "can't find toolchain for: {}", arg.display()),
         }
     }
 }
@@ -33,6 +35,7 @@ impl ::std::error::Error for CompilerError {
     fn description(&self) -> &str {
         match self {
             &CompilerError::InvalidArguments(_) => "can't parse command line arguments",
+            &CompilerError::ToolchainNotFound(_) => "can't find toolchain",
         }
     }
 
@@ -281,18 +284,20 @@ impl OutputInfo {
         }
     }
 
-    pub fn read(reader: output_info::Reader) -> Result<Self, capnp::Error> {
-        Ok(OutputInfo {
+    pub fn read(reader: output_info::Reader) -> Result<(Self, Vec<u8>), capnp::Error> {
+        let content = try!(reader.get_content()).to_vec();
+        let output = OutputInfo {
             status: match reader.get_undefined() {
                 true => Some(reader.get_status()),
                 false => None,
             },
             stdout: try!(reader.get_stdout()).to_vec(),
             stderr: try!(reader.get_stderr()).to_vec(),
-        })
+        };
+        Ok((output, content))
     }
 
-    pub fn write(&self, mut builder: output_info::Builder) {
+    pub fn write(&self, mut builder: output_info::Builder, content: &[u8]) {
         match self.status {
             Some(v) => {
                 builder.set_undefined(false);
@@ -304,12 +309,11 @@ impl OutputInfo {
         }
         builder.set_stdout(&self.stdout);
         builder.set_stderr(&self.stderr);
+        builder.set_content(content);
     }
 }
 
 pub struct CompilationTask {
-    // Compilation toolchain.
-    pub toolchain: Arc<Toolchain>,
     // Original compiler executable.
     pub command: CommandInfo,
     // Parsed arguments.
@@ -367,6 +371,19 @@ pub trait Toolchain: Send + Sync {
     fn identifier(&self) -> Option<String>;
     // Compile preprocessed file.
     fn compile_step(&self, task: CompileStep) -> Result<OutputInfo, Error>;
+    // Compile preprocessed file.
+    fn compile_memory(&self, mut task: CompileStep) -> Result<(OutputInfo, Vec<u8>), Error> {
+        task.output_object = None;
+        self.compile_step(task)
+            .map(|output| {
+                (OutputInfo {
+                    status: output.status,
+                    stderr: output.stderr,
+                    stdout: Vec::new(),
+                },
+                 output.stdout)
+            })
+    }
 }
 
 pub trait Compiler: Send + Sync {
@@ -392,9 +409,11 @@ pub trait Compiler: Send + Sync {
                    cache: &Cache,
                    statistic: &RwLock<Statistic>)
                    -> Result<Option<OutputInfo>, Error> {
+        let toolchain = try!(self.resolve_toolchain(&command)
+            .ok_or(Error::new(ErrorKind::InvalidInput,
+                              CompilerError::ToolchainNotFound(command.program.clone()))));
         match self.create_task(command, args) {
             Ok(Some(task)) => {
-                let toolchain = task.toolchain.clone();
                 match try!(self.preprocess_step(&task)) {
                         PreprocessResult::Success(preprocessed) => {
                             self.compile_prepare_step(task, preprocessed)

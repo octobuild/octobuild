@@ -143,7 +143,7 @@ impl BuilderService {
                 };
 
                 let toolchain: Arc<Toolchain> = state.toolchains.get(&request.toolchain).unwrap().clone();
-                let response = CompileResponse::from(toolchain.compile_step(compile_step));
+                let response = CompileResponse::from(toolchain.compile_memory(compile_step));
                 response.stream_write(&mut stream, &mut message::Builder::new_default()).unwrap();
             }
         }
