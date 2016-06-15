@@ -90,9 +90,12 @@ impl RemoteToolchain {
         let name = try!(self.identifier().ok_or(Error::new(ErrorKind::Other, "Can't get toolchain name")));
         let addr = try!(self.remote_endpoint(&name)
             .ok_or(Error::new(ErrorKind::Other, "Can't find helper for toolchain")));
+        if task.output_precompiled.is_some() {
+            return Err(Error::new(ErrorKind::Other,
+                                  "Remote precompiled header generation is not supported"));
+        }
 
         assert!(task.input_precompiled.is_none());
-        assert!(task.output_precompiled.is_none());
 
         // Connect to builder.
         let mut ostream = try!(TcpStream::connect(addr));
