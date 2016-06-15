@@ -369,6 +369,14 @@ pub enum PreprocessResult {
 pub trait Toolchain: Send + Sync {
     // Get toolchain identificator.
     fn identifier(&self) -> Option<String>;
+
+    // Parse compiler arguments.
+    fn create_task(&self, command: CommandInfo, args: &[String]) -> Result<Option<CompilationTask>, String>;
+    // Preprocessing source file.
+    fn preprocess_step(&self, task: &CompilationTask) -> Result<PreprocessResult, Error>;
+    // Compile preprocessed file.
+    fn compile_prepare_step(&self, task: CompilationTask, preprocessed: MemStream) -> Result<CompileStep, Error>;
+
     // Compile preprocessed file.
     fn compile_step(&self, task: CompileStep) -> Result<OutputInfo, Error>;
     // Compile preprocessed file.
@@ -393,15 +401,6 @@ pub trait Compiler: Send + Sync {
     // Discovery local toolchains.
     fn discovery_toolchains(&self) -> Vec<Arc<Toolchain>>;
 
-    // Parse compiler arguments.
-    fn create_task(&self, command: CommandInfo, args: &[String]) -> Result<Option<CompilationTask>, String>;
-
-    // Preprocessing source file.
-    fn preprocess_step(&self, task: &CompilationTask) -> Result<PreprocessResult, Error>;
-
-    // Compile preprocessed file.
-    fn compile_prepare_step(&self, task: CompilationTask, preprocessed: MemStream) -> Result<CompileStep, Error>;
-
     // Run preprocess and compile.
     fn try_compile(&self,
                    command: CommandInfo,
@@ -412,11 +411,11 @@ pub trait Compiler: Send + Sync {
         let toolchain = try!(self.resolve_toolchain(&command)
             .ok_or(Error::new(ErrorKind::InvalidInput,
                               CompilerError::ToolchainNotFound(command.program.clone()))));
-        match self.create_task(command, args) {
+        match toolchain.create_task(command, args) {
             Ok(Some(task)) => {
-                match try!(self.preprocess_step(&task)) {
+                match try!(toolchain.preprocess_step(&task)) {
                         PreprocessResult::Success(preprocessed) => {
-                            self.compile_prepare_step(task, preprocessed)
+                            toolchain.compile_prepare_step(task, preprocessed)
                                 .and_then(|task| compile_step_cached(task, cache, statistic, toolchain))
                         }
                         PreprocessResult::Failed(output) => Ok(output),

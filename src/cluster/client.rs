@@ -85,21 +85,6 @@ impl<C: Compiler> Compiler for RemoteCompiler<C> {
                 })
             })
     }
-
-    // Parse compiler arguments.
-    fn create_task(&self, command: CommandInfo, args: &[String]) -> Result<Option<CompilationTask>, String> {
-        self.local.create_task(command, args)
-    }
-
-    // Preprocessing source file.
-    fn preprocess_step(&self, task: &CompilationTask) -> Result<PreprocessResult, Error> {
-        self.local.preprocess_step(task)
-    }
-
-    // Compile preprocessed file.
-    fn compile_prepare_step(&self, task: CompilationTask, preprocessed: MemStream) -> Result<CompileStep, Error> {
-        self.local.compile_prepare_step(task, preprocessed)
-    }
 }
 
 impl RemoteToolchain {
@@ -177,6 +162,21 @@ impl RemoteToolchain {
 impl Toolchain for RemoteToolchain {
     fn identifier(&self) -> Option<String> {
         self.identifier.clone()
+    }
+
+    // Parse compiler arguments.
+    fn create_task(&self, command: CommandInfo, args: &[String]) -> Result<Option<CompilationTask>, String> {
+        self.local.create_task(command, args)
+    }
+
+    // Preprocessing source file.
+    fn preprocess_step(&self, task: &CompilationTask) -> Result<PreprocessResult, Error> {
+        self.local.preprocess_step(task)
+    }
+
+    // Compile preprocessed file.
+    fn compile_prepare_step(&self, task: CompilationTask, preprocessed: MemStream) -> Result<CompileStep, Error> {
+        self.local.compile_prepare_step(task, preprocessed)
     }
 
     fn compile_step(&self, task: CompileStep) -> Result<OutputInfo, Error> {

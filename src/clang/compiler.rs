@@ -70,6 +70,12 @@ impl Compiler for ClangCompiler {
             .map(|entry| -> Arc<Toolchain> { Arc::new(ClangToolchain::new(entry.path())) })
             .collect()
     }
+}
+
+impl Toolchain for ClangToolchain {
+    fn identifier(&self) -> Option<String> {
+        self.identifier.get(|| clang_identifier(&self.path))
+    }
 
     fn create_task(&self, command: CommandInfo, args: &[String]) -> Result<Option<CompilationTask>, String> {
         super::prepare::create_task(command, args)
@@ -148,12 +154,6 @@ impl Compiler for ClangCompiler {
             };
         }
         Ok(CompileStep::new(task, preprocessed, args, false))
-    }
-}
-
-impl Toolchain for ClangToolchain {
-    fn identifier(&self) -> Option<String> {
-        self.identifier.get(|| clang_identifier(&self.path))
     }
 
     fn compile_step(&self, task: CompileStep) -> Result<OutputInfo, Error> {

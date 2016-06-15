@@ -95,6 +95,12 @@ impl Compiler for VsCompiler {
             .filter(|toolchain| toolchain.identifier().is_some())
             .collect()
     }
+}
+
+impl Toolchain for VsToolchain {
+    fn identifier(&self) -> Option<String> {
+        self.identifier.get(|| vs_identifier(&self.path))
+    }
 
     fn create_task(&self, command: CommandInfo, args: &[String]) -> Result<Option<CompilationTask>, String> {
         super::prepare::create_task(command, args)
@@ -193,12 +199,6 @@ impl Compiler for VsCompiler {
             args.push("/Yc".to_string());
         }
         Ok(CompileStep::new(task, preprocessed, args, true))
-    }
-}
-
-impl Toolchain for VsToolchain {
-    fn identifier(&self) -> Option<String> {
-        self.identifier.get(|| vs_identifier(&self.path))
     }
 
     fn compile_step(&self, task: CompileStep) -> Result<OutputInfo, Error> {
