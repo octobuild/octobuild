@@ -223,12 +223,14 @@ impl Toolchain for VsToolchain {
         // Output files.
         match &task.output_precompiled {
             &Some(ref path) => {
+                assert!(path.is_absolute());
                 command.arg(join_flag("/Fp", path));
             }
             &None => {}
         }
         match &task.input_precompiled {
             &Some(ref path) => {
+                assert!(path.is_absolute());
                 command.arg(join_flag("/Fp", path));
             }
             &None => {}

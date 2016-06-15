@@ -153,14 +153,14 @@ pub fn create_task(command: CommandInfo, args: &[String]) -> Result<Option<Compi
             };
 
             Ok(Some(CompilationTask {
-                command: command,
                 args: parsed_args,
                 language: language,
-                input_source: input_source,
-                input_precompiled: input_precompiled,
-                output_object: output_object,
-                output_precompiled: output_precompiled,
+                input_source: command.current_dir_join(&input_source),
+                input_precompiled: input_precompiled.map(|path| command.current_dir_join(&path)),
+                output_object: command.current_dir_join(&output_object),
+                output_precompiled: output_precompiled.map(|path| command.current_dir_join(&path)),
                 marker_precompiled: marker_precompiled,
+                command: command,
             }))
         })
 }

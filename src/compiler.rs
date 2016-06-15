@@ -200,6 +200,13 @@ impl CommandInfo {
         }
     }
 
+    pub fn current_dir_join(&self, path: &Path) -> PathBuf {
+        match &self.current_dir {
+            &Some(ref cwd) => cwd.join(path),
+            &None => path.to_path_buf(),
+        }
+    }
+
     pub fn to_command(&self) -> Command {
         let mut command = Command::new(&self.program);
         command.env_clear();
