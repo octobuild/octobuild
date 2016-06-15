@@ -24,7 +24,7 @@ pub struct RemoteCompiler<C: Compiler> {
 }
 
 struct RemoteShared {
-    base_url: Url,
+    base_url: Option<Url>,
     cooldown: Timespec,
     builders: Arc<Vec<BuilderInfo>>,
 }
@@ -36,12 +36,12 @@ struct RemoteToolchain {
 }
 
 impl<C: Compiler> RemoteCompiler<C> {
-    pub fn new<U: Into<Url>>(base_url: U, compiler: C) -> Self {
+    pub fn new(base_url: &Option<Url>, compiler: C) -> Self {
         RemoteCompiler {
             shared: Arc::new(RwLock::new(RemoteShared {
                 cooldown: Timespec { sec: 0, nsec: 0 },
                 builders: Arc::new(Vec::new()),
-                base_url: base_url.into(),
+                base_url: base_url.as_ref().map(|u| u.clone()),
             })),
             local: compiler,
         }
@@ -50,15 +50,20 @@ impl<C: Compiler> RemoteCompiler<C> {
 
 impl RemoteShared {
     fn receive_builders(&self) -> Result<Vec<BuilderInfo>, Error> {
-        let client = Client::new();
-        client.get(self.base_url.join(RPC_BUILDER_LIST).unwrap())
-            .send()
-            .map_err(|e| Error::new(ErrorKind::Other, e))
-            .and_then(|mut response| {
-                let mut payload = String::new();
-                response.read_to_string(&mut payload).map(|_| payload)
-            })
-            .and_then(|payload| json::decode(&payload).map_err(|e| Error::new(ErrorKind::InvalidData, e)))
+        match &self.base_url {
+            &Some(ref base_url) => {
+                let client = Client::new();
+                client.get(base_url.join(RPC_BUILDER_LIST).unwrap())
+                    .send()
+                    .map_err(|e| Error::new(ErrorKind::Other, e))
+                    .and_then(|mut response| {
+                        let mut payload = String::new();
+                        response.read_to_string(&mut payload).map(|_| payload)
+                    })
+                    .and_then(|payload| json::decode(&payload).map_err(|e| Error::new(ErrorKind::InvalidData, e)))
+            }
+            &None => Ok(Vec::new()),
+        }
     }
 }
 

@@ -9,6 +9,7 @@ extern crate tempdir;
 #[macro_use]
 extern crate log;
 
+use octobuild::config::Config;
 use octobuild::compiler::*;
 use octobuild::cluster::builder::{CompileRequest, CompileResponse};
 use octobuild::cluster::common::{BuilderInfo, BuilderInfoUpdate, RPC_BUILDER_UPDATE};
@@ -53,10 +54,10 @@ struct BuilderState {
 
 impl BuilderService {
     fn new() -> Self {
-        let addr: SocketAddr = FromStr::from_str("127.0.0.1:0")
-            .ok()
-            .expect("Failed to parse host:port string");
-        let listener = TcpListener::bind(&addr).ok().expect("Failed to bind address");
+        let config = Config::new().unwrap();
+        info!("Helper bind to address: {}", config.helper_bind);
+        let listener = TcpListener::bind(&config.helper_bind).ok().expect("Failed to bind address");
+        info!("Helper local address: {}", listener.local_addr().unwrap());
 
         let state = Arc::new(BuilderState {
             name: get_name(),
@@ -72,7 +73,7 @@ impl BuilderService {
         let done = Arc::new(AtomicBool::new(false));
         BuilderService {
             accepter: Some(BuilderService::thread_accepter(state.clone(), listener.try_clone().unwrap())),
-            anoncer: Some(BuilderService::thread_anoncer(state.clone(), done.clone())),
+            anoncer: Some(BuilderService::thread_anoncer(state.clone(), config.coordinator.unwrap(), done.clone())),
             done: done,
             listener: Some(listener),
         }
@@ -98,7 +99,7 @@ impl BuilderService {
         })
     }
 
-    fn thread_anoncer(state: Arc<BuilderState>, done: Arc<AtomicBool>) -> JoinHandle<()> {
+    fn thread_anoncer(state: Arc<BuilderState>, coordinator: Url, done: Arc<AtomicBool>) -> JoinHandle<()> {
         thread::spawn(move || {
             let info = BuilderInfoUpdate::new(BuilderInfo {
                 name: state.name.clone(),
@@ -109,10 +110,7 @@ impl BuilderService {
 
             let client = Client::new();
             while !done.load(Ordering::Relaxed) {
-                match client.post(Url::parse("http://localhost:3000")
-                        .unwrap()
-                        .join(RPC_BUILDER_UPDATE)
-                        .unwrap())
+                match client.post(coordinator.join(RPC_BUILDER_UPDATE).unwrap())
                     .body(&json::encode(&info).unwrap())
                     .send() {
                     Ok(_) => {}

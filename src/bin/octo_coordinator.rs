@@ -8,6 +8,7 @@ extern crate rustc_serialize;
 #[macro_use]
 extern crate log;
 
+use octobuild::config::Config;
 use octobuild::cluster::common::{BuilderInfo, BuilderInfoUpdate, RPC_BUILDER_LIST, RPC_BUILDER_UPDATE};
 use daemon::State;
 use daemon::Daemon;
@@ -91,12 +92,13 @@ fn main() {
             for signal in rx.iter() {
                 match signal {
                     State::Start => {
-                        info!("Coordinator: Starting on 3000");
+                        let config = Config::new().unwrap();
+                        info!("Coordinator bind to address: {}", config.coordinator_bind);
                         let router = service_router!(CoordinatorService::new(),
                         get RPC_BUILDER_LIST => rpc_agent_list,
                         post RPC_BUILDER_UPDATE => rpc_agent_update,
                     );
-                        web = Some(Iron::new(router).http("localhost:3000").unwrap());
+                        web = Some(Iron::new(router).http(config.coordinator_bind).unwrap());
                         info!("Coordinator: Ready");
                     }
                     State::Reload => {

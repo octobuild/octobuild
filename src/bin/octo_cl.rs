@@ -4,6 +4,7 @@ extern crate tempdir;
 use octobuild::vs::compiler::VsCompiler;
 use octobuild::io::statistic::Statistic;
 use octobuild::compiler::*;
+use octobuild::cluster::client::RemoteCompiler;
 use octobuild::cache::Cache;
 use octobuild::config::Config;
 
@@ -35,10 +36,11 @@ fn main() {
 fn compile() -> Result<OutputInfo, Error> {
     let statistic = RwLock::new(Statistic::new());
     let temp_dir = try!(TempDir::new("octobuild"));
-    let cache = Cache::new(&try!(Config::new()));
-    let compiler = VsCompiler::new(temp_dir.path());
+    let config = try!(Config::new());
+    let cache = Cache::new(&config);
     let args = Vec::from_iter(env::args());
     let command_info = CommandInfo::simple(Path::new("cl.exe"));
+    let compiler = RemoteCompiler::new(&config.coordinator, VsCompiler::new(temp_dir.path()));
     let output = try!(compiler.compile(command_info, &args[1..], &cache, &statistic));
 
     try!(io::stdout().write_all(&output.stdout));
