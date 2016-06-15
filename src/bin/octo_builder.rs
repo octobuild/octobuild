@@ -129,8 +129,7 @@ impl BuilderService {
             // Receive compilation request.
             {
                 let request = CompileRequest::stream_read(&mut buf, ::capnp::message::ReaderOptions::new()).unwrap();
-
-                println!("{:?}", request);
+                info!("Received task from: {}", stream.peer_addr().unwrap());
                 let compile_step: CompileStep = CompileStep {
                     output_object: None,
                     output_precompiled: None,
