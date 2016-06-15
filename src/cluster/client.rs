@@ -31,7 +31,6 @@ struct RemoteShared {
 
 struct RemoteToolchain {
     shared: Arc<RwLock<RemoteShared>>,
-    identifier: Option<String>,
     local: Arc<Toolchain>,
 }
 
@@ -80,7 +79,6 @@ impl<C: Compiler> Compiler for RemoteCompiler<C> {
             .map(|local| -> Arc<Toolchain> {
                 Arc::new(RemoteToolchain {
                     shared: self.shared.clone(),
-                    identifier: local.identifier(),
                     local: local,
                 })
             })
@@ -161,7 +159,7 @@ impl RemoteToolchain {
 
 impl Toolchain for RemoteToolchain {
     fn identifier(&self) -> Option<String> {
-        self.identifier.clone()
+        self.local.identifier()
     }
 
     // Parse compiler arguments.
