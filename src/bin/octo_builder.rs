@@ -151,12 +151,12 @@ impl BuilderService {
 
     fn discovery_toolchains() -> HashMap<String, Arc<Toolchain>> {
         let temp_dir = TempDir::new("octobuild").ok().expect("Can't create temporary directory");
-        let compilers: Vec<Box<Compiler>> = vec!(
-            Box::new(VsCompiler::new(temp_dir.path())),
-            Box::new(ClangCompiler::new()),
-        );
-        HashMap::from_iter(compilers.iter()
-            .flat_map(|compiler| compiler.discovery_toolchains())
+        let compiler = CompilerGroup::new(vec!(
+			Box::new(VsCompiler::new(temp_dir.path())),
+			Box::new(ClangCompiler::new()),
+		));
+        HashMap::from_iter(compiler.discovery_toolchains()
+            .into_iter()
             .filter_map(|toolchain| toolchain.identifier().map(|name| (name, toolchain))))
     }
 }

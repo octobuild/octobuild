@@ -73,7 +73,6 @@ impl Compiler for VsCompiler {
     fn discovery_toolchains(&self) -> Vec<Arc<Toolchain>> {
         use self::winreg::RegKey;
         use self::winreg::enums::*;
-        use std::ffi::OsString;
 
         lazy_static!{
 			static ref RE:self::regex::Regex = self::regex::Regex::new(r"^\d+\.\d+$").unwrap();
@@ -81,12 +80,12 @@ impl Compiler for VsCompiler {
         vec!["SOFTWARE\\Wow6432Node\\Microsoft\\VisualStudio\\SxS\\VC7", "SOFTWARE\\Microsoft\\VisualStudio\\SxS\\VC7"]
             .iter()
             .filter_map(|reg_path| RegKey::predef(HKEY_LOCAL_MACHINE).open_subkey_with_flags(reg_path, KEY_READ).ok())
-            .flat_map(|key| -> Vec<OsString> {
+            .flat_map(|key| -> Vec<String> {
                 key.enum_values()
                     .filter_map(|x| x.ok())
                     .map(|(name, _)| name)
                     .filter(|name| RE.is_match(&name))
-                    .filter_map(|name: String| -> Option<OsString> { key.get_value(name).ok() })
+                    .filter_map(|name: String| -> Option<String> { key.get_value(name).ok() })
                     .collect()
             })
             .map(|path| -> Arc<Toolchain> {
