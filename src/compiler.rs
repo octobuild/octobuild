@@ -460,8 +460,8 @@ pub trait Compiler: Send + Sync {
             Ok(None) => command.to_command().args(args).output().map(|o| OutputInfo::new(o)),
             // todo: log error reason
             Err(e) => {
-                println!("Can't use octobuild for compiling file, use fallback compilation: {}",
-                         e);
+                info!("Can't use octobuild for compiling file, use fallback compilation: {}",
+                      e);
                 command.to_command().args(args).output().map(|o| OutputInfo::new(o))
             }
         }
