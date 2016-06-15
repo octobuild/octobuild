@@ -292,8 +292,8 @@ impl OutputInfo {
         let content = try!(reader.get_content()).to_vec();
         let output = OutputInfo {
             status: match reader.get_undefined() {
-                true => Some(reader.get_status()),
-                false => None,
+                false => Some(reader.get_status()),
+                true => None,
             },
             stdout: try!(reader.get_stdout()).to_vec(),
             stderr: try!(reader.get_stderr()).to_vec(),
