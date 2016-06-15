@@ -32,7 +32,6 @@ use std::net::{Shutdown, SocketAddr, TcpListener, TcpStream};
 use std::sync::mpsc::Receiver;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
-use std::str::FromStr;
 use std::time::Duration;
 use std::thread;
 use std::thread::JoinHandle;

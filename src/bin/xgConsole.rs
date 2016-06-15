@@ -13,6 +13,7 @@ use octobuild::version;
 use octobuild::vs::compiler::VsCompiler;
 use octobuild::io::statistic::Statistic;
 use octobuild::clang::compiler::ClangCompiler;
+use octobuild::cluster::client::RemoteCompiler;
 use octobuild::compiler::*;
 
 use petgraph::{EdgeDirection, Graph};
@@ -45,10 +46,10 @@ struct ResultMessage {
     result: Result<OutputInfo, Error>,
 }
 
-struct ExecutorState {
+struct ExecutorState<C: Compiler> {
     cache: Cache,
     statistic: RwLock<Statistic>,
-    compilers: Vec<Box<Compiler>>,
+    compiler: C,
 }
 
 fn main() {
@@ -152,10 +153,11 @@ fn execute(args: &[String]) -> Result<Option<i32>, Error> {
     let state = Arc::new(ExecutorState {
         statistic: RwLock::new(Statistic::new()),
         cache: Cache::new(&config),
-        compilers: vec!(
+        compiler: RemoteCompiler::new(&config.coordinator,
+                                      CompilerGroup::new(vec!(
 			Box::new(VsCompiler::new(temp_dir.path())),
 			Box::new(ClangCompiler::new()),
-		),
+		))),
     });
     let files = args.iter()
         .filter(|a| !is_flag(a))
@@ -252,7 +254,7 @@ fn validate_graph(graph: Graph<BuildTask, ()>) -> Result<Graph<BuildTask, ()>, E
                    "Found cycles in build dependencies"))
 }
 
-fn execute_task(state: &ExecutorState, worker: usize, message: TaskMessage) -> ResultMessage {
+fn execute_task<C: Compiler>(state: &ExecutorState<C>, worker: usize, message: TaskMessage) -> ResultMessage {
     let args = expand_args(&message.task.args,
                            &|name: &str| -> Option<String> { env::var(name).ok() });
     let output = execute_compiler(state, &message.task, &args);
@@ -264,21 +266,16 @@ fn execute_task(state: &ExecutorState, worker: usize, message: TaskMessage) -> R
     }
 }
 
-fn execute_compiler(state: &ExecutorState, task: &BuildTask, args: &[String]) -> Result<OutputInfo, Error> {
+fn execute_compiler<C: Compiler>(state: &ExecutorState<C>,
+                                 task: &BuildTask,
+                                 args: &[String])
+                                 -> Result<OutputInfo, Error> {
     let command = CommandInfo {
         program: Path::new(&task.exec).to_path_buf(),
         current_dir: Some(Path::new(&task.working_dir).to_path_buf()),
         env: task.env.clone(),
     };
-    for compiler in state.compilers.iter() {
-        if compiler.resolve_toolchain(&command).is_some() {
-            return compiler.compile(command, args, &state.cache, &state.statistic);
-        }
-    }
-    command.to_command()
-        .args(&args)
-        .output()
-        .map(|o| OutputInfo::new(o))
+    state.compiler.compile(command, args, &state.cache, &state.statistic)
 }
 
 fn execute_graph(graph: &Graph<BuildTask, ()>,

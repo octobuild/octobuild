@@ -149,6 +149,10 @@ pub struct CommandInfo {
     pub env: Arc<CommandEnv>,
 }
 
+pub struct CompilerGroup {
+    compilers: Vec<Box<Compiler>>,
+}
+
 impl CommandEnv {
     pub fn new() -> Self {
         CommandEnv { map: HashMap::new() }
@@ -391,6 +395,23 @@ pub trait Toolchain: Send + Sync {
                 },
                  output.stdout)
             })
+    }
+}
+
+impl CompilerGroup {
+    pub fn new(compilers: Vec<Box<Compiler>>) -> Self {
+        CompilerGroup { compilers: compilers }
+    }
+}
+
+impl Compiler for CompilerGroup {
+    // Resolve toolchain for command execution.
+    fn resolve_toolchain(&self, command: &CommandInfo) -> Option<Arc<Toolchain>> {
+        self.compilers.iter().filter_map(|c| c.resolve_toolchain(command)).next()
+    }
+    // Discovery local toolchains.
+    fn discovery_toolchains(&self) -> Vec<Arc<Toolchain>> {
+        self.compilers.iter().flat_map(|c| c.discovery_toolchains()).collect()
     }
 }
 
