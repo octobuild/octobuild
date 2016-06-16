@@ -20,8 +20,8 @@ pub struct CompileRequest {
 
 #[derive(Debug)]
 pub struct OptionalContent {
-    hash: String,
-    data: Option<Vec<u8>>,
+    pub hash: String,
+    pub data: Option<Vec<u8>>,
 }
 
 #[derive(Debug)]

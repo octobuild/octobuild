@@ -2,6 +2,8 @@ extern crate regex;
 #[cfg(windows)]
 extern crate winreg;
 
+use byteorder::{LittleEndian, ReadBytesExt};
+
 pub use super::super::compiler::*;
 
 use super::postprocess;
@@ -11,7 +13,7 @@ use super::super::io::tempfile::TempFile;
 use super::super::lazy::Lazy;
 
 use std::fs::File;
-use std::io::{Cursor, Error, Read, Write};
+use std::io::{Cursor, Error, ErrorKind, Read, Seek, SeekFrom, Write};
 use std::env;
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -77,8 +79,17 @@ impl Compiler for VsCompiler {
         lazy_static!{
 			static ref RE:self::regex::Regex = self::regex::Regex::new(r"^\d+\.\d+$").unwrap();
 		}
-        vec!["SOFTWARE\\Wow6432Node\\Microsoft\\VisualStudio\\SxS\\VC7", "SOFTWARE\\Microsoft\\VisualStudio\\SxS\\VC7"]
-            .iter()
+
+        const CL_BIN: &'static [&'static str] = &["bin/cl.exe",
+                                                  "bin/x86_arm/cl.exe",
+                                                  "bin/x86_amd64/cl.exe",
+                                                  "bin/amd64_x86/cl.exe",
+                                                  "bin/amd64_arm/cl.exe",
+                                                  "bin/amd64/cl.exe"];
+        const VC_REG: &'static [&'static str] = &["SOFTWARE\\Wow6432Node\\Microsoft\\VisualStudio\\SxS\\VC7",
+                                                  "SOFTWARE\\Microsoft\\VisualStudio\\SxS\\VC7"];
+
+        VC_REG.iter()
             .filter_map(|reg_path| RegKey::predef(HKEY_LOCAL_MACHINE).open_subkey_with_flags(reg_path, KEY_READ).ok())
             .flat_map(|key| -> Vec<String> {
                 key.enum_values()
@@ -88,9 +99,15 @@ impl Compiler for VsCompiler {
                     .filter_map(|name: String| -> Option<String> { key.get_value(name).ok() })
                     .collect()
             })
-            .map(|path| -> Arc<Toolchain> {
-                Arc::new(VsToolchain::new(Path::new(&path).join("bin/cl.exe"), self.temp_dir.clone()))
+            .map(|path| Path::new(&path).to_path_buf())
+            .map(|path| -> Vec<PathBuf> {
+                CL_BIN.iter()
+                    .map(|bin| path.join(bin))
+                    .collect()
             })
+            .flat_map(|paths| paths.into_iter())
+            .filter(|cl| cl.exists())
+            .map(|cl| -> Arc<Toolchain> { Arc::new(VsToolchain::new(cl, self.temp_dir.clone())) })
             .filter(|toolchain| toolchain.identifier().is_some())
             .collect()
     }
@@ -187,13 +204,6 @@ impl Toolchain for VsToolchain {
         });
         args.push("/nologo".to_string());
         args.push("/T".to_string() + &task.language);
-        match &task.input_precompiled {
-            &Some(ref path) => {
-                args.push("/Yu".to_string());
-                args.push("/Fp".to_string() + &path.display().to_string());
-            }
-            &None => {}
-        }
         if task.output_precompiled.is_some() {
             args.push("/Yc".to_string());
         }
@@ -228,19 +238,21 @@ impl Toolchain for VsToolchain {
             }
             &None => {}
         }
-        match &task.input_precompiled {
-            &Some(ref path) => {
-                assert!(path.is_absolute());
-                command.arg(join_flag("/Fp", path));
-            }
-            &None => {}
-        }
         // Save input file name for output filter.
         let temp_file = input_temp.path()
             .file_name()
             .and_then(|o| o.to_str())
             .map(|o| o.as_bytes())
             .unwrap_or(b"");
+        // Use precompiled header
+        match &task.input_precompiled {
+            &Some(ref path) => {
+                assert!(path.is_absolute());
+                command.arg("/Yu");
+                command.arg(join_flag("/Fp", path));
+            }
+            &None => {}
+        }
         // Execute.
         command.output().map(|o| {
             OutputInfo {
@@ -337,7 +349,43 @@ fn vs_identifier(path: &Path) -> Option<String> {
         }
         String::from_utf16_lossy(slice::from_raw_parts(value_data as *mut u16, (value_size - 1) as usize))
     };
-    Some("cl ".to_string() + &product_version)
+    let executable_id = match read_executable_id(path) {
+        Ok(id) => id,
+        Err(e) => {
+            println!("{}", e);
+            return None;
+        }
+    };
+    Some(format!("cl {} {}", &product_version, executable_id))
+}
+
+fn read_executable_id(path: &Path) -> Result<String, Error> {
+    let mut header: Vec<u8> = Vec::with_capacity(0x54);
+
+    let mut file = try!(File::open(path));
+    // Read MZ header
+    header.resize(0x40, 0);
+    try!(file.read_exact(&mut header[..]));
+    // Check MZ header signature
+    if header[0..2] != [0x4D, 0x5A] {
+        return Err(Error::new(ErrorKind::InvalidData,
+                              "Unexpected file type (MZ header signature not found)"));
+    }
+    // Read PE header offset
+    let pe_offset = try!(Cursor::new(&header[0x3C..0x40]).read_u32::<LittleEndian>()) as u64;
+    // Read PE header
+    try!(file.seek(SeekFrom::Start(pe_offset)));
+    header.resize(0x54, 0);
+    try!(file.read_exact(&mut header[..]));
+    // Check PE header signature
+    if header[0..4] != [0x50, 0x45, 0x00, 0x00] {
+        return Err(Error::new(ErrorKind::InvalidData,
+                              "Unexpected file type (PE header signature not found)"));
+    }
+    let pe_time_date_stamp = try!(Cursor::new(&header[0x08..0x0C]).read_u32::<LittleEndian>());
+    let pe_size_of_image = try!(Cursor::new(&header[0x50..0x54]).read_u32::<LittleEndian>());
+    // Read PE header information
+    Ok(format!("{:X}{:x}", pe_time_date_stamp, pe_size_of_image))
 }
 
 fn prepare_output(line: &[u8], mut buffer: Vec<u8>, success: bool) -> Vec<u8> {

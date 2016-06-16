@@ -17,6 +17,7 @@ use octobuild::version;
 use octobuild::vs::compiler::VsCompiler;
 use octobuild::clang::compiler::ClangCompiler;
 use octobuild::io::memstream::MemStream;
+use octobuild::io::tempfile::TempFile;
 use daemon::State;
 use daemon::Daemon;
 use daemon::DaemonRunner;
@@ -25,10 +26,12 @@ use rustc_serialize::json;
 use tempdir::TempDir;
 use std::collections::HashMap;
 use std::error::Error;
+use std::fs::File;
 use std::io;
 use std::io::{BufReader, Read, Write};
 use std::iter::FromIterator;
 use std::net::{Shutdown, SocketAddr, TcpListener, TcpStream};
+use std::path::Path;
 use std::sync::mpsc::Receiver;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
@@ -47,6 +50,7 @@ struct BuilderService {
 
 struct BuilderState {
     name: String,
+    temp_dir: TempDir,
     endpoint: SocketAddr,
     toolchains: HashMap<String, Arc<Toolchain>>,
 }
@@ -58,10 +62,12 @@ impl BuilderService {
         let listener = TcpListener::bind(&config.helper_bind).ok().expect("Failed to bind address");
         info!("Helper local address: {}", listener.local_addr().unwrap());
 
+        let temp_dir = TempDir::new("octobuild").ok().expect("Can't create temporary directory");
         let state = Arc::new(BuilderState {
             name: get_name(),
             endpoint: listener.local_addr().unwrap(),
-            toolchains: BuilderService::discovery_toolchains(),
+            toolchains: BuilderService::discovery_toolchains(temp_dir.path()),
+            temp_dir: temp_dir,
         });
 
         info!("Found toolchains:");
@@ -128,18 +134,30 @@ impl BuilderService {
             let mut buf = BufReader::new(try!(stream.try_clone()));
             // Receive compilation request.
             {
-                let request = CompileRequest::stream_read(&mut buf, ::capnp::message::ReaderOptions::new()).unwrap();
+                let mut options = ::capnp::message::ReaderOptions::new();
+                options.traversal_limit_in_words(1024 * 1024 * 1024);
+                let request = CompileRequest::stream_read(&mut buf, options).unwrap();
                 info!("Received task from: {}", stream.peer_addr().unwrap());
+                let precompiled: Option<TempFile> = match request.precompiled {
+                    Some(ref content) => {
+                        let temp = TempFile::new_in(state.temp_dir.path(), ".pch");
+                        try!(File::create(temp.path())
+                            .and_then(|mut file| file.write(&content.data.as_ref().unwrap())));
+                        Some(temp)
+                    }
+                    None => None,
+                };
                 let compile_step: CompileStep = CompileStep {
                     output_object: None,
                     output_precompiled: None,
-                    input_precompiled: None,
+                    input_precompiled: precompiled.as_ref().map(|temp| temp.path().to_path_buf()),
                     args: request.args,
                     preprocessed: MemStream::from(request.preprocessed),
                 };
 
                 let toolchain: Arc<Toolchain> = state.toolchains.get(&request.toolchain).unwrap().clone();
                 let response = CompileResponse::from(toolchain.compile_memory(compile_step));
+                drop(precompiled);
                 response.stream_write(&mut stream, &mut message::Builder::new_default()).unwrap();
             }
         }
@@ -149,10 +167,9 @@ impl BuilderService {
         Ok(())
     }
 
-    fn discovery_toolchains() -> HashMap<String, Arc<Toolchain>> {
-        let temp_dir = TempDir::new("octobuild").ok().expect("Can't create temporary directory");
+    fn discovery_toolchains(temp_dir: &Path) -> HashMap<String, Arc<Toolchain>> {
         let compiler = CompilerGroup::new(vec!(
-			Box::new(VsCompiler::new(temp_dir.path())),
+			Box::new(VsCompiler::new(temp_dir)),
 			Box::new(ClangCompiler::new()),
 		));
         HashMap::from_iter(compiler.discovery_toolchains()

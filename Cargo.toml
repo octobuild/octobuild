@@ -40,6 +40,7 @@ num_cpus = "0.2.12"
 regex = "0.1.69"
 lazy_static = "0.2.1"
 
+byteorder = "*"
 log = "*"
 fern = "*"
 daemon = "*"

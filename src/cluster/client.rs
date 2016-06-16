@@ -7,7 +7,7 @@ use time::{Duration, Timespec};
 
 use ::io::memstream::MemStream;
 use ::cluster::common::{BuilderInfo, RPC_BUILDER_LIST};
-use ::cluster::builder::{CompileRequest, CompileResponse};
+use ::cluster::builder::{CompileRequest, CompileResponse, OptionalContent};
 use ::compiler::{CommandInfo, CompilationTask, CompileStep, Compiler, OutputInfo, PreprocessResult, Toolchain};
 
 use std::fs;
@@ -95,7 +95,19 @@ impl RemoteToolchain {
                                   "Remote precompiled header generation is not supported"));
         }
 
-        assert!(task.input_precompiled.is_none());
+        let precompiled = match task.input_precompiled {
+            Some(ref path) => {
+                let content = try!(File::open(&path).and_then(|mut file| {
+                    let mut buf = Vec::new();
+                    file.read_to_end(&mut buf).map(|_| buf)
+                }));
+                Some(OptionalContent {
+                    hash: "hash".to_string(), // todo: Need implementation
+                    data: Some(content),
+                })
+            }
+            None => None,
+        };
 
         // Connect to builder.
         let mut ostream = try!(TcpStream::connect(addr));
@@ -106,13 +118,15 @@ impl RemoteToolchain {
             toolchain: name.clone(),
             args: task.args.clone(),
             preprocessed: (&task.preprocessed).into(),
-            precompiled: None,
+            precompiled: precompiled,
         };
         try!(request.stream_write(&mut ostream, &mut message::Builder::new_default()));
         drop(request);
 
         // Receive compilation result.
-        CompileResponse::stream_read(&mut istream, ::capnp::message::ReaderOptions::new())
+        let mut options = ::capnp::message::ReaderOptions::new();
+        options.traversal_limit_in_words(1024 * 1024 * 1024);
+        CompileResponse::stream_read(&mut istream, options)
             .map_err(|e| Error::new(ErrorKind::InvalidData, e))
             .and_then(|result| {
                 match result {
