@@ -27,28 +27,28 @@ capnpc = "0.7.1"
 rustc_version = "0.1.7"
 
 [dependencies]
-yaml-rust = "0.3.2"
+yaml-rust = "0.3.3"
 filetime = "0.1.10"
-lz4 = "1.16.131"
-libc = "0.2.11"
+lz4 = "1.17.131"
+libc = "0.2.12"
 petgraph = "0.2.7"
-xml-rs = "0.3.2"
+xml-rs = "0.3.4"
 rand = "0.3.14"
 uuid = { version = "0.2.2", features = ["v4"] }
 tempdir = "0.3.4"
-num_cpus = "0.2.12"
-regex = "0.1.69"
+num_cpus = "0.2.13"
+regex = "0.1.71"
 lazy_static = "0.2.1"
 
-byteorder = "*"
-log = "*"
-fern = "*"
-daemon = "*"
-hyper = { version = "*", default-features = false, features = [""] }
-iron = "*"
-router = "*"
-time = "*"
-rustc-serialize = "*"
+byteorder = "0.5.3"
+log = "0.3.6"
+fern = "0.3.5"
+daemon = "0.0.7"
+hyper = { version = "0.9.8", default-features = false, features = [""] }
+iron = "0.3.0"
+router = "0.1.1"
+time = "0.1.35"
+rustc-serialize = "0.3.19"
 
 capnp = "0.7.1"
 
