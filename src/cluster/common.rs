@@ -4,6 +4,9 @@ use uuid::Uuid;
 pub const RPC_BUILDER_UPDATE: &'static str = "/rpc/v1/builder/update";
 pub const RPC_BUILDER_LIST: &'static str = "/rpc/v1/builder/list";
 
+pub const RPC_BUILDER_TASK: &'static str = "/rpc/v1/builder/task";
+pub const RPC_BUILDER_UPLOAD: &'static str = "/rpc/v1/builder/upload";
+
 #[derive(RustcEncodable, RustcDecodable)]
 pub struct BuilderInfo {
     // Agent name
