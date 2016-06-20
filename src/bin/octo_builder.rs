@@ -1,6 +1,7 @@
 extern crate octobuild;
 extern crate capnp;
 extern crate daemon;
+extern crate router;
 extern crate fern;
 extern crate hyper;
 extern crate rustc_serialize;
