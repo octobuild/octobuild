@@ -4,7 +4,6 @@ use capnp::serialize_packed;
 
 use ::builder_capnp::compile_request;
 use ::builder_capnp::compile_response;
-use ::builder_capnp::optional_content;
 use ::compiler::OutputInfo;
 
 use std::io;
@@ -14,14 +13,8 @@ use std::io::{BufRead, Write};
 pub struct CompileRequest {
     pub toolchain: String,
     pub args: Vec<String>,
-    pub preprocessed: Vec<u8>,
-    pub precompiled: Option<OptionalContent>,
-}
-
-#[derive(Debug)]
-pub struct OptionalContent {
-    pub hash: String,
-    pub data: Option<Vec<u8>>,
+    pub preprocessed_data: Vec<u8>,
+    pub precompiled_hash: Option<Vec<u8>>,
 }
 
 #[derive(Debug)]
@@ -52,9 +45,9 @@ impl CompileRequest {
             args: try!((0..args.len())
                 .map(|index| args.get(index).map(|value| value.to_string()))
                 .collect()),
-            preprocessed: try!(reader.get_preprocessed()).to_vec(),
-            precompiled: match reader.has_precompiled() {
-                true => Some(try!(OptionalContent::read(try!(reader.get_precompiled())))),
+            preprocessed_data: try!(reader.get_preprocessed_data()).to_vec(),
+            precompiled_hash: match reader.has_precompiled_hash() {
+                true => Some(try!(reader.get_precompiled_hash()).to_vec()),
                 false => None,
             },
         })
@@ -62,37 +55,16 @@ impl CompileRequest {
 
     pub fn write(&self, mut builder: compile_request::Builder) {
         builder.set_toolchain(&self.toolchain);
-        builder.set_preprocessed(&self.preprocessed);
+        builder.set_preprocessed_data(&self.preprocessed_data);
         {
             let mut args = builder.borrow().init_args(self.args.len() as u32);
             for index in 0..self.args.len() {
                 args.borrow().set(index as u32, &self.args.get(index).unwrap());
             }
         }
-        match self.precompiled {
+        match self.precompiled_hash {
             Some(ref value) => {
-                value.write(builder.borrow().init_precompiled());
-            }
-            None => {}
-        }
-    }
-}
-
-impl OptionalContent {
-    pub fn read(reader: optional_content::Reader) -> Result<Self, capnp::Error> {
-        Ok(OptionalContent {
-            hash: try!(reader.get_hash()).to_string(),
-            data: match reader.has_data() {
-                true => Some(try!(reader.get_data()).to_vec()),
-                false => None,
-            },
-        })
-    }
-    pub fn write(&self, mut builder: optional_content::Builder) {
-        builder.set_hash(&self.hash);
-        match self.data {
-            Some(ref value) => {
-                builder.set_data(&value);
+                builder.set_precompiled_hash(value);
             }
             None => {}
         }

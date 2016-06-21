@@ -1,5 +1,7 @@
 extern crate filetime;
 
+use md5::Digest;
+
 use std::path::{Path, PathBuf};
 use std::fs;
 use std::fs::File;
@@ -22,13 +24,13 @@ pub struct Cache {
 
 #[derive(Clone)]
 struct FileHash {
-    hash: String,
+    hash: Digest,
     size: u64,
     modified: FileTime,
 }
 
 pub trait FileHasher {
-    fn file_hash(&self, &Path) -> Result<String, Error>;
+    fn file_hash(&self, &Path) -> Result<Digest, Error>;
 }
 
 impl Cache {
@@ -55,7 +57,7 @@ impl Cache {
 }
 
 impl FileHasher for Cache {
-    fn file_hash(&self, path: &Path) -> Result<String, Error> {
+    fn file_hash(&self, path: &Path) -> Result<Digest, Error> {
         let result = self.file_hash_cache.run_cached(path.to_path_buf(),
                                                      |cached: Option<Result<FileHash, ()>>| -> Result<FileHash, ()> {
             let stat = match fs::metadata(path) {
@@ -87,7 +89,7 @@ impl FileHasher for Cache {
                 }
             };
             Ok(FileHash {
-                hash: hash.clone(),
+                hash: hash,
                 size: stat.len(),
                 modified: FileTime::from_last_modification_time(&stat),
             })
@@ -99,6 +101,6 @@ impl FileHasher for Cache {
     }
 }
 
-fn generate_file_hash(path: &Path) -> Result<String, Error> {
+fn generate_file_hash(path: &Path) -> Result<Digest, Error> {
     File::open(path).and_then(|mut file| hash_stream(&mut file))
 }

@@ -1,15 +1,19 @@
 use capnp::message;
 use hyper::{Client, Url};
+use hyper::client::Body;
+use hyper::header::Expect;
+use hyper::status::StatusCode;
 use rand;
+use rustc_serialize::hex::ToHex;
 use rustc_serialize::json;
 use time;
 use time::{Duration, Timespec};
 
-use ::cache::Cache;
+use ::cache::{Cache, FileHasher};
 use ::io::memstream::MemStream;
 use ::io::statistic::Statistic;
-use ::cluster::common::{BuilderInfo, RPC_BUILDER_LIST, RPC_BUILDER_TASK};
-use ::cluster::builder::{CompileRequest, CompileResponse, OptionalContent};
+use ::cluster::common::{BuilderInfo, RPC_BUILDER_LIST, RPC_BUILDER_TASK, RPC_BUILDER_UPLOAD};
+use ::cluster::builder::{CompileRequest, CompileResponse};
 use ::compiler::{CommandInfo, CompilationTask, CompileStep, Compiler, OutputInfo, PreprocessResult, Toolchain};
 
 use std::fs;
@@ -117,35 +121,19 @@ impl RemoteToolchain {
                                   "Remote precompiled header generation is not supported"));
         }
 
-        let precompiled = match task.input_precompiled {
-            Some(ref path) => {
-                // todo: self.shared.cache.file_hash(&path);
-                let content = try!(File::open(&path).and_then(|mut file| {
-                    let mut buf = Vec::new();
-                    file.read_to_end(&mut buf).map(|_| buf)
-                }));
-                Some(OptionalContent {
-                    hash: "hash".to_string(), // todo: Need implementation
-                    data: Some(content),
-                })
-            }
-            None => None,
-        };
-
+        let base_url = get_base_url(&addr);
         // Send compilation request.
         let request = CompileRequest {
             toolchain: name.clone(),
             args: task.args.clone(),
-            preprocessed: (&task.preprocessed).into(),
-            precompiled: precompiled,
+            preprocessed_data: (&task.preprocessed).into(),
+            precompiled_hash: try!(self.upload_precompiled(&task.input_precompiled, &base_url)),
         };
         let mut request_payload = Vec::new();
         try!(request.stream_write(&mut request_payload, &mut message::Builder::new_default()));
-
         self.shared
             .client
-            .post(base_url(&addr)
-                .join(RPC_BUILDER_TASK)
+            .post(base_url.join(RPC_BUILDER_TASK)
                 .unwrap())
             .body(&request_payload[..])
             .send()
@@ -169,11 +157,41 @@ impl RemoteToolchain {
             })
     }
 
-    fn upload_precompiled(&self, precompiled: &Option<PathBuf>) -> Result<Option<String>, Error> {
+    fn upload_precompiled(&self, precompiled: &Option<PathBuf>, base_url: &Url) -> Result<Option<Vec<u8>>, Error> {
         match precompiled {
             &Some(ref path) => {
-                // self.shared.cache.file_hash(&path);
-                unimplemented!();
+                // Get precompiled header file hash
+                let hash = try!(self.shared.cache.file_hash(&path));
+                // Check is precompiled header uploaded
+                // todo: this is workaround for https://github.com/hyperium/hyper/issues/838
+                match try!(self.shared
+                    .client
+                    .head(base_url.join(&format!("{}/{}", RPC_BUILDER_UPLOAD, hash.to_hex()))
+                        .unwrap())
+                    .send()
+                    .map(|response| response.status)
+                    .map_err(|e| Error::new(ErrorKind::BrokenPipe, e))) {
+                    StatusCode::Ok | StatusCode::Accepted => return Ok(Some(hash.to_vec())),
+                    _ => {}
+                }
+                let mut file = try!(File::open(path));
+                let meta = try!(file.metadata());
+                // Upload precompiled header
+                match try!(self.shared
+                    .client
+                    .post(base_url.join(&format!("{}/{}", RPC_BUILDER_UPLOAD, hash.to_hex()))
+                        .unwrap())
+                    .header(Expect::Continue)
+                    .body(Body::SizedBody(&mut file, meta.len()))
+                    .send()
+                    .map(|response| response.status)
+                    .map_err(|e| Error::new(ErrorKind::BrokenPipe, e))) {
+                    StatusCode::Ok | StatusCode::Accepted => Ok(Some(hash.to_vec())),
+                    status => {
+                        Err(Error::new(ErrorKind::BrokenPipe,
+                                       format!("Can't upload precompiled header: {}", status)))
+                    }
+                }
             }
             &None => Ok(None),
         }
@@ -250,7 +268,7 @@ impl Toolchain for RemoteToolchain {
     }
 }
 
-fn base_url(addr: &SocketAddr) -> Url {
+fn get_base_url(addr: &SocketAddr) -> Url {
     let mut url = Url::from_str("http://localhost").unwrap();
     url.set_ip_host(addr.ip()).unwrap();
     url.set_port(Some(addr.port())).unwrap();

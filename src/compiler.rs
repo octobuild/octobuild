@@ -2,6 +2,7 @@ use capnp;
 use md5;
 
 use byteorder::{LittleEndian, WriteBytesExt};
+use rustc_serialize::hex::ToHex;
 use std::collections::HashMap;
 use std::collections::hash_map;
 use std::env;
@@ -16,7 +17,6 @@ use ::io::memstream::MemStream;
 use ::io::statistic::Statistic;
 use ::cache::{Cache, FileHasher};
 use ::builder_capnp::output_info;
-use ::utils::hex_lower;
 
 #[derive(Debug)]
 pub enum CompilerError {
@@ -526,7 +526,7 @@ fn compile_step_cached(task: CompileStep,
     // Hash input files
     match task.input_precompiled {
         Some(ref path) => {
-            hash_bytes(&mut hasher, try!(cache.file_hash(&path)).as_bytes());
+            hash_bytes(&mut hasher, &try!(cache.file_hash(&path)));
         }
         None => {
             hasher.write_u64::<LittleEndian>(0).unwrap();
@@ -556,7 +556,7 @@ fn compile_step_cached(task: CompileStep,
 
     // Try to get files from cache or run
     cache.run_file_cached(statistic,
-                          &hex_lower(&hasher.compute()),
+                          &hasher.compute().to_hex(),
                           &outputs,
                           || -> Result<OutputInfo, Error> { toolchain.compile_step(task) },
                           || true)

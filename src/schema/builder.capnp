@@ -7,8 +7,8 @@ interface Coordinator {
 struct CompileRequest {
   toolchain @0 :Text;
   args @1 :List(Text);
-  preprocessed @2: Data;
-  precompiled @3: OptionalContent;
+  preprocessedData @2: Data;
+  precompiledHash @3: Data;
 }
 
 struct CompileResponse {
@@ -24,11 +24,6 @@ struct OutputInfo {
   stdout @2: Data;
   stderr @3: Data;
   content @4: Data;
-}
-
-struct OptionalContent {
-  hash @0 :Text;
-  data @1 :Data;
 }
 
 struct ErrorInfo {
