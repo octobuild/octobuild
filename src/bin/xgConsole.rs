@@ -27,7 +27,7 @@ use std::io::{BufReader, Error, ErrorKind, Write};
 use std::io;
 use std::iter::FromIterator;
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, Mutex, RwLock};
+use std::sync::{Arc, Mutex};
 use std::sync::mpsc::{Receiver, Sender, channel};
 use std::process;
 use std::thread;
@@ -48,7 +48,7 @@ struct ResultMessage {
 
 struct ExecutorState<C: Compiler> {
     cache: Cache,
-    statistic: RwLock<Statistic>,
+    statistic: Arc<Statistic>,
     compiler: C,
 }
 
@@ -149,15 +149,17 @@ fn expand_files(mut files: Vec<PathBuf>, arg: &str) -> Vec<PathBuf> {
 
 fn execute(args: &[String]) -> Result<Option<i32>, Error> {
     let config = try!(Config::new());
+    let statistic = Arc::new(Statistic::new());
     let temp_dir = try!(TempDir::new("octobuild"));
     let state = Arc::new(ExecutorState {
-        statistic: RwLock::new(Statistic::new()),
         cache: Cache::new(&config),
         compiler: RemoteCompiler::new(&config.coordinator,
                                       CompilerGroup::new(vec!(
 			Box::new(VsCompiler::new(temp_dir.path())),
 			Box::new(ClangCompiler::new()),
-		))),
+		)),
+                                      &statistic),
+        statistic: statistic,
     });
     let files = args.iter()
         .filter(|a| !is_flag(a))
@@ -186,7 +188,7 @@ fn execute(args: &[String]) -> Result<Option<i32>, Error> {
 
     let result = execute_graph(&validated_graph, tx_task, mutex_rx_task, rx_result);
     let _ = state.cache.cleanup();
-    println!("{}", state.statistic.read().unwrap().to_string());
+    println!("{}", state.statistic.to_string());
     result
 }
 

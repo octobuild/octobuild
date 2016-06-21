@@ -5,7 +5,7 @@ use std::path::{Path, PathBuf};
 use std::fs;
 use std::fs::File;
 use std::io::{Error, ErrorKind};
-use std::sync::RwLock;
+use std::sync::Arc;
 
 use self::filetime::FileTime;
 
@@ -42,7 +42,7 @@ impl Cache {
     }
 
     pub fn run_file_cached<F: FnOnce() -> Result<OutputInfo, Error>, C: Fn() -> bool>(&self,
-                                                                                      statistic: &RwLock<Statistic>,
+                                                                                      statistic: &Arc<Statistic>,
                                                                                       hash: u64,
                                                                                       outputs: &Vec<PathBuf>,
                                                                                       worker: F,

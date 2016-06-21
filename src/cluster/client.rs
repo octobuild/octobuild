@@ -6,7 +6,8 @@ use time;
 use time::{Duration, Timespec};
 
 use ::io::memstream::MemStream;
-use ::cluster::common::{BuilderInfo, RPC_BUILDER_LIST};
+use ::io::statistic::Statistic;
+use ::cluster::common::{BuilderInfo, RPC_BUILDER_LIST, RPC_BUILDER_TASK};
 use ::cluster::builder::{CompileRequest, CompileResponse, OptionalContent};
 use ::compiler::{CommandInfo, CompilationTask, CompileStep, Compiler, OutputInfo, PreprocessResult, Toolchain};
 
@@ -16,11 +17,12 @@ use std::io::{BufReader, Error, ErrorKind, Read, Write};
 use std::path::PathBuf;
 use std::str::FromStr;
 use std::sync::{Arc, RwLock};
-use std::net::{SocketAddr, TcpStream};
+use std::net::SocketAddr;
 
 pub struct RemoteCompiler<C: Compiler> {
     shared: Arc<RwLock<RemoteShared>>,
     local: C,
+    statistic: Arc<Statistic>,
 }
 
 struct RemoteShared {
@@ -32,10 +34,11 @@ struct RemoteShared {
 struct RemoteToolchain {
     shared: Arc<RwLock<RemoteShared>>,
     local: Arc<Toolchain>,
+    statistic: Arc<Statistic>,
 }
 
 impl<C: Compiler> RemoteCompiler<C> {
-    pub fn new(base_url: &Option<Url>, compiler: C) -> Self {
+    pub fn new(base_url: &Option<Url>, compiler: C, statistic: &Arc<Statistic>) -> Self {
         RemoteCompiler {
             shared: Arc::new(RwLock::new(RemoteShared {
                 cooldown: Timespec { sec: 0, nsec: 0 },
@@ -43,6 +46,7 @@ impl<C: Compiler> RemoteCompiler<C> {
                 base_url: base_url.as_ref().map(|u| u.clone()),
             })),
             local: compiler,
+            statistic: statistic.clone(),
         }
     }
 }
@@ -79,9 +83,18 @@ impl<C: Compiler> Compiler for RemoteCompiler<C> {
             .map(|local| -> Arc<Toolchain> {
                 Arc::new(RemoteToolchain {
                     shared: self.shared.clone(),
+                    statistic: self.statistic.clone(),
                     local: local,
                 })
             })
+    }
+}
+
+struct ReadWrapper<'a, R: 'a + Read>(&'a mut R);
+
+impl<'a, R: 'a + Read> Read for ReadWrapper<'a, R> {
+    fn read(&mut self, buf: &mut [u8]) -> Result<usize, Error> {
+        self.0.read(buf)
     }
 }
 
@@ -109,10 +122,6 @@ impl RemoteToolchain {
             None => None,
         };
 
-        // Connect to builder.
-        let mut ostream = try!(TcpStream::connect(addr));
-        let mut istream = BufReader::new(ostream.try_clone().unwrap());
-
         // Send compilation request.
         let request = CompileRequest {
             toolchain: name.clone(),
@@ -120,22 +129,32 @@ impl RemoteToolchain {
             preprocessed: (&task.preprocessed).into(),
             precompiled: precompiled,
         };
-        try!(request.stream_write(&mut ostream, &mut message::Builder::new_default()));
-        drop(request);
+        let mut request_payload = Vec::new();
+        try!(request.stream_write(&mut request_payload, &mut message::Builder::new_default()));
 
-        // Receive compilation result.
-        let mut options = ::capnp::message::ReaderOptions::new();
-        options.traversal_limit_in_words(1024 * 1024 * 1024);
-        CompileResponse::stream_read(&mut istream, options)
-            .map_err(|e| Error::new(ErrorKind::InvalidData, e))
-            .and_then(|result| {
-                match result {
-                    CompileResponse::Success(ref output, ref content) => {
-                        try!(write_output(&task.output_object, output.success(), content));
-                    }
-                    _ => {}
-                }
-                Ok(result)
+        let client = Client::new();
+        client.post(base_url(&addr)
+                .join(RPC_BUILDER_TASK)
+                .unwrap())
+            .body(&request_payload[..])
+            .send()
+            .map_err(|e| Error::new(ErrorKind::Other, e))
+            .and_then(|mut response| {
+                // Receive compilation result.
+                let mut options = ::capnp::message::ReaderOptions::new();
+                options.traversal_limit_in_words(1024 * 1024 * 1024);
+                CompileResponse::stream_read(&mut BufReader::new(ReadWrapper(&mut response)), options)
+                    .map_err(|e| Error::new(ErrorKind::InvalidData, e))
+                    .and_then(|result| {
+                        match result {
+                            CompileResponse::Success(ref output, ref content) => {
+                                try!(write_output(&task.output_object, output.success(), content));
+                            }
+                            _ => {}
+                        }
+                        self.statistic.inc_remote();
+                        Ok(result)
+                    })
             })
     }
 
@@ -208,6 +227,13 @@ impl Toolchain for RemoteToolchain {
             }
         }
     }
+}
+
+fn base_url(addr: &SocketAddr) -> Url {
+    let mut url = Url::from_str("http://localhost").unwrap();
+    url.set_ip_host(addr.ip()).unwrap();
+    url.set_port(Some(addr.port())).unwrap();
+    url
 }
 
 fn write_output(path: &Option<PathBuf>, success: bool, output: &[u8]) -> Result<(), Error> {

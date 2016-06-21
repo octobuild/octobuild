@@ -30,11 +30,6 @@ struct BuilderState {
     pub timeout: Timespec,
 }
 
-struct CoordinatorService {
-    state: Arc<CoordinatorState>,
-    http: Nickel,
-}
-
 struct CoordinatorState {
     builders: RwLock<Vec<BuilderState>>,
 }
@@ -42,15 +37,6 @@ struct CoordinatorState {
 impl CoordinatorState {
     pub fn new() -> Self {
         CoordinatorState { builders: RwLock::new(Vec::new()) }
-    }
-}
-
-impl CoordinatorService {
-    pub fn new() -> Self {
-        CoordinatorService {
-            state: Arc::new(CoordinatorState::new()),
-            http: Nickel::new(),
-        }
     }
 }
 
@@ -139,12 +125,12 @@ fn main() {
                         let config = Config::new().unwrap();
                         info!("Coordinator bind to address: {}", config.coordinator_bind);
 
-                        let mut server = CoordinatorService::new();
-                        server.http.get(RPC_BUILDER_LIST, RpcAgentListHandler(server.state.clone()));
-                        server.http.post(RPC_BUILDER_UPDATE,
-                                         RpcAgentUpdateHandler(server.state.clone()));
+                        let state = Arc::new(CoordinatorState::new());
+                        let mut http = Nickel::new();
+                        http.get(RPC_BUILDER_LIST, RpcAgentListHandler(state.clone()));
+                        http.post(RPC_BUILDER_UPDATE, RpcAgentUpdateHandler(state.clone()));
 
-                        let listener = server.http.listen(config.coordinator_bind).unwrap();
+                        let listener = http.listen(config.coordinator_bind).unwrap();
 
                         web = Some(listener);
                         info!("Coordinator: Ready");

@@ -1,42 +1,56 @@
 use std::cmp::max;
 
+use std::sync::atomic::{AtomicUsize, Ordering};
+
 pub struct Statistic {
-    pub hit_count: usize,
-    pub hit_bytes: usize,
-    pub miss_count: usize,
-    pub miss_bytes: usize,
+    pub hit_count: AtomicUsize,
+    pub hit_bytes: AtomicUsize,
+    pub miss_count: AtomicUsize,
+    pub miss_bytes: AtomicUsize,
+    pub remote_count: AtomicUsize,
 }
 
 impl Statistic {
     pub fn new() -> Self {
         Statistic {
-            hit_count: 0,
-            hit_bytes: 0,
-            miss_count: 0,
-            miss_bytes: 0,
+            hit_count: AtomicUsize::new(0),
+            hit_bytes: AtomicUsize::new(0),
+            miss_count: AtomicUsize::new(0),
+            miss_bytes: AtomicUsize::new(0),
+            remote_count: AtomicUsize::new(0),
         }
     }
 
-    pub fn add_hit(&mut self, bytes: usize) {
-        self.hit_count += 1;
-        self.hit_bytes += bytes;
+    pub fn add_hit(&self, bytes: usize) {
+        self.hit_count.fetch_add(1, Ordering::Release);
+        self.hit_bytes.fetch_add(bytes, Ordering::Release);
     }
 
-    pub fn add_miss(&mut self, bytes: usize) {
-        self.miss_count += 1;
-        self.miss_bytes += bytes;
+    pub fn add_miss(&self, bytes: usize) {
+        self.miss_count.fetch_add(1, Ordering::Release);
+        self.miss_bytes.fetch_add(bytes, Ordering::Release);
+    }
+
+    pub fn inc_remote(&self) {
+        self.remote_count.fetch_add(1, Ordering::Release);
     }
 
     pub fn to_string(&self) -> String {
-        let total_count = self.hit_count + self.miss_count;
+        let hit_count = self.hit_count.load(Ordering::Relaxed);
+        let hit_bytes = self.hit_bytes.load(Ordering::Relaxed);
+        let miss_count = self.miss_count.load(Ordering::Relaxed);
+        let miss_bytes = self.miss_bytes.load(Ordering::Relaxed);
+        let remote_count = self.remote_count.load(Ordering::Relaxed);
+        let total_count = hit_count + miss_count;
         format!(
-			"Cache statistic: hit {} of {} ({} %), read {}, write {}, total {}",
-			self.hit_count,
+			"Cache statistic: hit {} of {} ({} %), remote {}, read {}, write {}, total {}",
+			hit_count,
 			total_count,
-			self.hit_count * 100 / max(total_count, 1),
-			self.hit_bytes,
-			self.miss_bytes,
-			self.hit_bytes + self.miss_bytes,
+			hit_count * 100 / max(total_count, 1),
+            remote_count   ,
+            hit_bytes,
+			miss_bytes,
+			hit_bytes + miss_bytes,
 		)
     }
 }

@@ -434,7 +434,7 @@ pub trait Compiler: Send + Sync {
                    command: CommandInfo,
                    args: &[String],
                    cache: &Cache,
-                   statistic: &RwLock<Statistic>)
+                   statistic: &Arc<Statistic>)
                    -> Result<Option<OutputInfo>, Error> {
         let toolchain = try!(self.resolve_toolchain(&command)
             .ok_or(Error::new(ErrorKind::InvalidInput,
@@ -460,7 +460,7 @@ pub trait Compiler: Send + Sync {
                command: CommandInfo,
                args: &[String],
                cache: &Cache,
-               statistic: &RwLock<Statistic>)
+               statistic: &Arc<Statistic>)
                -> Result<OutputInfo, Error> {
         match self.try_compile(command.clone(), args, cache, statistic) {
             Ok(Some(output)) => Ok(output),
@@ -510,7 +510,7 @@ impl ToolchainHolder {
 
 fn compile_step_cached(task: CompileStep,
                        cache: &Cache,
-                       statistic: &RwLock<Statistic>,
+                       statistic: &Arc<Statistic>,
                        toolchain: Arc<Toolchain>)
                        -> Result<OutputInfo, Error> {
     let mut hasher = SipHasher::new();

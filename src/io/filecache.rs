@@ -8,7 +8,7 @@ use std::fs;
 use std::fs::{File, OpenOptions};
 use std::io::{Error, ErrorKind, Read, Seek, SeekFrom, Write};
 use std::path::{Path, PathBuf};
-use std::sync::RwLock;
+use std::sync::Arc;
 
 use self::filetime::FileTime;
 
@@ -82,7 +82,7 @@ impl FileCache {
     }
 
     pub fn run_cached<F: FnOnce() -> Result<OutputInfo, Error>, C: Fn() -> bool>(&self,
-                                                                                 statistic: &RwLock<Statistic>,
+                                                                                 statistic: &Arc<Statistic>,
                                                                                  hash: u64,
                                                                                  outputs: &Vec<PathBuf>,
                                                                                  worker: F,
@@ -161,7 +161,7 @@ fn write_cached_file<W: Write>(stream: &mut W, path: &PathBuf) -> Result<(), Err
     Ok(())
 }
 
-fn write_cache(statistic: &RwLock<Statistic>,
+fn write_cache(statistic: &Arc<Statistic>,
                path: &Path,
                paths: &Vec<PathBuf>,
                output: &OutputInfo)
@@ -185,7 +185,7 @@ fn write_cache(statistic: &RwLock<Statistic>,
     try!(stream.write_all(FOOTER));
     match stream.finish() {
         (writer, result) => {
-            statistic.write().unwrap().add_miss(writer.len());
+            statistic.add_miss(writer.len());
             result
         }
     }
@@ -210,7 +210,7 @@ fn read_cached_file<R: Read>(stream: &mut R, path: &PathBuf) -> Result<(), Error
     Ok(())
 }
 
-fn read_cache(statistic: &RwLock<Statistic>, path: &Path, paths: &Vec<PathBuf>) -> Result<OutputInfo, Error> {
+fn read_cache(statistic: &Arc<Statistic>, path: &Path, paths: &Vec<PathBuf>) -> Result<OutputInfo, Error> {
     let mut file = try!(OpenOptions::new().read(true).write(true).open(Path::new(path)));
     try!(file.write(&[4]));
     try!(file.seek(SeekFrom::Start(0)));
@@ -246,7 +246,7 @@ fn read_cache(statistic: &RwLock<Statistic>, path: &Path, paths: &Vec<PathBuf>) 
         return Err(Error::new(ErrorKind::InvalidInput,
                               CacheError::InvalidFooter(path.to_path_buf())));
     }
-    statistic.write().unwrap().add_hit(stream.finish().0.len());
+    statistic.add_hit(stream.finish().0.len());
     Ok(output)
 }
 

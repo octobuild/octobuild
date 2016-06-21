@@ -15,7 +15,7 @@ use std::io;
 use std::io::{Error, Write};
 use std::iter::FromIterator;
 use std::path::Path;
-use std::sync::RwLock;
+use std::sync::Arc;
 use std::process;
 
 fn main() {
@@ -34,17 +34,19 @@ fn main() {
 }
 
 fn compile() -> Result<OutputInfo, Error> {
-    let statistic = RwLock::new(Statistic::new());
+    let statistic = Arc::new(Statistic::new());
     let temp_dir = try!(TempDir::new("octobuild"));
     let config = try!(Config::new());
     let cache = Cache::new(&config);
     let args = Vec::from_iter(env::args());
     let command_info = CommandInfo::simple(Path::new("cl.exe"));
-    let compiler = RemoteCompiler::new(&config.coordinator, VsCompiler::new(temp_dir.path()));
+    let compiler = RemoteCompiler::new(&config.coordinator,
+                                       VsCompiler::new(temp_dir.path()),
+                                       &statistic);
     let output = try!(compiler.compile(command_info, &args[1..], &cache, &statistic));
 
     try!(io::stdout().write_all(&output.stdout));
     try!(io::stderr().write_all(&output.stderr));
-    println!("{}", statistic.read().unwrap().to_string());
+    println!("{}", statistic.to_string());
     Ok(output)
 }
