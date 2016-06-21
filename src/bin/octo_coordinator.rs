@@ -1,6 +1,5 @@
 extern crate octobuild;
 extern crate daemon;
-extern crate iron;
 extern crate router;
 extern crate fern;
 extern crate time;
@@ -15,11 +14,13 @@ use octobuild::cluster::common::{BuilderInfo, BuilderInfoUpdate, RPC_BUILDER_LIS
 use daemon::State;
 use daemon::Daemon;
 use daemon::DaemonRunner;
-use nickel::{HttpRouter, MediaType, Middleware, MiddlewareResult, Nickel, Request, Response};
+use nickel::{HttpRouter, MediaType, Middleware, MiddlewareResult, Nickel, NickelError, Request, Response};
 use nickel::status::StatusCode;
 use rustc_serialize::json;
 use time::{Duration, Timespec};
 use std::io::Read;
+use std::net::{IpAddr, SocketAddr};
+use std::str::FromStr;
 use std::sync::mpsc::Receiver;
 use std::sync::{Arc, RwLock};
 
@@ -63,7 +64,20 @@ impl<D> Middleware<D> for RpcAgentUpdateHandler {
                            -> MiddlewareResult<'a, D> {
         let mut payload = String::new();
         request.origin.read_to_string(&mut payload).unwrap();
-        let update: BuilderInfoUpdate = json::decode(&payload).unwrap();
+        let mut update: BuilderInfoUpdate = json::decode(&payload).unwrap();
+        // Fix inspecified endpoint IP address.
+        let endpoint = match SocketAddr::from_str(&update.info.endpoint) {
+            Ok(v) => v,
+            Err(e) => {
+                return Err(NickelError::new(response,
+                                            format!("Can't parse endpoint address: {}", e),
+                                            StatusCode::BadRequest));
+            }
+        };
+        if is_unspecified(&endpoint.ip()) {
+            update.info.endpoint = SocketAddr::new(request.origin.remote_addr.ip(), endpoint.port()).to_string();
+        }
+        // Update information.
         {
             let mut holder = self.0.builders.write().unwrap();
             let now = time::get_time();
@@ -104,6 +118,13 @@ impl<D> Middleware<D> for RpcAgentListHandler {
     }
 }
 
+fn is_unspecified(ip: &IpAddr) -> bool {
+    match ip {
+        &IpAddr::V4(ref ip) => ip.octets() == [0, 0, 0, 0],
+        &IpAddr::V6(ref ip) => ip.is_unspecified(),
+    }
+}
+
 fn main() {
     let daemon = Daemon { name: "octobuild_coordinator".to_string() };
 
@@ -134,7 +155,7 @@ fn main() {
                     State::Stop => {
                         info!("Coordinator: Stoping");
                         match web.take() {
-                            Some(mut v) => {
+                            Some(v) => {
                                 v.detach();
                             }
                             None => {}

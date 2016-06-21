@@ -45,7 +45,6 @@ log = "0.3.6"
 fern = "0.3.5"
 daemon = "0.0.7"
 hyper = { version = "0.9.8", default-features = false, features = [""] }
-iron = "0.3.0"
 nickel = { version = "0.8.1", git = "https://github.com/bozaro/nickel.rs.git", rev = "28eb6e2f" }
 router = "0.1.1"
 time = "0.1.35"
