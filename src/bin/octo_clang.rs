@@ -33,10 +33,13 @@ fn main() {
 fn compile() -> Result<OutputInfo, Error> {
     let statistic = Arc::new(Statistic::new());
     let config = try!(Config::new());
-    let cache = Cache::new(&config);
+    let cache = Arc::new(Cache::new(&config));
     let args = Vec::from_iter(env::args());
     let command_info = CommandInfo::simple(Path::new("clang"));
-    let compiler = RemoteCompiler::new(&config.coordinator, ClangCompiler::new(), &statistic);
+    let compiler = RemoteCompiler::new(&config.coordinator,
+                                       ClangCompiler::new(),
+                                       &cache,
+                                       &statistic);
     let output = try!(compiler.compile(command_info, &args[1..], &cache, &statistic));
 
     try!(io::stdout().write_all(&output.stdout));

@@ -3,12 +3,11 @@ use std::collections::HashMap;
 use std::collections::hash_map::Entry;
 use std::hash::Hash;
 
-#[derive(Clone)]
 pub struct MemCache<K, V>
     where K: Eq + Hash + Clone,
           V: Clone + Send
 {
-    map: Arc<Mutex<HashMap<K, Arc<Mutex<Option<V>>>>>>,
+    map: Mutex<HashMap<K, Arc<Mutex<Option<V>>>>>,
 }
 
 impl<K, V> MemCache<K, V>
@@ -16,7 +15,7 @@ impl<K, V> MemCache<K, V>
           V: Clone + Send
 {
     pub fn new() -> Self {
-        MemCache { map: Arc::new(Mutex::new(HashMap::new())) }
+        MemCache { map: Mutex::new(HashMap::new()) }
     }
 
     pub fn run_cached<F>(&self, key: K, worker: F) -> V

@@ -47,7 +47,7 @@ struct ResultMessage {
 }
 
 struct ExecutorState<C: Compiler> {
-    cache: Cache,
+    cache: Arc<Cache>,
     statistic: Arc<Statistic>,
     compiler: C,
 }
@@ -150,15 +150,17 @@ fn expand_files(mut files: Vec<PathBuf>, arg: &str) -> Vec<PathBuf> {
 fn execute(args: &[String]) -> Result<Option<i32>, Error> {
     let config = try!(Config::new());
     let statistic = Arc::new(Statistic::new());
+    let cache = Arc::new(Cache::new(&config));
     let temp_dir = try!(TempDir::new("octobuild"));
     let state = Arc::new(ExecutorState {
-        cache: Cache::new(&config),
         compiler: RemoteCompiler::new(&config.coordinator,
                                       CompilerGroup::new(vec!(
 			Box::new(VsCompiler::new(temp_dir.path())),
 			Box::new(ClangCompiler::new()),
 		)),
+                                      &cache,
                                       &statistic),
+        cache: cache,
         statistic: statistic,
     });
     let files = args.iter()

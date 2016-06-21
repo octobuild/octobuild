@@ -15,7 +15,6 @@ use super::io::filecache::FileCache;
 use super::io::statistic::Statistic;
 use super::utils::hash_stream;
 
-#[derive(Clone)]
 pub struct Cache {
     file_cache: FileCache,
     file_hash_cache: MemCache<PathBuf, Result<FileHash, ()>>,

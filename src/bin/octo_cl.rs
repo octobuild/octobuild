@@ -37,11 +37,12 @@ fn compile() -> Result<OutputInfo, Error> {
     let statistic = Arc::new(Statistic::new());
     let temp_dir = try!(TempDir::new("octobuild"));
     let config = try!(Config::new());
-    let cache = Cache::new(&config);
+    let cache = Arc::new(Cache::new(&config));
     let args = Vec::from_iter(env::args());
     let command_info = CommandInfo::simple(Path::new("cl.exe"));
     let compiler = RemoteCompiler::new(&config.coordinator,
                                        VsCompiler::new(temp_dir.path()),
+                                       &cache,
                                        &statistic);
     let output = try!(compiler.compile(command_info, &args[1..], &cache, &statistic));
 

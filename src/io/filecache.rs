@@ -61,7 +61,6 @@ impl ::std::error::Error for CacheError {
     }
 }
 
-#[derive(Clone)]
 pub struct FileCache {
     cache_dir: PathBuf,
     cache_limit: u64,

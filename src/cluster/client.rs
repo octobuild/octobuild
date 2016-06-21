@@ -5,6 +5,7 @@ use rustc_serialize::json;
 use time;
 use time::{Duration, Timespec};
 
+use ::cache::Cache;
 use ::io::memstream::MemStream;
 use ::io::statistic::Statistic;
 use ::cluster::common::{BuilderInfo, RPC_BUILDER_LIST, RPC_BUILDER_TASK};
@@ -20,40 +21,49 @@ use std::sync::{Arc, RwLock};
 use std::net::SocketAddr;
 
 pub struct RemoteCompiler<C: Compiler> {
-    shared: Arc<RwLock<RemoteShared>>,
+    shared: Arc<RemoteShared>,
     local: C,
-    statistic: Arc<Statistic>,
 }
 
-struct RemoteShared {
-    base_url: Option<Url>,
+struct RemoteSharedMut {
     cooldown: Timespec,
     builders: Arc<Vec<BuilderInfo>>,
 }
 
-struct RemoteToolchain {
-    shared: Arc<RwLock<RemoteShared>>,
-    local: Arc<Toolchain>,
+struct RemoteShared {
+    mutable: RwLock<RemoteSharedMut>,
+    base_url: Option<Url>,
     statistic: Arc<Statistic>,
+    cache: Arc<Cache>,
+    client: Client,
+}
+
+struct RemoteToolchain {
+    shared: Arc<RemoteShared>,
+    local: Arc<Toolchain>,
 }
 
 impl<C: Compiler> RemoteCompiler<C> {
-    pub fn new(base_url: &Option<Url>, compiler: C, statistic: &Arc<Statistic>) -> Self {
+    pub fn new(base_url: &Option<Url>, compiler: C, cache: &Arc<Cache>, statistic: &Arc<Statistic>) -> Self {
         RemoteCompiler {
-            shared: Arc::new(RwLock::new(RemoteShared {
-                cooldown: Timespec { sec: 0, nsec: 0 },
-                builders: Arc::new(Vec::new()),
+            shared: Arc::new(RemoteShared {
+                mutable: RwLock::new(RemoteSharedMut {
+                    cooldown: Timespec { sec: 0, nsec: 0 },
+                    builders: Arc::new(Vec::new()),
+                }),
                 base_url: base_url.as_ref().map(|u| u.clone()),
-            })),
+                cache: cache.clone(),
+                statistic: statistic.clone(),
+                client: Client::new(),
+            }),
             local: compiler,
-            statistic: statistic.clone(),
         }
     }
 }
 
-impl RemoteShared {
-    fn receive_builders(&self) -> Result<Vec<BuilderInfo>, Error> {
-        match &self.base_url {
+impl RemoteSharedMut {
+    fn receive_builders(&self, base_url: &Option<Url>) -> Result<Vec<BuilderInfo>, Error> {
+        match base_url {
             &Some(ref base_url) => {
                 let client = Client::new();
                 client.get(base_url.join(RPC_BUILDER_LIST).unwrap())
@@ -83,7 +93,6 @@ impl<C: Compiler> Compiler for RemoteCompiler<C> {
             .map(|local| -> Arc<Toolchain> {
                 Arc::new(RemoteToolchain {
                     shared: self.shared.clone(),
-                    statistic: self.statistic.clone(),
                     local: local,
                 })
             })
@@ -110,6 +119,7 @@ impl RemoteToolchain {
 
         let precompiled = match task.input_precompiled {
             Some(ref path) => {
+                // todo: self.shared.cache.file_hash(&path);
                 let content = try!(File::open(&path).and_then(|mut file| {
                     let mut buf = Vec::new();
                     file.read_to_end(&mut buf).map(|_| buf)
@@ -132,8 +142,9 @@ impl RemoteToolchain {
         let mut request_payload = Vec::new();
         try!(request.stream_write(&mut request_payload, &mut message::Builder::new_default()));
 
-        let client = Client::new();
-        client.post(base_url(&addr)
+        self.shared
+            .client
+            .post(base_url(&addr)
                 .join(RPC_BUILDER_TASK)
                 .unwrap())
             .body(&request_payload[..])
@@ -152,26 +163,36 @@ impl RemoteToolchain {
                             }
                             _ => {}
                         }
-                        self.statistic.inc_remote();
+                        self.shared.statistic.inc_remote();
                         Ok(result)
                     })
             })
     }
 
+    fn upload_precompiled(&self, precompiled: &Option<PathBuf>) -> Result<Option<String>, Error> {
+        match precompiled {
+            &Some(ref path) => {
+                // self.shared.cache.file_hash(&path);
+                unimplemented!();
+            }
+            &None => Ok(None),
+        }
+    }
+
     fn builders(&self) -> Arc<Vec<BuilderInfo>> {
         let now = time::get_time();
         {
-            let holder = self.shared.read().unwrap();
+            let holder = self.shared.mutable.read().unwrap();
             if holder.cooldown >= now {
                 return holder.builders.clone();
             }
         }
         {
-            let mut holder = self.shared.write().unwrap();
+            let mut holder = self.shared.mutable.write().unwrap();
             if holder.cooldown >= now {
                 return holder.builders.clone();
             }
-            match holder.receive_builders() {
+            match holder.receive_builders(&self.shared.base_url) {
                 Ok(builders) => {
                     holder.builders = Arc::new(builders);
                     holder.cooldown = now + Duration::seconds(5);
