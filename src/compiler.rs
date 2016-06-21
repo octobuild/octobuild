@@ -1,20 +1,22 @@
 use capnp;
+use md5;
 
+use byteorder::{LittleEndian, WriteBytesExt};
 use std::collections::HashMap;
 use std::collections::hash_map;
 use std::env;
 use std::iter::FromIterator;
 use std::fmt::{Display, Formatter};
-use std::io::{Error, ErrorKind};
+use std::io::{Error, ErrorKind, Write};
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, RwLock};
 use std::process::{Command, Output};
-use std::hash::{Hash, Hasher, SipHasher};
 
 use ::io::memstream::MemStream;
 use ::io::statistic::Statistic;
 use ::cache::{Cache, FileHasher};
 use ::builder_capnp::output_info;
+use ::utils::hex_lower;
 
 #[derive(Debug)]
 pub enum CompilerError {
@@ -513,11 +515,11 @@ fn compile_step_cached(task: CompileStep,
                        statistic: &Arc<Statistic>,
                        toolchain: Arc<Toolchain>)
                        -> Result<OutputInfo, Error> {
-    let mut hasher = SipHasher::new();
+    let mut hasher = md5::Context::new();
     // Get hash from preprocessed data
     task.preprocessed.hash(&mut hasher);
     // Hash arguments
-    hasher.write_usize(task.args.len());
+    hasher.write_u64::<LittleEndian>(task.args.len() as u64).unwrap();
     for arg in task.args.iter() {
         hash_bytes(&mut hasher, &arg.as_bytes());
     }
@@ -527,11 +529,15 @@ fn compile_step_cached(task: CompileStep,
             hash_bytes(&mut hasher, try!(cache.file_hash(&path)).as_bytes());
         }
         None => {
-            hasher.write_usize(0);
+            hasher.write_u64::<LittleEndian>(0).unwrap();
         }
     }
     // Store output precompiled flag
-    task.output_precompiled.is_some().hash(&mut hasher);
+    hasher.write_u8(match task.output_precompiled.is_some() {
+            true => 1,
+            false => 0,
+        })
+        .unwrap();
 
     // Output files list
     let mut outputs: Vec<PathBuf> = Vec::new();
@@ -550,15 +556,15 @@ fn compile_step_cached(task: CompileStep,
 
     // Try to get files from cache or run
     cache.run_file_cached(statistic,
-                          hasher.finish(),
+                          &hex_lower(&hasher.compute()),
                           &outputs,
                           || -> Result<OutputInfo, Error> { toolchain.compile_step(task) },
                           || true)
 }
 
-fn hash_bytes<H: Hasher>(hasher: &mut H, bytes: &[u8]) {
-    hasher.write_usize(bytes.len());
-    hasher.write(&bytes);
+fn hash_bytes<W: Write>(hasher: &mut W, bytes: &[u8]) {
+    hasher.write_u64::<LittleEndian>(bytes.len() as u64).unwrap();
+    hasher.write(&bytes).unwrap();
 }
 
 fn fn_find_exec(path: PathBuf) -> Option<PathBuf> {

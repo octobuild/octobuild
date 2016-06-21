@@ -8,6 +8,7 @@ extern crate byteorder;
 extern crate capnp;
 extern crate fern;
 extern crate hyper;
+extern crate md5;
 extern crate rustc_serialize;
 extern crate time;
 extern crate uuid;
@@ -41,7 +42,6 @@ pub mod io {
     pub mod binary;
     pub mod counter;
     pub mod filecache;
-    pub mod hashwriter;
     pub mod memcache;
     pub mod memstream;
     pub mod statistic;

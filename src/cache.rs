@@ -1,6 +1,5 @@
 extern crate filetime;
 
-use std::hash::{Hash, Hasher, SipHasher};
 use std::path::{Path, PathBuf};
 use std::fs;
 use std::fs::File;
@@ -14,7 +13,7 @@ use super::compiler::OutputInfo;
 use super::io::memcache::MemCache;
 use super::io::filecache::FileCache;
 use super::io::statistic::Statistic;
-use super::utils::hash_write_stream;
+use super::utils::hash_stream;
 
 #[derive(Clone)]
 pub struct Cache {
@@ -43,7 +42,7 @@ impl Cache {
 
     pub fn run_file_cached<F: FnOnce() -> Result<OutputInfo, Error>, C: Fn() -> bool>(&self,
                                                                                       statistic: &Arc<Statistic>,
-                                                                                      hash: u64,
+                                                                                      hash: &str,
                                                                                       outputs: &Vec<PathBuf>,
                                                                                       worker: F,
                                                                                       checker: C)
@@ -102,8 +101,5 @@ impl FileHasher for Cache {
 }
 
 fn generate_file_hash(path: &Path) -> Result<String, Error> {
-    let mut hash = SipHasher::new();
-    let mut file = try!(File::open(path));
-    try!(hash_write_stream(&mut hash, &mut file));
-    Ok(format!("{:016x}", hash.finish()))
+    File::open(path).and_then(|mut file| hash_stream(&mut file))
 }

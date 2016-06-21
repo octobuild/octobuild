@@ -1,9 +1,9 @@
+use byteorder::{LittleEndian, WriteBytesExt};
 use std::collections::VecDeque;
 use std::collections::vec_deque;
 use std::cmp::min;
 use std::mem;
 use std::ptr;
-use std::hash::Hasher;
 use std::io::Result;
 pub use std::io::{Read, Write};
 
@@ -63,10 +63,10 @@ impl MemStream {
         Ok(self.size)
     }
 
-    pub fn hash<H: Hasher>(&self, hasher: &mut H) {
-        hasher.write_usize(self.size);
+    pub fn hash<W: Write>(&self, hasher: &mut W) {
+        hasher.write_u64::<LittleEndian>(self.size as u64).unwrap();
         for block in self.iter() {
-            hasher.write(block);
+            hasher.write(block).unwrap();
         }
     }
 

@@ -83,12 +83,11 @@ impl FileCache {
 
     pub fn run_cached<F: FnOnce() -> Result<OutputInfo, Error>, C: Fn() -> bool>(&self,
                                                                                  statistic: &Arc<Statistic>,
-                                                                                 hash: u64,
+                                                                                 hash: &str,
                                                                                  outputs: &Vec<PathBuf>,
                                                                                  worker: F,
                                                                                  checker: C)
                                                                                  -> Result<OutputInfo, Error> {
-        let hash = format!("{:016x}", hash);
         let path = self.cache_dir.join(&hash[0..2]).join(&(hash[2..].to_string() + SUFFIX));
         // Try to read data from cache.
         match read_cache(statistic, &path, outputs) {

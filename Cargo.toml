@@ -39,6 +39,7 @@ tempdir = "0.3.4"
 num_cpus = "0.2.13"
 regex = "0.1.71"
 lazy_static = "0.2.1"
+md5 = "0.1.1"
 
 byteorder = "0.5.3"
 log = "0.3.6"
