@@ -1,5 +1,6 @@
 extern crate octobuild;
 extern crate capnp;
+extern crate crypto;
 extern crate daemon;
 extern crate router;
 extern crate fern;
@@ -10,7 +11,6 @@ extern crate tempdir;
 extern crate nickel;
 #[macro_use]
 extern crate log;
-extern crate md5;
 
 use octobuild::config::Config;
 use octobuild::compiler::*;
@@ -27,13 +27,14 @@ use daemon::State;
 use daemon::Daemon;
 use daemon::DaemonRunner;
 use hyper::{Client, Url};
-use md5::{Context, Digest};
+use crypto::digest::Digest;
+use crypto::md5::Md5;
 use nickel::{HttpRouter, ListeningServer, MediaType, Middleware, MiddlewareResult, Nickel, NickelError, Request,
              Response};
 use nickel::status::StatusCode;
 use nickel::method::Method;
 use rustc_serialize::json;
-use rustc_serialize::hex::{FromHex, ToHex};
+use rustc_serialize::hex::FromHex;
 use tempdir::TempDir;
 use std::collections::HashMap;
 use std::error::Error;
@@ -42,7 +43,6 @@ use std::fs::File;
 use std::io;
 use std::io::{BufReader, Read, Write};
 use std::iter::FromIterator;
-use std::mem;
 use std::net::SocketAddr;
 use std::path::{Path, PathBuf};
 use std::sync::mpsc::Receiver;
@@ -175,16 +175,16 @@ impl<D> Middleware<D> for RpcBuilderTaskHandler {
             let request = CompileRequest::stream_read(&mut buf, options).unwrap();
             let precompiled: Option<PathBuf> = match request.precompiled_hash {
                 Some(ref hash) => {
-                    if hash.len() != mem::size_of::<Digest>() {
+                    if !is_valid_md5(hash) {
                         return Err(NickelError::new(res,
-                                                    format!("Invalid hash value: {}", hash.to_hex()),
+                                                    format!("Invalid hash value: {}", hash),
                                                     StatusCode::BadRequest));
                     }
-                    let path = state.precompiled_dir.join(hash.to_hex() + PRECOMPILED_SUFFIX);
+                    let path = state.precompiled_dir.join(hash.to_string() + PRECOMPILED_SUFFIX);
                     if !path.exists() {
                         return Err(NickelError::new(res,
-                                                    format!("Precompiled file not found: {}", hash.to_hex()),
-                                                    StatusCode::BadRequest));
+                                                    format!("Precompiled file not found: {}", hash),
+                                                    StatusCode::FailedDependency));
                     }
                     Some(path)
                 }
@@ -218,35 +218,37 @@ impl<D> Middleware<D> for RpcBuilderUploadHandler {
                            -> MiddlewareResult<'a, D> {
         let state = self.0.as_ref();
         // Receive compilation request.
-        let hash_str = match request.param("hash") {
+        let hash = match request.param("hash") {
             Some(v) => v.to_string(),
             None => {
                 return Err(NickelError::new(response, "Hash is not defined", StatusCode::BadRequest));
             }
         };
-        let hash = match hash_str.from_hex() {
-            Ok(ref v) if v.len() == mem::size_of::<Digest>() => v.clone(),
-            _ => {
-                return Err(NickelError::new(response,
-                                            format!("Invalid hash value: {}", hash_str),
-                                            StatusCode::BadRequest));
-            }
-        };
-
+        if !is_valid_md5(&hash) {
+            return Err(NickelError::new(response,
+                                        format!("Invalid hash value: {}", hash),
+                                        StatusCode::BadRequest));
+        }
         info!("Received upload from ({}): {} ",
-              hash_str,
+              hash,
               request.origin.remote_addr);
 
-        let path = state.precompiled_dir.join(hash.to_hex() + PRECOMPILED_SUFFIX);
+        let path = state.precompiled_dir.join(hash.clone() + PRECOMPILED_SUFFIX);
         if path.exists() {
             // File is already uploaded
             response.set(StatusCode::Accepted);
             return response.send("");
         }
 
-        // Upload file.
+        if request.origin.method == Method::Head {
+            // File not uploaded.
+            response.set(StatusCode::NotFound);
+            return response.send("");
+        }
+
+        // Receive uploading file.
         let tempory = TempFile::new_in(&state.precompiled_dir, ".tmp");
-        let mut hasher = Context::new();
+        let mut hasher = Md5::new();
         let mut temp = match File::create(tempory.path()) {
             Ok(f) => f,
             Err(e) => {
@@ -256,6 +258,7 @@ impl<D> Middleware<D> for RpcBuilderUploadHandler {
             }
         };
         let mut buf: [u8; DEFAULT_BUF_SIZE] = [0; DEFAULT_BUF_SIZE];
+        let mut total_size = 0;
         loop {
             let size = match request.origin.read(&mut buf) {
                 Ok(v) => v,
@@ -268,6 +271,7 @@ impl<D> Middleware<D> for RpcBuilderUploadHandler {
             if size <= 0 {
                 break;
             }
+            total_size += size;
             match temp.write(&buf[0..size]) {
                 Ok(_) => {}
                 Err(e) => {
@@ -276,10 +280,12 @@ impl<D> Middleware<D> for RpcBuilderUploadHandler {
                                                 StatusCode::InternalServerError));
                 }
             }
-            hasher.consume(&buf[0..size]);
+            hasher.input(&buf[0..size]);
         }
-        if hasher.compute().to_vec() != hash {
-            return Err(NickelError::new(response, "Content hash mismatch", StatusCode::BadRequest));
+        if hasher.result_str() != hash {
+            return Err(NickelError::new(response,
+                                        format!("Content hash mismatch: {}, {}", hash, total_size),
+                                        StatusCode::BadRequest));
         }
         drop(temp);
 
@@ -297,6 +303,10 @@ impl<D> Middleware<D> for RpcBuilderUploadHandler {
         response.set(StatusCode::Ok);
         response.send("")
     }
+}
+
+fn is_valid_md5(hash: &str) -> bool {
+    hash.from_hex().ok().map_or(false, |v| v.len() == Md5::new().output_bytes())
 }
 
 impl BuilderState {

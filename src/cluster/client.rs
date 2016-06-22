@@ -4,7 +4,6 @@ use hyper::client::Body;
 use hyper::header::Expect;
 use hyper::status::StatusCode;
 use rand;
-use rustc_serialize::hex::ToHex;
 use rustc_serialize::json;
 use time;
 use time::{Duration, Timespec};
@@ -157,36 +156,39 @@ impl RemoteToolchain {
             })
     }
 
-    fn upload_precompiled(&self, precompiled: &Option<PathBuf>, base_url: &Url) -> Result<Option<Vec<u8>>, Error> {
+    fn upload_precompiled(&self, precompiled: &Option<PathBuf>, base_url: &Url) -> Result<Option<String>, Error> {
         match precompiled {
             &Some(ref path) => {
                 // Get precompiled header file hash
-                let hash = try!(self.shared.cache.file_hash(&path));
+                let meta = try!(self.shared.cache.file_hash(&path));
                 // Check is precompiled header uploaded
                 // todo: this is workaround for https://github.com/hyperium/hyper/issues/838
                 match try!(self.shared
                     .client
-                    .head(base_url.join(&format!("{}/{}", RPC_BUILDER_UPLOAD, hash.to_hex()))
+                    .head(base_url.join(&format!("{}/{}", RPC_BUILDER_UPLOAD, meta.hash))
                         .unwrap())
                     .send()
                     .map(|response| response.status)
                     .map_err(|e| Error::new(ErrorKind::BrokenPipe, e))) {
-                    StatusCode::Ok | StatusCode::Accepted => return Ok(Some(hash.to_vec())),
+                    StatusCode::Ok | StatusCode::Accepted => return Ok(Some(meta.hash)),
                     _ => {}
                 }
+                println!("Upload: {}, {}, {}",
+                         path.file_name().unwrap().to_string_lossy(),
+                         meta.hash,
+                         meta.size);
                 let mut file = try!(File::open(path));
-                let meta = try!(file.metadata());
                 // Upload precompiled header
                 match try!(self.shared
                     .client
-                    .post(base_url.join(&format!("{}/{}", RPC_BUILDER_UPLOAD, hash.to_hex()))
+                    .post(base_url.join(&format!("{}/{}", RPC_BUILDER_UPLOAD, meta.hash))
                         .unwrap())
                     //.header(Expect::Continue) // todo: this is workaround for https://github.com/hyperium/hyper/issues/838
-                    .body(Body::SizedBody(&mut file, meta.len()))
+                    .body(Body::SizedBody(&mut file, meta.size))
                     .send()
                     .map(|response| response.status)
                     .map_err(|e| Error::new(ErrorKind::BrokenPipe, e))) {
-                    StatusCode::Ok | StatusCode::Accepted => Ok(Some(hash.to_vec())),
+                    StatusCode::Ok | StatusCode::Accepted => Ok(Some(meta.hash)),
                     status => {
                         Err(Error::new(ErrorKind::BrokenPipe,
                                        format!("Can't upload precompiled header: {}", status)))

@@ -8,7 +8,7 @@ struct CompileRequest {
   toolchain @0 :Text;
   args @1 :List(Text);
   preprocessedData @2: Data;
-  precompiledHash @3: Data;
+  precompiledHash @3: Text;
 }
 
 struct CompileResponse {

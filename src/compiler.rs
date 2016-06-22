@@ -1,8 +1,7 @@
 use capnp;
-use md5;
 
-use byteorder::{LittleEndian, WriteBytesExt};
-use rustc_serialize::hex::ToHex;
+use crypto::digest::Digest;
+use crypto::md5::Md5;
 use std::collections::HashMap;
 use std::collections::hash_map;
 use std::env;
@@ -424,6 +423,29 @@ impl Compiler for CompilerGroup {
     }
 }
 
+trait Hasher: Digest {
+    fn hash_u64(&mut self, number: u64) {
+        let mut n = number;
+        let mut buf: [u8; 8] = [0; 8];
+        for i in 0..buf.len() {
+            buf[i] = (n & 0xFF) as u8;
+            n = n >> 8;
+        }
+        self.input(&buf);
+    }
+
+    fn hash_u8(&mut self, number: u8) {
+        self.input(&[number]);
+    }
+
+    fn hash_bytes(&mut self, bytes: &[u8]) {
+        self.hash_u64(bytes.len() as u64);
+        self.input(bytes);
+    }
+}
+
+impl<D: Digest + ?Sized> Hasher for D {}
+
 pub trait Compiler: Send + Sync {
     // Resolve toolchain for command execution.
     fn resolve_toolchain(&self, command: &CommandInfo) -> Option<Arc<Toolchain>>;
@@ -515,29 +537,29 @@ fn compile_step_cached(task: CompileStep,
                        statistic: &Arc<Statistic>,
                        toolchain: Arc<Toolchain>)
                        -> Result<OutputInfo, Error> {
-    let mut hasher = md5::Context::new();
+    let mut hasher = Md5::new();
     // Get hash from preprocessed data
+    hasher.hash_u64(task.preprocessed.len() as u64);
     task.preprocessed.hash(&mut hasher);
     // Hash arguments
-    hasher.write_u64::<LittleEndian>(task.args.len() as u64).unwrap();
+    hasher.hash_u64(task.args.len() as u64);
     for arg in task.args.iter() {
-        hash_bytes(&mut hasher, &arg.as_bytes());
+        hasher.hash_bytes(&arg.as_bytes());
     }
     // Hash input files
     match task.input_precompiled {
         Some(ref path) => {
-            hash_bytes(&mut hasher, &try!(cache.file_hash(&path)));
+            hasher.hash_bytes(try!(cache.file_hash(&path)).hash.as_bytes());
         }
         None => {
-            hasher.write_u64::<LittleEndian>(0).unwrap();
+            hasher.hash_u64(0);
         }
     }
     // Store output precompiled flag
-    hasher.write_u8(match task.output_precompiled.is_some() {
-            true => 1,
-            false => 0,
-        })
-        .unwrap();
+    hasher.hash_u8(match task.output_precompiled.is_some() {
+        true => 1,
+        false => 0,
+    });
 
     // Output files list
     let mut outputs: Vec<PathBuf> = Vec::new();
@@ -556,15 +578,10 @@ fn compile_step_cached(task: CompileStep,
 
     // Try to get files from cache or run
     cache.run_file_cached(statistic,
-                          &hasher.compute().to_hex(),
+                          &hasher.result_str(),
                           &outputs,
                           || -> Result<OutputInfo, Error> { toolchain.compile_step(task) },
                           || true)
-}
-
-fn hash_bytes<W: Write>(hasher: &mut W, bytes: &[u8]) {
-    hasher.write_u64::<LittleEndian>(bytes.len() as u64).unwrap();
-    hasher.write(&bytes).unwrap();
 }
 
 fn fn_find_exec(path: PathBuf) -> Option<PathBuf> {

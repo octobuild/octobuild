@@ -39,7 +39,6 @@ tempdir = "0.3.4"
 num_cpus = "0.2.13"
 regex = "0.1.71"
 lazy_static = "0.2.1"
-md5 = "0.1.1"
 
 byteorder = "0.5.3"
 log = "0.3.6"
@@ -51,6 +50,7 @@ router = "0.1.1"
 time = "0.1.35"
 rustc-serialize = "0.3.19"
 
+rust-crypto = { version = "0.2.35", git = "https://github.com/bozaro/rust-crypto.git", branch = "pr-364", default-features = false, features = [""] }
 capnp = "0.7.1"
 
 [target.'cfg(windows)'.dependencies]

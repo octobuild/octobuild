@@ -14,7 +14,7 @@ pub struct CompileRequest {
     pub toolchain: String,
     pub args: Vec<String>,
     pub preprocessed_data: Vec<u8>,
-    pub precompiled_hash: Option<Vec<u8>>,
+    pub precompiled_hash: Option<String>,
 }
 
 #[derive(Debug)]
@@ -47,7 +47,7 @@ impl CompileRequest {
                 .collect()),
             preprocessed_data: try!(reader.get_preprocessed_data()).to_vec(),
             precompiled_hash: match reader.has_precompiled_hash() {
-                true => Some(try!(reader.get_precompiled_hash()).to_vec()),
+                true => Some(try!(reader.get_precompiled_hash()).to_string()),
                 false => None,
             },
         })

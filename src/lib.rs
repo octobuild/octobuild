@@ -8,7 +8,7 @@ extern crate byteorder;
 extern crate capnp;
 extern crate fern;
 extern crate hyper;
-extern crate md5;
+extern crate crypto;
 extern crate rustc_serialize;
 extern crate time;
 extern crate uuid;

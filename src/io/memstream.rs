@@ -1,4 +1,4 @@
-use byteorder::{LittleEndian, WriteBytesExt};
+use crypto::digest::Digest;
 use std::collections::VecDeque;
 use std::collections::vec_deque;
 use std::cmp::min;
@@ -35,7 +35,7 @@ impl MemStream {
         }
     }
 
-    pub fn size(&self) -> usize {
+    pub fn len(&self) -> usize {
         return self.size;
     }
 
@@ -63,10 +63,9 @@ impl MemStream {
         Ok(self.size)
     }
 
-    pub fn hash<W: Write>(&self, hasher: &mut W) {
-        hasher.write_u64::<LittleEndian>(self.size as u64).unwrap();
+    pub fn hash<D: Digest>(&self, hasher: &mut D) {
         for block in self.iter() {
-            hasher.write(block).unwrap();
+            hasher.input(block);
         }
     }
 
