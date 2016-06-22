@@ -173,10 +173,6 @@ impl RemoteToolchain {
                     StatusCode::Ok | StatusCode::Accepted => return Ok(Some(meta.hash)),
                     _ => {}
                 }
-                println!("Upload: {}, {}, {}",
-                         path.file_name().unwrap().to_string_lossy(),
-                         meta.hash,
-                         meta.size);
                 let mut file = try!(File::open(path));
                 // Upload precompiled header
                 match try!(self.shared
