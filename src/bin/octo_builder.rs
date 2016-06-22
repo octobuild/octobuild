@@ -47,7 +47,7 @@ use std::net::SocketAddr;
 use std::path::{Path, PathBuf};
 use std::sync::mpsc::Receiver;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use std::thread;
 use std::thread::JoinHandle;
@@ -65,6 +65,11 @@ struct BuilderState {
     temp_dir: TempDir,
     precompiled_dir: PathBuf,
     toolchains: HashMap<String, Arc<Toolchain>>,
+    precompiled: Mutex<HashMap<String, Arc<PrecompiledFile>>>,
+}
+
+struct PrecompiledFile {
+    lock: Mutex<()>,
 }
 
 const PRECOMPILED_SUFFIX: &'static str = ".pch";
@@ -83,6 +88,7 @@ impl BuilderService {
             toolchains: BuilderService::discovery_toolchains(temp_dir.path()),
             temp_dir: temp_dir,
             precompiled_dir: config.cache_dir,
+            precompiled: Mutex::new(HashMap::new()),
         });
 
         let mut http = Nickel::new();
@@ -229,7 +235,8 @@ impl<D> Middleware<D> for RpcBuilderUploadHandler {
                                         format!("Invalid hash value: {}", hash),
                                         StatusCode::BadRequest));
         }
-        info!("Received upload from ({}): {} ",
+        info!("Received upload from ({}, {}): {} ",
+              request.origin.method,
               hash,
               request.origin.remote_addr);
 
@@ -246,8 +253,17 @@ impl<D> Middleware<D> for RpcBuilderUploadHandler {
             return response.send("");
         }
 
+        // Don't upload same file in multiple threads.
+        let precompiled: Arc<PrecompiledFile> = state.get_precompiled(&hash);
+        let lock = precompiled.lock.lock().unwrap();
+        if path.exists() {
+            // File is already uploaded
+            response.set(StatusCode::Accepted);
+            return response.send("");
+        }
+
         // Receive uploading file.
-        let tempory = TempFile::new_in(&state.precompiled_dir, ".tmp");
+        let tempory = TempFile::wrap(&path.with_extension("tmp"));
         let mut hasher = Md5::new();
         let mut temp = match File::create(tempory.path()) {
             Ok(f) => f,
@@ -314,6 +330,15 @@ impl BuilderState {
         let mut names: Vec<String> = self.toolchains.keys().map(|s| s.clone()).collect();
         names.sort();
         names
+    }
+
+    fn get_precompiled(&self, hash: &str) -> Arc<PrecompiledFile> {
+        self.precompiled
+            .lock()
+            .unwrap()
+            .entry(hash.to_string())
+            .or_insert_with(|| Arc::new(PrecompiledFile { lock: Mutex::new(()) }))
+            .clone()
     }
 }
 
