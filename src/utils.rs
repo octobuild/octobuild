@@ -5,6 +5,7 @@ use fern;
 use time;
 use std::env;
 use std::iter::FromIterator;
+use std::io;
 use std::io::{Error, Read};
 
 pub const DEFAULT_BUF_SIZE: usize = 1024 * 64;
@@ -13,16 +14,9 @@ pub fn filter<T, R, F: Fn(&T) -> Option<R>>(args: &Vec<T>, filter: F) -> Vec<R> 
     Vec::from_iter(args.iter().filter_map(filter))
 }
 
-pub fn hash_stream<R: Read>(stream: &mut R) -> Result<String, Error> {
+pub fn hash_stream<R: Read>(reader: &mut R) -> Result<String, Error> {
     let mut hash = Md5::new();
-    let mut buf: [u8; DEFAULT_BUF_SIZE] = [0; DEFAULT_BUF_SIZE];
-    loop {
-        let size = try!(stream.read(&mut buf));
-        if size <= 0 {
-            break;
-        }
-        hash.input(&buf[0..size]);
-    }
+    try! (io::copy(reader, &mut hash.as_write()));
     Ok(hash.result_str())
 }
 

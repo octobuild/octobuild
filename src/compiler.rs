@@ -540,7 +540,7 @@ fn compile_step_cached(task: CompileStep,
     let mut hasher = Md5::new();
     // Get hash from preprocessed data
     hasher.hash_u64(task.preprocessed.len() as u64);
-    task.preprocessed.hash(&mut hasher);
+    try!(task.preprocessed.copy(&mut hasher.as_write()));
     // Hash arguments
     hasher.hash_u64(task.args.len() as u64);
     for arg in task.args.iter() {

@@ -1,4 +1,3 @@
-use crypto::digest::Digest;
 use std::collections::VecDeque;
 use std::collections::vec_deque;
 use std::cmp::min;
@@ -61,12 +60,6 @@ impl MemStream {
             try!(writer.write(block));
         }
         Ok(self.size)
-    }
-
-    pub fn hash<D: Digest>(&self, hasher: &mut D) {
-        for block in self.iter() {
-            hasher.input(block);
-        }
     }
 
     fn write_data(&mut self, buf: &[u8]) -> usize {
