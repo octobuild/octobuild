@@ -181,7 +181,7 @@ impl RemoteToolchain {
                     .client
                     .post(base_url.join(&format!("{}/{}", RPC_BUILDER_UPLOAD, hash.to_hex()))
                         .unwrap())
-                    .header(Expect::Continue)
+                    //.header(Expect::Continue) // todo: this is workaround for https://github.com/hyperium/hyper/issues/838
                     .body(Body::SizedBody(&mut file, meta.len()))
                     .send()
                     .map(|response| response.status)
