@@ -10,6 +10,7 @@ extern crate fern;
 extern crate hyper;
 extern crate crypto;
 extern crate rustc_serialize;
+extern crate tempdir;
 extern crate time;
 extern crate uuid;
 extern crate rand;
@@ -30,7 +31,6 @@ pub mod cluster {
     pub mod client;
     pub mod builder;
 }
-pub mod common;
 pub mod compiler;
 pub mod config;
 pub mod hostname;

@@ -77,8 +77,8 @@ impl Toolchain for ClangToolchain {
         self.identifier.get(|| clang_identifier(&self.path))
     }
 
-    fn create_task(&self, command: CommandInfo, args: &[String]) -> Result<Option<CompilationTask>, String> {
-        super::prepare::create_task(command, args)
+    fn create_tasks(&self, command: CommandInfo, args: &[String]) -> Result<Vec<CompilationTask>, String> {
+        super::prepare::create_tasks(command, args)
     }
 
     fn preprocess_step(&self, task: &CompilationTask) -> Result<PreprocessResult, Error> {
@@ -89,7 +89,7 @@ impl Toolchain for ClangToolchain {
         args.push("-frewrite-includes".to_string());
 
         // Make parameters list for preprocessing.
-        for arg in task.args.iter() {
+        for arg in task.shared.args.iter() {
             match arg {
                 &Arg::Flag { ref scope, ref flag } => {
                     match scope {
@@ -120,7 +120,7 @@ impl Toolchain for ClangToolchain {
         args.push("-o".to_string());
         args.push("-".to_string());
 
-        execute(task.command.to_command().args(&args))
+        execute(task.shared.command.to_command().args(&args))
     }
 
     // Compile preprocessed file.
@@ -128,7 +128,7 @@ impl Toolchain for ClangToolchain {
         let mut args = Vec::new();
         args.push("-x".to_string());
         args.push(task.language.clone());
-        for arg in task.args.iter() {
+        for arg in task.shared.args.iter() {
             match arg {
                 &Arg::Flag { ref scope, ref flag } => {
                     match scope {

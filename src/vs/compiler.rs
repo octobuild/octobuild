@@ -3,6 +3,7 @@ extern crate regex;
 extern crate winreg;
 
 use byteorder::{LittleEndian, ReadBytesExt};
+use tempdir::TempDir;
 
 pub use super::super::compiler::*;
 
@@ -21,29 +22,29 @@ use std::sync::Arc;
 use self::regex::bytes::{NoExpand, Regex};
 
 pub struct VsCompiler {
-    temp_dir: PathBuf,
+    temp_dir: Arc<TempDir>,
     toolchains: ToolchainHolder,
 }
 
 impl VsCompiler {
-    pub fn new(temp_dir: &Path) -> Self {
+    pub fn new(temp_dir: &Arc<TempDir>) -> Self {
         VsCompiler {
-            temp_dir: temp_dir.to_path_buf(),
+            temp_dir: temp_dir.clone(),
             toolchains: ToolchainHolder::new(),
         }
     }
 }
 
 struct VsToolchain {
-    temp_dir: PathBuf,
+    temp_dir: Arc<TempDir>,
     path: PathBuf,
     identifier: Lazy<Option<String>>,
 }
 
 impl VsToolchain {
-    pub fn new(path: PathBuf, temp_dir: PathBuf) -> Self {
+    pub fn new(path: PathBuf, temp_dir: &Arc<TempDir>) -> Self {
         VsToolchain {
-            temp_dir: temp_dir,
+            temp_dir: temp_dir.clone(),
             path: path,
             identifier: Lazy::new(),
         }
@@ -59,7 +60,7 @@ impl Compiler for VsCompiler {
             .map_or(false, |n| (n == "cl.exe") || (n == "cl")) {
             command.find_executable().and_then(|path| {
                 self.toolchains.resolve(&path,
-                                        |path| Arc::new(VsToolchain::new(path, self.temp_dir.clone())))
+                                        |path| Arc::new(VsToolchain::new(path, &self.temp_dir)))
             })
         } else {
             None
@@ -107,7 +108,7 @@ impl Compiler for VsCompiler {
             })
             .flat_map(|paths| paths.into_iter())
             .filter(|cl| cl.exists())
-            .map(|cl| -> Arc<Toolchain> { Arc::new(VsToolchain::new(cl, self.temp_dir.clone())) })
+            .map(|cl| -> Arc<Toolchain> { Arc::new(VsToolchain::new(cl, &self.temp_dir)) })
             .filter(|toolchain| toolchain.identifier().is_some())
             .collect()
     }
@@ -118,13 +119,13 @@ impl Toolchain for VsToolchain {
         self.identifier.get(|| vs_identifier(&self.path))
     }
 
-    fn create_task(&self, command: CommandInfo, args: &[String]) -> Result<Option<CompilationTask>, String> {
-        super::prepare::create_task(command, args)
+    fn create_tasks(&self, command: CommandInfo, args: &[String]) -> Result<Vec<CompilationTask>, String> {
+        super::prepare::create_task(command, args).map(|task| task.into_iter().collect())
     }
 
     fn preprocess_step(&self, task: &CompilationTask) -> Result<PreprocessResult, Error> {
         // Make parameters list for preprocessing.
-        let mut args = filter(&task.args, |arg: &Arg| -> Option<String> {
+        let mut args = filter(&task.shared.args, |arg: &Arg| -> Option<String> {
             match arg {
                 &Arg::Flag { ref scope, ref flag } => {
                     match scope {
@@ -152,17 +153,17 @@ impl Toolchain for VsToolchain {
         args.push("/we4002".to_string()); // C4002: too many actual parameters for macro 'identifier'
         args.push(task.input_source.display().to_string());
 
-        let mut command = task.command.to_command();
+        let mut command = task.shared.command.to_command();
         command.args(&args)
             .arg(&join_flag("/Fo", &task.output_object)); // /Fo option also set output path for #import directive
         let output = try!(command.output());
         if output.status.success() {
             let mut content = MemStream::new();
-            if task.input_precompiled.is_some() || task.output_precompiled.is_some() {
+            if task.shared.input_precompiled.is_some() || task.shared.output_precompiled.is_some() {
                 try!(postprocess::filter_preprocessed(&mut Cursor::new(output.stdout),
                                                       &mut content,
-                                                      &task.marker_precompiled,
-                                                      task.output_precompiled.is_some()));
+                                                      &task.shared.marker_precompiled,
+                                                      task.shared.output_precompiled.is_some()));
             } else {
                 try!(content.write(&output.stdout));
             };
@@ -178,12 +179,14 @@ impl Toolchain for VsToolchain {
 
     // Compile preprocessed file.
     fn compile_prepare_step(&self, task: CompilationTask, preprocessed: MemStream) -> Result<CompileStep, Error> {
-        let mut args = filter(&task.args, |arg: &Arg| -> Option<String> {
+        let mut args = filter(&task.shared.args, |arg: &Arg| -> Option<String> {
             match arg {
                 &Arg::Flag { ref scope, ref flag } => {
                     match scope {
                         &Scope::Compiler | &Scope::Shared => Some("/".to_string() + &flag),
-                        &Scope::Preprocessor if task.output_precompiled.is_some() => Some("/".to_string() + &flag),
+                        &Scope::Preprocessor if task.shared.output_precompiled.is_some() => {
+                            Some("/".to_string() + &flag)
+                        }
                         &Scope::Ignore |
                         &Scope::Preprocessor => None,
                     }
@@ -191,7 +194,7 @@ impl Toolchain for VsToolchain {
                 &Arg::Param { ref scope, ref flag, ref value } => {
                     match scope {
                         &Scope::Compiler | &Scope::Shared => Some("/".to_string() + &flag + &value),
-                        &Scope::Preprocessor if task.output_precompiled.is_some() => {
+                        &Scope::Preprocessor if task.shared.output_precompiled.is_some() => {
                             Some("/".to_string() + &flag + &value)
                         }
                         &Scope::Ignore |
@@ -204,7 +207,7 @@ impl Toolchain for VsToolchain {
         });
         args.push("/nologo".to_string());
         args.push("/T".to_string() + &task.language);
-        if task.output_precompiled.is_some() {
+        if task.shared.output_precompiled.is_some() {
             args.push("/Yc".to_string());
         }
         Ok(CompileStep::new(task, preprocessed, args, true))
@@ -212,14 +215,14 @@ impl Toolchain for VsToolchain {
 
     fn compile_step(&self, task: CompileStep) -> Result<OutputInfo, Error> {
         // Input file path.
-        let input_temp = TempFile::new_in(&self.temp_dir, ".i");
+        let input_temp = TempFile::new_in(self.temp_dir.path(), ".i");
         try!(File::create(input_temp.path()).and_then(|mut s| task.preprocessed.copy(&mut s)));
         // Output file path
         let output_object = task.output_object.expect("Visual Studio don't support compilation to stdout.");
         // Run compiler.
         let mut command = Command::new(&self.path);
         command.env_clear()
-            .current_dir(&self.temp_dir)
+            .current_dir(self.temp_dir.path())
             .arg("/c")
             .args(&task.args)
             .arg(input_temp.path().to_str().unwrap())
@@ -265,7 +268,7 @@ impl Toolchain for VsToolchain {
 
     // Compile preprocessed file.
     fn compile_memory(&self, mut task: CompileStep) -> Result<(OutputInfo, Vec<u8>), Error> {
-        let output_temp = TempFile::new_in(&self.temp_dir, ".o");
+        let output_temp = TempFile::new_in(self.temp_dir.path(), ".o");
         task.output_object = Some(output_temp.path().to_path_buf());
         self.compile_step(task)
             .and_then(|output| {

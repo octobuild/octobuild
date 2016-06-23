@@ -3,9 +3,10 @@ use std::ascii::AsciiExt;
 use std::fs::File;
 use std::io::{Error, Read};
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
 use super::super::cmd;
-use super::super::compiler::{Arg, CommandInfo, CompilationTask, InputKind, OutputKind, Scope};
+use super::super::compiler::{Arg, CommandInfo, CompilationArgs, CompilationTask, InputKind, OutputKind, Scope};
 use super::super::utils::filter;
 
 enum ParamValue<T> {
@@ -152,15 +153,18 @@ pub fn create_task(command: CommandInfo, args: &[String]) -> Result<Option<Compi
                 }
             };
 
+            let cwd = command.current_dir.clone();
             Ok(Some(CompilationTask {
-                args: parsed_args,
+                shared: Arc::new(CompilationArgs {
+                    args: parsed_args,
+                    input_precompiled: input_precompiled.map(|path| command.current_dir_join(&path)),
+                    output_precompiled: output_precompiled.map(|path| command.current_dir_join(&path)),
+                    marker_precompiled: marker_precompiled,
+                    command: command,
+                }),
                 language: language,
-                input_source: command.current_dir_join(&input_source),
-                input_precompiled: input_precompiled.map(|path| command.current_dir_join(&path)),
-                output_object: command.current_dir_join(&output_object),
-                output_precompiled: output_precompiled.map(|path| command.current_dir_join(&path)),
-                marker_precompiled: marker_precompiled,
-                command: command,
+                input_source: cwd.as_ref().map(|cwd| cwd.join(&input_source)).unwrap_or(input_source),
+                output_object: cwd.as_ref().map(|cwd| cwd.join(&output_object)).unwrap_or(output_object),
             }))
         })
 }
@@ -264,6 +268,7 @@ fn parse_argument<S: AsRef<str>, I: Iterator<Item = S>>(iter: &mut I) -> Option<
                             s if s.starts_with("Yu") => Ok(Arg::input(InputKind::Marker, "Yu", &s[2..])),
                             s if s.starts_with("Yl") => Ok(Arg::flag(Scope::Shared, flag)),
                             s if s.starts_with("FI") => Ok(Arg::param(Scope::Preprocessor, "FI", &s[2..])),
+                            s if s.starts_with("analyze") => Ok(Arg::flag(Scope::Shared, flag)),
                             _ => Err(arg.as_ref().to_string()),
                         }
                     }

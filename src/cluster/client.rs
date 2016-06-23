@@ -237,8 +237,8 @@ impl Toolchain for RemoteToolchain {
     }
 
     // Parse compiler arguments.
-    fn create_task(&self, command: CommandInfo, args: &[String]) -> Result<Option<CompilationTask>, String> {
-        self.local.create_task(command, args)
+    fn create_tasks(&self, command: CommandInfo, args: &[String]) -> Result<Vec<CompilationTask>, String> {
+        self.local.create_tasks(command, args)
     }
 
     // Preprocessing source file.

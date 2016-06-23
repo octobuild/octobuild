@@ -3,12 +3,14 @@ extern crate petgraph;
 extern crate tempdir;
 extern crate regex;
 #[macro_use]
+extern crate log;
+#[macro_use]
 extern crate lazy_static;
 
-use octobuild::common::BuildTask;
 use octobuild::config::Config;
 use octobuild::cache::Cache;
 use octobuild::xg;
+use octobuild::xg::parser::{XgGraph, XgNode};
 use octobuild::version;
 use octobuild::vs::compiler::VsCompiler;
 use octobuild::io::statistic::Statistic;
@@ -32,16 +34,27 @@ use std::sync::mpsc::{Receiver, Sender, channel};
 use std::process;
 use std::thread;
 
-#[derive(Debug)]
+type BuildGraph = Graph<Arc<BuildTask>, ()>;
+
 struct TaskMessage {
     index: NodeIndex,
-    task: BuildTask,
+    task: Arc<BuildTask>,
 }
 
-#[derive(Debug)]
+struct BuildTask {
+    pub title: String,
+    pub action: BuildAction,
+}
+
+enum BuildAction {
+    Empty,
+    Exec(CommandInfo, Vec<String>),
+    Compilation(Arc<Toolchain>, CompilationTask),
+}
+
 struct ResultMessage {
     index: NodeIndex,
-    task: BuildTask,
+    task: Arc<BuildTask>,
     worker: usize,
     result: Result<OutputInfo, Error>,
 }
@@ -151,11 +164,10 @@ fn execute(args: &[String]) -> Result<Option<i32>, Error> {
     let config = try!(Config::new());
     let statistic = Arc::new(Statistic::new());
     let cache = Arc::new(Cache::new(&config));
-    let temp_dir = try!(TempDir::new("octobuild"));
     let state = Arc::new(ExecutorState {
         compiler: RemoteCompiler::new(&config.coordinator,
                                       CompilerGroup::new(vec!(
-			Box::new(VsCompiler::new(temp_dir.path())),
+			Box::new(VsCompiler::new(&Arc::new(try!(TempDir::new("octobuild"))))),
 			Box::new(ClangCompiler::new()),
 		)),
                                       &cache,
@@ -175,20 +187,26 @@ fn execute(args: &[String]) -> Result<Option<i32>, Error> {
         let file = try!(File::open(&Path::new(arg)));
         try!(xg::parser::parse(&mut graph, BufReader::new(file)));
     }
-    let validated_graph = try!(validate_graph(graph));
+    let build_graph = try!(validate_graph(graph).and_then(|graph| prepare_graph(&state, graph)));
 
     let (tx_result, rx_result): (Sender<ResultMessage>, Receiver<ResultMessage>) = channel();
     let (tx_task, rx_task): (Sender<TaskMessage>, Receiver<TaskMessage>) = channel();
-    let mutex_rx_task =
-        create_threads(rx_task,
-                       tx_result,
-                       config.process_limit,
-                       |worker_id: usize| {
-                           let state_clone = state.clone();
-                           move |task: TaskMessage| -> ResultMessage { execute_task(&state_clone, worker_id, task) }
-                       });
+    let mutex_rx_task = create_threads(rx_task,
+                                       tx_result,
+                                       config.process_limit,
+                                       |worker_id: usize| {
+        let state_clone = state.clone();
+        move |message| {
+            ResultMessage {
+                index: message.index,
+                worker: worker_id,
+                result: execute_compiler(&state_clone, &message.task),
+                task: message.task,
+            }
+        }
+    });
 
-    let result = execute_graph(&validated_graph, tx_task, mutex_rx_task, rx_result);
+    let result = execute_graph(&build_graph, tx_task, mutex_rx_task, rx_result);
     let _ = state.cache.cleanup();
     println!("{}", state.statistic.to_string());
     result
@@ -231,9 +249,9 @@ fn create_threads<R: 'static + Send,
     mutex_rx_task
 }
 
-fn validate_graph(graph: Graph<BuildTask, ()>) -> Result<Graph<BuildTask, ()>, Error> {
-    let mut completed: Vec<bool> = Vec::new();
-    let mut queue: Vec<NodeIndex> = Vec::new();
+fn validate_graph<N, E>(graph: Graph<N, E>) -> Result<Graph<N, E>, Error> {
+    let mut completed: Vec<bool> = Vec::with_capacity(graph.node_count());
+    let mut queue: Vec<NodeIndex> = Vec::with_capacity(graph.node_count());
     for index in 0..graph.node_count() {
         completed.push(false);
         queue.push(NodeIndex::new(index));
@@ -258,31 +276,95 @@ fn validate_graph(graph: Graph<BuildTask, ()>) -> Result<Graph<BuildTask, ()>, E
                    "Found cycles in build dependencies"))
 }
 
-fn execute_task<C: Compiler>(state: &ExecutorState<C>, worker: usize, message: TaskMessage) -> ResultMessage {
-    let args = expand_args(&message.task.args,
-                           &|name: &str| -> Option<String> { env::var(name).ok() });
-    let output = execute_compiler(state, &message.task, &args);
-    ResultMessage {
-        index: message.index,
-        task: message.task,
-        worker: worker,
-        result: output,
+fn env_resolver(name: &str) -> Option<String> {
+    env::var(name).ok()
+}
+
+fn prepare_graph<C: Compiler>(state: &ExecutorState<C>, graph: XgGraph) -> Result<BuildGraph, Error> {
+    let mut remap: Vec<NodeIndex> = Vec::with_capacity(graph.node_count());
+    let mut depends: Vec<NodeIndex> = Vec::with_capacity(graph.node_count());
+
+    let mut result: BuildGraph = Graph::new();
+    for raw_node in graph.raw_nodes().iter() {
+        let node: &XgNode = &raw_node.weight;
+        let args: Vec<String> = node.args.iter().map(|ref arg| expand_arg(&arg, &env_resolver)).collect();
+        let command = node.command.clone();
+
+        let mut actions: Vec<BuildAction> = state.compiler
+            .create_tasks(command.clone(), &args)
+            .map(|tasks| {
+                tasks.into_iter()
+                    .map(|(toolchain, task)| BuildAction::Compilation(toolchain, task))
+                    .collect()
+            })
+            .unwrap_or_else(|e| {
+                info!("Can't use octobuild for task {}: {}", node.title, e);
+                Vec::new()
+            });
+        if actions.len() == 0 {
+            actions.push(BuildAction::Exec(command, args))
+        }
+        let node_index = NodeIndex::new(remap.len());
+        if actions.len() == 1 {
+            depends.push(node_index);
+            remap.push(result.add_node(Arc::new(BuildTask {
+                title: node.title.clone(),
+                action: actions.into_iter().next().unwrap(),
+            })));
+        } else {
+            // Add group node for tracking end of all task actions
+            let group_node = result.add_node(Arc::new(BuildTask {
+                title: node.title.clone(),
+                action: BuildAction::Empty,
+            }));
+            depends.push(NodeIndex::end());
+            // Add task actions
+            let mut index = 1;
+            let total = actions.len();
+            for action in actions.into_iter() {
+                let action_node = result.add_node(Arc::new(BuildTask {
+                    title: format!("{} ({}/{})", node.title, index, total),
+                    action: action,
+                }));
+                depends.push(node_index);
+                result.add_edge(group_node, action_node, ());
+                index += 1;
+            }
+            remap.push(group_node);
+        }
+    }
+
+    assert!(remap.len() == graph.node_count());
+    assert!(depends.len() == result.node_count());
+    for i in 0..depends.len() {
+        let node_a = NodeIndex::new(i);
+        for neighbor in graph.neighbors_directed(depends.get(i).unwrap().clone(), EdgeDirection::Outgoing) {
+            let node_b = remap.get(neighbor.index()).unwrap();
+            result.add_edge(node_a, node_b.clone(), ());
+        }
+    }
+    validate_graph(result)
+}
+
+fn execute_compiler<C: Compiler>(state: &ExecutorState<C>, task: &BuildTask) -> Result<OutputInfo, Error> {
+    match &task.action {
+        &BuildAction::Empty => {
+            Ok(OutputInfo {
+                status: Some(0),
+                stderr: Vec::new(),
+                stdout: Vec::new(),
+            })
+        }
+        &BuildAction::Exec(ref command, ref args) => {
+            command.to_command().args(args).output().map(|o| OutputInfo::new(o))
+        }
+        &BuildAction::Compilation(ref toolchain, ref task) => {
+            toolchain.compile_task(task.clone(), &state.cache, &state.statistic)
+        }
     }
 }
 
-fn execute_compiler<C: Compiler>(state: &ExecutorState<C>,
-                                 task: &BuildTask,
-                                 args: &[String])
-                                 -> Result<OutputInfo, Error> {
-    let command = CommandInfo {
-        program: Path::new(&task.exec).to_path_buf(),
-        current_dir: Some(Path::new(&task.working_dir).to_path_buf()),
-        env: task.env.clone(),
-    };
-    state.compiler.compile(command, args, &state.cache, &state.statistic)
-}
-
-fn execute_graph(graph: &Graph<BuildTask, ()>,
+fn execute_graph(graph: &BuildGraph,
                  tx_task: Sender<TaskMessage>,
                  mutex_rx_task: Arc<Mutex<Receiver<TaskMessage>>>,
                  rx_result: Receiver<ResultMessage>)
@@ -300,7 +382,7 @@ fn execute_graph(graph: &Graph<BuildTask, ()>,
     result
 }
 
-fn execute_until_failed(graph: &Graph<BuildTask, ()>,
+fn execute_until_failed(graph: &BuildGraph,
                         tx_task: Sender<TaskMessage>,
                         rx_result: &Receiver<ResultMessage>,
                         count: &mut usize)
@@ -360,7 +442,7 @@ fn print_task_result(message: &ResultMessage, completed: &mut usize, total: usiz
     Ok(())
 }
 
-fn is_ready(graph: &Graph<BuildTask, ()>, completed: &Vec<bool>, source: &NodeIndex) -> bool {
+fn is_ready<N, E>(graph: &Graph<N, E>, completed: &Vec<bool>, source: &NodeIndex) -> bool {
     for neighbor in graph.neighbors_directed(*source, EdgeDirection::Outgoing) {
         if !completed[neighbor.index()] {
             return false;
@@ -399,14 +481,6 @@ fn expand_arg<F: Fn(&str) -> Option<String>>(arg: &str, resolver: &F) -> String 
                 break;
             }
         }
-    }
-    result
-}
-
-fn expand_args<F: Fn(&str) -> Option<String>>(args: &Vec<String>, resolver: &F) -> Vec<String> {
-    let mut result: Vec<String> = Vec::new();
-    for arg in args.iter() {
-        result.push(expand_arg(&arg, resolver));
     }
     result
 }

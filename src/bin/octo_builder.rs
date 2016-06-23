@@ -44,7 +44,7 @@ use std::io;
 use std::io::{BufReader, Read, Write};
 use std::iter::FromIterator;
 use std::net::SocketAddr;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::sync::mpsc::Receiver;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
@@ -62,7 +62,6 @@ struct BuilderService {
 
 struct BuilderState {
     name: String,
-    temp_dir: TempDir,
     precompiled_dir: PathBuf,
     toolchains: HashMap<String, Arc<Toolchain>>,
     precompiled: Mutex<HashMap<String, Arc<PrecompiledFile>>>,
@@ -85,8 +84,7 @@ impl BuilderService {
         let temp_dir = TempDir::new("octobuild").ok().expect("Can't create temporary directory");
         let state = Arc::new(BuilderState {
             name: get_name(),
-            toolchains: BuilderService::discovery_toolchains(temp_dir.path()),
-            temp_dir: temp_dir,
+            toolchains: BuilderService::discovery_toolchains(&Arc::new(temp_dir)),
             precompiled_dir: config.cache_dir,
             precompiled: Mutex::new(HashMap::new()),
         });
@@ -147,7 +145,7 @@ impl BuilderService {
         })
     }
 
-    fn discovery_toolchains(temp_dir: &Path) -> HashMap<String, Arc<Toolchain>> {
+    fn discovery_toolchains(temp_dir: &Arc<TempDir>) -> HashMap<String, Arc<Toolchain>> {
         let compiler = CompilerGroup::new(vec!(
 			Box::new(VsCompiler::new(temp_dir)),
 			Box::new(ClangCompiler::new()),
@@ -315,7 +313,7 @@ impl<D> Middleware<D> for RpcBuilderUploadHandler {
                 }
             }
         }
-
+        drop(lock);
         response.set(StatusCode::Ok);
         response.send("")
     }

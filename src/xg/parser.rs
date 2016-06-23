@@ -2,20 +2,29 @@ extern crate xml;
 extern crate petgraph;
 
 use cmd;
-use common::BuildTask;
-use compiler::CommandEnv;
+use compiler::{CommandEnv, CommandInfo};
 
 use std::env;
 use std::fmt::{Display, Formatter};
 use std::io::{Error, ErrorKind, Read};
 use std::collections::{HashMap, HashSet};
 use std::iter::FromIterator;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use self::petgraph::graph::{Graph, NodeIndex};
 
 use self::xml::reader::EventReader;
 use self::xml::reader::XmlEvent;
+
+#[derive(Debug)]
+pub struct XgNode {
+    pub title: String,
+    pub command: CommandInfo,
+    pub args: Vec<String>,
+}
+
+pub type XgGraph = Graph<XgNode, ()>;
 
 #[derive(Debug)]
 pub enum XgParseError {
@@ -76,18 +85,18 @@ struct XgProject {
 struct XgTask {
     title: Option<String>,
     tool: String,
-    working_dir: String,
+    working_dir: PathBuf,
     depends_on: Vec<String>,
 }
 
 #[derive(Debug)]
 struct XgTool {
-    exec: String,
+    exec: PathBuf,
     args: String,
     output: Option<String>,
 }
 
-pub fn parse<R: Read>(graph: &mut Graph<BuildTask, ()>, reader: R) -> Result<(), Error> {
+pub fn parse<R: Read>(graph: &mut XgGraph, reader: R) -> Result<(), Error> {
     let mut parser = EventReader::new(reader);
     loop {
         match try!(next_xml_event(&mut parser)) {
@@ -102,7 +111,7 @@ pub fn parse<R: Read>(graph: &mut Graph<BuildTask, ()>, reader: R) -> Result<(),
     }
 }
 
-pub fn parse_build_set<R: Read>(graph: &mut Graph<BuildTask, ()>, events: &mut EventReader<R>) -> Result<(), Error> {
+pub fn parse_build_set<R: Read>(graph: &mut XgGraph, events: &mut EventReader<R>) -> Result<(), Error> {
     let mut envs: HashMap<String, XgEnvironment> = HashMap::new();
     let mut projects: Vec<XgProject> = Vec::new();
     loop {
@@ -216,7 +225,7 @@ fn parse_tools<R: Read>(events: &mut EventReader<R>, tools: &mut HashMap<String,
                         let exec = try!(take_attr(&mut attrs, "Path"));
                         tools.insert(name,
                                      XgTool {
-                                         exec: exec,
+                                         exec: Path::new(&exec).to_path_buf(),
                                          output: attrs.remove("OutputPrefix"),
                                          args: attrs.remove("Params")
                                              .unwrap_or_else(|| String::new()),
@@ -255,7 +264,7 @@ fn parse_tasks<R: Read>(events: &mut EventReader<R>) -> Result<HashMap<String, X
                                      XgTask {
                                          title: attrs.remove("Caption"),
                                          tool: tool,
-                                         working_dir: working_dir,
+                                         working_dir: Path::new(&working_dir).to_path_buf(),
                                          depends_on: depends_on.into_iter()
                                              .collect::<Vec<String>>(),
                                      });
@@ -295,7 +304,7 @@ fn next_xml_event<R: Read>(reader: &mut EventReader<R>) -> Result<XmlEvent, Erro
     reader.next().map_err(|e| Error::new(ErrorKind::InvalidInput, XgParseError::XmlError(e)))
 }
 
-fn parse_create_graph(graph: &mut Graph<BuildTask, ()>,
+fn parse_create_graph(graph: &mut XgGraph,
                       envs: HashMap<String, XgEnvironment>,
                       projects: Vec<XgProject>)
                       -> Result<(), Error> {
@@ -309,7 +318,7 @@ fn parse_create_graph(graph: &mut Graph<BuildTask, ()>,
     Ok(())
 }
 
-fn graph_project(graph: &mut Graph<BuildTask, ()>, project: XgProject, env: &XgEnvironment) -> Result<(), Error> {
+fn graph_project(graph: &mut XgGraph, project: XgProject, env: &XgEnvironment) -> Result<(), Error> {
     let mut nodes: Vec<NodeIndex> = Vec::new();
     let mut task_refs: HashMap<&str, NodeIndex> = HashMap::new();
     for (id, task) in project.tasks.iter() {
@@ -317,20 +326,19 @@ fn graph_project(graph: &mut Graph<BuildTask, ()>, project: XgProject, env: &XgE
             Error::new(ErrorKind::InvalidInput,
                        XgParseError::ToolNotFound(task.tool.clone()))
         }));
-        let node = graph.add_node(BuildTask {
-            title: match task.title {
-                Some(ref v) => v.clone(),
-                None => {
-                    match tool.output {
-                        Some(ref v) => v.clone(),
-                        None => String::new(),
-                    }
-                }
+        let node = graph.add_node(XgNode {
+            title: task.title
+                .as_ref()
+                .map_or_else(|| tool.output.as_ref().map_or_else(|| String::new(), |v| v.clone()),
+                             |v| v.clone()),
+            command: CommandInfo {
+                program: tool.exec.clone(),
+                // Working directory
+                current_dir: Some(task.working_dir.clone()),
+                // Environment variables
+                env: env.variables.clone(),
             },
-            exec: tool.exec.clone(),
             args: try!(cmd::native::parse(&tool.args)),
-            env: env.variables.clone(),
-            working_dir: task.working_dir.clone(),
         });
         task_refs.insert(&id, node);
         nodes.push(node);

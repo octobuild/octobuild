@@ -20,12 +20,7 @@ use std::process;
 
 fn main() {
     process::exit(match compile() {
-        Ok(output) => {
-            match output.status {
-                Some(r) => r,
-                None => 501,
-            }
-        }
+        Ok(status) => status,
         Err(e) => {
             println!("FATAL ERROR: {}", e);
             500
@@ -33,21 +28,26 @@ fn main() {
     })
 }
 
-fn compile() -> Result<OutputInfo, Error> {
+fn compile() -> Result<i32, Error> {
     let statistic = Arc::new(Statistic::new());
-    let temp_dir = try!(TempDir::new("octobuild"));
     let config = try!(Config::new());
     let cache = Arc::new(Cache::new(&config));
     let args = Vec::from_iter(env::args());
     let command_info = CommandInfo::simple(Path::new("cl.exe"));
     let compiler = RemoteCompiler::new(&config.coordinator,
-                                       VsCompiler::new(temp_dir.path()),
+                                       VsCompiler::new(&Arc::new(try!(TempDir::new("octobuild")))),
                                        &cache,
                                        &statistic);
-    let output = try!(compiler.compile(command_info, &args[1..], &cache, &statistic));
-
-    try!(io::stdout().write_all(&output.stdout));
-    try!(io::stderr().write_all(&output.stderr));
+    let outputs = try!(compiler.compile(command_info, &args[1..], &cache, &statistic));
+    let mut status = 0;
+    for output in outputs.into_iter() {
+        try!(io::stdout().write_all(&output.stdout));
+        try!(io::stderr().write_all(&output.stderr));
+        if !output.success() {
+            status = output.status.unwrap_or(501);
+            break;
+        }
+    }
     println!("{}", statistic.to_string());
-    Ok(output)
+    Ok(status)
 }

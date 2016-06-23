@@ -202,10 +202,7 @@ impl CommandInfo {
     }
 
     pub fn current_dir_join(&self, path: &Path) -> PathBuf {
-        match &self.current_dir {
-            &Some(ref cwd) => cwd.join(path),
-            &None => path.to_path_buf(),
-        }
+        self.current_dir.as_ref().map_or_else(|| path.to_path_buf(), |cwd| cwd.join(path))
     }
 
     pub fn to_command(&self) -> Command {
@@ -325,23 +322,31 @@ impl OutputInfo {
     }
 }
 
-pub struct CompilationTask {
+#[derive(Debug)]
+pub struct CompilationArgs {
     // Original compiler executable.
     pub command: CommandInfo,
     // Parsed arguments.
     pub args: Vec<Arg>,
-    // Source language.
-    pub language: String,
-    // Input source file name.
-    pub input_source: PathBuf,
     // Input precompiled header file name.
     pub input_precompiled: Option<PathBuf>,
-    // Output object file name.
-    pub output_object: PathBuf,
     // Output precompiled header file name.
     pub output_precompiled: Option<PathBuf>,
     // Marker for precompiled header.
     pub marker_precompiled: Option<String>,
+}
+
+#[derive(Clone)]
+#[derive(Debug)]
+pub struct CompilationTask {
+    // Compilation  arguments.
+    pub shared: Arc<CompilationArgs>,
+    // Source language.
+    pub language: String,
+    // Input source file name.
+    pub input_source: PathBuf,
+    // Output object file name.
+    pub output_object: PathBuf,
 }
 
 pub struct CompileStep {
@@ -359,12 +364,12 @@ pub struct CompileStep {
 
 impl CompileStep {
     pub fn new(task: CompilationTask, preprocessed: MemStream, args: Vec<String>, use_precompiled: bool) -> Self {
-        assert!(use_precompiled || task.input_precompiled.is_none());
+        assert!(use_precompiled || task.shared.input_precompiled.is_none());
         CompileStep {
             output_object: Some(task.output_object),
-            output_precompiled: task.output_precompiled,
+            output_precompiled: task.shared.output_precompiled.clone(),
             input_precompiled: match use_precompiled {
-                true => task.input_precompiled,
+                true => task.shared.input_precompiled.clone(),
                 false => None,
             },
             args: args,
@@ -383,7 +388,7 @@ pub trait Toolchain: Send + Sync {
     fn identifier(&self) -> Option<String>;
 
     // Parse compiler arguments.
-    fn create_task(&self, command: CommandInfo, args: &[String]) -> Result<Option<CompilationTask>, String>;
+    fn create_tasks(&self, command: CommandInfo, args: &[String]) -> Result<Vec<CompilationTask>, String>;
     // Preprocessing source file.
     fn preprocess_step(&self, task: &CompilationTask) -> Result<PreprocessResult, Error>;
     // Compile preprocessed file.
@@ -403,6 +408,72 @@ pub trait Toolchain: Send + Sync {
                 },
                  output.stdout)
             })
+    }
+
+    fn compile_task(&self,
+                    task: CompilationTask,
+                    cache: &Cache,
+                    statistic: &Arc<Statistic>)
+                    -> Result<OutputInfo, Error> {
+        self.preprocess_step(&task).and_then(|preprocessed| match preprocessed {
+            PreprocessResult::Success(preprocessed) => {
+                self.compile_prepare_step(task, preprocessed)
+                    .and_then(|task| self.compile_step_cached(task, cache, statistic))
+            }
+            PreprocessResult::Failed(output) => Ok(output),
+        })
+    }
+
+    fn compile_step_cached(&self,
+                           task: CompileStep,
+                           cache: &Cache,
+                           statistic: &Arc<Statistic>)
+                           -> Result<OutputInfo, Error> {
+        let mut hasher = Md5::new();
+        // Get hash from preprocessed data
+        hasher.hash_u64(task.preprocessed.len() as u64);
+        try!(task.preprocessed.copy(&mut hasher.as_write()));
+        // Hash arguments
+        hasher.hash_u64(task.args.len() as u64);
+        for arg in task.args.iter() {
+            hasher.hash_bytes(&arg.as_bytes());
+        }
+        // Hash input files
+        match task.input_precompiled {
+            Some(ref path) => {
+                hasher.hash_bytes(try!(cache.file_hash(&path)).hash.as_bytes());
+            }
+            None => {
+                hasher.hash_u64(0);
+            }
+        }
+        // Store output precompiled flag
+        hasher.hash_u8(match task.output_precompiled.is_some() {
+            true => 1,
+            false => 0,
+        });
+
+        // Output files list
+        let mut outputs: Vec<PathBuf> = Vec::new();
+        match task.output_object {
+            Some(ref path) => {
+                outputs.push(path.clone());
+            }
+            None => {}
+        }
+        match task.output_precompiled {
+            Some(ref path) => {
+                outputs.push(path.clone());
+            }
+            None => {}
+        }
+
+        // Try to get files from cache or run
+        cache.run_file_cached(statistic,
+                              &hasher.result_str(),
+                              &outputs,
+                              || -> Result<OutputInfo, Error> { self.compile_step(task) },
+                              || true)
     }
 }
 
@@ -453,30 +524,36 @@ pub trait Compiler: Send + Sync {
     // Discovery local toolchains.
     fn discovery_toolchains(&self) -> Vec<Arc<Toolchain>>;
 
+    fn create_tasks(&self,
+                    command: CommandInfo,
+                    args: &[String])
+                    -> Result<Vec<(Arc<Toolchain>, CompilationTask)>, Error> {
+        self.resolve_toolchain(&command)
+            .ok_or(Error::new(ErrorKind::InvalidInput,
+                              CompilerError::ToolchainNotFound(command.program.clone())))
+            .and_then(|toolchain| {
+                toolchain.create_tasks(command, args)
+                    .map_err(|e| Error::new(ErrorKind::InvalidInput, CompilerError::InvalidArguments(e)))
+                    .map(|tasks| {
+                        tasks.into_iter()
+                            .map(|task| (toolchain.clone(), task))
+                            .collect()
+                    })
+            })
+    }
+
     // Run preprocess and compile.
     fn try_compile(&self,
                    command: CommandInfo,
                    args: &[String],
                    cache: &Cache,
                    statistic: &Arc<Statistic>)
-                   -> Result<Option<OutputInfo>, Error> {
-        let toolchain = try!(self.resolve_toolchain(&command)
-            .ok_or(Error::new(ErrorKind::InvalidInput,
-                              CompilerError::ToolchainNotFound(command.program.clone()))));
-        match toolchain.create_task(command, args) {
-            Ok(Some(task)) => {
-                match try!(toolchain.preprocess_step(&task)) {
-                        PreprocessResult::Success(preprocessed) => {
-                            toolchain.compile_prepare_step(task, preprocessed)
-                                .and_then(|task| compile_step_cached(task, cache, statistic, toolchain))
-                        }
-                        PreprocessResult::Failed(output) => Ok(output),
-                    }
-                    .map(|v| Some(v))
-            }
-            Ok(None) => Ok(None),
-            Err(e) => Err(Error::new(ErrorKind::InvalidInput, CompilerError::InvalidArguments(e))),
-        }
+                   -> Result<Vec<OutputInfo>, Error> {
+        self.create_tasks(command, args).and_then(|tasks| {
+            tasks.into_iter()
+                .map(|(toolchain, task)| toolchain.compile_task(task, cache, statistic))
+                .collect()
+        })
     }
 
     // Run preprocess and compile.
@@ -485,15 +562,19 @@ pub trait Compiler: Send + Sync {
                args: &[String],
                cache: &Cache,
                statistic: &Arc<Statistic>)
-               -> Result<OutputInfo, Error> {
+               -> Result<Vec<OutputInfo>, Error> {
         match self.try_compile(command.clone(), args, cache, statistic) {
-            Ok(Some(output)) => Ok(output),
-            Ok(None) => command.to_command().args(args).output().map(|o| OutputInfo::new(o)),
-            // todo: log error reason
+            Ok(outputs) => {
+                if outputs.len() > 0 {
+                    Ok(outputs)
+                } else {
+                    command.to_command().args(args).output().map(|o| vec![OutputInfo::new(o)])
+                }
+            }
             Err(e) => {
                 info!("Can't use octobuild for compiling file, use fallback compilation: {}",
                       e);
-                command.to_command().args(args).output().map(|o| OutputInfo::new(o))
+                command.to_command().args(args).output().map(|o| vec![OutputInfo::new(o)])
             }
         }
     }
@@ -530,58 +611,6 @@ impl ToolchainHolder {
                 .clone())
         }
     }
-}
-
-fn compile_step_cached(task: CompileStep,
-                       cache: &Cache,
-                       statistic: &Arc<Statistic>,
-                       toolchain: Arc<Toolchain>)
-                       -> Result<OutputInfo, Error> {
-    let mut hasher = Md5::new();
-    // Get hash from preprocessed data
-    hasher.hash_u64(task.preprocessed.len() as u64);
-    try!(task.preprocessed.copy(&mut hasher.as_write()));
-    // Hash arguments
-    hasher.hash_u64(task.args.len() as u64);
-    for arg in task.args.iter() {
-        hasher.hash_bytes(&arg.as_bytes());
-    }
-    // Hash input files
-    match task.input_precompiled {
-        Some(ref path) => {
-            hasher.hash_bytes(try!(cache.file_hash(&path)).hash.as_bytes());
-        }
-        None => {
-            hasher.hash_u64(0);
-        }
-    }
-    // Store output precompiled flag
-    hasher.hash_u8(match task.output_precompiled.is_some() {
-        true => 1,
-        false => 0,
-    });
-
-    // Output files list
-    let mut outputs: Vec<PathBuf> = Vec::new();
-    match task.output_object {
-        Some(ref path) => {
-            outputs.push(path.clone());
-        }
-        None => {}
-    }
-    match task.output_precompiled {
-        Some(ref path) => {
-            outputs.push(path.clone());
-        }
-        None => {}
-    }
-
-    // Try to get files from cache or run
-    cache.run_file_cached(statistic,
-                          &hasher.result_str(),
-                          &outputs,
-                          || -> Result<OutputInfo, Error> { toolchain.compile_step(task) },
-                          || true)
 }
 
 fn fn_find_exec(path: PathBuf) -> Option<PathBuf> {
