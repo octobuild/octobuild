@@ -15,28 +15,25 @@ enum ParamValue<T> {
     Many(Vec<T>),
 }
 
-pub fn create_task(command: CommandInfo, args: &[String]) -> Result<Option<CompilationTask>, String> {
+pub fn create_tasks(command: CommandInfo, args: &[String]) -> Result<Vec<CompilationTask>, String> {
     load_arguments(&command.current_dir, args.iter())
         .map_err(|e: Error| format!("IO error: {}", e))
         .and_then(|a| parse_arguments(a.iter()))
         .and_then(|parsed_args| {
             // Source file name.
-            let input_source = match find_param(&parsed_args, |arg: &Arg| -> Option<PathBuf> {
-                match *arg {
-                    Arg::Input { ref kind, ref file, .. } if *kind == InputKind::Source => {
-                        Some(Path::new(file).to_path_buf())
+            let input_sources: Vec<PathBuf> = parsed_args.iter()
+                .filter_map(|arg| {
+                    match arg {
+                        &Arg::Input { ref kind, ref file, .. } if *kind == InputKind::Source => {
+                            Some(Path::new(file).to_path_buf())
+                        }
+                        _ => None,
                     }
-                    _ => None,
-                }
-            }) {
-                ParamValue::None => {
-                    return Err(format!("Can't find source file path."));
-                }
-                ParamValue::Single(v) => v,
-                ParamValue::Many(v) => {
-                    return Err(format!("Found too many source files: {:?}", v));
-                }
-            };
+                })
+                .collect();
+            if input_sources.len() == 0 {
+                return Err(format!("Can't find source file path."));
+            }
             // Precompiled header file name.
             let precompiled_file = match find_param(&parsed_args, |arg: &Arg| -> Option<PathBuf> {
                 match *arg {
@@ -52,6 +49,7 @@ pub fn create_task(command: CommandInfo, args: &[String]) -> Result<Option<Compi
                     return Err(format!("Found too many precompiled header files: {:?}", v));
                 }
             };
+            let cwd = command.current_dir.clone();
             // Precompiled header file name.
             let marker_precompiled;
             let input_precompiled;
@@ -94,79 +92,82 @@ pub fn create_task(command: CommandInfo, args: &[String]) -> Result<Option<Compi
                 }
             };
             // Output object file name.
-            let output_object = match find_param(&parsed_args, |arg: &Arg| -> Option<PathBuf> {
-                match *arg {
-                    Arg::Output { ref kind, ref file, .. } if *kind == OutputKind::Object => {
-                        Some(Path::new(file).to_path_buf())
+            let output_object: Option<PathBuf> = match find_param(&parsed_args, |arg: &Arg| -> Option<PathBuf> {
+                    match *arg {
+                        Arg::Output { ref kind, ref file, .. } if *kind == OutputKind::Object => {
+                            Some(Path::new(file).to_path_buf())
+                        }
+                        _ => None,
                     }
-                    _ => None,
+                }) {
+                    ParamValue::None => None,
+                    ParamValue::Single(v) => Some(v),
+                    ParamValue::Many(v) => {
+                        return Err(format!("Found too many output object files: {:?}", v));
+                    }
                 }
-            }) {
-                ParamValue::None => input_source.with_extension("obj"),
-                ParamValue::Single(v) => v,
-                ParamValue::Many(v) => {
-                    return Err(format!("Found too many output object files: {:?}", v));
-                }
-            };
+                .map(|path| cwd.as_ref().map(|cwd| cwd.join(&path)).unwrap_or(path));
             // Language
-            let language: String;
-            match find_param(&parsed_args, |arg: &Arg| -> Option<String> {
+            let language: Option<String> = match find_param(&parsed_args, |arg: &Arg| -> Option<String> {
                 match arg {
                     &Arg::Param { ref flag, ref value, .. } if *flag == "T" => Some(value.clone()),
                     _ => None,
                 }
             }) {
-                ParamValue::None => {
-                    match input_source.extension() {
-                        Some(extension) => {
-                            match extension.to_str() {
-                                Some(e) if e.eq_ignore_ascii_case("cpp") => {
-                                    language = "P".to_string();
-                                }
-                                Some(e) if e.eq_ignore_ascii_case("c") => {
-                                    language = "C".to_string();
-                                }
-                                _ => {
-                                    return Err(format!("Can't detect file language by extension: {}",
-                                                       input_source.as_os_str().to_string_lossy()));
-                                }
-                            }
-                        }
-                        _ => {
-                            return Err(format!("Can't detect file language by extension: {:?}",
-                                               input_source.as_os_str().to_string_lossy()));
-                        }
-                    }
-                }
-                ParamValue::Single(v) => {
-                    match &v[..] {
-                        "P" | "C" => {
-                            language = v.clone();
-                        }
-                        _ => {
-                            return Err(format!("Unknown source language type: {}", v));
-                        }
-                    }
-                }
+                ParamValue::None => None,
+                ParamValue::Single(v) => Some(v.clone()),
                 ParamValue::Many(v) => {
                     return Err(format!("Found too many output object files: {:?}", v));
                 }
             };
-
-            let cwd = command.current_dir.clone();
-            Ok(Some(CompilationTask {
-                shared: Arc::new(CompilationArgs {
-                    args: parsed_args,
-                    input_precompiled: input_precompiled.map(|path| command.current_dir_join(&path)),
-                    output_precompiled: output_precompiled.map(|path| command.current_dir_join(&path)),
-                    marker_precompiled: marker_precompiled,
-                    command: command,
-                }),
-                language: language,
-                input_source: cwd.as_ref().map(|cwd| cwd.join(&input_source)).unwrap_or(input_source),
-                output_object: cwd.as_ref().map(|cwd| cwd.join(&output_object)).unwrap_or(output_object),
-            }))
+            let shared = Arc::new(CompilationArgs {
+                args: parsed_args,
+                input_precompiled: input_precompiled.map(|path| command.current_dir_join(&path)),
+                output_precompiled: output_precompiled.map(|path| command.current_dir_join(&path)),
+                marker_precompiled: marker_precompiled,
+                command: command,
+            });
+            input_sources.into_iter()
+                .map(|source| {
+                    let input_source = cwd.as_ref().map(|cwd| cwd.join(&source)).unwrap_or(source);
+                    Ok(CompilationTask {
+                        shared: shared.clone(),
+                        language: try!(language.as_ref()
+                            .map_or_else(|| {
+                                input_source.extension()
+                                    .and_then(|ext| match ext.to_str() {
+                                        Some(e) if e.eq_ignore_ascii_case("cpp") => Some("P"),
+                                        Some(e) if e.eq_ignore_ascii_case("c") => Some("C"),
+                                        _ => None,
+                                    })
+                                    .map(|ext| ext.to_string())
+                            },
+                                         |lang| Some(lang.clone()))
+                            .ok_or_else(|| {
+                                format!("Can't detect file language by extension: {}",
+                                        input_source.to_string_lossy())
+                            })),
+                        output_object: try!(get_output_object(&input_source, &output_object)),
+                        input_source: input_source,
+                    })
+                })
+                .collect()
         })
+}
+
+fn get_output_object(input_source: &Path, output_object: &Option<PathBuf>) -> Result<PathBuf, String> {
+    output_object.as_ref().map_or_else(|| Ok(input_source.with_extension("obj")),
+                                       |path| match path.file_name().is_some() {
+                                           true => Ok(path.clone()),
+                                           false => {
+                                               input_source.file_name()
+                                                   .map(|name| path.join(name).with_extension("obj"))
+                                                   .ok_or_else(|| {
+                                                       format!("Input file path does not contains file name: {}",
+                                                               input_source.to_string_lossy())
+                                                   })
+                                           }
+                                       })
 }
 
 fn find_param<T, R, F: Fn(&T) -> Option<R>>(args: &Vec<T>, filter: F) -> ParamValue<R> {

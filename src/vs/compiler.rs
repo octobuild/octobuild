@@ -120,7 +120,7 @@ impl Toolchain for VsToolchain {
     }
 
     fn create_tasks(&self, command: CommandInfo, args: &[String]) -> Result<Vec<CompilationTask>, String> {
-        super::prepare::create_task(command, args).map(|task| task.into_iter().collect())
+        super::prepare::create_tasks(command, args)
     }
 
     fn preprocess_step(&self, task: &CompilationTask) -> Result<PreprocessResult, Error> {
