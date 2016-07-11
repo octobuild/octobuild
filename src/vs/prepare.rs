@@ -157,9 +157,8 @@ pub fn create_tasks(command: CommandInfo, args: &[String]) -> Result<Vec<Compila
 
 fn get_output_object(input_source: &Path, output_object: &Option<PathBuf>) -> Result<PathBuf, String> {
     output_object.as_ref().map_or_else(|| Ok(input_source.with_extension("obj")),
-                                       |path| match path.file_name().is_some() {
-                                           true => Ok(path.clone()),
-                                           false => {
+                                       |path| match path.is_dir() {
+                                           true => {
                                                input_source.file_name()
                                                    .map(|name| path.join(name).with_extension("obj"))
                                                    .ok_or_else(|| {
@@ -167,6 +166,7 @@ fn get_output_object(input_source: &Path, output_object: &Option<PathBuf>) -> Re
                                                                input_source.to_string_lossy())
                                                    })
                                            }
+                                           false => Ok(path.clone()),
                                        })
 }
 
