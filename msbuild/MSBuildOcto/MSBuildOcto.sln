@@ -7,14 +7,20 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MSBuildOcto", "MSBuildOcto.
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
-		Release|Win32 = Release|Win32
-		Release|x64 = Release|x64
+		V110_Win32|AnyCPU = V110_Win32|AnyCPU
+		V110_x64|AnyCPU = V110_x64|AnyCPU
+		V120|AnyCPU = V120|AnyCPU
+		V140|AnyCPU = V140|AnyCPU
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
-		{EA4976EA-2C22-4ECC-9561-320676E14671}.Release|Win32.ActiveCfg = Release|Win32
-		{EA4976EA-2C22-4ECC-9561-320676E14671}.Release|Win32.Build.0 = Release|Win32
-		{EA4976EA-2C22-4ECC-9561-320676E14671}.Release|x64.ActiveCfg = Release|x64
-		{EA4976EA-2C22-4ECC-9561-320676E14671}.Release|x64.Build.0 = Release|x64
+		{EA4976EA-2C22-4ECC-9561-320676E14671}.V110_Win32|AnyCPU.ActiveCfg = V110_Win32|Any CPU
+		{EA4976EA-2C22-4ECC-9561-320676E14671}.V110_Win32|AnyCPU.Build.0 = V110_Win32|Any CPU
+		{EA4976EA-2C22-4ECC-9561-320676E14671}.V110_x64|AnyCPU.ActiveCfg = V110_x64|Any CPU
+		{EA4976EA-2C22-4ECC-9561-320676E14671}.V110_x64|AnyCPU.Build.0 = V110_x64|Any CPU
+		{EA4976EA-2C22-4ECC-9561-320676E14671}.V120|AnyCPU.ActiveCfg = V120|Any CPU
+		{EA4976EA-2C22-4ECC-9561-320676E14671}.V120|AnyCPU.Build.0 = V120|Any CPU
+		{EA4976EA-2C22-4ECC-9561-320676E14671}.V140|AnyCPU.ActiveCfg = V140|Any CPU
+		{EA4976EA-2C22-4ECC-9561-320676E14671}.V140|AnyCPU.Build.0 = V140|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
