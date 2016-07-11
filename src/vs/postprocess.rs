@@ -1,4 +1,3 @@
-use std::hash::Hasher;
 use std::fmt::{Display, Formatter};
 use std::io::{Error, ErrorKind, Read, Write};
 

@@ -1,4 +1,3 @@
-use rustc_serialize::{Decoder, Encodable, Encoder};
 use uuid::Uuid;
 
 pub const RPC_BUILDER_UPDATE: &'static str = "/rpc/v1/builder/update";

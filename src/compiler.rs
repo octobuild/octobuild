@@ -7,7 +7,7 @@ use std::collections::hash_map;
 use std::env;
 use std::iter::FromIterator;
 use std::fmt::{Display, Formatter};
-use std::io::{Error, ErrorKind, Write};
+use std::io::{Error, ErrorKind};
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, RwLock};
 use std::process::{Command, Output};

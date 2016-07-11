@@ -1,7 +1,6 @@
 use capnp::message;
 use hyper::{Client, Url};
 use hyper::client::Body;
-use hyper::header::Expect;
 use hyper::status::StatusCode;
 use rand;
 use rustc_serialize::json;
