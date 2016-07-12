@@ -1,3 +1,5 @@
+use local_encoding;
+
 use std::fmt::{Display, Formatter};
 use std::io::{Error, ErrorKind, Read, Write};
 
@@ -85,7 +87,7 @@ pub fn filter_preprocessed(reader: &mut Read,
         Some(ref v) => {
             match state.utf8 {
                 true => Some(Vec::from(v.as_bytes())),
-                false => Some(try!(string_to_local_bytes(v.replace("\\", "/")))),
+                false => Some(try!(local_encoding::string_to_ansi(&v.replace("\\", "/")))),
             }
         }
         None => None,
@@ -431,62 +433,6 @@ fn is_subpath(parent: &[u8], child: &[u8]) -> bool {
     parent.ends_with(child) && (parent[parent.len() - child.len() - 1] == b'/')
 }
 
-fn string_to_local_bytes(s: String) -> Result<Vec<u8>, Error> {
-    #[cfg(unix)]
-    fn string_to_local_bytes_inner(s: String) -> Result<Vec<u8>, Error> {
-        Ok(s.into_bytes())
-    }
-
-    #[cfg(windows)]
-    fn string_to_local_bytes_inner(s: String) -> Result<Vec<u8>, Error> {
-        extern crate winapi;
-        extern crate kernel32;
-
-        use std::ffi::OsStr;
-        use std::os::windows::ffi::OsStrExt;
-        use std::ptr;
-
-        const WC_COMPOSITECHECK: winapi::DWORD = 0x00000200; // use composite chars
-
-        // Empty string
-        if s.len() == 0 {
-            return Ok(Vec::new());
-        }
-        unsafe {
-            let wstr: Vec<u16> = OsStr::new(&s).encode_wide().chain(Some(0)).collect::<Vec<_>>();
-            // Get length of ANSI string
-            let len = kernel32::WideCharToMultiByte(winapi::CP_ACP,
-                                                    WC_COMPOSITECHECK,
-                                                    wstr.as_ptr(),
-                                                    (wstr.len() - 1) as i32,
-                                                    ptr::null_mut(),
-                                                    0,
-                                                    ptr::null(),
-                                                    ptr::null_mut());
-            if len <= 0 {
-                return Err(Error::new(ErrorKind::InvalidInput, PostprocessError::InvalidLiteral));
-            }
-            // Convert UTF-16 to ANSI
-            let mut astr: Vec<u8> = Vec::with_capacity(len as usize);
-            astr.set_len(len as usize);
-            match kernel32::WideCharToMultiByte(winapi::CP_ACP,
-                                                WC_COMPOSITECHECK,
-                                                wstr.as_ptr(),
-                                                (wstr.len() - 1) as i32,
-                                                astr.as_mut_ptr() as winapi::LPSTR,
-                                                len,
-                                                ptr::null(),
-                                                ptr::null_mut()) {
-                l if (l as usize) == astr.len() => Ok(astr),
-                l if l > 0 => Ok(Vec::from(&astr[0..(l as usize)])),
-                _ => Err(Error::new(ErrorKind::InvalidInput, PostprocessError::InvalidLiteral)),
-            }
-        }
-    }
-
-    string_to_local_bytes_inner(s)
-}
-
 #[cfg(test)]
 mod test {
     use std::io::{Cursor, Write};
@@ -647,16 +593,5 @@ int main(int argc, char **argv) {
 "#,
                      Some("e:\\work\\octobuild\\test_cl\\sample header.h".to_string()),
                      true);
-    }
-
-    /**
-	 * Test for checking converting ANSI to Unicode characters on Ms Windows.
-	 * Since the test is dependent on the environment, checked only Latin characters.
-	 */
-    #[test]
-    fn test_string_to_local_bytes() {
-        let s = "test\0data";
-        assert_eq!(super::string_to_local_bytes(s.to_string()).unwrap(),
-                   s.to_string().into_bytes());
     }
 }

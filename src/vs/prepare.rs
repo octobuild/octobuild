@@ -1,7 +1,9 @@
+use local_encoding;
+
 use std::iter::FromIterator;
 use std::ascii::AsciiExt;
 use std::fs::File;
-use std::io::{Error, Read};
+use std::io::{Error, ErrorKind, Read};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
@@ -188,8 +190,9 @@ fn load_arguments<S: AsRef<str>, I: Iterator<Item = S>>(base: &Option<PathBuf>, 
                 &None => Path::new(&item.as_ref()[1..]).to_path_buf(),
             };
             let mut file = try!(File::open(path));
-            let mut text = String::new();
-            try!(file.read_to_string(&mut text));
+            let mut data = Vec::new();
+            try!(file.read_to_end(&mut data));
+            let text = try!(decode_string(&data));
             let mut args = try!(cmd::native::parse(&text));
             result.append(&mut args);
         } else {
@@ -197,6 +200,31 @@ fn load_arguments<S: AsRef<str>, I: Iterator<Item = S>>(base: &Option<PathBuf>, 
         }
     }
     Ok(result)
+}
+
+fn decode_string(data: &[u8]) -> Result<String, Error> {
+    if data.starts_with(&[0xEF, 0xBB, 0xBF]) {
+        String::from_utf8(data[3..].to_vec()).map_err(|e| Error::new(ErrorKind::InvalidInput, e))
+    } else if data.starts_with(&[0xFE, 0xFF]) {
+        decode_utf16(&data[2..], |a, b| (a << 8) + b)
+    } else if data.starts_with(&[0xFF, 0xFE]) {
+        decode_utf16(&data[2..], |a, b| (b << 8) + a)
+    } else {
+        local_encoding::ansi_to_string(data)
+    }
+}
+
+fn decode_utf16<F: Fn(u16,u16)->u16>(data: &[u8], endian: F) -> Result<String, Error> {
+    let mut utf16 = Vec::new();
+    if data.len() % 2 != 0 {
+        return Err(Error::new(ErrorKind::InvalidInput, "Invalid UTF-16 line: odd bytes length"));
+    }
+    let mut i = 0;
+    while i < data.len() {
+        utf16.push(endian(data[i] as u16, data[i+1] as u16));
+        i += 2;
+    }
+    String::from_utf16(&utf16).map_err(|e| Error::new(ErrorKind::InvalidInput, e))
 }
 
 fn parse_arguments<S: AsRef<str>, I: Iterator<Item = S>>(mut iter: I) -> Result<Vec<Arg>, String> {
@@ -326,4 +354,16 @@ fn test_parse_argument() {
                 Arg::param(Scope::Shared, "D", "TEST2"),
                 Arg::flag(Scope::Shared, "arch:AVX"),
                 Arg::input(InputKind::Source, "", "sample.cpp")])
+}
+
+#[test]
+fn test_decode_string(){
+    // ANSI
+    assert_eq!(&decode_string(b"test").unwrap(), "test");
+    // UTF-8
+    assert_eq!(&decode_string(b"\xEF\xBB\xBFtest \xD1\x80\xD1\x83\xD1\x81").unwrap(), "test рус");
+    // UTF-16LE
+    assert_eq!(&decode_string(b"\xFF\xFEt\x00e\x00s\x00t\x00 \x00\x40\x04\x43\x04\x41\x04").unwrap(), "test рус");
+    // UTF-16BE
+    assert_eq!(&decode_string(b"\xFE\xFF\x00t\x00e\x00s\x00t\x00 \x04\x40\x04\x43\x04\x41").unwrap(), "test рус");
 }

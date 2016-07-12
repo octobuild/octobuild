@@ -49,6 +49,7 @@ nickel = { version = "0.8.1", git = "https://github.com/bozaro/nickel.rs.git", b
 router = "0.1.1"
 time = "0.1.35"
 rustc-serialize = "0.3.19"
+local-encoding = {version = "0.1.0", git = "https://github.com/bozaro/local-encoding-rs" }
 
 rust-crypto = { version = "0.2.35", git = "https://github.com/bozaro/rust-crypto.git", branch = "pr-364", default-features = false, features = [""] }
 capnp = "0.7.1"

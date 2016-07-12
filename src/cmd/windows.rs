@@ -117,3 +117,9 @@ fn test_parse_8() {
     assert_eq!(parse("/TEST\"C:\\Windows\\System32\" d e").unwrap(),
                ["/TESTC:\\Windows\\System32", "d", "e"]);
 }
+
+#[test]
+fn test_parse_9() {
+    assert_eq!(parse("/Fp\"Debug\\HelloWorld.pch\" /Fo\"Debug\\\\\" /Gd").unwrap(),
+               ["/FpDebug\\HelloWorld.pch", "/FoDebug\\", "/Gd"]);
+}
