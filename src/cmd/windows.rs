@@ -33,7 +33,7 @@ pub fn parse(cmd: &str) -> Result<Vec<String>, Error> {
             }
             '"' => {
                 arg = add_slashes(arg, slash / 2);
-                if (slash & 2) == 0 {
+                if (slash & 1) == 0 {
                     quote = !quote;
                 } else {
                     arg.push(c);
