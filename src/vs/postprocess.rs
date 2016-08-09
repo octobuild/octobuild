@@ -1,4 +1,4 @@
-use local_encoding;
+use local_encoding::{Encoding, Encoder};
 
 use std::fmt::{Display, Formatter};
 use std::io::{Error, ErrorKind, Read, Write};
@@ -87,7 +87,7 @@ pub fn filter_preprocessed(reader: &mut Read,
         Some(ref v) => {
             match state.utf8 {
                 true => Some(Vec::from(v.as_bytes())),
-                false => Some(try!(local_encoding::string_to_ansi(&v.replace("\\", "/")))),
+                false => Some(try!(Encoding::ANSI.to_bytes(&v.replace("\\", "/")))),
             }
         }
         None => None,

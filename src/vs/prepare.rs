@@ -1,4 +1,4 @@
-use local_encoding;
+use local_encoding::{Encoding, Encoder};
 
 use std::iter::FromIterator;
 use std::ascii::AsciiExt;
@@ -210,7 +210,7 @@ fn decode_string(data: &[u8]) -> Result<String, Error> {
     } else if data.starts_with(&[0xFF, 0xFE]) {
         decode_utf16(&data[2..], |a, b| (b << 8) + a)
     } else {
-        local_encoding::ansi_to_string(data)
+        Encoding::ANSI.to_string(data)
     }
 }
 
