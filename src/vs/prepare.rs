@@ -285,6 +285,7 @@ fn parse_argument<S: AsRef<str>, I: Iterator<Item = S>>(iter: &mut I) -> Option<
                             s if s.starts_with("RTC") => Ok(Arg::flag(Scope::Shared, flag)),
                             s if s.starts_with("Z") => Ok(Arg::flag(Scope::Shared, flag)),
                             s if s.starts_with("d2Zi+") => Ok(Arg::flag(Scope::Shared, flag)),
+                            s if s.starts_with("MP") => Ok(Arg::flag(Scope::Compiler, flag)),
                             s if s.starts_with("MD") => Ok(Arg::flag(Scope::Shared, flag)),
                             s if s.starts_with("MT") => Ok(Arg::flag(Scope::Shared, flag)),
                             s if s.starts_with("EH") => Ok(Arg::flag(Scope::Shared, flag)),
