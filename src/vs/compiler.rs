@@ -228,7 +228,8 @@ impl Toolchain for VsToolchain {
             .arg(input_temp.path().to_str().unwrap())
             .arg(&join_flag("/Fo", &output_object));
         // Copy required environment variables.
-        for (name, value) in vec!["SystemDrive", "SystemRoot", "TEMP", "TMP"]
+        // todo: #15 Need to make correct PATH variable for cl.exe manually
+        for (name, value) in vec!["SystemDrive", "SystemRoot", "TEMP", "TMP", "PATH"]
             .iter()
             .filter_map(|name| env::var(name).ok().map(|value| (name, value))) {
             command.env(name, value);
