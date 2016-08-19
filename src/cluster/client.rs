@@ -7,12 +7,12 @@ use rustc_serialize::json;
 use time;
 use time::{Duration, Timespec};
 
-use ::cache::{Cache, FileHasher};
+use ::cache::FileHasher;
 use ::io::memstream::MemStream;
-use ::io::statistic::Statistic;
 use ::cluster::common::{BuilderInfo, RPC_BUILDER_LIST, RPC_BUILDER_TASK, RPC_BUILDER_UPLOAD};
 use ::cluster::builder::{CompileRequest, CompileResponse};
-use ::compiler::{CommandInfo, CompilationTask, CompileStep, Compiler, OutputInfo, PreprocessResult, Toolchain};
+use ::compiler::{CommandInfo, CompilationTask, CompileStep, Compiler, OutputInfo, PreprocessResult, SharedState,
+                 Toolchain};
 
 use std::fs;
 use std::fs::File;
@@ -35,8 +35,7 @@ struct RemoteSharedMut {
 struct RemoteShared {
     mutable: RwLock<RemoteSharedMut>,
     base_url: Option<Url>,
-    statistic: Arc<Statistic>,
-    cache: Arc<Cache>,
+    shared: Arc<SharedState>,
     client: Client,
 }
 
@@ -46,7 +45,7 @@ struct RemoteToolchain {
 }
 
 impl<C: Compiler> RemoteCompiler<C> {
-    pub fn new(base_url: &Option<Url>, compiler: C, cache: &Arc<Cache>, statistic: &Arc<Statistic>) -> Self {
+    pub fn new(base_url: &Option<Url>, compiler: C, shared: &Arc<SharedState>) -> Self {
         RemoteCompiler {
             shared: Arc::new(RemoteShared {
                 mutable: RwLock::new(RemoteSharedMut {
@@ -54,8 +53,7 @@ impl<C: Compiler> RemoteCompiler<C> {
                     builders: Arc::new(Vec::new()),
                 }),
                 base_url: base_url.as_ref().map(|u| u.clone()),
-                cache: cache.clone(),
-                statistic: statistic.clone(),
+                shared: shared.clone(),
                 client: Client::new(),
             }),
             local: compiler,
@@ -149,7 +147,7 @@ impl RemoteToolchain {
                             }
                             _ => {}
                         }
-                        self.shared.statistic.inc_remote();
+                        self.shared.shared.statistic.inc_remote();
                         Ok(result)
                     })
             })
@@ -159,7 +157,7 @@ impl RemoteToolchain {
         match precompiled {
             &Some(ref path) => {
                 // Get precompiled header file hash
-                let meta = try!(self.shared.cache.file_hash(&path));
+                let meta = try!(self.shared.shared.cache.file_hash(&path));
                 // Check is precompiled header uploaded
                 // todo: this is workaround for https://github.com/hyperium/hyper/issues/838
                 match try!(self.shared

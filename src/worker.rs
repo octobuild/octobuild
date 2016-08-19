@@ -1,7 +1,7 @@
 use petgraph::{EdgeDirection, Graph};
 use petgraph::graph::NodeIndex;
 
-use self::super::compiler::{CommandInfo, CompilationTask, OutputInfo, SharedState, Toolchain};
+use ::compiler::{CommandInfo, CompilationTask, OutputInfo, SharedState, Toolchain};
 
 use std::io::{Error, ErrorKind};
 use std::cmp::{max, min};
@@ -235,8 +235,6 @@ fn execute_compiler(state: &SharedState, task: &BuildTask) -> Result<OutputInfo,
         &BuildAction::Exec(ref command, ref args) => {
             command.to_command().args(args).output().map(|o| OutputInfo::new(o))
         }
-        &BuildAction::Compilation(ref toolchain, ref task) => {
-            toolchain.compile_task(task.clone(), &state.cache, &state.statistic)
-        }
+        &BuildAction::Compilation(ref toolchain, ref task) => toolchain.compile_task(task.clone(), state),
     }
 }

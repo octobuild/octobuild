@@ -12,6 +12,7 @@ use std::path::{Path, PathBuf};
 use std::sync::{Arc, RwLock};
 use std::process::{Command, Output};
 
+use ::config::Config;
 use ::io::memstream::MemStream;
 use ::io::statistic::Statistic;
 use ::cache::{Cache, FileHasher};
@@ -151,12 +152,21 @@ pub struct CommandInfo {
 }
 
 pub struct SharedState {
-    pub cache: Arc<Cache>,
-    pub statistic: Arc<Statistic>,
+    pub cache: Cache,
+    pub statistic: Statistic,
 }
 
 pub struct CompilerGroup {
     compilers: Vec<Box<Compiler>>,
+}
+
+impl SharedState {
+    pub fn new(config: &Config) -> Self {
+        SharedState {
+            statistic: Statistic::new(),
+            cache: Cache::new(&config),
+        }
+    }
 }
 
 impl CommandEnv {
@@ -415,25 +425,17 @@ pub trait Toolchain: Send + Sync {
             })
     }
 
-    fn compile_task(&self,
-                    task: CompilationTask,
-                    cache: &Cache,
-                    statistic: &Arc<Statistic>)
-                    -> Result<OutputInfo, Error> {
+    fn compile_task(&self, task: CompilationTask, state: &SharedState) -> Result<OutputInfo, Error> {
         self.preprocess_step(&task).and_then(|preprocessed| match preprocessed {
             PreprocessResult::Success(preprocessed) => {
                 self.compile_prepare_step(task, preprocessed)
-                    .and_then(|task| self.compile_step_cached(task, cache, statistic))
+                    .and_then(|task| self.compile_step_cached(task, state))
             }
             PreprocessResult::Failed(output) => Ok(output),
         })
     }
 
-    fn compile_step_cached(&self,
-                           task: CompileStep,
-                           cache: &Cache,
-                           statistic: &Arc<Statistic>)
-                           -> Result<OutputInfo, Error> {
+    fn compile_step_cached(&self, task: CompileStep, state: &SharedState) -> Result<OutputInfo, Error> {
         let mut hasher = Md5::new();
         // Get hash from preprocessed data
         hasher.hash_u64(task.preprocessed.len() as u64);
@@ -446,7 +448,7 @@ pub trait Toolchain: Send + Sync {
         // Hash input files
         match task.input_precompiled {
             Some(ref path) => {
-                hasher.hash_bytes(try!(cache.file_hash(&path)).hash.as_bytes());
+                hasher.hash_bytes(try!(state.cache.file_hash(&path)).hash.as_bytes());
             }
             None => {
                 hasher.hash_u64(0);
@@ -474,11 +476,11 @@ pub trait Toolchain: Send + Sync {
         }
 
         // Try to get files from cache or run
-        cache.run_file_cached(statistic,
-                              &hasher.result_str(),
-                              &outputs,
-                              || -> Result<OutputInfo, Error> { self.compile_step(task) },
-                              || true)
+        state.cache.run_file_cached(&state.statistic,
+                                    &hasher.result_str(),
+                                    &outputs,
+                                    || -> Result<OutputInfo, Error> { self.compile_step(task) },
+                                    || true)
     }
 }
 
@@ -551,24 +553,18 @@ pub trait Compiler: Send + Sync {
     fn try_compile(&self,
                    command: CommandInfo,
                    args: &[String],
-                   cache: &Cache,
-                   statistic: &Arc<Statistic>)
+                   state: &SharedState)
                    -> Result<Vec<OutputInfo>, Error> {
         self.create_tasks(command, args).and_then(|tasks| {
             tasks.into_iter()
-                .map(|(toolchain, task)| toolchain.compile_task(task, cache, statistic))
+                .map(|(toolchain, task)| toolchain.compile_task(task, state))
                 .collect()
         })
     }
 
     // Run preprocess and compile.
-    fn compile(&self,
-               command: CommandInfo,
-               args: &[String],
-               cache: &Cache,
-               statistic: &Arc<Statistic>)
-               -> Result<Vec<OutputInfo>, Error> {
-        match self.try_compile(command.clone(), args, cache, statistic) {
+    fn compile(&self, command: CommandInfo, args: &[String], state: &SharedState) -> Result<Vec<OutputInfo>, Error> {
+        match self.try_compile(command.clone(), args, state) {
             Ok(outputs) => {
                 if outputs.len() > 0 {
                     Ok(outputs)

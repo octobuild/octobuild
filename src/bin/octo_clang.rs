@@ -1,10 +1,8 @@
 extern crate octobuild;
 
-use octobuild::io::statistic::Statistic;
 use octobuild::clang::compiler::ClangCompiler;
 use octobuild::compiler::*;
 use octobuild::cluster::client::RemoteCompiler;
-use octobuild::cache::Cache;
 use octobuild::config::Config;
 
 use std::env;
@@ -26,16 +24,12 @@ fn main() {
 }
 
 fn compile() -> Result<i32, Error> {
-    let statistic = Arc::new(Statistic::new());
     let config = try!(Config::new());
-    let cache = Arc::new(Cache::new(&config));
     let args = Vec::from_iter(env::args());
+    let state = Arc::new(SharedState::new(&config));
     let command_info = CommandInfo::simple(Path::new("clang"));
-    let compiler = RemoteCompiler::new(&config.coordinator,
-                                       ClangCompiler::new(),
-                                       &cache,
-                                       &statistic);
-    let outputs = try!(compiler.compile(command_info, &args[1..], &cache, &statistic));
+    let compiler = RemoteCompiler::new(&config.coordinator, ClangCompiler::new(), &state);
+    let outputs = try!(compiler.compile(command_info, &args[1..], state.as_ref()));
     let mut status = 0;
     for output in outputs.into_iter() {
         try!(io::stdout().write_all(&output.stdout));
@@ -45,6 +39,6 @@ fn compile() -> Result<i32, Error> {
             break;
         }
     }
-    println!("{}", statistic.to_string());
+    println!("{}", state.statistic.to_string());
     Ok(status)
 }

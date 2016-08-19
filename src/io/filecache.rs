@@ -8,7 +8,6 @@ use std::fs;
 use std::fs::{File, OpenOptions};
 use std::io::{Error, ErrorKind, Read, Seek, SeekFrom, Write};
 use std::path::{Path, PathBuf};
-use std::sync::Arc;
 
 use self::filetime::FileTime;
 
@@ -81,7 +80,7 @@ impl FileCache {
     }
 
     pub fn run_cached<F: FnOnce() -> Result<OutputInfo, Error>, C: Fn() -> bool>(&self,
-                                                                                 statistic: &Arc<Statistic>,
+                                                                                 statistic: &Statistic,
                                                                                  hash: &str,
                                                                                  outputs: &Vec<PathBuf>,
                                                                                  worker: F,
@@ -159,11 +158,7 @@ fn write_cached_file<W: Write>(stream: &mut W, path: &PathBuf) -> Result<(), Err
     Ok(())
 }
 
-fn write_cache(statistic: &Arc<Statistic>,
-               path: &Path,
-               paths: &Vec<PathBuf>,
-               output: &OutputInfo)
-               -> Result<(), Error> {
+fn write_cache(statistic: &Statistic, path: &Path, paths: &Vec<PathBuf>, output: &OutputInfo) -> Result<(), Error> {
     if !output.success() {
         return Ok(());
     }
@@ -208,7 +203,7 @@ fn read_cached_file<R: Read>(stream: &mut R, path: &PathBuf) -> Result<(), Error
     Ok(())
 }
 
-fn read_cache(statistic: &Arc<Statistic>, path: &Path, paths: &Vec<PathBuf>) -> Result<OutputInfo, Error> {
+fn read_cache(statistic: &Statistic, path: &Path, paths: &Vec<PathBuf>) -> Result<OutputInfo, Error> {
     let mut file = try!(OpenOptions::new().read(true).write(true).open(Path::new(path)));
     try!(file.write(&[4]));
     try!(file.seek(SeekFrom::Start(0)));

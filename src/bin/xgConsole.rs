@@ -8,12 +8,10 @@ extern crate log;
 extern crate lazy_static;
 
 use octobuild::config::Config;
-use octobuild::cache::Cache;
 use octobuild::xg;
 use octobuild::xg::parser::{XgGraph, XgNode};
 use octobuild::version;
 use octobuild::vs::compiler::VsCompiler;
-use octobuild::io::statistic::Statistic;
 use octobuild::clang::compiler::ClangCompiler;
 use octobuild::cluster::client::RemoteCompiler;
 use octobuild::compiler::*;
@@ -133,17 +131,13 @@ fn expand_files(mut files: Vec<PathBuf>, arg: &str) -> Vec<PathBuf> {
 
 fn execute(args: &[String]) -> Result<Option<i32>, Error> {
     let config = try!(Config::new());
-    let state = Arc::new(SharedState {
-        cache: Arc::new(Cache::new(&config)),
-        statistic: Arc::new(Statistic::new()),
-    });
+    let state = Arc::new(SharedState::new(&config));
     let compiler = RemoteCompiler::new(&config.coordinator,
                                        CompilerGroup::new(vec!(
     Box::new(VsCompiler::new(&Arc::new(try!(TempDir::new("octobuild"))))),
     Box::new(ClangCompiler::new()),
     )),
-                                       &state.cache,
-                                       &state.statistic);
+                                       &state);
     let files = args.iter()
         .filter(|a| !is_flag(a))
         .fold(Vec::new(), |state, a| expand_files(state, &a));
