@@ -150,6 +150,11 @@ pub struct CommandInfo {
     pub env: Arc<CommandEnv>,
 }
 
+pub struct SharedState {
+    pub cache: Arc<Cache>,
+    pub statistic: Arc<Statistic>,
+}
+
 pub struct CompilerGroup {
     compilers: Vec<Box<Compiler>>,
 }

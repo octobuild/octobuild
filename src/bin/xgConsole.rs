@@ -18,6 +18,10 @@ use octobuild::clang::compiler::ClangCompiler;
 use octobuild::cluster::client::RemoteCompiler;
 use octobuild::compiler::*;
 
+use octobuild::worker::validate_graph;
+use octobuild::worker::execute_graph;
+use octobuild::worker::{BuildAction, BuildGraph, BuildResult, BuildTask};
+
 use petgraph::{EdgeDirection, Graph};
 use petgraph::graph::NodeIndex;
 use tempdir::TempDir;
@@ -29,41 +33,8 @@ use std::io::{BufReader, Error, ErrorKind, Write};
 use std::io;
 use std::iter::FromIterator;
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, Mutex};
-use std::sync::mpsc::{Receiver, Sender, channel};
+use std::sync::Arc;
 use std::process;
-use std::thread;
-
-type BuildGraph = Graph<Arc<BuildTask>, ()>;
-
-struct TaskMessage {
-    index: NodeIndex,
-    task: Arc<BuildTask>,
-}
-
-struct BuildTask {
-    pub title: String,
-    pub action: BuildAction,
-}
-
-enum BuildAction {
-    Empty,
-    Exec(CommandInfo, Vec<String>),
-    Compilation(Arc<Toolchain>, CompilationTask),
-}
-
-struct ResultMessage {
-    index: NodeIndex,
-    task: Arc<BuildTask>,
-    worker: usize,
-    result: Result<OutputInfo, Error>,
-}
-
-struct ExecutorState<C: Compiler> {
-    cache: Arc<Cache>,
-    statistic: Arc<Statistic>,
-    compiler: C,
-}
 
 fn main() {
     println!("xgConsole ({}):", version::full_version());
@@ -162,19 +133,17 @@ fn expand_files(mut files: Vec<PathBuf>, arg: &str) -> Vec<PathBuf> {
 
 fn execute(args: &[String]) -> Result<Option<i32>, Error> {
     let config = try!(Config::new());
-    let statistic = Arc::new(Statistic::new());
-    let cache = Arc::new(Cache::new(&config));
-    let state = Arc::new(ExecutorState {
-        compiler: RemoteCompiler::new(&config.coordinator,
-                                      CompilerGroup::new(vec!(
-			Box::new(VsCompiler::new(&Arc::new(try!(TempDir::new("octobuild"))))),
-			Box::new(ClangCompiler::new()),
-		)),
-                                      &cache,
-                                      &statistic),
-        cache: cache,
-        statistic: statistic,
+    let state = Arc::new(SharedState {
+        cache: Arc::new(Cache::new(&config)),
+        statistic: Arc::new(Statistic::new()),
     });
+    let compiler = RemoteCompiler::new(&config.coordinator,
+                                       CompilerGroup::new(vec!(
+    Box::new(VsCompiler::new(&Arc::new(try!(TempDir::new("octobuild"))))),
+    Box::new(ClangCompiler::new()),
+    )),
+                                       &state.cache,
+                                       &state.statistic);
     let files = args.iter()
         .filter(|a| !is_flag(a))
         .fold(Vec::new(), |state, a| expand_files(state, &a));
@@ -187,100 +156,22 @@ fn execute(args: &[String]) -> Result<Option<i32>, Error> {
         let file = try!(File::open(&Path::new(arg)));
         try!(xg::parser::parse(&mut graph, BufReader::new(file)));
     }
-    let build_graph = try!(validate_graph(graph).and_then(|graph| prepare_graph(&state, graph)));
+    let build_graph = try!(validate_graph(graph).and_then(|graph| prepare_graph(&compiler, graph)));
 
-    let (tx_result, rx_result): (Sender<ResultMessage>, Receiver<ResultMessage>) = channel();
-    let (tx_task, rx_task): (Sender<TaskMessage>, Receiver<TaskMessage>) = channel();
-    let mutex_rx_task = create_threads(rx_task,
-                                       tx_result,
-                                       config.process_limit,
-                                       |worker_id: usize| {
-        let state_clone = state.clone();
-        move |message| {
-            ResultMessage {
-                index: message.index,
-                worker: worker_id,
-                result: execute_compiler(&state_clone, &message.task),
-                task: message.task,
-            }
-        }
-    });
-
-    let result = execute_graph(&build_graph, tx_task, mutex_rx_task, rx_result);
+    let result = execute_graph(state.clone(),
+                               build_graph,
+                               config.process_limit,
+                               print_task_result);
     let _ = state.cache.cleanup();
     println!("{}", state.statistic.to_string());
     result
-}
-
-fn create_threads<R: 'static + Send,
-                  T: 'static + Send,
-                  Worker: 'static + Fn(T) -> R + Send,
-                  Factory: Fn(usize) -> Worker>
-    (rx_task: Receiver<T>,
-     tx_result: Sender<R>,
-     num_cpus: usize,
-     factory: Factory)
-     -> Arc<Mutex<Receiver<T>>> {
-    let mutex_rx_task = Arc::new(Mutex::new(rx_task));
-    for cpu_id in 0..num_cpus {
-        let local_rx_task = mutex_rx_task.clone();
-        let local_tx_result = tx_result.clone();
-        let worker = factory(cpu_id);
-        thread::spawn(move || {
-            loop {
-                let task: T;
-                match local_rx_task.lock().unwrap().recv() {
-                    Ok(v) => {
-                        task = v;
-                    }
-                    Err(_) => {
-                        break;
-                    }
-                }
-                match local_tx_result.send(worker(task)) {
-                    Ok(_) => {}
-                    Err(_) => {
-                        break;
-                    }
-                }
-            }
-        });
-    }
-    mutex_rx_task
-}
-
-fn validate_graph<N, E>(graph: Graph<N, E>) -> Result<Graph<N, E>, Error> {
-    let mut completed: Vec<bool> = Vec::with_capacity(graph.node_count());
-    let mut queue: Vec<NodeIndex> = Vec::with_capacity(graph.node_count());
-    for index in 0..graph.node_count() {
-        completed.push(false);
-        queue.push(NodeIndex::new(index));
-    }
-    let mut count: usize = 0;
-    let mut i: usize = 0;
-    while i < queue.len() {
-        let index = queue[i];
-        if (!completed[index.index()]) && (is_ready(&graph, &completed, &index)) {
-            completed[index.index()] = true;
-            for neighbor in graph.neighbors_directed(index, EdgeDirection::Incoming) {
-                queue.push(neighbor);
-            }
-            count += 1;
-            if count == completed.len() {
-                return Ok(graph);
-            }
-        }
-        i = i + 1;
-    }
-    Err(Error::new(ErrorKind::InvalidInput,
-                   "Found cycles in build dependencies"))
 }
 
 fn env_resolver(name: &str) -> Option<String> {
     env::var(name).ok()
 }
 
-fn prepare_graph<C: Compiler>(state: &ExecutorState<C>, graph: XgGraph) -> Result<BuildGraph, Error> {
+fn prepare_graph<C: Compiler>(compiler: &C, graph: XgGraph) -> Result<BuildGraph, Error> {
     let mut remap: Vec<NodeIndex> = Vec::with_capacity(graph.node_count());
     let mut depends: Vec<NodeIndex> = Vec::with_capacity(graph.node_count());
 
@@ -290,8 +181,7 @@ fn prepare_graph<C: Compiler>(state: &ExecutorState<C>, graph: XgGraph) -> Resul
         let args: Vec<String> = node.args.iter().map(|ref arg| expand_arg(&arg, &env_resolver)).collect();
         let command = node.command.clone();
 
-        let mut actions: Vec<BuildAction> = state.compiler
-            .create_tasks(command.clone(), &args)
+        let mut actions: Vec<BuildAction> = compiler.create_tasks(command.clone(), &args)
             .map(|tasks| {
                 tasks.into_iter()
                     .map(|(toolchain, task)| BuildAction::Compilation(toolchain, task))
@@ -346,109 +236,20 @@ fn prepare_graph<C: Compiler>(state: &ExecutorState<C>, graph: XgGraph) -> Resul
     validate_graph(result)
 }
 
-fn execute_compiler<C: Compiler>(state: &ExecutorState<C>, task: &BuildTask) -> Result<OutputInfo, Error> {
-    match &task.action {
-        &BuildAction::Empty => {
-            Ok(OutputInfo {
-                status: Some(0),
-                stderr: Vec::new(),
-                stdout: Vec::new(),
-            })
-        }
-        &BuildAction::Exec(ref command, ref args) => {
-            command.to_command().args(args).output().map(|o| OutputInfo::new(o))
-        }
-        &BuildAction::Compilation(ref toolchain, ref task) => {
-            toolchain.compile_task(task.clone(), &state.cache, &state.statistic)
-        }
-    }
-}
-
-fn execute_graph(graph: &BuildGraph,
-                 tx_task: Sender<TaskMessage>,
-                 mutex_rx_task: Arc<Mutex<Receiver<TaskMessage>>>,
-                 rx_result: Receiver<ResultMessage>)
-                 -> Result<Option<i32>, Error> {
-    // Run all tasks.
-    let mut count: usize = 0;
-    let result = execute_until_failed(graph, tx_task, &rx_result, &mut count);
-    // Cleanup task queue.
-    for _ in mutex_rx_task.lock().unwrap().iter() {
-    }
-    // Wait for in progress task completion.
-    for message in rx_result.iter() {
-        try!(print_task_result(&message, &mut count, graph.node_count()));
-    }
-    result
-}
-
-fn execute_until_failed(graph: &BuildGraph,
-                        tx_task: Sender<TaskMessage>,
-                        rx_result: &Receiver<ResultMessage>,
-                        count: &mut usize)
-                        -> Result<Option<i32>, Error> {
-    let mut completed: Vec<bool> = Vec::new();
-    for _ in 0..graph.node_count() {
-        completed.push(false);
-    }
-    for index in graph.externals(EdgeDirection::Outgoing) {
-        try!(tx_task.send(TaskMessage {
-                index: index,
-                task: graph.node_weight(index).unwrap().clone(),
-            })
-            .map_err(|e| Error::new(ErrorKind::Other, e)));
-    }
-
-    for message in rx_result.iter() {
-        assert!(!completed[message.index.index()]);
-        try!(print_task_result(&message, count, graph.node_count()));
-        let result = try!(message.result);
-        if !result.success() {
-            return Ok(result.status);
-        }
-        completed[message.index.index()] = true;
-
-        for source in graph.neighbors_directed(message.index, EdgeDirection::Incoming) {
-            if is_ready(graph, &completed, &source) {
-                try!(tx_task.send(TaskMessage {
-                        index: source,
-                        task: graph.node_weight(source).unwrap().clone(),
-                    })
-                    .map_err(|e| Error::new(ErrorKind::Other, e)));
-            }
-        }
-
-        if *count == completed.len() {
-            return Ok(Some(0));
-        }
-    }
-    panic!("Unexpected end of result pipe");
-}
-
-fn print_task_result(message: &ResultMessage, completed: &mut usize, total: usize) -> Result<(), Error> {
-    *completed += 1;
+fn print_task_result(result: BuildResult) -> Result<(), Error> {
     println!("#{} {}/{}: {}",
-             message.worker,
-             completed,
-             total,
-             message.task.title);
-    match message.result {
-        Ok(ref output) => {
+             result.worker,
+             result.completed,
+             result.total,
+             result.task.title);
+    match result.result {
+        &Ok(ref output) => {
             try!(io::stdout().write_all(&output.stdout));
             try!(io::stderr().write_all(&output.stderr));
         }
-        Err(_) => {}
+        &Err(_) => {}
     }
     Ok(())
-}
-
-fn is_ready<N, E>(graph: &Graph<N, E>, completed: &Vec<bool>, source: &NodeIndex) -> bool {
-    for neighbor in graph.neighbors_directed(*source, EdgeDirection::Outgoing) {
-        if !completed[neighbor.index()] {
-            return false;
-        }
-    }
-    true
 }
 
 fn expand_arg<F: Fn(&str) -> Option<String>>(arg: &str, resolver: &F) -> String {

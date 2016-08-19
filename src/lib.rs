@@ -15,6 +15,7 @@ extern crate tempdir;
 extern crate time;
 extern crate uuid;
 extern crate rand;
+extern crate petgraph;
 extern crate regex;
 #[cfg(windows)]
 extern crate winapi;
@@ -67,3 +68,4 @@ pub mod cmd {
 pub mod filter {
     pub mod comments;
 }
+pub mod worker;

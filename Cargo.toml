@@ -29,7 +29,7 @@ rustc_version = "0.1.7"
 [dependencies]
 yaml-rust = "0.3.3"
 filetime = "0.1.10"
-lz4 = "1.17.131"
+lz4 = "1.18.131"
 libc = "0.2.12"
 petgraph = "0.2.7"
 xml-rs = "0.3.4"
@@ -44,7 +44,7 @@ byteorder = "0.5.3"
 log = "0.3.6"
 fern = "0.3.5"
 daemon = "0.0.7"
-hyper = { version = "0.9.8", default-features = false, features = [""] }
+hyper = { version = "0.9.10", default-features = false, features = [""] }
 nickel = { version = "0.8.1", git = "https://github.com/bozaro/nickel.rs.git", branch = "pr-334" }
 router = "0.1.1"
 time = "0.1.35"

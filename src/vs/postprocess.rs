@@ -1,4 +1,4 @@
-use local_encoding::{Encoding, Encoder};
+use local_encoding::{Encoder, Encoding};
 
 use std::fmt::{Display, Formatter};
 use std::io::{Error, ErrorKind, Read, Write};
