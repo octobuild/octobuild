@@ -1,4 +1,5 @@
 extern crate octobuild;
+extern crate petgraph;
 extern crate tempdir;
 
 use octobuild::vs::compiler::VsCompiler;
@@ -6,6 +7,10 @@ use octobuild::compiler::*;
 use octobuild::cluster::client::RemoteCompiler;
 use octobuild::config::Config;
 
+use octobuild::worker::execute_graph;
+use octobuild::worker::{BuildAction, BuildGraph, BuildResult, BuildTask};
+
+use petgraph::Graph;
 use tempdir::TempDir;
 
 use std::env;
@@ -18,7 +23,7 @@ use std::process;
 
 fn main() {
     process::exit(match compile() {
-        Ok(status) => status,
+        Ok(status) => status.unwrap_or(501),
         Err(e) => {
             println!("FATAL ERROR: {}", e);
             500
@@ -26,7 +31,7 @@ fn main() {
     })
 }
 
-fn compile() -> Result<i32, Error> {
+fn compile() -> Result<Option<i32>, Error> {
     let config = try!(Config::new());
     let args = Vec::from_iter(env::args());
     let state = Arc::new(SharedState::new(&config));
@@ -34,16 +39,31 @@ fn compile() -> Result<i32, Error> {
     let compiler = RemoteCompiler::new(&config.coordinator,
                                        VsCompiler::new(&Arc::new(try!(TempDir::new("octobuild")))),
                                        &state);
-    let outputs = try!(compiler.compile(command_info, &args[1..], state.as_ref()));
-    let mut status = 0;
-    for output in outputs.into_iter() {
-        try!(io::stdout().write_all(&output.stdout));
-        try!(io::stderr().write_all(&output.stderr));
-        if !output.success() {
-            status = output.status.unwrap_or(501);
-            break;
-        }
+    let actions = BuildAction::create_tasks(&compiler, command_info, &args[1..], "cl");
+
+    let mut build_graph: BuildGraph = Graph::new();
+    for action in actions.into_iter() {
+        build_graph.add_node(Arc::new(BuildTask {
+            title: "".to_string(),
+            action: action,
+        }));
     }
+    let result = execute_graph(state.clone(),
+                               build_graph,
+                               config.process_limit,
+                               print_task_result);
     println!("{}", state.statistic.to_string());
-    Ok(status)
+    result
+}
+
+
+fn print_task_result(result: BuildResult) -> Result<(), Error> {
+    match result.result {
+        &Ok(ref output) => {
+            try!(io::stdout().write_all(&output.stdout));
+            try!(io::stderr().write_all(&output.stderr));
+        }
+        &Err(_) => {}
+    }
+    Ok(())
 }

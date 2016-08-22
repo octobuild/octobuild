@@ -1,7 +1,7 @@
 use petgraph::{EdgeDirection, Graph};
 use petgraph::graph::NodeIndex;
 
-use ::compiler::{CommandInfo, CompilationTask, OutputInfo, SharedState, Toolchain};
+use ::compiler::{CommandInfo, CompilationTask, Compiler, OutputInfo, SharedState, Toolchain};
 
 use std::io::{Error, ErrorKind};
 use std::cmp::{max, min};
@@ -57,6 +57,28 @@ impl<'a> BuildResult<'a> {
             completed: *completed,
             total: total,
         }
+    }
+}
+impl BuildAction {
+    pub fn create_tasks<C: Compiler>(compiler: &C,
+                                     command: CommandInfo,
+                                     args: &[String],
+                                     title: &str)
+                                     -> Vec<BuildAction> {
+        let actions: Vec<BuildAction> = compiler.create_tasks(command.clone(), &args)
+            .map(|tasks| {
+                tasks.into_iter()
+                    .map(|(toolchain, task)| BuildAction::Compilation(toolchain, task))
+                    .collect()
+            })
+            .unwrap_or_else(|e| {
+                info!("Can't use octobuild for task {}: {}", title, e);
+                Vec::new()
+            });
+        if actions.len() == 0 {
+            return vec![BuildAction::Exec(command, args.to_vec())];
+        }
+        actions
     }
 }
 

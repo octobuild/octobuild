@@ -175,19 +175,7 @@ fn prepare_graph<C: Compiler>(compiler: &C, graph: XgGraph) -> Result<BuildGraph
         let args: Vec<String> = node.args.iter().map(|ref arg| expand_arg(&arg, &env_resolver)).collect();
         let command = node.command.clone();
 
-        let mut actions: Vec<BuildAction> = compiler.create_tasks(command.clone(), &args)
-            .map(|tasks| {
-                tasks.into_iter()
-                    .map(|(toolchain, task)| BuildAction::Compilation(toolchain, task))
-                    .collect()
-            })
-            .unwrap_or_else(|e| {
-                info!("Can't use octobuild for task {}: {}", node.title, e);
-                Vec::new()
-            });
-        if actions.len() == 0 {
-            actions.push(BuildAction::Exec(command, args))
-        }
+        let actions = BuildAction::create_tasks(compiler, command.clone(), &args, &node.title);
         let node_index = NodeIndex::new(remap.len());
         if actions.len() == 1 {
             depends.push(node_index);
