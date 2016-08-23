@@ -68,4 +68,5 @@ pub mod cmd {
 pub mod filter {
     pub mod comments;
 }
+pub mod simple;
 pub mod worker;
