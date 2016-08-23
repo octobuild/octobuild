@@ -23,7 +23,7 @@ name = "octo_coordinator"
 name = "xgConsole"
 
 [build-dependencies]
-capnpc = "0.7.1"
+capnpc = "0.7.2"
 rustc_version = "0.1.7"
 
 [dependencies]
@@ -34,9 +34,9 @@ libc = "0.2.12"
 petgraph = "0.2.7"
 xml-rs = "0.3.4"
 rand = "0.3.14"
-uuid = { version = "0.2.2", features = ["v4"] }
+uuid = { version = "0.3.1", features = ["v4"] }
 tempdir = "0.3.4"
-num_cpus = "0.2.13"
+num_cpus = "1.0.0"
 regex = "0.1.71"
 lazy_static = "0.2.1"
 
@@ -46,13 +46,12 @@ fern = "0.3.5"
 daemon = "0.0.7"
 hyper = { version = "0.9.10", default-features = false, features = [""] }
 nickel = { version = "0.8.1", git = "https://github.com/bozaro/nickel.rs.git", branch = "pr-334" }
-router = "0.1.1"
 time = "0.1.35"
 rustc-serialize = "0.3.19"
 local-encoding = "0.2.0"
 
 rust-crypto = { version = "0.2.35", git = "https://github.com/bozaro/rust-crypto.git", branch = "pr-364", default-features = false, features = [""] }
-capnp = "0.7.1"
+capnp = "0.7.2"
 
 [target.'cfg(windows)'.dependencies]
 winreg = "0.3.5"

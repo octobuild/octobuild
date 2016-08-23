@@ -1,6 +1,5 @@
 extern crate octobuild;
 extern crate daemon;
-extern crate router;
 extern crate fern;
 extern crate time;
 extern crate rustc_serialize;
