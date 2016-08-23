@@ -16,9 +16,9 @@ use octobuild::compiler::*;
 use octobuild::cluster::builder::{CompileRequest, CompileResponse};
 use octobuild::cluster::common::{BuilderInfo, BuilderInfoUpdate, RPC_BUILDER_TASK, RPC_BUILDER_UPDATE,
                                  RPC_BUILDER_UPLOAD};
+use octobuild::simple::create_temp_dir;
+use octobuild::simple::supported_compilers;
 use octobuild::version;
-use octobuild::vs::compiler::VsCompiler;
-use octobuild::clang::compiler::ClangCompiler;
 use octobuild::io::memstream::MemStream;
 use octobuild::io::tempfile::TempFile;
 use octobuild::utils::DEFAULT_BUF_SIZE;
@@ -80,10 +80,10 @@ impl BuilderService {
         let config = Config::new().unwrap();
         info!("Helper bind to address: {}", config.helper_bind);
 
-        let temp_dir = TempDir::new("octobuild").ok().expect("Can't create temporary directory");
+        let temp_dir = create_temp_dir().ok().expect("Can't create temporary directory");
         let state = Arc::new(BuilderState {
             name: get_name(),
-            toolchains: BuilderService::discovery_toolchains(&Arc::new(temp_dir)),
+            toolchains: BuilderService::discovery_toolchains(&Arc::new(SharedState::new(&config)), &temp_dir),
             precompiled_dir: config.cache_dir,
             precompiled: Mutex::new(HashMap::new()),
         });
@@ -144,11 +144,8 @@ impl BuilderService {
         })
     }
 
-    fn discovery_toolchains(temp_dir: &Arc<TempDir>) -> HashMap<String, Arc<Toolchain>> {
-        let compiler = CompilerGroup::new(vec!(
-			Box::new(VsCompiler::new(temp_dir)),
-			Box::new(ClangCompiler::new()),
-		));
+    fn discovery_toolchains(state: &Arc<SharedState>, temp_dir: &Arc<TempDir>) -> HashMap<String, Arc<Toolchain>> {
+        let compiler = supported_compilers(state, temp_dir);
         HashMap::from_iter(compiler.discovery_toolchains()
             .into_iter()
             .filter_map(|toolchain| toolchain.identifier().map(|name| (name, toolchain))))

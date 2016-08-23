@@ -1,6 +1,5 @@
 extern crate octobuild;
 extern crate petgraph;
-extern crate tempdir;
 extern crate regex;
 #[macro_use]
 extern crate log;
@@ -11,18 +10,17 @@ use octobuild::config::Config;
 use octobuild::xg;
 use octobuild::xg::parser::{XgGraph, XgNode};
 use octobuild::version;
-use octobuild::vs::compiler::VsCompiler;
-use octobuild::clang::compiler::ClangCompiler;
 use octobuild::cluster::client::RemoteCompiler;
 use octobuild::compiler::*;
 
+use octobuild::simple::create_temp_dir;
+use octobuild::simple::supported_compilers;
 use octobuild::worker::validate_graph;
 use octobuild::worker::execute_graph;
 use octobuild::worker::{BuildAction, BuildGraph, BuildResult, BuildTask};
 
 use petgraph::{EdgeDirection, Graph};
 use petgraph::graph::NodeIndex;
-use tempdir::TempDir;
 use regex::Regex;
 
 use std::fs::File;
@@ -133,10 +131,7 @@ fn execute(args: &[String]) -> Result<Option<i32>, Error> {
     let config = try!(Config::new());
     let state = Arc::new(SharedState::new(&config));
     let compiler = RemoteCompiler::new(&config.coordinator,
-                                       CompilerGroup::new(vec!(
-    Box::new(VsCompiler::new(&Arc::new(try!(TempDir::new("octobuild"))))),
-    Box::new(ClangCompiler::new()),
-    )),
+                                       supported_compilers(&state, &try!(create_temp_dir())),
                                        &state);
     let files = args.iter()
         .filter(|a| !is_flag(a))

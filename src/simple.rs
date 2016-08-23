@@ -2,10 +2,14 @@ use ::compiler::*;
 use ::cluster::client::RemoteCompiler;
 use ::config::Config;
 
+use ::clang::compiler::ClangCompiler;
+use ::vs::compiler::VsCompiler;
+
 use ::worker::execute_graph;
 use ::worker::{BuildAction, BuildGraph, BuildResult, BuildTask};
 
 use petgraph::Graph;
+use tempdir::TempDir;
 
 use std::env;
 use std::io;
@@ -14,9 +18,21 @@ use std::iter::FromIterator;
 use std::path::Path;
 use std::sync::Arc;
 
+pub fn supported_compilers(state: &Arc<SharedState>, temp_dir: &Arc<TempDir>) -> CompilerGroup {
+    CompilerGroup::new(state,
+                       vec!(
+    Box::new(VsCompiler::new(state, &temp_dir)),
+    Box::new(ClangCompiler::new(state)),
+    ))
+}
+
+pub fn create_temp_dir() -> Result<Arc<TempDir>, Error> {
+    TempDir::new("octobuild").map(|t| Arc::new(t))
+}
+
 pub fn simple_compile<C, F>(exec: &str, factory: F) -> i32
     where C: Compiler,
-          F: FnOnce(&Config) -> Result<C, Error>
+          F: FnOnce(&Config, &Arc<SharedState>) -> Result<C, Error>
 {
     let config = match Config::new() {
         Ok(v) => v,
@@ -25,14 +41,15 @@ pub fn simple_compile<C, F>(exec: &str, factory: F) -> i32
             return 501;
         }
     };
-    let compiler = match factory(&config) {
+    let state = Arc::new(SharedState::new(&config));
+    let compiler = match factory(&config, &state) {
         Ok(v) => v,
         Err(e) => {
             error!("FATAL ERROR: Can't create compiler instance {}", e);
             return 502;
         }
     };
-    match compile(&config, exec, compiler) {
+    match compile(&config, &state, exec, compiler) {
         Ok(status) => status.unwrap_or(503),
         Err(e) => {
             println!("FATAL ERROR: {}", e);
@@ -41,11 +58,10 @@ pub fn simple_compile<C, F>(exec: &str, factory: F) -> i32
     }
 }
 
-pub fn compile<C>(config: &Config, exec: &str, compiler: C) -> Result<Option<i32>, Error>
+pub fn compile<C>(config: &Config, state: &Arc<SharedState>, exec: &str, compiler: C) -> Result<Option<i32>, Error>
     where C: Compiler
 {
     let args = Vec::from_iter(env::args());
-    let state = Arc::new(SharedState::new(&config));
     let command_info = CommandInfo::simple(Path::new(exec));
     let remote = RemoteCompiler::new(&config.coordinator, compiler, &state);
     let actions = BuildAction::create_tasks(&remote, command_info, &args[1..], exec);

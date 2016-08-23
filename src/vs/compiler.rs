@@ -2,7 +2,6 @@ extern crate regex;
 #[cfg(windows)]
 extern crate winreg;
 
-use byteorder::{LittleEndian, ReadBytesExt};
 use tempdir::TempDir;
 
 pub use super::super::compiler::*;
@@ -14,7 +13,7 @@ use super::super::io::tempfile::TempFile;
 use super::super::lazy::Lazy;
 
 use std::fs::File;
-use std::io::{Cursor, Error, ErrorKind, Read, Seek, SeekFrom, Write};
+use std::io::{Cursor, Error, Read, Write};
 use std::env;
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -22,16 +21,18 @@ use std::sync::Arc;
 use self::regex::bytes::{NoExpand, Regex};
 
 pub struct VsCompiler {
+    state: Arc<SharedState>,
     temp_dir: Arc<TempDir>,
     toolchains: ToolchainHolder,
 }
 
 impl VsCompiler {
-    pub fn default() -> Result<Self, Error> {
-        Ok(VsCompiler::new(&Arc::new(try!(TempDir::new("octobuild")))))
+    pub fn default(state: &Arc<SharedState>) -> Result<Self, Error> {
+        Ok(VsCompiler::new(state, &Arc::new(try!(TempDir::new("octobuild")))))
     }
-    pub fn new(temp_dir: &Arc<TempDir>) -> Self {
+    pub fn new(state: &Arc<SharedState>, temp_dir: &Arc<TempDir>) -> Self {
         VsCompiler {
+            state: state.clone(),
             temp_dir: temp_dir.clone(),
             toolchains: ToolchainHolder::new(),
         }
@@ -39,14 +40,16 @@ impl VsCompiler {
 }
 
 struct VsToolchain {
+    state: Arc<SharedState>,
     temp_dir: Arc<TempDir>,
     path: PathBuf,
     identifier: Lazy<Option<String>>,
 }
 
 impl VsToolchain {
-    pub fn new(path: PathBuf, temp_dir: &Arc<TempDir>) -> Self {
+    pub fn new(state: &Arc<SharedState>, path: PathBuf, temp_dir: &Arc<TempDir>) -> Self {
         VsToolchain {
+            state: state.clone(),
             temp_dir: temp_dir.clone(),
             path: path,
             identifier: Lazy::new(),
@@ -55,6 +58,10 @@ impl VsToolchain {
 }
 
 impl Compiler for VsCompiler {
+    fn state(&self) -> &SharedState {
+        &self.state
+    }
+
     fn resolve_toolchain(&self, command: &CommandInfo) -> Option<Arc<Toolchain>> {
         if command.program
             .file_name()
@@ -63,7 +70,7 @@ impl Compiler for VsCompiler {
             .map_or(false, |n| (n == "cl.exe") || (n == "cl")) {
             command.find_executable().and_then(|path| {
                 self.toolchains.resolve(&path,
-                                        |path| Arc::new(VsToolchain::new(path, &self.temp_dir)))
+                                        |path| Arc::new(VsToolchain::new(&self.state, path, &self.temp_dir)))
             })
         } else {
             None
@@ -122,6 +129,10 @@ impl Toolchain for VsToolchain {
         self.identifier.get(|| vs_identifier(&self.path))
     }
 
+    fn state(&self) -> &SharedState {
+        &self.state
+    }
+
     fn create_tasks(&self, command: CommandInfo, args: &[String]) -> Result<Vec<CompilationTask>, String> {
         super::prepare::create_tasks(command, args)
     }
@@ -159,7 +170,7 @@ impl Toolchain for VsToolchain {
         let mut command = task.shared.command.to_command();
         command.args(&args)
             .arg(&join_flag("/Fo", &task.output_object)); // /Fo option also set output path for #import directive
-        let output = try!(command.output());
+        let output = try!(self.state.wrap_slow(|| command.output()));
         if output.status.success() {
             let mut content = MemStream::new();
             if task.shared.input_precompiled.is_some() || task.shared.output_precompiled.is_some() {
@@ -261,12 +272,14 @@ impl Toolchain for VsToolchain {
             &None => {}
         }
         // Execute.
-        command.output().map(|o| {
-            OutputInfo {
-                status: o.status.code(),
-                stdout: prepare_output(temp_file, o.stdout.clone(), o.status.code() == Some(0)),
-                stderr: o.stderr,
-            }
+        self.state.wrap_slow(|| {
+            command.output().map(|o| {
+                OutputInfo {
+                    status: o.status.code(),
+                    stdout: prepare_output(temp_file, o.stdout.clone(), o.status.code() == Some(0)),
+                    stderr: o.stderr,
+                }
+            })
         })
     }
 
@@ -366,7 +379,11 @@ fn vs_identifier(path: &Path) -> Option<String> {
     Some(format!("cl {} {}", &product_version, executable_id))
 }
 
+#[cfg(windows)]
 fn read_executable_id(path: &Path) -> Result<String, Error> {
+    use byteorder::{LittleEndian, ReadBytesExt};
+    use std::io::{ErrorKind, Seek, SeekFrom};
+
     let mut header: Vec<u8> = Vec::with_capacity(0x54);
 
     let mut file = try!(File::open(path));

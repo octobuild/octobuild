@@ -17,6 +17,7 @@ extern crate uuid;
 extern crate rand;
 extern crate petgraph;
 extern crate regex;
+extern crate ipc;
 #[cfg(windows)]
 extern crate winapi;
 

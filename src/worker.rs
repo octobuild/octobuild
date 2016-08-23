@@ -268,8 +268,8 @@ fn execute_compiler(state: &SharedState, task: &BuildTask) -> Result<OutputInfo,
             })
         }
         &BuildAction::Exec(ref command, ref args) => {
-            command.to_command().args(args).output().map(|o| OutputInfo::new(o))
+            state.wrap_slow(|| command.to_command().args(args).output().map(|o| OutputInfo::new(o)))
         }
-        &BuildAction::Compilation(ref toolchain, ref task) => toolchain.compile_task(task.clone(), state),
+        &BuildAction::Compilation(ref toolchain, ref task) => toolchain.compile_task(task.clone()),
     }
 }

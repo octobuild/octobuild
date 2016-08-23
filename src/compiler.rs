@@ -2,6 +2,9 @@ use capnp;
 
 use crypto::digest::Digest;
 use crypto::md5::Md5;
+use ipc::Semaphore;
+
+use std::cmp::min;
 use std::collections::HashMap;
 use std::collections::hash_map;
 use std::env;
@@ -152,20 +155,30 @@ pub struct CommandInfo {
 }
 
 pub struct SharedState {
+    pub semaphore: Semaphore,
     pub cache: Cache,
     pub statistic: Statistic,
 }
 
 pub struct CompilerGroup {
+    state: Arc<SharedState>,
     compilers: Vec<Box<Compiler>>,
 }
 
 impl SharedState {
     pub fn new(config: &Config) -> Self {
         SharedState {
+            semaphore: Semaphore::new("octobuild-worker", min(config.process_limit, 1 as usize)).unwrap(), /* todo: Remove unwrap() */
             statistic: Statistic::new(),
             cache: Cache::new(&config),
         }
+    }
+
+    pub fn wrap_slow<T, F: FnOnce() -> T>(&self, func: F) -> T {
+        let guard = self.semaphore.access();
+        let result = func();
+        drop(guard);
+        result
     }
 }
 
@@ -401,6 +414,8 @@ pub enum PreprocessResult {
 pub trait Toolchain: Send + Sync {
     // Get toolchain identificator.
     fn identifier(&self) -> Option<String>;
+    // Get shared state.
+    fn state(&self) -> &SharedState;
 
     // Parse compiler arguments.
     fn create_tasks(&self, command: CommandInfo, args: &[String]) -> Result<Vec<CompilationTask>, String>;
@@ -425,18 +440,19 @@ pub trait Toolchain: Send + Sync {
             })
     }
 
-    fn compile_task(&self, task: CompilationTask, state: &SharedState) -> Result<OutputInfo, Error> {
+    fn compile_task(&self, task: CompilationTask) -> Result<OutputInfo, Error> {
         self.preprocess_step(&task).and_then(|preprocessed| match preprocessed {
             PreprocessResult::Success(preprocessed) => {
                 self.compile_prepare_step(task, preprocessed)
-                    .and_then(|task| self.compile_step_cached(task, state))
+                    .and_then(|task| self.compile_step_cached(task))
             }
             PreprocessResult::Failed(output) => Ok(output),
         })
     }
 
-    fn compile_step_cached(&self, task: CompileStep, state: &SharedState) -> Result<OutputInfo, Error> {
+    fn compile_step_cached(&self, task: CompileStep) -> Result<OutputInfo, Error> {
         let mut hasher = Md5::new();
+        let state = self.state();
         // Get hash from preprocessed data
         hasher.hash_u64(task.preprocessed.len() as u64);
         try!(task.preprocessed.copy(&mut hasher.as_write()));
@@ -485,8 +501,11 @@ pub trait Toolchain: Send + Sync {
 }
 
 impl CompilerGroup {
-    pub fn new(compilers: Vec<Box<Compiler>>) -> Self {
-        CompilerGroup { compilers: compilers }
+    pub fn new(state: &Arc<SharedState>, compilers: Vec<Box<Compiler>>) -> Self {
+        CompilerGroup {
+            state: state.clone(),
+            compilers: compilers,
+        }
     }
 }
 
@@ -498,6 +517,10 @@ impl Compiler for CompilerGroup {
     // Discovery local toolchains.
     fn discovery_toolchains(&self) -> Vec<Arc<Toolchain>> {
         self.compilers.iter().flat_map(|c| c.discovery_toolchains()).collect()
+    }
+    // Get shared state.
+    fn state(&self) -> &SharedState {
+        &self.state
     }
 }
 
@@ -527,9 +550,10 @@ impl<D: Digest + ?Sized> Hasher for D {}
 pub trait Compiler: Send + Sync {
     // Resolve toolchain for command execution.
     fn resolve_toolchain(&self, command: &CommandInfo) -> Option<Arc<Toolchain>>;
-
     // Discovery local toolchains.
     fn discovery_toolchains(&self) -> Vec<Arc<Toolchain>>;
+    // Get shared state.
+    fn state(&self) -> &SharedState;
 
     fn create_tasks(&self,
                     command: CommandInfo,
@@ -550,32 +574,29 @@ pub trait Compiler: Send + Sync {
     }
 
     // Run preprocess and compile.
-    fn try_compile(&self,
-                   command: CommandInfo,
-                   args: &[String],
-                   state: &SharedState)
-                   -> Result<Vec<OutputInfo>, Error> {
+    fn try_compile(&self, command: CommandInfo, args: &[String]) -> Result<Vec<OutputInfo>, Error> {
         self.create_tasks(command, args).and_then(|tasks| {
             tasks.into_iter()
-                .map(|(toolchain, task)| toolchain.compile_task(task, state))
+                .map(|(toolchain, task)| toolchain.compile_task(task))
                 .collect()
         })
     }
 
     // Run preprocess and compile.
-    fn compile(&self, command: CommandInfo, args: &[String], state: &SharedState) -> Result<Vec<OutputInfo>, Error> {
-        match self.try_compile(command.clone(), args, state) {
+    fn compile(&self, command: CommandInfo, args: &[String]) -> Result<Vec<OutputInfo>, Error> {
+        let state = self.state();
+        match self.try_compile(command.clone(), args) {
             Ok(outputs) => {
                 if outputs.len() > 0 {
                     Ok(outputs)
                 } else {
-                    command.to_command().args(args).output().map(|o| vec![OutputInfo::new(o)])
+                    state.wrap_slow(|| command.to_command().args(args).output().map(|o| vec![OutputInfo::new(o)]))
                 }
             }
             Err(e) => {
                 info!("Can't use octobuild for compiling file, use fallback compilation: {}",
                       e);
-                command.to_command().args(args).output().map(|o| vec![OutputInfo::new(o)])
+                state.wrap_slow(|| command.to_command().args(args).output().map(|o| vec![OutputInfo::new(o)]))
             }
         }
     }

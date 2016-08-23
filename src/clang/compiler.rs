@@ -23,23 +23,29 @@ lazy_static! {
 }
 
 pub struct ClangCompiler {
+    state: Arc<SharedState>,
     toolchains: ToolchainHolder,
 }
 
 impl ClangCompiler {
-    pub fn new() -> Self {
-        ClangCompiler { toolchains: ToolchainHolder::new() }
+    pub fn new(state: &Arc<SharedState>) -> Self {
+        ClangCompiler {
+            state: state.clone(),
+            toolchains: ToolchainHolder::new(),
+        }
     }
 }
 
 struct ClangToolchain {
+    state: Arc<SharedState>,
     path: PathBuf,
     identifier: Lazy<Option<String>>,
 }
 
 impl ClangToolchain {
-    pub fn new(path: PathBuf) -> Self {
+    pub fn new(state: &Arc<SharedState>, path: PathBuf) -> Self {
         ClangToolchain {
+            state: state.clone(),
             path: path,
             identifier: Lazy::new(),
         }
@@ -47,12 +53,19 @@ impl ClangToolchain {
 }
 
 impl Compiler for ClangCompiler {
+    fn state(&self) -> &SharedState {
+        &self.state
+    }
+
     fn resolve_toolchain(&self, command: &CommandInfo) -> Option<Arc<Toolchain>> {
         if command.program
             .file_name()
             .map_or(false, |n| RE_CLANG.is_match(n.to_string_lossy().as_bytes())) {
             command.find_executable()
-                .and_then(|path| self.toolchains.resolve(&path, |path| Arc::new(ClangToolchain::new(path))))
+                .and_then(|path| {
+                    self.toolchains.resolve(&path,
+                                            |path| Arc::new(ClangToolchain::new(&self.state, path)))
+                })
         } else {
             None
         }
@@ -67,7 +80,7 @@ impl Compiler for ClangCompiler {
             .flat_map(|read_dir| read_dir)
             .filter_map(|entry| entry.ok())
             .filter(|entry| RE_CLANG.is_match(entry.file_name().to_string_lossy().as_bytes()))
-            .map(|entry| -> Arc<Toolchain> { Arc::new(ClangToolchain::new(entry.path())) })
+            .map(|entry| -> Arc<Toolchain> { Arc::new(ClangToolchain::new(&self.state, entry.path())) })
             .collect()
     }
 }
@@ -75,6 +88,10 @@ impl Compiler for ClangCompiler {
 impl Toolchain for ClangToolchain {
     fn identifier(&self) -> Option<String> {
         self.identifier.get(|| clang_identifier(&self.path))
+    }
+
+    fn state(&self) -> &SharedState {
+        &self.state
     }
 
     fn create_tasks(&self, command: CommandInfo, args: &[String]) -> Result<Vec<CompilationTask>, String> {
@@ -120,7 +137,7 @@ impl Toolchain for ClangToolchain {
         args.push("-o".to_string());
         args.push("-".to_string());
 
-        execute(task.shared.command.to_command().args(&args))
+        self.state.wrap_slow(|| execute(task.shared.command.to_command().args(&args)))
     }
 
     // Compile preprocessed file.
@@ -158,23 +175,25 @@ impl Toolchain for ClangToolchain {
 
     fn compile_step(&self, task: CompileStep) -> Result<OutputInfo, Error> {
         // Run compiler.
-        Command::new(&self.path)
-            .env_clear()
-            .arg("-c")
-            .args(&task.args)
-            .arg("-")
-            .arg("-o")
-            .arg(task.output_object.as_ref().map_or("-".to_string(), |path| path.display().to_string()))
-            .stdin(Stdio::piped())
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped())
-            .spawn()
-            .and_then(|mut child| {
-                try!(task.preprocessed.copy(child.stdin.as_mut().unwrap()));
-                let _ = task.preprocessed;
-                child.wait_with_output()
-            })
-            .map(|o| OutputInfo::new(o))
+        self.state.wrap_slow(|| {
+            Command::new(&self.path)
+                .env_clear()
+                .arg("-c")
+                .args(&task.args)
+                .arg("-")
+                .arg("-o")
+                .arg(task.output_object.as_ref().map_or("-".to_string(), |path| path.display().to_string()))
+                .stdin(Stdio::piped())
+                .stdout(Stdio::piped())
+                .stderr(Stdio::piped())
+                .spawn()
+                .and_then(|mut child| {
+                    try!(task.preprocessed.copy(child.stdin.as_mut().unwrap()));
+                    let _ = task.preprocessed;
+                    child.wait_with_output()
+                })
+                .map(|o| OutputInfo::new(o))
+        })
     }
 }
 

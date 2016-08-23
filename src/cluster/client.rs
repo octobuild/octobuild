@@ -81,6 +81,10 @@ impl RemoteSharedMut {
 }
 
 impl<C: Compiler> Compiler for RemoteCompiler<C> {
+    fn state(&self) -> &SharedState {
+        &self.shared.shared
+    }
+
     // Discovery local toolchains.
     fn discovery_toolchains(&self) -> Vec<Arc<Toolchain>> {
         self.local.discovery_toolchains()
@@ -231,6 +235,10 @@ impl RemoteToolchain {
 impl Toolchain for RemoteToolchain {
     fn identifier(&self) -> Option<String> {
         self.local.identifier()
+    }
+
+    fn state(&self) -> &SharedState {
+        &self.shared.shared
     }
 
     // Parse compiler arguments.
