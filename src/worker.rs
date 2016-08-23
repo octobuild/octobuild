@@ -215,6 +215,19 @@ pub fn execute_graph<F>(state: Arc<SharedState>,
         return Ok(Some(0));
     }
 
+    if graph.node_count() == 1 {
+        let task = &graph.raw_nodes()[0].weight;
+        let result = execute_compiler(&state, task);
+        try!(update_progress(BuildResult {
+            worker: 0,
+            completed: 1,
+            total: 1,
+            result: &result,
+            task: task,
+        }));
+        return result.map(|output| output.status);
+    }
+
     let (tx_result, rx_result): (Sender<ResultMessage>, Receiver<ResultMessage>) = channel();
     let (tx_task, rx_task): (Sender<TaskMessage>, Receiver<TaskMessage>) = channel();
     let mutex_rx_task = create_threads(rx_task,
