@@ -7,6 +7,9 @@ authors = [ "Artem V. Navrotskiy <bozaro@users.noreply.github.com>" ]
 [profile.bench]
 debug = true
 
+[profile.release]
+panic = "abort"
+
 [[bin]]
 name = "octo_builder"
 
