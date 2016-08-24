@@ -118,7 +118,7 @@ impl Compiler for VsCompiler {
             })
             .flat_map(|paths| paths.into_iter())
             .filter(|cl| cl.exists())
-            .map(|cl| -> Arc<Toolchain> { Arc::new(VsToolchain::new(cl, &self.temp_dir)) })
+            .map(|cl| -> Arc<Toolchain> { Arc::new(VsToolchain::new(&self.state, cl, &self.temp_dir)) })
             .filter(|toolchain| toolchain.identifier().is_some())
             .collect()
     }

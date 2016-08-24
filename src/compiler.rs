@@ -4,7 +4,7 @@ use crypto::digest::Digest;
 use crypto::md5::Md5;
 use ipc::Semaphore;
 
-use std::cmp::min;
+use std::cmp::max;
 use std::collections::HashMap;
 use std::collections::hash_map;
 use std::env;
@@ -168,7 +168,7 @@ pub struct CompilerGroup {
 impl SharedState {
     pub fn new(config: &Config) -> Self {
         SharedState {
-            semaphore: Semaphore::new("octobuild-worker", min(config.process_limit, 1 as usize)).unwrap(), /* todo: Remove unwrap() */
+            semaphore: Semaphore::new("octobuild-worker", max(config.process_limit, 1 as usize)).unwrap(), /* todo: Remove unwrap() */
             statistic: Statistic::new(),
             cache: Cache::new(&config),
         }

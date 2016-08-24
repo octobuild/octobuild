@@ -49,7 +49,7 @@ nickel = { version = "0.8.1", git = "https://github.com/bozaro/nickel.rs.git", b
 time = "0.1.35"
 rustc-serialize = "0.3.19"
 local-encoding = "0.2.0"
-ipc = { git = "https://github.com/alexcrichton/ipc-rs", rev = "3537e37" }
+ipc = { git = "https://github.com/bozaro/ipc-rs.git", rev = "b90057d" }
 
 rust-crypto = { version = "0.2.35", git = "https://github.com/bozaro/rust-crypto.git", branch = "pr-364", default-features = false, features = [""] }
 capnp = "0.7.2"
