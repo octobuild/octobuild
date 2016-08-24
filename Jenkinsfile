@@ -31,6 +31,7 @@ parallel 'Linux': {
 
     //stage 'Linux: Prepare rust'
     withRustEnv {
+      sh "rustup self update"
       sh "rustup toolchain install $rustVersion"
       sh "rustup override add $rustVersion"
     }
@@ -85,6 +86,8 @@ def windowsBuild(String stageName, String arch) {
 
       //stage "$stageName: Prepare rust"
       withRustEnv {
+        sh "rustup self update"
+        sh "rustup toolchain install $rustVersion"
         sh "rustup override add $rustVersion"
         sh "rustup target add $arch-pc-windows-gnu"
       }
