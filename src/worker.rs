@@ -59,6 +59,7 @@ impl<'a> BuildResult<'a> {
         }
     }
 }
+
 impl BuildAction {
     pub fn create_tasks<C: Compiler>(compiler: &C,
                                      command: CommandInfo,
@@ -72,7 +73,7 @@ impl BuildAction {
                     .collect()
             })
             .unwrap_or_else(|e| {
-                info!("Can't use octobuild for task {}: {}", title, e);
+                warn!("Can't use octobuild for task {}: {}", title, e);
                 Vec::new()
             });
         if actions.len() == 0 {

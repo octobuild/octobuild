@@ -572,34 +572,6 @@ pub trait Compiler: Send + Sync {
                     })
             })
     }
-
-    // Run preprocess and compile.
-    fn try_compile(&self, command: CommandInfo, args: &[String]) -> Result<Vec<OutputInfo>, Error> {
-        self.create_tasks(command, args).and_then(|tasks| {
-            tasks.into_iter()
-                .map(|(toolchain, task)| toolchain.compile_task(task))
-                .collect()
-        })
-    }
-
-    // Run preprocess and compile.
-    fn compile(&self, command: CommandInfo, args: &[String]) -> Result<Vec<OutputInfo>, Error> {
-        let state = self.state();
-        match self.try_compile(command.clone(), args) {
-            Ok(outputs) => {
-                if outputs.len() > 0 {
-                    Ok(outputs)
-                } else {
-                    state.wrap_slow(|| command.to_command().args(args).output().map(|o| vec![OutputInfo::new(o)]))
-                }
-            }
-            Err(e) => {
-                info!("Can't use octobuild for compiling file, use fallback compilation: {}",
-                      e);
-                state.wrap_slow(|| command.to_command().args(args).output().map(|o| vec![OutputInfo::new(o)]))
-            }
-        }
-    }
 }
 
 pub struct ToolchainHolder {
