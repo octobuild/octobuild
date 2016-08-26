@@ -2,6 +2,7 @@ use local_encoding::{Encoder, Encoding};
 
 use std::fmt::{Display, Formatter};
 use std::io::{Error, ErrorKind, Read, Write};
+use std::ascii::AsciiExt;
 
 #[derive(Clone, Copy, Debug)]
 pub enum PostprocessError {
@@ -427,10 +428,13 @@ impl<'a> ScannerState<'a> {
 }
 
 fn is_subpath(parent: &[u8], child: &[u8]) -> bool {
-    if parent == child {
-        return true;
+    if parent.len() < child.len() {
+        return false;
     }
-    parent.ends_with(child) && (parent[parent.len() - child.len() - 1] == b'/')
+    if (parent.len() != child.len()) && (parent[parent.len() - child.len() - 1] != b'/') {
+        return false;
+    }
+    child.eq_ignore_ascii_case(&parent[parent.len() - child.len()..])
 }
 
 #[cfg(test)]
@@ -507,6 +511,30 @@ int main(int argc, char **argv) {
 }
 "#,
                      Some("sample header.h".to_string()),
+                     false);
+    }
+
+    #[test]
+    fn test_filter_precompiled_case() {
+        check_filter(r#"#line 1 "sample.cpp"
+#line 1 "e:/work/octobuild/test_cl/StdAfx.h"
+# pragma once
+void hello1();
+void hello2();
+#line 2 "sample.cpp"
+
+int main(int argc, char **argv) {
+    return 0;
+}
+"#,
+                     r#"#pragma hdrstop
+#line 2 "sample.cpp"
+
+int main(int argc, char **argv) {
+    return 0;
+}
+"#,
+                     Some("STDafx.h".to_string()),
                      false);
     }
 
