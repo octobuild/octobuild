@@ -140,7 +140,7 @@ impl<'a> ScannerState<'a> {
 
     #[inline(always)]
     fn next(&mut self) {
-        assert!(self.buf_read < self.buf_size);
+        debug_assert!(self.buf_read < self.buf_size);
         self.buf_read += 1;
     }
 
@@ -336,7 +336,7 @@ impl<'a> ScannerState<'a> {
     fn parse_spaces(&mut self) -> Result<(), Error> {
         loop {
             assert!(self.buf_size <= self.buf_data.len());
-            while self.buf_read != self.buf_size {
+            while self.buf_read < self.buf_size {
                 match self.buf_data[self.buf_read] {
                     // non-nl-white-space ::= a blank, tab, or formfeed character
                     b' ' | b'\t' | b'\x0C' => {
@@ -357,7 +357,7 @@ impl<'a> ScannerState<'a> {
         let mut offset: usize = 0;
         loop {
             assert!(self.buf_size <= self.buf_data.len());
-            while self.buf_read != self.buf_size {
+            while self.buf_read < self.buf_size {
                 let c: u8 = self.buf_data[self.buf_read];
                 match c {
                     // end-of-line ::= newline | carriage-return | carriage-return newline
@@ -388,7 +388,7 @@ impl<'a> ScannerState<'a> {
         let mut raw_offset = 1;
         loop {
             assert!(self.buf_size <= self.buf_data.len());
-            while self.buf_read != self.buf_size {
+            while self.buf_read < self.buf_size {
                 let c: u8 = self.buf_data[self.buf_read];
                 match c {
                     // end-of-line ::= newline | carriage-return | carriage-return newline
