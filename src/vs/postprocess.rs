@@ -333,6 +333,7 @@ impl<'a> ScannerState<'a> {
         }
     }
 
+    #[inline(always)]
     fn parse_spaces(&mut self) -> Result<(), Error> {
         loop {
             assert!(self.buf_size <= self.buf_data.len());
