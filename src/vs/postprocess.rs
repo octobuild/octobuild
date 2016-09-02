@@ -147,23 +147,20 @@ impl<'a> ScannerState<'a> {
         Ok(Some(*self.ptr_read))
     }
 
+    #[inline(always)]
     unsafe fn next(&mut self) {
         debug_assert!(self.ptr_read != self.ptr_end);
         self.ptr_read = self.ptr_read.offset(1);
     }
 
     unsafe fn read(&mut self) -> Result<bool, Error> {
-        if self.ptr_read == self.ptr_end {
-            try!(self.flush());
-            let base = self.buf_data.as_ptr();
-            self.ptr_read = base;
-            self.ptr_copy = base;
-            self.ptr_end = base.offset(try!(self.reader.read(&mut self.buf_data)) as isize);
-            if self.ptr_read == self.ptr_end {
-                return Ok(false);
-            }
-        }
-        Ok(true)
+        debug_assert!(self.ptr_read == self.ptr_end);
+        try!(self.flush());
+        let base = self.buf_data.as_ptr();
+        self.ptr_read = base;
+        self.ptr_copy = base;
+        self.ptr_end = base.offset(try!(self.reader.read(&mut self.buf_data)) as isize);
+        Ok(self.ptr_read != self.ptr_end)
     }
 
     unsafe fn copy_to_end(&mut self) -> Result<(), Error> {
@@ -212,7 +209,7 @@ impl<'a> ScannerState<'a> {
     }
 
     unsafe fn parse_line(&mut self) -> Result<(), Error> {
-        try!(self.parse_spaces());
+        try!(self.parse_empty());
         match try!(self.peek()) {
             Some(b'#') => {
                 self.next();
@@ -364,6 +361,25 @@ impl<'a> ScannerState<'a> {
         }
     }
 
+    unsafe fn parse_empty(&mut self) -> Result<(), Error> {
+        loop {
+            while self.ptr_read != self.ptr_end {
+                match *self.ptr_read {
+                    // non-nl-white-space ::= a blank, tab, or formfeed character
+                    b' ' | b'\t' | b'\x0C' | b'\n' | b'\r' => {
+                        self.next();
+                    }
+                    _ => {
+                        return Ok(());
+                    }
+                }
+            }
+            if !try!(self.read()) {
+                return Ok(());
+            }
+        }
+    }
+
     unsafe fn parse_token<'b>(&mut self, token: &'b mut [u8]) -> Result<&'b [u8], Error> {
         let mut offset: usize = 0;
         loop {
@@ -372,7 +388,7 @@ impl<'a> ScannerState<'a> {
                 match c {
                     // end-of-line ::= newline | carriage-return | carriage-return newline
                     b'a'...b'z' | b'A'...b'Z' | b'0'...b'9' | b'_' => {
-                        if offset == token.len() {
+                        if offset >= token.len() {
                             return Err(Error::new(ErrorKind::InvalidInput, PostprocessError::TokenTooLong));
                         }
                         token[offset] = c;
