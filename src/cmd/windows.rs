@@ -10,7 +10,7 @@ pub fn parse(cmd: &str) -> Result<Vec<String>, Error> {
     let mut data = false;
     for c in cmd.chars() {
         match c {
-            ' ' | '\t' => {
+            ' ' | '\t' | '\n' | '\r' => {
                 arg = add_slashes(arg,
                                   if quote && ((slash % 2) == 0) {
                                       slash / 2
