@@ -140,7 +140,7 @@ impl<'a> ScannerState<'a> {
 
     unsafe fn peek(&mut self) -> Result<Option<u8>, Error> {
         if self.ptr_read == self.ptr_end {
-            if try!(self.read()) == 0 {
+            if !try!(self.read()) {
                 return Ok(None);
             }
         }
@@ -152,15 +152,18 @@ impl<'a> ScannerState<'a> {
         self.ptr_read = self.ptr_read.offset(1);
     }
 
-    unsafe fn read(&mut self) -> Result<usize, Error> {
+    unsafe fn read(&mut self) -> Result<bool, Error> {
         if self.ptr_read == self.ptr_end {
             try!(self.flush());
             let base = self.buf_data.as_ptr();
             self.ptr_read = base;
             self.ptr_copy = base;
             self.ptr_end = base.offset(try!(self.reader.read(&mut self.buf_data)) as isize);
+            if self.ptr_read == self.ptr_end {
+                return Ok(false);
+            }
         }
-        Ok(delta(self.ptr_read, self.ptr_end))
+        Ok(true)
     }
 
     unsafe fn copy_to_end(&mut self) -> Result<(), Error> {
@@ -231,7 +234,7 @@ impl<'a> ScannerState<'a> {
                     b'\r' => {
                         self.ptr_read = self.ptr_read.offset(1);
                         if self.ptr_read == self.ptr_end {
-                            if try!(self.read()) == 0 {
+                            if !try!(self.read()) {
                                 return Ok(b"\r");
                             }
                         }
@@ -252,7 +255,7 @@ impl<'a> ScannerState<'a> {
                 self.ptr_read = self.ptr_read.offset(1)
             }
             self.ptr_read = self.ptr_end;
-            if try!(self.read()) == 0 {
+            if !try!(self.read()) {
                 return Ok(b"");
             }
         }
@@ -355,7 +358,7 @@ impl<'a> ScannerState<'a> {
                     }
                 }
             }
-            if try!(self.read()) == 0 {
+            if !try!(self.read()) {
                 return Ok(());
             }
         }
@@ -381,7 +384,7 @@ impl<'a> ScannerState<'a> {
                 }
                 self.next();
             }
-            if try!(self.read()) == 0 {
+            if !try!(self.read()) {
                 return Ok(token);
             }
         }
@@ -429,7 +432,7 @@ impl<'a> ScannerState<'a> {
                     return Err(Error::new(ErrorKind::InvalidInput, PostprocessError::LiteralTooLong));
                 }
             }
-            if try!(self.read()) == 0 {
+            if !try!(self.read()) {
                 return Err(Error::new(ErrorKind::InvalidInput, PostprocessError::LiteralEof));
             }
         }
