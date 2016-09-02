@@ -138,6 +138,7 @@ impl<'a> ScannerState<'a> {
         Ok(())
     }
 
+    #[inline(always)]
     unsafe fn peek(&mut self) -> Result<Option<u8>, Error> {
         if self.ptr_read == self.ptr_end {
             if !try!(self.read()) {
