@@ -1,5 +1,6 @@
 use local_encoding::{Encoder, Encoding};
 
+use libc;
 use std::fmt::{Display, Formatter};
 use std::io::{Error, ErrorKind, Read, Write};
 use std::ptr;
@@ -101,12 +102,15 @@ pub fn filter_preprocessed(reader: &mut Read,
             }
             None => None,
         };
-        if state.ptr_read != state.ptr_end {
-            loop {
-                try!(state.parse_line());
-                if state.done {
-                    return state.copy_to_end();
+        loop {
+            if state.ptr_read == state.ptr_end {
+                if !try!(state.read()) {
+                    break;
                 }
+            }
+            try!(state.parse_line());
+            if state.done {
+                return state.copy_to_end();
             }
         }
         Err(Error::new(ErrorKind::InvalidInput, PostprocessError::MarkerNotFound))
@@ -224,33 +228,43 @@ impl<'a> ScannerState<'a> {
         }
     }
 
-    #[inline(always)]
-    unsafe fn next_line(&mut self) -> Result<&'static [u8], Error> {
+    unsafe fn next_line(&mut self) -> Result<(), Error> {
         loop {
-            while self.ptr_read != self.ptr_end {
-                match *self.ptr_read {
-                    b'\r' => {
-                        self.ptr_read = self.ptr_read.offset(1);
-                        if self.ptr_read == self.ptr_end {
-                            if !try!(self.read()) {
-                                return Ok(b"\r");
-                            }
-                        }
-                        if *self.ptr_read == b'\n' {
-                            self.ptr_read = self.ptr_read.offset(1);
-                            return Ok(b"\r\n");
-                        }
-                        // end-of-line ::= newline | carriage-return | carriage-return newline
-                        return Ok(b"\r");
-                    }
-                    b'\n' => {
-                        // end-of-line ::= newline | carriage-return | carriage-return newline
-                        self.ptr_read = self.ptr_read.offset(1);
-                        return Ok(b"\n");
-                    }
-                    _ => {}
+            let end = libc::memchr(self.ptr_read as *const libc::c_void,
+                                   b'\n' as i32,
+                                   delta(self.ptr_read, self.ptr_end)) as *const u8;
+            if end != ptr::null() {
+                self.ptr_read = end.offset(1);
+                return Ok(());
+            }
+            self.ptr_read = self.ptr_end;
+            if !try!(self.read()) {
+                return Ok(());
+            }
+        }
+    }
+
+    unsafe fn next_line_eol(&mut self) -> Result<&'static [u8], Error> {
+        let mut last: u8 = 0;
+        loop {
+            let end = libc::memchr(self.ptr_read as *const libc::c_void,
+                                   b'\n' as i32,
+                                   delta(self.ptr_read, self.ptr_end)) as *const u8;
+            if end != ptr::null() {
+                if end != &self.buf_data[0] {
+                    last = *end.offset(-1);
                 }
-                self.ptr_read = self.ptr_read.offset(1)
+                self.ptr_read = end.offset(1);
+                if last == b'\r' {
+                    return Ok(b"\r\n");
+                }
+                return Ok(b"\n");
+            }
+
+            if self.ptr_end != &self.buf_data[0] {
+                last = *self.ptr_end.offset(-1);
+            } else {
+                last = 0;
             }
             self.ptr_read = self.ptr_end;
             if !try!(self.read()) {
@@ -280,7 +294,7 @@ impl<'a> ScannerState<'a> {
         let line = try!(self.parse_token(&mut line_token));
         try!(self.parse_spaces());
         let (file, raw) = try!(self.parse_path(&mut file_token, &mut file_raw));
-        let eol = try!(self.next_line());
+        let eol = try!(self.next_line_eol());
         self.entry_file = match self.entry_file.take() {
             Some(path) => {
                 if self.header_found && (path == file) {
@@ -492,7 +506,6 @@ mod test {
     fn check_filter(original: &str, expected: &str, marker: Option<String>, keep_headers: bool) {
         check_filter_pass(original, expected, &marker, keep_headers, "\n");
         check_filter_pass(original, expected, &marker, keep_headers, "\r\n");
-        check_filter_pass(original, expected, &marker, keep_headers, "\r");
     }
 
     #[test]
