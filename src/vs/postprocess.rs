@@ -127,7 +127,6 @@ impl<'a> ScannerState<'a> {
         Ok(())
     }
 
-    #[inline(always)]
     fn peek(&mut self) -> Result<Option<u8>, Error> {
         if self.buf_read == self.buf_size {
             try!(self.read());
@@ -135,16 +134,17 @@ impl<'a> ScannerState<'a> {
         if self.buf_size == 0 {
             return Ok(None);
         }
-        Ok(Some(self.buf_data[self.buf_read]))
+        unsafe {
+            let buf_data: *mut u8 = &mut self.buf_data[0];
+            Ok(Some(*buf_data.offset(self.buf_read as isize)))
+        }
     }
 
-    #[inline(always)]
     fn next(&mut self) {
         debug_assert!(self.buf_read < self.buf_size);
         self.buf_read += 1;
     }
 
-    #[inline(always)]
     fn read(&mut self) -> Result<usize, Error> {
         if self.buf_read == self.buf_size {
             try!(self.flush());
@@ -217,34 +217,38 @@ impl<'a> ScannerState<'a> {
     }
 
     fn next_line(&mut self) -> Result<&'static [u8], Error> {
-        loop {
-            for i in self.buf_read..self.buf_size {
-                match self.buf_data[i] {
-                    b'\r' => {
-                        self.buf_read = i + 1;
-                        if self.buf_read == self.buf_size {
-                            if try!(self.read()) == 0 {
-                                return Ok(b"\r");
+        debug_assert!(self.buf_size <= self.buf_data.len());
+        unsafe {
+            let buf_data: *mut u8 = &mut self.buf_data[0];
+            loop {
+                for i in self.buf_read..self.buf_size {
+                    match *buf_data.offset(i as isize) {
+                        b'\r' => {
+                            self.buf_read = i + 1;
+                            if self.buf_read == self.buf_size {
+                                if try!(self.read()) == 0 {
+                                    return Ok(b"\r");
+                                }
                             }
+                            if *buf_data.offset(self.buf_read as isize) == b'\n' {
+                                self.buf_read += 1;
+                                return Ok(b"\r\n");
+                            }
+                            // end-of-line ::= newline | carriage-return | carriage-return newline
+                            return Ok(b"\r");
                         }
-                        if self.buf_data[self.buf_read] == b'\n' {
-                            self.buf_read += 1;
-                            return Ok(b"\r\n");
+                        b'\n' => {
+                            // end-of-line ::= newline | carriage-return | carriage-return newline
+                            self.buf_read = i + 1;
+                            return Ok(b"\n");
                         }
-                        // end-of-line ::= newline | carriage-return | carriage-return newline
-                        return Ok(b"\r");
+                        _ => {}
                     }
-                    b'\n' => {
-                        // end-of-line ::= newline | carriage-return | carriage-return newline
-                        self.buf_read = i + 1;
-                        return Ok(b"\n");
-                    }
-                    _ => {}
                 }
-            }
-            self.buf_read = self.buf_size;
-            if try!(self.read()) == 0 {
-                return Ok(b"");
+                self.buf_read = self.buf_size;
+                if try!(self.read()) == 0 {
+                    return Ok(b"");
+                }
             }
         }
     }
@@ -333,18 +337,20 @@ impl<'a> ScannerState<'a> {
         }
     }
 
-    #[inline(always)]
     fn parse_spaces(&mut self) -> Result<(), Error> {
         loop {
-            assert!(self.buf_size <= self.buf_data.len());
-            while self.buf_read < self.buf_size {
-                match self.buf_data[self.buf_read] {
-                    // non-nl-white-space ::= a blank, tab, or formfeed character
-                    b' ' | b'\t' | b'\x0C' => {
-                        self.next();
-                    }
-                    _ => {
-                        return Ok(());
+            debug_assert!(self.buf_size <= self.buf_data.len());
+            unsafe {
+                let buf_data: *mut u8 = &mut self.buf_data[0];
+                while self.buf_read < self.buf_size {
+                    match *buf_data.offset(self.buf_read as isize) {
+                        // non-nl-white-space ::= a blank, tab, or formfeed character
+                        b' ' | b'\t' | b'\x0C' => {
+                            self.next();
+                        }
+                        _ => {
+                            return Ok(());
+                        }
                     }
                 }
             }
@@ -357,26 +363,29 @@ impl<'a> ScannerState<'a> {
     fn parse_token<'b>(&mut self, token: &'b mut [u8]) -> Result<&'b [u8], Error> {
         let mut offset: usize = 0;
         loop {
-            assert!(self.buf_size <= self.buf_data.len());
-            while self.buf_read < self.buf_size {
-                let c: u8 = self.buf_data[self.buf_read];
-                match c {
-                    // end-of-line ::= newline | carriage-return | carriage-return newline
-                    b'a'...b'z' | b'A'...b'Z' | b'0'...b'9' | b'_' => {
-                        if offset == token.len() {
-                            return Err(Error::new(ErrorKind::InvalidInput, PostprocessError::TokenTooLong));
+            debug_assert!(self.buf_size <= self.buf_data.len());
+            unsafe {
+                let buf_data: *mut u8 = &mut self.buf_data[0];
+                while self.buf_read < self.buf_size {
+                    let c: u8 = *buf_data.offset(self.buf_read as isize);
+                    match c {
+                        // end-of-line ::= newline | carriage-return | carriage-return newline
+                        b'a'...b'z' | b'A'...b'Z' | b'0'...b'9' | b'_' => {
+                            if offset == token.len() {
+                                return Err(Error::new(ErrorKind::InvalidInput, PostprocessError::TokenTooLong));
+                            }
+                            token[offset] = c;
+                            offset += 1;
                         }
-                        token[offset] = c;
-                        offset += 1;
+                        _ => {
+                            return Ok(&token[0..offset]);
+                        }
                     }
-                    _ => {
-                        return Ok(&token[0..offset]);
-                    }
+                    self.next();
                 }
-                self.next();
-            }
-            if try!(self.read()) == 0 {
-                return Ok(token);
+                if try!(self.read()) == 0 {
+                    return Ok(token);
+                }
             }
         }
     }
@@ -388,41 +397,44 @@ impl<'a> ScannerState<'a> {
         let mut token_offset = 0;
         let mut raw_offset = 1;
         loop {
-            assert!(self.buf_size <= self.buf_data.len());
-            while self.buf_read < self.buf_size {
-                let c: u8 = self.buf_data[self.buf_read];
-                match c {
-                    // end-of-line ::= newline | carriage-return | carriage-return newline
-                    b'\n' | b'\r' => {
-                        return Err(Error::new(ErrorKind::InvalidInput, PostprocessError::LiteralEol));
-                    }
-                    b'\\' => {
-                        raw[raw_offset + 0] = b'\\';
-                        raw[raw_offset + 1] = c;
-                        raw_offset += 2;
-                        token[token_offset] = match try!(self.parse_escape()) {
-                            b'\\' => b'/',
-                            v => v,
-                        };
-                        token_offset += 1;
-                    }
-                    c => {
-                        self.next();
-                        raw[raw_offset] = c;
-                        raw_offset += 1;
-                        if c == quote {
-                            return Ok((&token[..token_offset], &raw[..raw_offset]));
+            debug_assert!(self.buf_size <= self.buf_data.len());
+            unsafe {
+                let buf_data: *mut u8 = &mut self.buf_data[0];
+                while self.buf_read < self.buf_size {
+                    let c: u8 = *buf_data.offset(self.buf_read as isize);
+                    match c {
+                        // end-of-line ::= newline | carriage-return | carriage-return newline
+                        b'\n' | b'\r' => {
+                            return Err(Error::new(ErrorKind::InvalidInput, PostprocessError::LiteralEol));
                         }
-                        token[token_offset] = c;
-                        token_offset += 1;
+                        b'\\' => {
+                            raw[raw_offset + 0] = b'\\';
+                            raw[raw_offset + 1] = c;
+                            raw_offset += 2;
+                            token[token_offset] = match try!(self.parse_escape()) {
+                                b'\\' => b'/',
+                                v => v,
+                            };
+                            token_offset += 1;
+                        }
+                        c => {
+                            self.next();
+                            raw[raw_offset] = c;
+                            raw_offset += 1;
+                            if c == quote {
+                                return Ok((&token[..token_offset], &raw[..raw_offset]));
+                            }
+                            token[token_offset] = c;
+                            token_offset += 1;
+                        }
+                    }
+                    if (raw_offset >= raw.len() - 2) || (token_offset >= token.len() - 1) {
+                        return Err(Error::new(ErrorKind::InvalidInput, PostprocessError::LiteralTooLong));
                     }
                 }
-                if (raw_offset >= raw.len() - 2) || (token_offset >= token.len() - 1) {
-                    return Err(Error::new(ErrorKind::InvalidInput, PostprocessError::LiteralTooLong));
+                if try!(self.read()) == 0 {
+                    return Err(Error::new(ErrorKind::InvalidInput, PostprocessError::LiteralEof));
                 }
-            }
-            if try!(self.read()) == 0 {
-                return Err(Error::new(ErrorKind::InvalidInput, PostprocessError::LiteralEof));
             }
         }
     }
