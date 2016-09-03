@@ -47,6 +47,7 @@ num_cpus = "1.0.0"
 regex = "0.1.71"
 lazy_static = "0.2.1"
 clap = "2.11.0"
+crossbeam = "0.2.10"
 
 byteorder = "0.5.3"
 log = "0.3.6"

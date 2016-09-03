@@ -18,10 +18,10 @@ use std::iter::FromIterator;
 use std::path::Path;
 use std::sync::Arc;
 
-pub fn supported_compilers(state: &Arc<SharedState>, temp_dir: &Arc<TempDir>) -> CompilerGroup {
+pub fn supported_compilers(temp_dir: &Arc<TempDir>) -> CompilerGroup {
     CompilerGroup::new()
-        .add(VsCompiler::new(state, &temp_dir))
-        .add(ClangCompiler::new(state))
+        .add(VsCompiler::new(&temp_dir))
+        .add(ClangCompiler::new())
 }
 
 pub fn create_temp_dir() -> Result<Arc<TempDir>, Error> {
@@ -30,7 +30,7 @@ pub fn create_temp_dir() -> Result<Arc<TempDir>, Error> {
 
 pub fn simple_compile<C, F>(exec: &str, factory: F) -> i32
     where C: Compiler,
-          F: FnOnce(&Config, &Arc<SharedState>) -> Result<C, Error>
+          F: FnOnce(&Config) -> Result<C, Error>
 {
     let config = match Config::new() {
         Ok(v) => v,
@@ -39,8 +39,8 @@ pub fn simple_compile<C, F>(exec: &str, factory: F) -> i32
             return 501;
         }
     };
-    let state = Arc::new(SharedState::new(&config));
-    let compiler = match factory(&config, &state) {
+    let state = SharedState::new(&config);
+    let compiler = match factory(&config) {
         Ok(v) => v,
         Err(e) => {
             error!("FATAL ERROR: Can't create compiler instance {}", e);
@@ -56,12 +56,12 @@ pub fn simple_compile<C, F>(exec: &str, factory: F) -> i32
     }
 }
 
-pub fn compile<C>(config: &Config, state: &Arc<SharedState>, exec: &str, compiler: C) -> Result<Option<i32>, Error>
+pub fn compile<C>(config: &Config, state: &SharedState, exec: &str, compiler: C) -> Result<Option<i32>, Error>
     where C: Compiler
 {
     let args = Vec::from_iter(env::args());
     let command_info = CommandInfo::simple(Path::new(exec));
-    let remote = RemoteCompiler::new(&config.coordinator, compiler, &state);
+    let remote = RemoteCompiler::new(&config.coordinator, compiler);
     let actions = BuildAction::create_tasks(&remote, command_info, &args[1..], exec);
 
     let mut build_graph: BuildGraph = Graph::new();
@@ -71,10 +71,7 @@ pub fn compile<C>(config: &Config, state: &Arc<SharedState>, exec: &str, compile
             action: action,
         }));
     }
-    let result = execute_graph(state.clone(),
-                               build_graph,
-                               config.process_limit,
-                               print_task_result);
+    let result = execute_graph(state, build_graph, config.process_limit, print_task_result);
     println!("{}", state.statistic.to_string());
     result
 }

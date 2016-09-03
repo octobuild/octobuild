@@ -129,10 +129,9 @@ fn expand_files(mut files: Vec<PathBuf>, arg: &str) -> Vec<PathBuf> {
 
 fn execute(args: &[String]) -> Result<Option<i32>, Error> {
     let config = try!(Config::new());
-    let state = Arc::new(SharedState::new(&config));
+    let state = SharedState::new(&config);
     let compiler = RemoteCompiler::new(&config.coordinator,
-                                       supported_compilers(&state, &try!(create_temp_dir())),
-                                       &state);
+                                       supported_compilers(&try!(create_temp_dir())));
     let files = args.iter()
         .filter(|a| !is_flag(a))
         .fold(Vec::new(), |state, a| expand_files(state, &a));
@@ -147,10 +146,7 @@ fn execute(args: &[String]) -> Result<Option<i32>, Error> {
     }
     let build_graph = try!(validate_graph(graph).and_then(|graph| prepare_graph(&compiler, graph)));
 
-    let result = execute_graph(state.clone(),
-                               build_graph,
-                               config.process_limit,
-                               print_task_result);
+    let result = execute_graph(&state, build_graph, config.process_limit, print_task_result);
     let _ = state.cache.cleanup();
     println!("{}", state.statistic.to_string());
     result

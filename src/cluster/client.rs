@@ -35,7 +35,6 @@ struct RemoteSharedMut {
 struct RemoteShared {
     mutable: RwLock<RemoteSharedMut>,
     base_url: Option<Url>,
-    shared: Arc<SharedState>,
     client: Client,
 }
 
@@ -45,7 +44,7 @@ struct RemoteToolchain {
 }
 
 impl<C: Compiler> RemoteCompiler<C> {
-    pub fn new(base_url: &Option<Url>, compiler: C, shared: &Arc<SharedState>) -> Self {
+    pub fn new(base_url: &Option<Url>, compiler: C) -> Self {
         RemoteCompiler {
             shared: Arc::new(RemoteShared {
                 mutable: RwLock::new(RemoteSharedMut {
@@ -53,7 +52,6 @@ impl<C: Compiler> RemoteCompiler<C> {
                     builders: Arc::new(Vec::new()),
                 }),
                 base_url: base_url.as_ref().map(|u| u.clone()),
-                shared: shared.clone(),
                 client: Client::new(),
             }),
             local: compiler,
@@ -108,7 +106,7 @@ impl<'a, R: 'a + Read> Read for ReadWrapper<'a, R> {
 }
 
 impl RemoteToolchain {
-    fn compile_remote(&self, task: &CompileStep) -> Result<CompileResponse, Error> {
+    fn compile_remote(&self, state: &SharedState, task: &CompileStep) -> Result<CompileResponse, Error> {
         let name = try!(self.identifier().ok_or(Error::new(ErrorKind::Other, "Can't get toolchain name")));
         let addr = try!(self.remote_endpoint(&name)
             .ok_or(Error::new(ErrorKind::Other, "Can't find helper for toolchain")));
@@ -123,7 +121,7 @@ impl RemoteToolchain {
             toolchain: name.clone(),
             args: task.args.clone(),
             preprocessed_data: (&task.preprocessed).into(),
-            precompiled_hash: try!(self.upload_precompiled(&task.input_precompiled, &base_url)),
+            precompiled_hash: try!(self.upload_precompiled(state, &task.input_precompiled, &base_url)),
         };
         let mut request_payload = Vec::new();
         try!(request.stream_write(&mut request_payload, &mut message::Builder::new_default()));
@@ -147,17 +145,21 @@ impl RemoteToolchain {
                             }
                             _ => {}
                         }
-                        self.shared.shared.statistic.inc_remote();
+                        state.statistic.inc_remote();
                         Ok(result)
                     })
             })
     }
 
-    fn upload_precompiled(&self, precompiled: &Option<PathBuf>, base_url: &Url) -> Result<Option<String>, Error> {
+    fn upload_precompiled(&self,
+                          state: &SharedState,
+                          precompiled: &Option<PathBuf>,
+                          base_url: &Url)
+                          -> Result<Option<String>, Error> {
         match precompiled {
             &Some(ref path) => {
                 // Get precompiled header file hash
-                let meta = try!(self.shared.shared.cache.file_hash(&path));
+                let meta = try!(state.cache.file_hash(&path));
                 // Check is precompiled header uploaded
                 // todo: this is workaround for https://github.com/hyperium/hyper/issues/838
                 match try!(self.shared
@@ -233,18 +235,14 @@ impl Toolchain for RemoteToolchain {
         self.local.identifier()
     }
 
-    fn state(&self) -> &SharedState {
-        &self.shared.shared
-    }
-
     // Parse compiler arguments.
     fn create_tasks(&self, command: CommandInfo, args: &[String]) -> Result<Vec<CompilationTask>, String> {
         self.local.create_tasks(command, args)
     }
 
     // Preprocessing source file.
-    fn preprocess_step(&self, task: &CompilationTask) -> Result<PreprocessResult, Error> {
-        self.local.preprocess_step(task)
+    fn preprocess_step(&self, state: &SharedState, task: &CompilationTask) -> Result<PreprocessResult, Error> {
+        self.local.preprocess_step(state, task)
     }
 
     // Compile preprocessed file.
@@ -252,8 +250,8 @@ impl Toolchain for RemoteToolchain {
         self.local.compile_prepare_step(task, preprocessed)
     }
 
-    fn compile_step(&self, task: CompileStep) -> Result<OutputInfo, Error> {
-        match self.compile_remote(&task) {
+    fn compile_step(&self, state: &SharedState, task: CompileStep) -> Result<OutputInfo, Error> {
+        match self.compile_remote(state, &task) {
             Ok(response) => {
                 match response {
                     CompileResponse::Success(output, _) => Ok(output),
@@ -262,7 +260,7 @@ impl Toolchain for RemoteToolchain {
             }
             Err(e) => {
                 trace!("Fallback to local build: {}", e);
-                self.local.compile_step(task)
+                self.local.compile_step(state, task)
             }
         }
     }

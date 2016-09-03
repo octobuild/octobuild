@@ -411,22 +411,20 @@ pub enum PreprocessResult {
 pub trait Toolchain: Send + Sync {
     // Get toolchain identificator.
     fn identifier(&self) -> Option<String>;
-    // Get shared state.
-    fn state(&self) -> &SharedState;
 
     // Parse compiler arguments.
     fn create_tasks(&self, command: CommandInfo, args: &[String]) -> Result<Vec<CompilationTask>, String>;
     // Preprocessing source file.
-    fn preprocess_step(&self, task: &CompilationTask) -> Result<PreprocessResult, Error>;
+    fn preprocess_step(&self, state: &SharedState, task: &CompilationTask) -> Result<PreprocessResult, Error>;
     // Compile preprocessed file.
     fn compile_prepare_step(&self, task: CompilationTask, preprocessed: MemStream) -> Result<CompileStep, Error>;
 
     // Compile preprocessed file.
-    fn compile_step(&self, task: CompileStep) -> Result<OutputInfo, Error>;
+    fn compile_step(&self, state: &SharedState, task: CompileStep) -> Result<OutputInfo, Error>;
     // Compile preprocessed file.
-    fn compile_memory(&self, mut task: CompileStep) -> Result<(OutputInfo, Vec<u8>), Error> {
+    fn compile_memory(&self, state: &SharedState, mut task: CompileStep) -> Result<(OutputInfo, Vec<u8>), Error> {
         task.output_object = None;
-        self.compile_step(task)
+        self.compile_step(state, task)
             .map(|output| {
                 (OutputInfo {
                     status: output.status,
@@ -437,19 +435,18 @@ pub trait Toolchain: Send + Sync {
             })
     }
 
-    fn compile_task(&self, task: CompilationTask) -> Result<OutputInfo, Error> {
-        self.preprocess_step(&task).and_then(|preprocessed| match preprocessed {
+    fn compile_task(&self, state: &SharedState, task: CompilationTask) -> Result<OutputInfo, Error> {
+        self.preprocess_step(state, &task).and_then(|preprocessed| match preprocessed {
             PreprocessResult::Success(preprocessed) => {
                 self.compile_prepare_step(task, preprocessed)
-                    .and_then(|task| self.compile_step_cached(task))
+                    .and_then(|task| self.compile_step_cached(state, task))
             }
             PreprocessResult::Failed(output) => Ok(output),
         })
     }
 
-    fn compile_step_cached(&self, task: CompileStep) -> Result<OutputInfo, Error> {
+    fn compile_step_cached(&self, state: &SharedState, task: CompileStep) -> Result<OutputInfo, Error> {
         let mut hasher = Md5::new();
-        let state = self.state();
         // Get hash from preprocessed data
         hasher.hash_u64(task.preprocessed.len() as u64);
         try!(task.preprocessed.copy(&mut hasher.as_write()));
@@ -492,7 +489,7 @@ pub trait Toolchain: Send + Sync {
         state.cache.run_file_cached(&state.statistic,
                                     &hasher.result_str(),
                                     &outputs,
-                                    || -> Result<OutputInfo, Error> { self.compile_step(task) },
+                                    || -> Result<OutputInfo, Error> { self.compile_step(state, task) },
                                     || true)
     }
 }

@@ -1,5 +1,6 @@
 use petgraph::{EdgeDirection, Graph};
 use petgraph::graph::NodeIndex;
+use crossbeam;
 
 use ::compiler::{CommandInfo, CompilationTask, Compiler, OutputInfo, SharedState, Toolchain};
 
@@ -8,7 +9,6 @@ use std::borrow::Cow;
 use std::cmp::{max, min};
 use std::sync::{Arc, Mutex};
 use std::sync::mpsc::{Receiver, Sender, channel};
-use std::thread;
 
 pub type BuildGraph = Graph<Arc<BuildTask>, ()>;
 
@@ -90,43 +90,6 @@ impl BuildAction {
             &BuildAction::Compilation(_, ref task) => Cow::Borrowed(task.input_source.to_str().unwrap_or("")),
         }
     }
-}
-
-fn create_threads<R: 'static + Send,
-                  T: 'static + Send,
-                  Worker: 'static + Fn(T) -> R + Send,
-                  Factory: Fn(usize) -> Worker>
-    (rx_task: Receiver<T>,
-     tx_result: Sender<R>,
-     num_cpus: usize,
-     factory: Factory)
-     -> Arc<Mutex<Receiver<T>>> {
-    let mutex_rx_task = Arc::new(Mutex::new(rx_task));
-    for cpu_id in 0..num_cpus {
-        let local_rx_task = mutex_rx_task.clone();
-        let local_tx_result = tx_result.clone();
-        let worker = factory(cpu_id);
-        thread::spawn(move || {
-            loop {
-                let task: T;
-                match local_rx_task.lock().unwrap().recv() {
-                    Ok(v) => {
-                        task = v;
-                    }
-                    Err(_) => {
-                        break;
-                    }
-                }
-                match local_tx_result.send(worker(task)) {
-                    Ok(_) => {}
-                    Err(_) => {
-                        break;
-                    }
-                }
-            }
-        });
-    }
-    mutex_rx_task
 }
 
 pub fn validate_graph<N, E>(graph: Graph<N, E>) -> Result<Graph<N, E>, Error> {
@@ -213,7 +176,7 @@ fn is_ready<N, E>(graph: &Graph<N, E>, completed: &Vec<bool>, source: &NodeIndex
     true
 }
 
-pub fn execute_graph<F>(state: Arc<SharedState>,
+pub fn execute_graph<F>(state: &SharedState,
                         build_graph: BuildGraph,
                         process_limit: usize,
                         update_progress: F)
@@ -240,32 +203,45 @@ pub fn execute_graph<F>(state: Arc<SharedState>,
 
     let (tx_result, rx_result): (Sender<ResultMessage>, Receiver<ResultMessage>) = channel();
     let (tx_task, rx_task): (Sender<TaskMessage>, Receiver<TaskMessage>) = channel();
-    let mutex_rx_task = create_threads(rx_task,
-                                       tx_result,
-                                       max(1, min(process_limit, graph.node_count())),
-                                       |worker_id: usize| {
-        let state_clone = state.clone();
-        move |message| {
-            ResultMessage {
-                index: message.index,
-                worker: worker_id,
-                result: execute_compiler(&state_clone, &message.task),
-                task: message.task,
-            }
+    let mutex_rx_task = Arc::new(Mutex::new(rx_task));
+    let num_cpus = max(1, min(process_limit, graph.node_count()));
+    crossbeam::scope(|scope| {
+        for worker_id in 0..num_cpus {
+            let local_rx_task = mutex_rx_task.clone();
+            let local_tx_result = tx_result.clone();
+            scope.spawn(move || {
+                loop {
+                    let message = match local_rx_task.lock().unwrap().recv() {
+                        Ok(v) => v,
+                        Err(_) => {
+                            break;
+                        }
+                    };
+                    match local_tx_result.send(ResultMessage {
+                        index: message.index,
+                        worker: worker_id,
+                        result: execute_compiler(state, &message.task),
+                        task: message.task,
+                    }) {
+                        Ok(_) => {}
+                        Err(_) => {
+                            break;
+                        }
+                    }
+                }
+            });
         }
-    });
-
-    // Run all tasks.
-    let mut count: usize = 0;
-    let result = execute_until_failed(&graph, tx_task, &rx_result, &mut count, &update_progress);
-    // Cleanup task queue.
-    for _ in mutex_rx_task.lock().unwrap().iter() {
-    }
-    // Wait for in progress task completion.
-    for message in rx_result.iter() {
-        try!(update_progress(BuildResult::new(&message, &mut count, graph.node_count())));
-    }
-    result
+        // Run all tasks.
+        let mut count: usize = 0;
+        let result = execute_until_failed(&graph, tx_task, &rx_result, &mut count, &update_progress);
+        // Cleanup task queue.
+        for _ in mutex_rx_task.lock().unwrap().iter() {}
+        // Wait for in progress task completion.
+        for message in rx_result.iter() {
+            try!(update_progress(BuildResult::new(&message, &mut count, graph.node_count())));
+        }
+        result
+    })
 }
 
 fn execute_compiler(state: &SharedState, task: &BuildTask) -> Result<OutputInfo, Error> {
@@ -280,6 +256,6 @@ fn execute_compiler(state: &SharedState, task: &BuildTask) -> Result<OutputInfo,
         &BuildAction::Exec(ref command, ref args) => {
             state.wrap_slow(|| command.to_command().args(args).output().map(|o| OutputInfo::new(o)))
         }
-        &BuildAction::Compilation(ref toolchain, ref task) => toolchain.compile_task(task.clone()),
+        &BuildAction::Compilation(ref toolchain, ref task) => toolchain.compile_task(state, task.clone()),
     }
 }

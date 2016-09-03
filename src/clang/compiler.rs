@@ -23,29 +23,23 @@ lazy_static! {
 }
 
 pub struct ClangCompiler {
-    state: Arc<SharedState>,
     toolchains: ToolchainHolder,
 }
 
 impl ClangCompiler {
-    pub fn new(state: &Arc<SharedState>) -> Self {
-        ClangCompiler {
-            state: state.clone(),
-            toolchains: ToolchainHolder::new(),
-        }
+    pub fn new() -> Self {
+        ClangCompiler { toolchains: ToolchainHolder::new() }
     }
 }
 
 struct ClangToolchain {
-    state: Arc<SharedState>,
     path: PathBuf,
     identifier: Lazy<Option<String>>,
 }
 
 impl ClangToolchain {
-    pub fn new(state: &Arc<SharedState>, path: PathBuf) -> Self {
+    pub fn new(path: PathBuf) -> Self {
         ClangToolchain {
-            state: state.clone(),
             path: path,
             identifier: Lazy::new(),
         }
@@ -58,10 +52,7 @@ impl Compiler for ClangCompiler {
             .file_name()
             .map_or(false, |n| RE_CLANG.is_match(n.to_string_lossy().as_bytes())) {
             command.find_executable()
-                .and_then(|path| {
-                    self.toolchains.resolve(&path,
-                                            |path| Arc::new(ClangToolchain::new(&self.state, path)))
-                })
+                .and_then(|path| self.toolchains.resolve(&path, |path| Arc::new(ClangToolchain::new(path))))
         } else {
             None
         }
@@ -76,7 +67,7 @@ impl Compiler for ClangCompiler {
             .flat_map(|read_dir| read_dir)
             .filter_map(|entry| entry.ok())
             .filter(|entry| RE_CLANG.is_match(entry.file_name().to_string_lossy().as_bytes()))
-            .map(|entry| -> Arc<Toolchain> { Arc::new(ClangToolchain::new(&self.state, entry.path())) })
+            .map(|entry| -> Arc<Toolchain> { Arc::new(ClangToolchain::new(entry.path())) })
             .collect()
     }
 }
@@ -86,15 +77,11 @@ impl Toolchain for ClangToolchain {
         self.identifier.get(|| clang_identifier(&self.path))
     }
 
-    fn state(&self) -> &SharedState {
-        &self.state
-    }
-
     fn create_tasks(&self, command: CommandInfo, args: &[String]) -> Result<Vec<CompilationTask>, String> {
         super::prepare::create_tasks(command, args)
     }
 
-    fn preprocess_step(&self, task: &CompilationTask) -> Result<PreprocessResult, Error> {
+    fn preprocess_step(&self, state: &SharedState, task: &CompilationTask) -> Result<PreprocessResult, Error> {
         let mut args = Vec::new();
         args.push("-E".to_string());
         args.push("-x".to_string());
@@ -133,7 +120,7 @@ impl Toolchain for ClangToolchain {
         args.push("-o".to_string());
         args.push("-".to_string());
 
-        self.state.wrap_slow(|| execute(task.shared.command.to_command().args(&args)))
+        state.wrap_slow(|| execute(task.shared.command.to_command().args(&args)))
     }
 
     // Compile preprocessed file.
@@ -169,9 +156,9 @@ impl Toolchain for ClangToolchain {
         Ok(CompileStep::new(task, preprocessed, args, false))
     }
 
-    fn compile_step(&self, task: CompileStep) -> Result<OutputInfo, Error> {
+    fn compile_step(&self, state: &SharedState, task: CompileStep) -> Result<OutputInfo, Error> {
         // Run compiler.
-        self.state.wrap_slow(|| {
+        state.wrap_slow(|| {
             Command::new(&self.path)
                 .env_clear()
                 .arg("-c")

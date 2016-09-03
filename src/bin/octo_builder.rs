@@ -61,6 +61,7 @@ struct BuilderService {
 
 struct BuilderState {
     name: String,
+    shared: SharedState,
     precompiled_dir: PathBuf,
     toolchains: HashMap<String, Arc<Toolchain>>,
     precompiled: Mutex<HashMap<String, Arc<PrecompiledFile>>>,
@@ -83,7 +84,8 @@ impl BuilderService {
         let temp_dir = create_temp_dir().ok().expect("Can't create temporary directory");
         let state = Arc::new(BuilderState {
             name: get_name(),
-            toolchains: BuilderService::discovery_toolchains(&Arc::new(SharedState::new(&config)), &temp_dir),
+            shared: SharedState::new(&config),
+            toolchains: BuilderService::discovery_toolchains(&temp_dir),
             precompiled_dir: config.cache_dir,
             precompiled: Mutex::new(HashMap::new()),
         });
@@ -144,8 +146,8 @@ impl BuilderService {
         })
     }
 
-    fn discovery_toolchains(state: &Arc<SharedState>, temp_dir: &Arc<TempDir>) -> HashMap<String, Arc<Toolchain>> {
-        let compiler = supported_compilers(state, temp_dir);
+    fn discovery_toolchains(temp_dir: &Arc<TempDir>) -> HashMap<String, Arc<Toolchain>> {
+        let compiler = supported_compilers(temp_dir);
         HashMap::from_iter(compiler.discovery_toolchains()
             .into_iter()
             .filter_map(|toolchain| toolchain.identifier().map(|name| (name, toolchain))))
@@ -199,7 +201,7 @@ impl<D> Middleware<D> for RpcBuilderTaskHandler {
             };
 
             let toolchain: Arc<Toolchain> = state.toolchains.get(&request.toolchain).unwrap().clone();
-            let response = CompileResponse::from(toolchain.compile_memory(compile_step));
+            let response = CompileResponse::from(toolchain.compile_memory(&state.shared, compile_step));
 
             let mut payload = Vec::new();
             response.stream_write(&mut payload, &mut message::Builder::new_default()).unwrap();

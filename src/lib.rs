@@ -8,6 +8,7 @@ extern crate local_encoding;
 extern crate libc;
 extern crate byteorder;
 extern crate capnp;
+extern crate crossbeam;
 extern crate fern;
 extern crate hyper;
 extern crate crypto;

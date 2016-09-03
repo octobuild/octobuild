@@ -21,18 +21,16 @@ use std::sync::Arc;
 use self::regex::bytes::{NoExpand, Regex};
 
 pub struct VsCompiler {
-    state: Arc<SharedState>,
     temp_dir: Arc<TempDir>,
     toolchains: ToolchainHolder,
 }
 
 impl VsCompiler {
-    pub fn default(state: &Arc<SharedState>) -> Result<Self, Error> {
-        Ok(VsCompiler::new(state, &Arc::new(try!(TempDir::new("octobuild")))))
+    pub fn default() -> Result<Self, Error> {
+        Ok(VsCompiler::new(&Arc::new(try!(TempDir::new("octobuild")))))
     }
-    pub fn new(state: &Arc<SharedState>, temp_dir: &Arc<TempDir>) -> Self {
+    pub fn new(temp_dir: &Arc<TempDir>) -> Self {
         VsCompiler {
-            state: state.clone(),
             temp_dir: temp_dir.clone(),
             toolchains: ToolchainHolder::new(),
         }
@@ -40,16 +38,14 @@ impl VsCompiler {
 }
 
 struct VsToolchain {
-    state: Arc<SharedState>,
     temp_dir: Arc<TempDir>,
     path: PathBuf,
     identifier: Lazy<Option<String>>,
 }
 
 impl VsToolchain {
-    pub fn new(state: &Arc<SharedState>, path: PathBuf, temp_dir: &Arc<TempDir>) -> Self {
+    pub fn new(path: PathBuf, temp_dir: &Arc<TempDir>) -> Self {
         VsToolchain {
-            state: state.clone(),
             temp_dir: temp_dir.clone(),
             path: path,
             identifier: Lazy::new(),
@@ -66,7 +62,7 @@ impl Compiler for VsCompiler {
             .map_or(false, |n| (n == "cl.exe") || (n == "cl")) {
             command.find_executable().and_then(|path| {
                 self.toolchains.resolve(&path,
-                                        |path| Arc::new(VsToolchain::new(&self.state, path, &self.temp_dir)))
+                                        |path| Arc::new(VsToolchain::new(path, &self.temp_dir)))
             })
         } else {
             None
@@ -125,15 +121,11 @@ impl Toolchain for VsToolchain {
         self.identifier.get(|| vs_identifier(&self.path))
     }
 
-    fn state(&self) -> &SharedState {
-        &self.state
-    }
-
     fn create_tasks(&self, command: CommandInfo, args: &[String]) -> Result<Vec<CompilationTask>, String> {
         super::prepare::create_tasks(command, args)
     }
 
-    fn preprocess_step(&self, task: &CompilationTask) -> Result<PreprocessResult, Error> {
+    fn preprocess_step(&self, state: &SharedState, task: &CompilationTask) -> Result<PreprocessResult, Error> {
         // Make parameters list for preprocessing.
         let mut args = filter(&task.shared.args, |arg: &Arg| -> Option<String> {
             match arg {
@@ -166,7 +158,7 @@ impl Toolchain for VsToolchain {
         let mut command = task.shared.command.to_command();
         command.args(&args)
             .arg(&join_flag("/Fo", &task.output_object)); // /Fo option also set output path for #import directive
-        let output = try!(self.state.wrap_slow(|| command.output()));
+        let output = try!(state.wrap_slow(|| command.output()));
         if output.status.success() {
             let mut content = MemStream::new();
             if task.shared.input_precompiled.is_some() || task.shared.output_precompiled.is_some() {
@@ -223,7 +215,7 @@ impl Toolchain for VsToolchain {
         Ok(CompileStep::new(task, preprocessed, args, true))
     }
 
-    fn compile_step(&self, task: CompileStep) -> Result<OutputInfo, Error> {
+    fn compile_step(&self, state: &SharedState, task: CompileStep) -> Result<OutputInfo, Error> {
         // Input file path.
         let input_temp = TempFile::new_in(self.temp_dir.path(), ".i");
         try!(File::create(input_temp.path()).and_then(|mut s| task.preprocessed.copy(&mut s)));
@@ -268,7 +260,7 @@ impl Toolchain for VsToolchain {
             &None => {}
         }
         // Execute.
-        self.state.wrap_slow(|| {
+        state.wrap_slow(|| {
             command.output().map(|o| {
                 OutputInfo {
                     status: o.status.code(),
@@ -280,10 +272,10 @@ impl Toolchain for VsToolchain {
     }
 
     // Compile preprocessed file.
-    fn compile_memory(&self, mut task: CompileStep) -> Result<(OutputInfo, Vec<u8>), Error> {
+    fn compile_memory(&self, state: &SharedState, mut task: CompileStep) -> Result<(OutputInfo, Vec<u8>), Error> {
         let output_temp = TempFile::new_in(self.temp_dir.path(), ".o");
         task.output_object = Some(output_temp.path().to_path_buf());
-        self.compile_step(task)
+        self.compile_step(state, task)
             .and_then(|output| {
                 File::open(&output_temp.path()).and_then(|mut f| {
                     let mut buffer = Vec::new();
