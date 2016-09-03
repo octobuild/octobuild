@@ -4,6 +4,7 @@ use petgraph::graph::NodeIndex;
 use ::compiler::{CommandInfo, CompilationTask, Compiler, OutputInfo, SharedState, Toolchain};
 
 use std::io::{Error, ErrorKind};
+use std::borrow::Cow;
 use std::cmp::{max, min};
 use std::sync::{Arc, Mutex};
 use std::sync::mpsc::{Receiver, Sender, channel};
@@ -73,13 +74,21 @@ impl BuildAction {
                     .collect()
             })
             .unwrap_or_else(|e| {
-                warn!("Can't use octobuild for task {}: {}", title, e);
+                println!("Can't use octobuild for task {}: {}", title, e);
                 Vec::new()
             });
         if actions.len() == 0 {
             return vec![BuildAction::Exec(command, args.to_vec())];
         }
         actions
+    }
+
+    pub fn title(self: &Self) -> Cow<str> {
+        match self {
+            &BuildAction::Empty => Cow::Borrowed(""),
+            &BuildAction::Exec(_, ref args) => Cow::Owned(format!("{:?}", args)),
+            &BuildAction::Compilation(_, ref task) => Cow::Borrowed(task.input_source.to_str().unwrap_or("")),
+        }
     }
 }
 

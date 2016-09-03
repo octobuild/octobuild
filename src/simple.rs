@@ -69,7 +69,7 @@ pub fn compile<C>(config: &Config, state: &Arc<SharedState>, exec: &str, compile
     let mut build_graph: BuildGraph = Graph::new();
     for action in actions.into_iter() {
         build_graph.add_node(Arc::new(BuildTask {
-            title: "".to_string(),
+            title: action.title().into_owned(),
             action: action,
         }));
     }
