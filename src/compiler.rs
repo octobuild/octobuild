@@ -160,10 +160,7 @@ pub struct SharedState {
     pub statistic: Statistic,
 }
 
-pub struct CompilerGroup {
-    state: Arc<SharedState>,
-    compilers: Vec<Box<Compiler>>,
-}
+pub struct CompilerGroup(Vec<Box<Compiler>>);
 
 impl SharedState {
     pub fn new(config: &Config) -> Self {
@@ -501,26 +498,24 @@ pub trait Toolchain: Send + Sync {
 }
 
 impl CompilerGroup {
-    pub fn new(state: &Arc<SharedState>, compilers: Vec<Box<Compiler>>) -> Self {
-        CompilerGroup {
-            state: state.clone(),
-            compilers: compilers,
-        }
+    pub fn new() -> Self {
+        CompilerGroup(Vec::new())
+    }
+
+    pub fn add<C: 'static + Compiler>(mut self: Self, compiler: C) -> Self {
+        self.0.push(Box::new(compiler));
+        self
     }
 }
 
 impl Compiler for CompilerGroup {
     // Resolve toolchain for command execution.
     fn resolve_toolchain(&self, command: &CommandInfo) -> Option<Arc<Toolchain>> {
-        self.compilers.iter().filter_map(|c| c.resolve_toolchain(command)).next()
+        self.0.iter().filter_map(|c| c.resolve_toolchain(command)).next()
     }
     // Discovery local toolchains.
     fn discovery_toolchains(&self) -> Vec<Arc<Toolchain>> {
-        self.compilers.iter().flat_map(|c| c.discovery_toolchains()).collect()
-    }
-    // Get shared state.
-    fn state(&self) -> &SharedState {
-        &self.state
+        self.0.iter().flat_map(|c| c.discovery_toolchains()).collect()
     }
 }
 
@@ -552,8 +547,6 @@ pub trait Compiler: Send + Sync {
     fn resolve_toolchain(&self, command: &CommandInfo) -> Option<Arc<Toolchain>>;
     // Discovery local toolchains.
     fn discovery_toolchains(&self) -> Vec<Arc<Toolchain>>;
-    // Get shared state.
-    fn state(&self) -> &SharedState;
 
     fn create_tasks(&self,
                     command: CommandInfo,

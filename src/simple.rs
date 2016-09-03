@@ -19,11 +19,9 @@ use std::path::Path;
 use std::sync::Arc;
 
 pub fn supported_compilers(state: &Arc<SharedState>, temp_dir: &Arc<TempDir>) -> CompilerGroup {
-    CompilerGroup::new(state,
-                       vec!(
-    Box::new(VsCompiler::new(state, &temp_dir)),
-    Box::new(ClangCompiler::new(state)),
-    ))
+    CompilerGroup::new()
+        .add(VsCompiler::new(state, &temp_dir))
+        .add(ClangCompiler::new(state))
 }
 
 pub fn create_temp_dir() -> Result<Arc<TempDir>, Error> {

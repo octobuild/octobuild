@@ -58,10 +58,6 @@ impl VsToolchain {
 }
 
 impl Compiler for VsCompiler {
-    fn state(&self) -> &SharedState {
-        &self.state
-    }
-
     fn resolve_toolchain(&self, command: &CommandInfo) -> Option<Arc<Toolchain>> {
         if command.program
             .file_name()
