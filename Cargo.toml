@@ -9,6 +9,7 @@ debug = true
 
 [profile.release]
 panic = "abort"
+debug = true
 
 [[bin]]
 name = "octo_builder"
@@ -24,6 +25,9 @@ name = "octo_coordinator"
 
 [[bin]]
 name = "xgConsole"
+
+[[bin]]
+name = "filter_cl"
 
 [build-dependencies]
 capnpc = "0.7.2"
@@ -42,6 +46,7 @@ tempdir = "0.3.4"
 num_cpus = "1.0.0"
 regex = "0.1.71"
 lazy_static = "0.2.1"
+clap = "2.11.0"
 
 byteorder = "0.5.3"
 log = "0.3.6"

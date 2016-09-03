@@ -5,6 +5,7 @@ extern crate log;
 extern crate lazy_static;
 
 extern crate local_encoding;
+extern crate libc;
 extern crate byteorder;
 extern crate capnp;
 extern crate fern;
