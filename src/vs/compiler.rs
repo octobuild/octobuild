@@ -372,7 +372,7 @@ fn vs_identifier(path: &Path) -> Option<String> {
     let executable_id = match read_executable_id(path) {
         Ok(id) => id,
         Err(e) => {
-            println!("{}", e);
+            warn!("{}", e);
             return None;
         }
     };
