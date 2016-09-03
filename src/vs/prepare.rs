@@ -7,9 +7,8 @@ use std::io::{Error, ErrorKind, Read};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-use super::super::cmd;
-use super::super::compiler::{Arg, CommandInfo, CompilationArgs, CompilationTask, InputKind, OutputKind, Scope};
-use super::super::utils::filter;
+use ::cmd;
+use ::compiler::{Arg, CommandInfo, CompilationArgs, CompilationTask, InputKind, OutputKind, Scope};
 
 enum ParamValue<T> {
     None,

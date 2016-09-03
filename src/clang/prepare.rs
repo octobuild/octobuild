@@ -4,8 +4,7 @@ use std::ascii::AsciiExt;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-use super::super::compiler::{Arg, CommandInfo, CompilationArgs, CompilationTask, InputKind, OutputKind, Scope};
-use super::super::utils::filter;
+use ::compiler::{Arg, CommandInfo, CompilationArgs, CompilationTask, InputKind, OutputKind, Scope};
 
 enum ParamValue<T> {
     None,
