@@ -9,6 +9,7 @@ debug = true
 
 [profile.release]
 panic = "abort"
+debug = true
 
 [[bin]]
 name = "octo_builder"
