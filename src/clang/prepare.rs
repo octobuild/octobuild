@@ -333,6 +333,7 @@ fn test_parse_argument_compile() {
                 Arg::flag(Scope::Shared, "mmmx"),
                 Arg::flag(Scope::Shared, "msse"),
                 Arg::flag(Scope::Shared, "msse2"),
+                Arg::flag(Scope::Shared, "nostdinc++"),
                 Arg::flag(Scope::Shared, "fno-math-errno"),
                 Arg::flag(Scope::Shared, "fno-rtti"),
                 Arg::flag(Scope::Shared, "g3"),
