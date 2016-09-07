@@ -232,6 +232,7 @@ fn parse_argument(iter: &mut Iter<String>) -> Option<Result<Arg, String>> {
                         match flag {
                             "c" => Ok(Arg::flag(Scope::Ignore, flag)),
                             "pipe" => Ok(Arg::flag(Scope::Shared, flag)),
+                            "nostdinc++" => Ok(Arg::flag(Scope::Shared, flag)),
                             s if s.starts_with("f") => Ok(Arg::flag(Scope::Shared, flag)),
                             s if s.starts_with("g") => Ok(Arg::flag(Scope::Shared, flag)),
                             s if s.starts_with("O") => Ok(Arg::flag(Scope::Shared, flag)),
@@ -333,7 +334,6 @@ fn test_parse_argument_compile() {
                 Arg::flag(Scope::Shared, "mmmx"),
                 Arg::flag(Scope::Shared, "msse"),
                 Arg::flag(Scope::Shared, "msse2"),
-                Arg::flag(Scope::Shared, "nostdinc++"),
                 Arg::flag(Scope::Shared, "fno-math-errno"),
                 Arg::flag(Scope::Shared, "fno-rtti"),
                 Arg::flag(Scope::Shared, "g3"),
