@@ -95,6 +95,9 @@ impl BuildAction {
 pub fn validate_graph<N, E>(graph: Graph<N, E>) -> Result<Graph<N, E>, Error> {
     let mut completed: Vec<bool> = Vec::with_capacity(graph.node_count());
     let mut queue: Vec<NodeIndex> = Vec::with_capacity(graph.node_count());
+    if graph.node_count() == 0 {
+        return Ok(graph);
+    }
     for index in 0..graph.node_count() {
         completed.push(false);
         queue.push(NodeIndex::new(index));
@@ -231,6 +234,7 @@ pub fn execute_graph<F>(state: &SharedState,
                 }
             });
         }
+        drop(tx_result);
         // Run all tasks.
         let mut count: usize = 0;
         let result = execute_until_failed(&graph, tx_task, &rx_result, &mut count, &update_progress);
@@ -257,5 +261,75 @@ fn execute_compiler(state: &SharedState, task: &BuildTask) -> Result<OutputInfo,
             state.wrap_slow(|| command.to_command().args(args).output().map(|o| OutputInfo::new(o)))
         }
         &BuildAction::Compilation(ref toolchain, ref task) => toolchain.compile_task(state, task.clone()),
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    use ::compiler::SharedState;
+    use ::config::Config;
+
+    use std::sync::{Arc, Mutex};
+
+    #[test]
+    fn test_execute_graph_empty() {
+        let state = SharedState::new(&Config::defaults().unwrap());
+        let graph = BuildGraph::new();
+        execute_graph(&state, graph, 2, |_| {
+                assert!(false);
+                Ok(())
+            })
+            .unwrap();
+    }
+
+    #[test]
+    fn test_execute_graph_single() {
+        let state = SharedState::new(&Config::defaults().unwrap());
+
+        // Simple two tasks graph
+        let mut graph = BuildGraph::new();
+        graph.add_node(Arc::new(BuildTask {
+            title: "task 1".to_string(),
+            action: BuildAction::Empty,
+        }));
+
+        let result = Mutex::new(Vec::new());
+        execute_graph(&state, graph, 4, |r| {
+                result.lock().unwrap().push(r.task.title.clone());
+                Ok(())
+            })
+            .unwrap();
+
+        let actual: Vec<String> = result.lock().unwrap().clone();
+        assert_eq!(actual, vec!["task 1".to_string()]);
+    }
+    // Test for #19 issue (https://github.com/bozaro/octobuild/issues/19)
+    #[test]
+    fn test_execute_graph_no_hang() {
+        let state = SharedState::new(&Config::defaults().unwrap());
+
+        // Simple two tasks graph
+        let mut graph = BuildGraph::new();
+        let t1 = graph.add_node(Arc::new(BuildTask {
+            title: "task 1".to_string(),
+            action: BuildAction::Empty,
+        }));
+        let t2 = graph.add_node(Arc::new(BuildTask {
+            title: "task 2".to_string(),
+            action: BuildAction::Empty,
+        }));
+        graph.add_edge(t2, t1, ());
+
+        let result = Mutex::new(Vec::new());
+        execute_graph(&state, graph, 4, |r| {
+                result.lock().unwrap().push(r.task.title.clone());
+                Ok(())
+            })
+            .unwrap();
+
+        let actual: Vec<String> = result.lock().unwrap().clone();
+        assert_eq!(actual, vec!["task 1".to_string(), "task 2".to_string()]);
     }
 }
