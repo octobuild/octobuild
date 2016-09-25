@@ -1,11 +1,18 @@
 [package]
 name = "octobuild"
 build = "src/build.rs"
-version = "0.1.13"
+version = "0.1.14"
 authors = [ "Artem V. Navrotskiy <bozaro@users.noreply.github.com>" ]
 
 [profile.bench]
 debug = true
+
+[profile.release]
+panic = "abort"
+debug = true
+
+[[bin]]
+name = "octo_builder"
 
 [[bin]]
 name = "octo_cl"
@@ -14,23 +21,50 @@ name = "octo_cl"
 name = "octo_clang"
 
 [[bin]]
+name = "octo_coordinator"
+
+[[bin]]
 name = "xgConsole"
 
+[[bin]]
+name = "filter_cl"
+
 [build-dependencies]
+capnpc = "0.7.2"
 rustc_version = "0.1.7"
 
 [dependencies]
-yaml-rust = "0.3.2"
+yaml-rust = "0.3.3"
 filetime = "0.1.10"
-lz4 = "1.16.131"
-libc = "0.2.11"
+lz4 = "1.18.131"
+libc = "0.2.12"
 petgraph = "0.2.7"
-xml-rs = "0.3.2"
+xml-rs = "0.3.4"
 rand = "0.3.14"
-uuid = { version = "0.2.2", features = ["v4"] }
+uuid = { version = "0.3.1", features = ["v4"] }
 tempdir = "0.3.4"
-num_cpus = "0.2.12"
-regex = "0.1.69"
+num_cpus = "1.0.0"
+regex = "0.1.71"
 lazy_static = "0.2.1"
+clap = "2.11.0"
+crossbeam = "0.2.10"
+
+byteorder = "0.5.3"
+log = "0.3.6"
+fern = "0.3.5"
+daemon = "0.0.7"
+hyper = { version = "0.9.10", default-features = false, features = [""] }
+nickel = { version = "0.8.1", git = "https://github.com/bozaro/nickel.rs.git", branch = "pr-334" }
+time = "0.1.35"
+rustc-serialize = "0.3.19"
+local-encoding = "0.2.0"
+ipc = { git = "https://github.com/bozaro/ipc-rs.git", rev = "b90057d" }
+
+rust-crypto = { version = "0.2.35", git = "https://github.com/bozaro/rust-crypto.git", branch = "pr-364", default-features = false, features = [""] }
+capnp = "0.7.2"
+
+[target.'cfg(windows)'.dependencies]
+winreg = "0.3.5"
 winapi = "0.2.7"
 kernel32-sys = "0.2.2"
+version-sys = { version = "0.0.1", git = "https://github.com/retep998/winapi-rs.git", rev = "bd08970c" }

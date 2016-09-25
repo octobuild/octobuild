@@ -1,5 +1,10 @@
 # Changes
 
+## 0.1.14:
+
+ * Linux: Add -nostdinc++ to whitelist (fix #17)
+ * VC: Case insensitive precompiled header name lookup
+
 ## 0.1.13
 
  * Linux: Change default cache location from ~/.cache/.octobuild to ~/.cache/octobuild.

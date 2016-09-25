@@ -1,0 +1,5 @@
+!3rd/**
+obj/
+bin/*.dll
+bin/*.pdb
+*.suo

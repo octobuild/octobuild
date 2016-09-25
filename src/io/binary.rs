@@ -1,14 +1,14 @@
-﻿use std::mem;
-use std::io::{Error, ErrorKind, Read, Write, Result};
+use std::mem;
+use std::io::{Error, ErrorKind, Read, Result, Write};
 
 /// Reads a single byte. Returns `Err` on EOF.
 fn read_byte(stream: &mut Read) -> Result<u8> {
-	let mut buf = [0];
-	let size = try! (stream.read(&mut buf));
-	if size <= 0 {
-		return Err(Error::new(ErrorKind::InvalidInput, "Unexpected end of data"));
-	}
-	Ok(buf[0])
+    let mut buf = [0];
+    let size = try!(stream.read(&mut buf));
+    if size <= 0 {
+        return Err(Error::new(ErrorKind::InvalidInput, "Unexpected end of data"));
+    }
+    Ok(buf[0])
 }
 
 /// Reads exactly `len` bytes and gives you back a new vector of length
@@ -26,14 +26,14 @@ pub fn read_exact(stream: &mut Read, len: usize) -> Result<Vec<u8>> {
     unsafe {
         buf.set_len(len);
     }
-    try! (read_array(stream, &mut buf[..]));
+    try!(read_array(stream, &mut buf[..]));
     Ok(buf)
 }
 
 fn read_array(stream: &mut Read, buf: &mut [u8]) -> Result<()> {
     let mut pos = 0;
     while pos < buf.len() {
-        let size = try! (stream.read(&mut buf[pos..]));
+        let size = try!(stream.read(&mut buf[pos..]));
         if size <= 0 {
             return Err(Error::new(ErrorKind::InvalidInput, "Unexpected end of data"));
         }
@@ -66,10 +66,8 @@ pub fn read_u8(stream: &mut Read) -> Result<u8> {
 #[inline]
 pub fn read_u64(stream: &mut Read) -> Result<u64> {
     let mut buf: [u8; 8] = [0; 8];
-    try! (read_array(stream, &mut buf));
-    Ok(unsafe { 
-        mem::transmute_copy::<_, u64>(&buf)
-    })
+    try!(read_array(stream, &mut buf));
+    Ok(unsafe { mem::transmute_copy::<_, u64>(&buf) })
 }
 
 #[inline]
