@@ -112,18 +112,7 @@ done
       }
 
       stage ("$stageName: Installer") {
-        sh "7z x -y -otarget/wixsharp/ .jenkins/distrib/WixSharp.1.0.35.0.7z"
-        withEnv([
-          'WIXSHARP_DIR=Z:$WORKSPACE/target/wixsharp',
-          'WIXSHARP_WIXDIR=Z:$WORKSPACE/target/wixsharp/Wix_bin/bin',
-        ]) {
-          sh """
-export WORKSPACE="`pwd`"
-export WIXSHARP_DIR="Z:\$WORKSPACE/target/wixsharp"
-export WIXSHARP_WIXDIR="Z:\$WORKSPACE/target/wixsharp/Wix_bin/bin"
-wine target/wixsharp/cscs.exe wixcs/setup.cs
-"""
-        }
+        sh "./installer-msi.sh"
         withCredentials([[$class: 'FileBinding', credentialsId: '54b693ef-b304-4d3d-a53b-6efd64dd76f4', variable: 'PEM_FILE']]) {
           sh """
 for i in target/*.msi; do
