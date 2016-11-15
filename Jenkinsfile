@@ -14,7 +14,7 @@ export WINEPREFIX=$HOME/.wine-i686/
 winetricks dotnet40
 wine reg add "HKLM\\Software\\Microsoft\\Windows NT\\CurrentVersion\\ProfileList\\S-1-5-21-0-0-0-1000"
 */
-rustVersion = "1.11.0"
+rustVersion = "1.13.0"
 
 def TAG_NAME = getParameter("TAG_NAME")
 if (TAG_NAME != null) {
