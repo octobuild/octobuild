@@ -30,7 +30,7 @@ name = "xgConsole"
 name = "filter_cl"
 
 [build-dependencies]
-capnpc = "0.7.2"
+capnpc = "0.7.4"
 rustc_version = "0.1.7"
 
 [dependencies]
@@ -61,7 +61,7 @@ local-encoding = "0.2.0"
 ipc = { git = "https://github.com/bozaro/ipc-rs.git", rev = "b90057d" }
 
 rust-crypto = { version = "0.2.35", git = "https://github.com/bozaro/rust-crypto.git", branch = "pr-364", default-features = false, features = [""] }
-capnp = "0.7.2"
+capnp = "0.7.4"
 
 [target.'cfg(windows)'.dependencies]
 winreg = "0.3.5"
