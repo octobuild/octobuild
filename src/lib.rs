@@ -68,8 +68,5 @@ pub mod cmd {
     pub mod unix;
     pub mod native;
 }
-pub mod filter {
-    pub mod comments;
-}
 pub mod simple;
 pub mod worker;
