@@ -62,7 +62,10 @@ REVISION={revision}
 }
 
 fn main() {
-    capnpc::compile(&Path::new("schema"), &[Path::new("src/schema/builder.capnp")]).unwrap();
+    capnpc::CompilerCommand::new()
+        .src_prefix("src/schema")
+        .file("src/schema/builder.capnp")
+        .run().unwrap();
     save_platform().unwrap();
     save_version().unwrap();
     save_control().unwrap();

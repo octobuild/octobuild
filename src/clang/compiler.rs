@@ -1,6 +1,5 @@
 pub use super::super::compiler::*;
 
-use super::super::filter::comments::CommentsRemover;
 use super::super::io::memstream::MemStream;
 use super::super::lazy::Lazy;
 
@@ -253,7 +252,7 @@ fn execute(command: &mut Command) -> Result<PreprocessResult, Error> {
     }
 
     let rx_err = read_stderr(child.stderr.take());
-    let stdout = read_stdout(child.stdout.take().map(|f| CommentsRemover::new(f)));
+    let stdout = read_stdout(child.stdout.take());
     let status = try!(child.wait());
     let stderr = bytes(rx_err);
 

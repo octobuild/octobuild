@@ -1,7 +1,7 @@
 [package]
 name = "octobuild"
 build = "src/build.rs"
-version = "0.1.14"
+version = "0.1.15"
 authors = [ "Artem V. Navrotskiy <bozaro@users.noreply.github.com>" ]
 
 [profile.bench]
@@ -30,13 +30,13 @@ name = "xgConsole"
 name = "filter_cl"
 
 [build-dependencies]
-capnpc = "0.7.2"
+capnpc = "0.7.4"
 rustc_version = "0.1.7"
 
 [dependencies]
 yaml-rust = "0.3.3"
 filetime = "0.1.10"
-lz4 = "1.18.131"
+lz4 = "1.20.0"
 libc = "0.2.12"
 petgraph = "0.2.7"
 xml-rs = "0.3.4"
@@ -61,7 +61,7 @@ local-encoding = "0.2.0"
 ipc = { git = "https://github.com/bozaro/ipc-rs.git", rev = "b90057d" }
 
 rust-crypto = { version = "0.2.35", git = "https://github.com/bozaro/rust-crypto.git", branch = "pr-364", default-features = false, features = [""] }
-capnp = "0.7.2"
+capnp = "0.7.4"
 
 [target.'cfg(windows)'.dependencies]
 winreg = "0.3.5"
