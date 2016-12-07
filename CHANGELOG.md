@@ -1,5 +1,13 @@
 # Changes
 
+## 0.1.15:
+
+ * Clang: Feature "remove comments from clang preprocessed output" is removed
+   from Octobuild as unsafe (fix #23).
+
+   To increase cache hit on Unreal Engine build please patch UE4
+   like https://github.com/EpicGames/UnrealEngine/pull/3014
+
 ## 0.1.14:
 
  * Linux: Add -nostdinc++ to whitelist (fix #17)

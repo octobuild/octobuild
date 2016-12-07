@@ -66,4 +66,5 @@ This project require some patches for Unreal Engine:
  * [#1789](https://github.com/EpicGames/UnrealEngine/pull/1789) Allow use xgConsole on Linux (merged to 4.11)
  * [#1825](https://github.com/EpicGames/UnrealEngine/pull/1825) Don't disable XGE for building UnrealHeaderTool (merged to 4.12)
  * [#1959](https://github.com/EpicGames/UnrealEngine/pull/1959) Fix redistributable build on Windows for UE 4.11 (merged to 4.12)
- * [#2144](https://github.com/EpicGames/UnrealEngine/pull/2144) Enable xgConsole octobuild implementation in AutomationTool
+ * [#2144](https://github.com/EpicGames/UnrealEngine/pull/2144) Enable xgConsole octobuild implementation in AutomationTool (merged to 4.14)
+ * [#3014](https://github.com/EpicGames/UnrealEngine/pull/3014) Increase cache hit by removing timestamp from generated filed
