@@ -36,7 +36,7 @@ rustc_version = "0.1.7"
 [dependencies]
 yaml-rust = "0.3.3"
 filetime = "0.1.10"
-lz4 = "1.18.131"
+lz4 = "1.20.0"
 libc = "0.2.12"
 petgraph = "0.2.7"
 xml-rs = "0.3.4"
