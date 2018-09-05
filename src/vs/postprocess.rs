@@ -5,7 +5,6 @@ use std::fmt::{Display, Formatter};
 use std::io::{Error, ErrorKind, Read, Write};
 use std::ptr;
 use std::slice;
-use std::ascii::AsciiExt;
 
 #[derive(Clone, Copy, Debug)]
 pub enum PostprocessError {

@@ -91,7 +91,7 @@ impl CompileResponse {
                 let (output, content) = try!(OutputInfo::read(try!(reader)));
                 CompileResponse::Success(output, content)
             }
-            compile_response::Which::Error(reader) => {
+            compile_response::Which::Error(_reader) => {
                 // todo: Need good error transfer.
                 CompileResponse::Err(io::Error::new(io::ErrorKind::Other, "oh no!"))
             }
@@ -103,7 +103,7 @@ impl CompileResponse {
             &CompileResponse::Success(ref success, ref content) => {
                 success.write(builder.borrow().init_success(), content)
             }
-            &CompileResponse::Err(ref err) => {
+            &CompileResponse::Err(ref _err) => {
                 builder.borrow().init_error();
             }
         }

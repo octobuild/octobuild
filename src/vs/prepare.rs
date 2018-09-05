@@ -1,7 +1,6 @@
 use local_encoding::{Encoder, Encoding};
 
 use std::iter::FromIterator;
-use std::ascii::AsciiExt;
 use std::fs::File;
 use std::io::{Error, ErrorKind, Read};
 use std::path::{Path, PathBuf};

@@ -69,7 +69,7 @@ impl MemStream {
             if dst_offset == 0 {
                 self.blocks.push_back(unsafe { mem::uninitialized() });
             };
-            let mut block = self.blocks.back_mut().unwrap();
+            let block = self.blocks.back_mut().unwrap();
             let copy_size = min(buf.len() - src_offset, BLOCK_SIZE - dst_offset);
             memcpy(&buf[src_offset..src_offset + copy_size],
                    &mut block[dst_offset..dst_offset + copy_size]);

@@ -1,6 +1,5 @@
 use std::iter::FromIterator;
 use std::slice::Iter;
-use std::ascii::AsciiExt;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 

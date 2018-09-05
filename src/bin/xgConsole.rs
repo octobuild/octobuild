@@ -1,7 +1,6 @@
 extern crate octobuild;
 extern crate petgraph;
 extern crate regex;
-#[macro_use]
 extern crate log;
 #[macro_use]
 extern crate lazy_static;
