@@ -53,14 +53,14 @@ byteorder = "0.5.3"
 log = "0.3.6"
 fern = "0.3.5"
 daemon = "0.0.7"
-hyper = { version = "0.9.10", default-features = false, features = [""] }
-nickel = { version = "0.8.1", git = "https://github.com/bozaro/nickel.rs.git", branch = "pr-334" }
+hyper = { version = "0.10", default-features = false }
+nickel = "0.10.1"
 time = "0.1.35"
 rustc-serialize = "0.3.19"
 local-encoding = "0.2.0"
-ipc = { git = "https://github.com/bozaro/ipc-rs.git", rev = "b90057d" }
+ipc = { git = "https://github.com/alexcrichton/ipc-rs" }
 
-rust-crypto = { version = "0.2.35", git = "https://github.com/bozaro/rust-crypto.git", branch = "pr-364", default-features = false, features = [""] }
+rust-crypto = { version = "0.2.35", git = "https://github.com/bozaro/rust-crypto.git", branch = "pr-364", default-features = false }
 capnp = "0.7.4"
 
 [target.'cfg(windows)'.dependencies]

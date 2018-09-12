@@ -3,7 +3,6 @@ extern crate daemon;
 extern crate fern;
 extern crate time;
 extern crate rustc_serialize;
-#[macro_use]
 extern crate nickel;
 #[macro_use]
 extern crate log;
