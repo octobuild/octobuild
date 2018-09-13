@@ -296,7 +296,9 @@ fn vs_identifier(path: &Path) -> Option<String> {
     extern crate kernel32;
     extern crate version;
 
-    use winapi::*;
+    use winapi::shared::minwindef::{ DWORD, LPCVOID, LPVOID, WORD };
+    use winapi::ctypes::c_void;
+
     use std::convert::Into;
     use std::ffi::OsStr;
     use std::ptr;
