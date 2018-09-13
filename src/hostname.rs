@@ -4,7 +4,9 @@ pub fn get_host_name() -> Result<String, ()> {
 
 #[cfg(windows)]
 fn get_host_name_native() -> Result<String, ()> {
-    extern crate winapi;
+
+    use winapi::shared::minwindef::{ DWORD, FALSE };
+
     extern crate kernel32;
 
     const MAX_COMPUTERNAME_LENGTH: usize = 31;
@@ -14,8 +16,8 @@ fn get_host_name_native() -> Result<String, ()> {
         let capacity = buf.capacity();
         buf.set_len(capacity);
 
-        let mut len: winapi::DWORD = buf.capacity() as winapi::DWORD - 1;
-        if kernel32::GetComputerNameW(buf.as_mut_ptr(), &mut len as *mut winapi::DWORD) == winapi::FALSE {
+        let mut len: DWORD = buf.capacity() as DWORD - 1;
+        if kernel32::GetComputerNameW(buf.as_mut_ptr(), &mut len as *mut DWORD) == FALSE {
             return Err(());
         }
         buf.set_len(len as usize);
