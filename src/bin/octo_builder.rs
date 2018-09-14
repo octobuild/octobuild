@@ -2,6 +2,7 @@ extern crate capnp;
 extern crate crypto;
 extern crate daemon;
 extern crate fern;
+extern crate hostname;
 extern crate hyper;
 extern crate nickel;
 extern crate octobuild;
@@ -397,7 +398,7 @@ impl Drop for BuilderService {
 }
 
 fn get_name() -> String {
-    octobuild::hostname::get_host_name().unwrap()
+    hostname::get_hostname().unwrap()
 }
 
 fn main() {

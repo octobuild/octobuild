@@ -34,6 +34,7 @@ capnpc = "0.7.4"
 rustc_version = "0.1.7"
 
 [dependencies]
+hostname = "0.1"
 yaml-rust = "0.3.3"
 filetime = "0.1.10"
 lz4 = "1.20.0"

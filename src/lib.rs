@@ -38,7 +38,6 @@ pub mod cluster {
 }
 pub mod compiler;
 pub mod config;
-pub mod hostname;
 pub mod lazy;
 pub mod utils;
 pub mod version;
