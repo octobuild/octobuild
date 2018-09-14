@@ -4,7 +4,6 @@ extern crate yaml_rust;
 
 use hyper::Url;
 
-use std::collections::BTreeMap;
 use std::env;
 use std::error::Error;
 use std::fs::File;
@@ -14,6 +13,7 @@ use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4, ToSocketAddrs};
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 
+use self::yaml_rust::yaml::Hash;
 use self::yaml_rust::{Yaml, YamlEmitter, YamlLoader};
 
 pub struct Config {
@@ -105,7 +105,7 @@ impl Config {
     fn show(&self) {
         let mut content = String::new();
 
-        let mut y = BTreeMap::new();
+        let mut y = Hash::new();
         y.insert(
             Yaml::String(PARAM_PROCESS_LIMIT.to_string()),
             Yaml::Integer(self.process_limit as i64),

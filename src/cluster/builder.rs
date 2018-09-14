@@ -59,9 +59,9 @@ impl CompileRequest {
         builder.set_toolchain(&self.toolchain);
         builder.set_preprocessed_data(&self.preprocessed_data);
         {
-            let mut args = builder.borrow().init_args(self.args.len() as u32);
+            let mut args = builder.reborrow().init_args(self.args.len() as u32);
             for index in 0..self.args.len() {
-                args.borrow().set(index as u32, &self.args.get(index).unwrap());
+                args.reborrow().set(index as u32, &self.args.get(index).unwrap());
             }
         }
         match self.precompiled_hash {
@@ -104,10 +104,10 @@ impl CompileResponse {
     pub fn write(&self, mut builder: compile_response::Builder) {
         match self {
             &CompileResponse::Success(ref success, ref content) => {
-                success.write(builder.borrow().init_success(), content)
+                success.write(builder.reborrow().init_success(), content)
             }
             &CompileResponse::Err(ref _err) => {
-                builder.borrow().init_error();
+                builder.reborrow().init_error();
             }
         }
     }

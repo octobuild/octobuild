@@ -428,7 +428,7 @@ fn prepare_output(line: &[u8], mut buffer: Vec<u8>, success: bool) -> Vec<u8> {
         lazy_static! {
             static ref RE: Regex = Regex::new(r"(?m)^\S+[^:]*\(\d+\) : warning C4628: .*$\n?").unwrap();
         }
-        buffer = RE.replace_all(&buffer, NoExpand(b""))
+        buffer = RE.replace_all(&buffer, NoExpand(b"")).to_vec()
     }
     buffer
 }

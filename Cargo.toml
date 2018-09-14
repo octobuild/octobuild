@@ -30,40 +30,40 @@ name = "xgConsole"
 name = "filter_cl"
 
 [build-dependencies]
-capnpc = "0.7.4"
-rustc_version = "0.1.7"
+capnpc = "0.9"
+rustc_version = "0.2"
 
 [dependencies]
 dirs= "1.0"
 hostname = "0.1"
-yaml-rust = "0.3.3"
-filetime = "0.1.10"
-lz4 = "1.20.0"
-libc = "0.2.12"
-petgraph = "0.2.7"
-xml-rs = "0.3.4"
-rand = "0.3.14"
-uuid = { version = "0.3.1", features = ["v4"] }
+yaml-rust = "0.4"
+filetime = "0.2"
+lz4 = "1.23.0"
+libc = "0.2"
+petgraph = "0.4"
+xml-rs = "0.8"
+rand = "0.5"
+uuid = { version = "0.7", features = ["v4"] }
 tempdir = "0.3.4"
-num_cpus = "1.0.0"
-regex = "0.1.71"
-lazy_static = "0.2.1"
+num_cpus = "1.8.0"
+regex = "1.0"
+lazy_static = "1.1"
 clap = "2.11.0"
-crossbeam = "0.2.10"
+crossbeam = "0.4"
 
-byteorder = "0.5.3"
-log = "0.3.6"
-fern = "0.3.5"
+byteorder = "1.2"
+log = "0.4"
+fern = "0.5"
 daemon = "0.0.8"
 hyper = { version = "0.10", default-features = false }
 nickel = "0.10.1"
-time = "0.1.35"
+time = "0.1"
 rustc-serialize = "0.3.19"
 local-encoding = "0.2.0"
 ipc = { git = "https://github.com/alexcrichton/ipc-rs" }
 
 rust-crypto = { version = "0.2.35", git = "https://github.com/bozaro/rust-crypto.git", branch = "pr-364", default-features = false }
-capnp = "0.7.4"
+capnp = "0.9"
 
 [target.'cfg(windows)'.dependencies]
 winreg = "0.5"

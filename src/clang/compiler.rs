@@ -40,7 +40,7 @@ struct ClangToolchain {
 impl ClangToolchain {
     pub fn new(path: PathBuf) -> Self {
         ClangToolchain {
-            path: path,
+            path,
             identifier: Lazy::new(),
         }
     }
@@ -174,7 +174,7 @@ impl Toolchain for ClangToolchain {
                 .stderr(Stdio::piped())
                 .spawn()
                 .and_then(|mut child| {
-                    try!(task.preprocessed.copy(child.stdin.as_mut().unwrap()));
+                    task.preprocessed.copy(child.stdin.as_mut().unwrap())?;
                     let _ = task.preprocessed;
                     child.wait_with_output()
                 }).map(|o| OutputInfo::new(o))
@@ -187,45 +187,32 @@ fn clang_parse_version(base_name: &str, stdout: &str) -> Option<String> {
         static ref RE: Regex = Regex::new(r"^.*clang.*?\((\S+)\).*\nTarget:\s*(\S+)").unwrap();
     }
 
-    RE.captures_iter(&stdout).next().and_then(|cap| {
-        Some(format!(
-            "{} {} {}",
-            base_name,
-            cap.at(1).unwrap_or(""),
-            cap.at(2).unwrap_or("")
-        ))
-    })
+    let cap: regex::Captures = RE.captures_iter(&stdout).next()?;
+    let version = cap.get(1)?.as_str();
+    let target = cap.get(2)?.as_str();
+
+    Some(format!("{} {} {}", base_name, version, target))
 }
 
 fn clang_identifier(clang: &Path) -> Option<String> {
-    clang
-        .file_name()
-        .and_then(|file_name| {
-            RE_CLANG
-                .captures_iter(file_name.to_string_lossy().as_bytes())
-                .next()
-                .and_then(|cap| cap.at(1))
-                .map(|base_name| String::from_utf8_lossy(base_name).into_owned())
-        }).and_then(|base_name| {
-            Command::new(clang.as_os_str())
-                .arg("--version")
-                .output()
-                .ok()
-                .and_then(|output| match output.status.success() {
-                    true => Some(String::from_utf8_lossy(&output.stdout).to_string()),
-                    false => None,
-                }).and_then(|stdout| clang_parse_version(&base_name, &stdout))
-        })
+    let filename = clang.file_name()?.to_string_lossy();
+    let cap: regex::bytes::Captures = RE_CLANG.captures_iter(filename.as_bytes()).next()?;
+    let base_name = String::from_utf8_lossy(cap.get(1)?.as_bytes()).into_owned();
+    let output = Command::new(clang.as_os_str()).arg("--version").output().ok()?;
+
+    if !output.status.success() {
+        return None;
+    }
+
+    clang_parse_version(&base_name, &String::from_utf8_lossy(&output.stdout).to_string())
 }
 
 fn execute(command: &mut Command) -> Result<PreprocessResult, Error> {
-    let mut child = try!(
-        command
-            .stdin(Stdio::piped())
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped())
-            .spawn()
-    );
+    let mut child = command
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()?;
     drop(child.stdin.take());
 
     fn read_stdout<T: Read>(stream: Option<T>) -> MemStream {
@@ -257,7 +244,7 @@ fn execute(command: &mut Command) -> Result<PreprocessResult, Error> {
 
     let rx_err = read_stderr(child.stderr.take());
     let stdout = read_stdout(child.stdout.take());
-    let status = try!(child.wait());
+    let status = child.wait()?;
     let stderr = bytes(rx_err);
 
     if status.success() {
@@ -266,7 +253,7 @@ fn execute(command: &mut Command) -> Result<PreprocessResult, Error> {
         Ok(PreprocessResult::Failed(OutputInfo {
             status: status.code(),
             stdout: Vec::new(),
-            stderr: stderr,
+            stderr,
         }))
     }
 }
@@ -281,7 +268,7 @@ mod test {
                 r#"Ubuntu clang version 3.5.0-4ubuntu2~trusty2 (tags/RELEASE_350/final) (based on LLVM 3.5.0)
 Target: x86_64-pc-linux-gnu
 Thread model: posix
-"#
+"#,
             ),
             Some("prefix tags/RELEASE_350/final x86_64-pc-linux-gnu".to_string())
         )
@@ -295,7 +282,7 @@ Thread model: posix
                 r#"Ubuntu clang version 3.6.0-2ubuntu1~trusty1 (tags/RELEASE_360/final) (based on LLVM 3.6.0)
 Target: x86_64-pc-linux-gnu
 Thread model: posix
-"#
+"#,
             ),
             Some("prefix tags/RELEASE_360/final x86_64-pc-linux-gnu".to_string())
         )
@@ -309,7 +296,7 @@ Thread model: posix
                 r#"Ubuntu clang version 3.5.2-3ubuntu1 (tags/RELEASE_352/final) (based on LLVM 3.5.2)
 Target: x86_64-pc-linux-gnu
 Thread model: posix
-"#
+"#,
             ),
             Some("prefix tags/RELEASE_352/final x86_64-pc-linux-gnu".to_string())
         )
@@ -323,7 +310,7 @@ Thread model: posix
                 r#"Ubuntu clang version 3.6.2-3ubuntu2 (tags/RELEASE_362/final) (based on LLVM 3.6.2)
 Target: x86_64-pc-linux-gnu
 Thread model: posix
-"#
+"#,
             ),
             Some("prefix tags/RELEASE_362/final x86_64-pc-linux-gnu".to_string())
         )
@@ -337,7 +324,7 @@ Thread model: posix
                 r#"Ubuntu clang version 3.7.1-2ubuntu2 (tags/RELEASE_371/final) (based on LLVM 3.7.1)
 Target: x86_64-pc-linux-gnu
 Thread model: posix
-"#
+"#,
             ),
             Some("prefix tags/RELEASE_371/final x86_64-pc-linux-gnu".to_string())
         )
@@ -352,7 +339,7 @@ Thread model: posix
 Target: x86_64-pc-linux-gnu
 Thread model: posix
 InstalledDir: /usr/bin
-"#
+"#,
             ),
             Some("prefix tags/RELEASE_380/final x86_64-pc-linux-gnu".to_string())
         )
