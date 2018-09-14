@@ -77,7 +77,7 @@ fn expand_files(mut files: Vec<PathBuf>, arg: &str) -> Vec<PathBuf> {
         let mut begin = 0;
         result.push_str("^");
         for (index, separator) in mask.match_indices(|c| c == '?' || c == '*') {
-            result.push_str(&regex::quote(&mask[begin..index]));
+            result.push_str(&regex::escape(&mask[begin..index]));
             result.push_str(match separator {
                 "?" => ".",
                 "*" => ".*",
@@ -85,7 +85,7 @@ fn expand_files(mut files: Vec<PathBuf>, arg: &str) -> Vec<PathBuf> {
             });
             begin = index + separator.len()
         }
-        result.push_str(&regex::quote(&mask[begin..]));
+        result.push_str(&regex::escape(&mask[begin..]));
         result.push_str("$");
         return Regex::new(&result).unwrap();
     }
