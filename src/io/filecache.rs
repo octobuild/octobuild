@@ -124,7 +124,7 @@ fn find_cache_files(dir: &Path, mut files: Vec<CacheFile>) -> Result<Vec<CacheFi
             files = r?;
         } else {
             files.push(CacheFile {
-                path: path,
+                path,
                 size: stat.len(),
                 accessed: FileTime::from_last_modification_time(&stat),
             });
@@ -272,7 +272,7 @@ fn read_output(stream: &mut Read) -> Result<OutputInfo, Error> {
     let stderr = read_blob(stream)?;
     Ok(OutputInfo {
         status: Some(0),
-        stdout: stdout,
-        stderr: stderr,
+        stdout,
+        stderr,
     })
 }

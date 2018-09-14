@@ -93,12 +93,12 @@ impl Config {
         }).unwrap_or_else(|| SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::new(0, 0, 0, 0), 3000)));
 
         Ok(Config {
-            process_limit: process_limit,
+            process_limit,
             cache_dir: replace_home(&cache_path)?,
-            cache_limit_mb: cache_limit_mb,
-            coordinator: coordinator,
-            helper_bind: helper_bind,
-            coordinator_bind: coordinator_bind,
+            cache_limit_mb,
+            coordinator,
+            helper_bind,
+            coordinator_bind,
         })
     }
 

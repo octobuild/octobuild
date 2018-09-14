@@ -184,7 +184,7 @@ fn parse_environment<R: Read>(events: &mut EventReader<R>) -> Result<XgEnvironme
     }
     Ok(XgEnvironment {
         variables: Arc::new(variables),
-        tools: tools,
+        tools,
     })
 }
 
@@ -262,7 +262,7 @@ fn parse_tasks<R: Read>(events: &mut EventReader<R>) -> Result<HashMap<String, X
                             name.clone(),
                             XgTask {
                                 title: attrs.remove("Caption"),
-                                tool: tool,
+                                tool,
                                 working_dir: Path::new(&working_dir).to_path_buf(),
                                 depends_on: depends_on.into_iter().collect::<Vec<String>>(),
                             },

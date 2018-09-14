@@ -87,7 +87,7 @@ impl FileHasher for Cache {
                     }
                 };
                 Ok(FileHash {
-                    hash: hash,
+                    hash,
                     size: stat.len(),
                     modified: FileTime::from_last_modification_time(&stat),
                 })

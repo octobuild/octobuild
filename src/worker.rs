@@ -56,7 +56,7 @@ impl<'a> BuildResult<'a> {
             task: &message.task,
             result: &message.result,
             completed: *completed,
-            total: total,
+            total,
         }
     }
 }
@@ -143,7 +143,7 @@ where
     for index in graph.externals(EdgeDirection::Outgoing) {
         tx_task
             .send(TaskMessage {
-                index: index,
+                index,
                 task: graph.node_weight(index).unwrap().clone(),
             }).map_err(|e| Error::new(ErrorKind::Other, e))?;
     }
@@ -207,7 +207,7 @@ where
             completed: 1,
             total: 1,
             result: &result,
-            task: task,
+            task,
         })?;
         return result.map(|output| output.status);
     }

@@ -90,7 +90,7 @@ impl<C: Compiler> Compiler for RemoteCompiler<C> {
         self.local.resolve_toolchain(command).map(|local| -> Arc<Toolchain> {
             Arc::new(RemoteToolchain {
                 shared: self.shared.clone(),
-                local: local,
+                local,
             })
         })
     }

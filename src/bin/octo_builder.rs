@@ -120,7 +120,7 @@ impl BuilderService {
                 done.clone(),
                 listener.socket(),
             )),
-            done: done,
+            done,
             listener: Some(listener),
         }
     }

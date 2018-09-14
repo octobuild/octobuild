@@ -193,7 +193,7 @@ fn prepare_graph<C: Compiler>(compiler: &C, graph: XgGraph) -> Result<BuildGraph
             for action in actions.into_iter() {
                 let action_node = result.add_node(Arc::new(BuildTask {
                     title: format!("{} ({}/{})", node.title, index, total),
-                    action: action,
+                    action,
                 }));
                 depends.push(node_index);
                 result.add_edge(group_node, action_node, ());

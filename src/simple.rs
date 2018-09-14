@@ -70,7 +70,7 @@ where
     for action in actions.into_iter() {
         build_graph.add_node(Arc::new(BuildTask {
             title: action.title().into_owned(),
-            action: action,
+            action,
         }));
     }
     let result = execute_graph(state, build_graph, config.process_limit, print_task_result);

@@ -125,8 +125,8 @@ pub fn create_tasks(command: CommandInfo, args: &[String]) -> Result<Vec<Compila
                 args: parsed_args,
                 input_precompiled: input_precompiled.map(|path| command.current_dir_join(&path)),
                 output_precompiled: output_precompiled.map(|path| command.current_dir_join(&path)),
-                marker_precompiled: marker_precompiled,
-                command: command,
+                marker_precompiled,
+                command,
             });
             input_sources
                 .into_iter()
@@ -154,7 +154,7 @@ pub fn create_tasks(command: CommandInfo, args: &[String]) -> Result<Vec<Compila
                                 )
                             })?,
                         output_object: get_output_object(&input_source, &output_object)?,
-                        input_source: input_source,
+                        input_source,
                     })
                 }).collect()
         })
