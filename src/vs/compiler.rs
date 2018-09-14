@@ -294,10 +294,9 @@ fn vs_identifier(_: &Path) -> Option<String> {
 
 #[cfg(windows)]
 fn vs_identifier(path: &Path) -> Option<String> {
-    extern crate version;
-
     use winapi::ctypes::c_void;
     use winapi::shared::minwindef::{DWORD, LPCVOID, LPVOID, WORD};
+    use winapi::um::winver;
 
     use std::convert::Into;
     use std::ffi::OsStr;
@@ -317,7 +316,7 @@ fn vs_identifier(path: &Path) -> Option<String> {
 
     let path_raw = utf16(path.as_os_str());
     // Get version info size
-    let size = unsafe { version::GetFileVersionInfoSizeW(path_raw.as_ptr(), ptr::null_mut()) };
+    let size = unsafe { winver::GetFileVersionInfoSizeW(path_raw.as_ptr(), ptr::null_mut()) };
     if size == 0 {
         return None;
     }
@@ -325,7 +324,7 @@ fn vs_identifier(path: &Path) -> Option<String> {
     let mut data: Vec<u8> = Vec::with_capacity(size as usize);
     unsafe {
         data.set_len(size as usize);
-        if version::GetFileVersionInfoW(path_raw.as_ptr(), 0, size, data.as_mut_ptr() as *mut c_void) == 0 {
+        if winver::GetFileVersionInfoW(path_raw.as_ptr(), 0, size, data.as_mut_ptr() as *mut c_void) == 0 {
             return None;
         }
     }
@@ -333,7 +332,7 @@ fn vs_identifier(path: &Path) -> Option<String> {
     let translation_key = unsafe {
         let mut value_size: DWORD = 0;
         let mut value_data: LPVOID = ptr::null_mut();
-        if version::VerQueryValueW(
+        if winver::VerQueryValueW(
             data.as_ptr() as LPCVOID,
             utf16(OsStr::new("\\VarFileInfo\\Translation")).as_ptr(),
             &mut value_data,
@@ -353,7 +352,7 @@ fn vs_identifier(path: &Path) -> Option<String> {
     let product_version = unsafe {
         let mut value_size: DWORD = 0;
         let mut value_data: LPVOID = ptr::null_mut();
-        if version::VerQueryValueW(
+        if winver::VerQueryValueW(
             data.as_ptr() as LPCVOID,
             utf16(OsStr::new(&(translation_key + "\\ProductVersion"))).as_ptr(),
             &mut value_data,
