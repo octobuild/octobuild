@@ -1,3 +1,4 @@
+extern crate dirs;
 extern crate num_cpus;
 extern crate yaml_rust;
 
@@ -192,7 +193,7 @@ fn load_config<P: AsRef<Path>>(path: P) -> Result<Yaml> {
 }
 
 fn get_local_config_path() -> Option<PathBuf> {
-    env::home_dir().map(|v| v.join(&(".".to_string() + CONFIG_FILE_NAME)))
+    dirs::home_dir().map(|v| v.join(&(".".to_string() + CONFIG_FILE_NAME)))
 }
 
 #[cfg(windows)]
@@ -209,7 +210,7 @@ fn get_global_config_path() -> Option<PathBuf> {
 
 fn replace_home(path: &str) -> Result<PathBuf> {
     if path.starts_with("~/") {
-        env::home_dir()
+        dirs::home_dir()
             .map(|v| v.join(&path[2..]))
             .ok_or(io::Error::new(ErrorKind::NotFound, "Can't determinate user HOME path"))
     } else {
