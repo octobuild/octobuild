@@ -93,8 +93,8 @@ fn expand_files(mut files: Vec<PathBuf>, arg: &str) -> Vec<PathBuf> {
     fn find_files(dir: &Path, mask: &str) -> Result<Vec<PathBuf>, Error> {
         let mut result = Vec::new();
         let expr = mask_to_regex(&mask.to_lowercase());
-        for entry in try!(fs::read_dir(dir)) {
-            let entry = try!(entry);
+        for entry in fs::read_dir(dir)? {
+            let entry = entry?;
             if entry
                 .file_name()
                 .to_str()
@@ -130,9 +130,9 @@ fn expand_files(mut files: Vec<PathBuf>, arg: &str) -> Vec<PathBuf> {
 }
 
 fn execute(args: &[String]) -> Result<Option<i32>, Error> {
-    let config = try!(Config::new());
+    let config = Config::new()?;
     let state = SharedState::new(&config);
-    let compiler = RemoteCompiler::new(&config.coordinator, supported_compilers(&try!(create_temp_dir())));
+    let compiler = RemoteCompiler::new(&config.coordinator, supported_compilers(&create_temp_dir()?));
     let files = args
         .iter()
         .filter(|a| !is_flag(a))
@@ -143,10 +143,10 @@ fn execute(args: &[String]) -> Result<Option<i32>, Error> {
 
     let mut graph = Graph::new();
     for arg in files.iter() {
-        let file = try!(File::open(&Path::new(arg)));
-        try!(xg::parser::parse(&mut graph, BufReader::new(file)));
+        let file = File::open(&Path::new(arg))?;
+        xg::parser::parse(&mut graph, BufReader::new(file))?;
     }
-    let build_graph = try!(validate_graph(graph).and_then(|graph| prepare_graph(&compiler, graph)));
+    let build_graph = validate_graph(graph).and_then(|graph| prepare_graph(&compiler, graph))?;
 
     let result = execute_graph(&state, build_graph, config.process_limit, print_task_result);
     let _ = state.cache.cleanup();
@@ -222,8 +222,8 @@ fn print_task_result(result: BuildResult) -> Result<(), Error> {
     );
     match result.result {
         &Ok(ref output) => {
-            try!(io::stdout().write_all(&output.stdout));
-            try!(io::stderr().write_all(&output.stderr));
+            io::stdout().write_all(&output.stdout)?;
+            io::stderr().write_all(&output.stderr)?;
         }
         &Err(_) => {}
     }

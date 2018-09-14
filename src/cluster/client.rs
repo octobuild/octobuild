@@ -106,14 +106,12 @@ impl<'a, R: 'a + Read> Read for ReadWrapper<'a, R> {
 
 impl RemoteToolchain {
     fn compile_remote(&self, state: &SharedState, task: &CompileStep) -> Result<CompileResponse, Error> {
-        let name = try!(
-            self.identifier()
-                .ok_or(Error::new(ErrorKind::Other, "Can't get toolchain name"))
-        );
-        let addr = try!(
-            self.remote_endpoint(&name)
-                .ok_or(Error::new(ErrorKind::Other, "Can't find helper for toolchain"))
-        );
+        let name = self
+            .identifier()
+            .ok_or(Error::new(ErrorKind::Other, "Can't get toolchain name"))?;
+        let addr = self
+            .remote_endpoint(&name)
+            .ok_or(Error::new(ErrorKind::Other, "Can't find helper for toolchain"))?;
         if task.output_precompiled.is_some() {
             return Err(Error::new(
                 ErrorKind::Other,
@@ -127,10 +125,10 @@ impl RemoteToolchain {
             toolchain: name.clone(),
             args: task.args.clone(),
             preprocessed_data: (&task.preprocessed).into(),
-            precompiled_hash: try!(self.upload_precompiled(state, &task.input_precompiled, &base_url)),
+            precompiled_hash: self.upload_precompiled(state, &task.input_precompiled, &base_url)?,
         };
         let mut request_payload = Vec::new();
-        try!(request.stream_write(&mut request_payload, &mut message::Builder::new_default()));
+        request.stream_write(&mut request_payload, &mut message::Builder::new_default())?;
         self.shared
             .client
             .post(base_url.join(RPC_BUILDER_TASK).unwrap())
@@ -146,7 +144,7 @@ impl RemoteToolchain {
                     .and_then(|result| {
                         match result {
                             CompileResponse::Success(ref output, ref content) => {
-                                try!(write_output(&task.output_object, output.success(), content));
+                                write_output(&task.output_object, output.success(), content)?;
                             }
                             _ => {}
                         }
@@ -165,34 +163,33 @@ impl RemoteToolchain {
         match precompiled {
             &Some(ref path) => {
                 // Get precompiled header file hash
-                let meta = try!(state.cache.file_hash(&path));
+                let meta = state.cache.file_hash(&path)?;
                 // Check is precompiled header uploaded
                 // todo: this is workaround for https://github.com/hyperium/hyper/issues/838
-                match try!(
-                    self.shared
-                        .client
-                        .head(base_url.join(&format!("{}/{}", RPC_BUILDER_UPLOAD, meta.hash)).unwrap())
-                        .send()
-                        .map(|response| response.status)
-                        .map_err(|e| Error::new(ErrorKind::BrokenPipe, e))
-                ) {
+                match self
+                    .shared
+                    .client
+                    .head(base_url.join(&format!("{}/{}", RPC_BUILDER_UPLOAD, meta.hash)).unwrap())
+                    .send()
+                    .map(|response| response.status)
+                    .map_err(|e| Error::new(ErrorKind::BrokenPipe, e))?
+                {
                     StatusCode::Ok | StatusCode::Accepted => return Ok(Some(meta.hash)),
                     _ => {}
                 }
-                let mut file = try!(File::open(path));
+                let mut file = File::open(path)?;
                 // Upload precompiled header
-                match try!(
-                    self.shared
+                match self.shared
                     .client
                     .post(base_url.join(&format!("{}/{}", RPC_BUILDER_UPLOAD, meta.hash))
                         .unwrap())
-                // todo: this is workaround for https://github.com/hyperium/hyper/issues/838
+                    // todo: this is workaround for https://github.com/hyperium/hyper/issues/838
                     //.header(Expect::Continue)
                     .body(Body::SizedBody(&mut file, meta.size))
                     .send()
                     .map(|response| response.status)
-                    .map_err(|e| Error::new(ErrorKind::BrokenPipe, e))
-                ) {
+                    .map_err(|e| Error::new(ErrorKind::BrokenPipe, e))?
+                {
                     StatusCode::Ok | StatusCode::Accepted => Ok(Some(meta.hash)),
                     status => Err(Error::new(
                         ErrorKind::BrokenPipe,

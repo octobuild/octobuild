@@ -25,8 +25,8 @@ pub enum CompileResponse {
 
 impl CompileRequest {
     pub fn stream_read<R: BufRead>(stream: &mut R, options: ReaderOptions) -> Result<Self, capnp::Error> {
-        let reader = try!(serialize_packed::read_message(stream, options));
-        Self::read(try!(reader.get_root::<compile_request::Reader>()))
+        let reader = serialize_packed::read_message(stream, options)?;
+        Self::read(reader.get_root::<compile_request::Reader>()?)
     }
 
     pub fn stream_write<W: Write, A: Allocator>(
@@ -39,17 +39,17 @@ impl CompileRequest {
     }
 
     pub fn read(reader: compile_request::Reader) -> Result<Self, capnp::Error> {
-        let args = try!(reader.get_args());
+        let args = reader.get_args()?;
         Ok(CompileRequest {
-            toolchain: try!(reader.get_toolchain()).to_string(),
+            toolchain: reader.get_toolchain()?.to_string(),
             args: try!(
                 (0..args.len())
                     .map(|index| args.get(index).map(|value| value.to_string()))
                     .collect()
             ),
-            preprocessed_data: try!(reader.get_preprocessed_data()).to_vec(),
+            preprocessed_data: reader.get_preprocessed_data()?.to_vec(),
             precompiled_hash: match reader.has_precompiled_hash() {
-                true => Some(try!(reader.get_precompiled_hash()).to_string()),
+                true => Some(reader.get_precompiled_hash()?.to_string()),
                 false => None,
             },
         })
@@ -75,8 +75,8 @@ impl CompileRequest {
 
 impl CompileResponse {
     pub fn stream_read<R: BufRead>(stream: &mut R, options: ReaderOptions) -> Result<Self, capnp::Error> {
-        let reader = try!(serialize_packed::read_message(stream, options));
-        Self::read(try!(reader.get_root::<compile_response::Reader>()))
+        let reader = serialize_packed::read_message(stream, options)?;
+        Self::read(reader.get_root::<compile_response::Reader>()?)
     }
 
     pub fn stream_write<W: Write, A: Allocator>(
@@ -89,9 +89,9 @@ impl CompileResponse {
     }
 
     pub fn read(reader: compile_response::Reader) -> Result<Self, capnp::Error> {
-        Ok(match try!(reader.which()) {
+        Ok(match reader.which()? {
             compile_response::Which::Success(reader) => {
-                let (output, content) = try!(OutputInfo::read(try!(reader)));
+                let (output, content) = OutputInfo::read(reader?)?;
                 CompileResponse::Success(output, content)
             }
             compile_response::Which::Error(_reader) => {

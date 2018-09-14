@@ -141,20 +141,18 @@ where
         completed.push(false);
     }
     for index in graph.externals(EdgeDirection::Outgoing) {
-        try!(
-            tx_task
-                .send(TaskMessage {
-                    index: index,
-                    task: graph.node_weight(index).unwrap().clone(),
-                }).map_err(|e| Error::new(ErrorKind::Other, e))
-        );
+        tx_task
+            .send(TaskMessage {
+                index: index,
+                task: graph.node_weight(index).unwrap().clone(),
+            }).map_err(|e| Error::new(ErrorKind::Other, e))?;
     }
 
     for message in rx_result.iter() {
         assert!(!completed[message.index.index()]);
 
-        try!(update_progress(BuildResult::new(&message, count, graph.node_count())));
-        let result = try!(message.result);
+        update_progress(BuildResult::new(&message, count, graph.node_count()))?;
+        let result = message.result?;
         if !result.success() {
             let status = result.status;
             return Ok(status);
@@ -163,13 +161,11 @@ where
 
         for source in graph.neighbors_directed(message.index, EdgeDirection::Incoming) {
             if is_ready(graph, &completed, &source) {
-                try!(
-                    tx_task
-                        .send(TaskMessage {
-                            index: source,
-                            task: graph.node_weight(source).unwrap().clone(),
-                        }).map_err(|e| Error::new(ErrorKind::Other, e))
-                );
+                tx_task
+                    .send(TaskMessage {
+                        index: source,
+                        task: graph.node_weight(source).unwrap().clone(),
+                    }).map_err(|e| Error::new(ErrorKind::Other, e))?;
             }
         }
 
@@ -198,7 +194,7 @@ pub fn execute_graph<F>(
 where
     F: Fn(BuildResult) -> Result<(), Error>,
 {
-    let graph = try!(validate_graph(build_graph));
+    let graph = validate_graph(build_graph)?;
     if graph.node_count() == 0 {
         return Ok(Some(0));
     }
@@ -206,13 +202,13 @@ where
     if graph.node_count() == 1 {
         let task = &graph.raw_nodes()[0].weight;
         let result = execute_compiler(&state, task);
-        try!(update_progress(BuildResult {
+        update_progress(BuildResult {
             worker: 0,
             completed: 1,
             total: 1,
             result: &result,
             task: task,
-        }));
+        })?;
         return result.map(|output| output.status);
     }
 
@@ -252,11 +248,7 @@ where
         for _ in mutex_rx_task.lock().unwrap().iter() {}
         // Wait for in progress task completion.
         for message in rx_result.iter() {
-            try!(update_progress(BuildResult::new(
-                &message,
-                &mut count,
-                graph.node_count()
-            )));
+            update_progress(BuildResult::new(&message, &mut count, graph.node_count()))?;
         }
         result
     })

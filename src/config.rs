@@ -94,7 +94,7 @@ impl Config {
 
         Ok(Config {
             process_limit: process_limit,
-            cache_dir: try!(replace_home(&cache_path)),
+            cache_dir: replace_home(&cache_path)?,
             cache_limit_mb: cache_limit_mb,
             coordinator: coordinator,
             helper_bind: helper_bind,
@@ -183,9 +183,9 @@ where
 }
 
 fn load_config<P: AsRef<Path>>(path: P) -> Result<Yaml> {
-    let mut file = try!(File::open(path));
+    let mut file = File::open(path)?;
     let mut content = String::new();
-    try!(file.read_to_string(&mut content));
+    file.read_to_string(&mut content)?;
     match YamlLoader::load_from_str(&content) {
         Ok(ref mut docs) => Ok(docs.pop().unwrap()),
         Err(e) => Err(io::Error::new(ErrorKind::InvalidInput, e)),

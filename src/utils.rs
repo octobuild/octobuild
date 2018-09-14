@@ -16,7 +16,7 @@ pub fn filter<T, R, F: Fn(&T) -> Option<R>>(args: &Vec<T>, filter: F) -> Vec<R> 
 
 pub fn hash_stream<R: Read>(reader: &mut R) -> Result<String, Error> {
     let mut hash = Md5::new();
-    try!(io::copy(reader, &mut hash.as_write()));
+    io::copy(reader, &mut hash.as_write())?;
     Ok(hash.result_str())
 }
 

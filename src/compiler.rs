@@ -312,14 +312,14 @@ impl OutputInfo {
     }
 
     pub fn read(reader: output_info::Reader) -> Result<(Self, Vec<u8>), capnp::Error> {
-        let content = try!(reader.get_content()).to_vec();
+        let content = reader.get_content()?.to_vec();
         let output = OutputInfo {
             status: match reader.get_undefined() {
                 false => Some(reader.get_status()),
                 true => None,
             },
-            stdout: try!(reader.get_stdout()).to_vec(),
-            stderr: try!(reader.get_stderr()).to_vec(),
+            stdout: reader.get_stdout()?.to_vec(),
+            stderr: reader.get_stderr()?.to_vec(),
         };
         Ok((output, content))
     }
@@ -442,7 +442,7 @@ pub trait Toolchain: Send + Sync {
         let mut hasher = Md5::new();
         // Get hash from preprocessed data
         hasher.hash_u64(task.preprocessed.len() as u64);
-        try!(task.preprocessed.copy(&mut hasher.as_write()));
+        task.preprocessed.copy(&mut hasher.as_write())?;
         // Hash arguments
         hasher.hash_u64(task.args.len() as u64);
         for arg in task.args.iter() {
@@ -451,7 +451,7 @@ pub trait Toolchain: Send + Sync {
         // Hash input files
         match task.input_precompiled {
             Some(ref path) => {
-                hasher.hash_bytes(try!(state.cache.file_hash(&path)).hash.as_bytes());
+                hasher.hash_bytes(state.cache.file_hash(&path)?.hash.as_bytes());
             }
             None => {
                 hasher.hash_u64(0);

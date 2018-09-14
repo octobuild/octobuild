@@ -15,12 +15,12 @@ fn save_platform() -> Result<(), Error> {
     let root_dir = env::var("CARGO_MANIFEST_DIR").unwrap();
     let profile = env::var("PROFILE").unwrap();
     let dest_path = Path::new(&root_dir).join("target").join(&profile).join("target.txt");
-    let mut f = try!(File::create(&dest_path));
+    let mut f = File::create(&dest_path)?;
     f.write_all(env::var("TARGET").unwrap().as_bytes())
 }
 
 fn load_revision() -> Result<String, Error> {
-    let output = try!(Command::new("git").arg("log").arg("-n1").arg("--format=%H").output());
+    let output = Command::new("git").arg("log").arg("-n1").arg("--format=%H").output()?;
     Ok(String::from_utf8(output.stdout).unwrap().trim().to_string())
 }
 
@@ -34,7 +34,7 @@ fn save_version() -> Result<(), Error> {
 pub const REVISION: &'static str = "{revision}";
 pub const RUSTC: &'static str = "{rustc}";
 "#,
-            revision = try!(load_revision()),
+            revision = load_revision()?,
             rustc = version().unwrap(),
         ).into_bytes(),
     )
@@ -57,7 +57,7 @@ ARCH={arch}
 REVISION={revision}
 "#,
             arch = arch,
-            revision = try!(load_revision()),
+            revision = load_revision()?,
             version = env::var("CARGO_PKG_VERSION").unwrap(),
         ).into_bytes(),
     )

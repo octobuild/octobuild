@@ -27,7 +27,7 @@ pub struct VsCompiler {
 
 impl VsCompiler {
     pub fn default() -> Result<Self, Error> {
-        Ok(VsCompiler::new(&Arc::new(try!(TempDir::new("octobuild")))))
+        Ok(VsCompiler::new(&Arc::new(TempDir::new("octobuild")?)))
     }
     pub fn new(temp_dir: &Arc<TempDir>) -> Self {
         VsCompiler {
@@ -160,18 +160,18 @@ impl Toolchain for VsToolchain {
 
         let mut command = task.shared.command.to_command();
         command.args(&args).arg(&join_flag("/Fo", &task.output_object)); // /Fo option also set output path for #import directive
-        let output = try!(state.wrap_slow(|| command.output()));
+        let output = state.wrap_slow(|| command.output())?;
         if output.status.success() {
             let mut content = MemStream::new();
             if task.shared.input_precompiled.is_some() || task.shared.output_precompiled.is_some() {
-                try!(postprocess::filter_preprocessed(
+                postprocess::filter_preprocessed(
                     &mut Cursor::new(output.stdout),
                     &mut content,
                     &task.shared.marker_precompiled,
-                    task.shared.output_precompiled.is_some()
-                ));
+                    task.shared.output_precompiled.is_some(),
+                )?;
             } else {
-                try!(content.write(&output.stdout));
+                content.write(&output.stdout)?;
             };
             Ok(PreprocessResult::Success(content))
         } else {
@@ -218,7 +218,7 @@ impl Toolchain for VsToolchain {
     fn compile_step(&self, state: &SharedState, task: CompileStep) -> Result<OutputInfo, Error> {
         // Input file path.
         let input_temp = TempFile::new_in(self.temp_dir.path(), ".i");
-        try!(File::create(input_temp.path()).and_then(|mut s| task.preprocessed.copy(&mut s)));
+        File::create(input_temp.path()).and_then(|mut s| task.preprocessed.copy(&mut s))?;
         // Output file path
         let output_object = task
             .output_object
@@ -383,10 +383,10 @@ fn read_executable_id(path: &Path) -> Result<String, Error> {
 
     let mut header: Vec<u8> = Vec::with_capacity(0x54);
 
-    let mut file = try!(File::open(path));
+    let mut file = File::open(path)?;
     // Read MZ header
     header.resize(0x40, 0);
-    try!(file.read_exact(&mut header[..]));
+    file.read_exact(&mut header[..])?;
     // Check MZ header signature
     if header[0..2] != [0x4D, 0x5A] {
         return Err(Error::new(
@@ -395,11 +395,11 @@ fn read_executable_id(path: &Path) -> Result<String, Error> {
         ));
     }
     // Read PE header offset
-    let pe_offset = try!(Cursor::new(&header[0x3C..0x40]).read_u32::<LittleEndian>()) as u64;
+    let pe_offset = Cursor::new(&header[0x3C..0x40]).read_u32::<LittleEndian>()? as u64;
     // Read PE header
-    try!(file.seek(SeekFrom::Start(pe_offset)));
+    file.seek(SeekFrom::Start(pe_offset))?;
     header.resize(0x54, 0);
-    try!(file.read_exact(&mut header[..]));
+    file.read_exact(&mut header[..])?;
     // Check PE header signature
     if header[0..4] != [0x50, 0x45, 0x00, 0x00] {
         return Err(Error::new(
@@ -407,8 +407,8 @@ fn read_executable_id(path: &Path) -> Result<String, Error> {
             "Unexpected file type (PE header signature not found)",
         ));
     }
-    let pe_time_date_stamp = try!(Cursor::new(&header[0x08..0x0C]).read_u32::<LittleEndian>());
-    let pe_size_of_image = try!(Cursor::new(&header[0x50..0x54]).read_u32::<LittleEndian>());
+    let pe_time_date_stamp = Cursor::new(&header[0x08..0x0C]).read_u32::<LittleEndian>()?;
+    let pe_size_of_image = Cursor::new(&header[0x50..0x54]).read_u32::<LittleEndian>()?;
     // Read PE header information
     Ok(format!("{:X}{:x}", pe_time_date_stamp, pe_size_of_image))
 }
