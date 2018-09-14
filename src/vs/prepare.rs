@@ -134,24 +134,26 @@ pub fn create_tasks(command: CommandInfo, args: &[String]) -> Result<Vec<Compila
                     let input_source = cwd.as_ref().map(|cwd| cwd.join(&source)).unwrap_or(source);
                     Ok(CompilationTask {
                         shared: shared.clone(),
-                        language: try!(
-                            language
-                                .as_ref()
-                                .map_or_else(
-                                    || input_source
+                        language: language
+                            .as_ref()
+                            .map_or_else(
+                                || {
+                                    input_source
                                         .extension()
                                         .and_then(|ext| match ext.to_str() {
                                             Some(e) if e.eq_ignore_ascii_case("cpp") => Some("P"),
                                             Some(e) if e.eq_ignore_ascii_case("c") => Some("C"),
                                             _ => None,
-                                        }).map(|ext| ext.to_string()),
-                                    |lang| Some(lang.clone())
-                                ).ok_or_else(|| format!(
+                                        }).map(|ext| ext.to_string())
+                                },
+                                |lang| Some(lang.clone()),
+                            ).ok_or_else(|| {
+                                format!(
                                     "Can't detect file language by extension: {}",
                                     input_source.to_string_lossy()
-                                ))
-                        ),
-                        output_object: try!(get_output_object(&input_source, &output_object)),
+                                )
+                            })?,
+                        output_object: get_output_object(&input_source, &output_object)?,
                         input_source: input_source,
                     })
                 }).collect()
@@ -193,11 +195,11 @@ fn load_arguments<S: AsRef<str>, I: Iterator<Item = S>>(base: &Option<PathBuf>, 
                 &Some(ref p) => p.join(&item.as_ref()[1..]),
                 &None => Path::new(&item.as_ref()[1..]).to_path_buf(),
             };
-            let mut file = try!(File::open(path));
+            let mut file = File::open(path)?;
             let mut data = Vec::new();
-            try!(file.read_to_end(&mut data));
-            let text = try!(decode_string(&data));
-            let mut args = try!(cmd::native::parse(&text));
+            file.read_to_end(&mut data)?;
+            let text = decode_string(&data)?;
+            let mut args = cmd::native::parse(&text)?;
             result.append(&mut args);
         } else {
             result.push(item.as_ref().to_string());

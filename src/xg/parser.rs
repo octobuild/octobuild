@@ -99,7 +99,7 @@ struct XgTool {
 pub fn parse<R: Read>(graph: &mut XgGraph, reader: R) -> Result<(), Error> {
     let mut parser = EventReader::new(reader);
     loop {
-        match try!(next_xml_event(&mut parser)) {
+        match next_xml_event(&mut parser)? {
             XmlEvent::StartElement { name, .. } => {
                 return match &name.local_name[..] {
                     "BuildSet" => parse_build_set(graph, &mut parser),
@@ -115,20 +115,20 @@ pub fn parse_build_set<R: Read>(graph: &mut XgGraph, events: &mut EventReader<R>
     let mut envs: HashMap<String, XgEnvironment> = HashMap::new();
     let mut projects: Vec<XgProject> = Vec::new();
     loop {
-        match try!(next_xml_event(events)) {
+        match next_xml_event(events)? {
             XmlEvent::StartElement { name, attributes, .. } => match &name.local_name[..] {
                 "Environments" => {
-                    try!(parse_environments(events, &mut envs));
+                    parse_environments(events, &mut envs)?;
                 }
                 "Project" => {
                     let mut attrs = map_attributes(attributes);
                     projects.push(XgProject {
-                        env: try!(take_attr(&mut attrs, "Env")),
-                        tasks: try!(parse_tasks(events)),
+                        env: take_attr(&mut attrs, "Env")?,
+                        tasks: parse_tasks(events)?,
                     });
                 }
                 _ => {
-                    try!(parse_skip(events, ()));
+                    parse_skip(events, ())?;
                 }
             },
             XmlEvent::EndElement { .. } => {
@@ -145,15 +145,15 @@ fn parse_environments<R: Read>(
     envs: &mut HashMap<String, XgEnvironment>,
 ) -> Result<(), Error> {
     loop {
-        match try!(next_xml_event(events)) {
+        match next_xml_event(events)? {
             XmlEvent::StartElement { name, attributes, .. } => match &name.local_name[..] {
                 "Environment" => {
                     let mut attrs = map_attributes(attributes);
-                    let name = try!(take_attr(&mut attrs, "Name"));
-                    envs.insert(name, try!(parse_environment(events)));
+                    let name = take_attr(&mut attrs, "Name")?;
+                    envs.insert(name, parse_environment(events)?);
                 }
                 _ => {
-                    try!(parse_skip(events, ()));
+                    parse_skip(events, ())?;
                 }
             },
             XmlEvent::EndElement { .. } => {
@@ -168,12 +168,12 @@ fn parse_environment<R: Read>(events: &mut EventReader<R>) -> Result<XgEnvironme
     let mut variables = env::vars().collect();
     let mut tools = HashMap::new();
     loop {
-        match try!(next_xml_event(events)) {
+        match next_xml_event(events)? {
             XmlEvent::StartElement { name, .. } => {
                 match &name.local_name[..] {
-                    "Variables" => try!(parse_variables(events, &mut variables)),
-                    "Tools" => try!(parse_tools(events, &mut tools)),
-                    _ => try!(parse_skip(events, ())),
+                    "Variables" => parse_variables(events, &mut variables)?,
+                    "Tools" => parse_tools(events, &mut tools)?,
+                    _ => parse_skip(events, ())?,
                 };
             }
             XmlEvent::EndElement { .. } => {
@@ -190,18 +190,18 @@ fn parse_environment<R: Read>(events: &mut EventReader<R>) -> Result<XgEnvironme
 
 fn parse_variables<R: Read>(events: &mut EventReader<R>, variables: &mut CommandEnv) -> Result<(), Error> {
     loop {
-        match try!(next_xml_event(events)) {
+        match next_xml_event(events)? {
             XmlEvent::StartElement { name, attributes, .. } => {
                 match &name.local_name[..] {
                     "Variable" => {
                         let mut attrs = map_attributes(attributes);
-                        let name = try!(take_attr(&mut attrs, "Name"));
-                        let value = try!(take_attr(&mut attrs, "Value"));
+                        let name = take_attr(&mut attrs, "Name")?;
+                        let value = take_attr(&mut attrs, "Value")?;
                         variables.insert(name, value);
                     }
                     _ => {}
                 }
-                try!(parse_skip(events, ()));
+                parse_skip(events, ())?;
             }
             XmlEvent::EndElement { .. } => {
                 return Ok(());
@@ -213,13 +213,13 @@ fn parse_variables<R: Read>(events: &mut EventReader<R>, variables: &mut Command
 
 fn parse_tools<R: Read>(events: &mut EventReader<R>, tools: &mut HashMap<String, XgTool>) -> Result<(), Error> {
     loop {
-        match try!(next_xml_event(events)) {
+        match next_xml_event(events)? {
             XmlEvent::StartElement { name, attributes, .. } => {
                 match &name.local_name[..] {
                     "Tool" => {
                         let mut attrs = map_attributes(attributes);
-                        let name = try!(take_attr(&mut attrs, "Name"));
-                        let exec = try!(take_attr(&mut attrs, "Path"));
+                        let name = take_attr(&mut attrs, "Name")?;
+                        let exec = take_attr(&mut attrs, "Path")?;
                         tools.insert(
                             name,
                             XgTool {
@@ -231,7 +231,7 @@ fn parse_tools<R: Read>(events: &mut EventReader<R>, tools: &mut HashMap<String,
                     }
                     _ => {}
                 }
-                try!(parse_skip(events, ()));
+                parse_skip(events, ())?;
             }
             XmlEvent::EndElement { .. } => {
                 return Ok(());
@@ -244,14 +244,14 @@ fn parse_tools<R: Read>(events: &mut EventReader<R>, tools: &mut HashMap<String,
 fn parse_tasks<R: Read>(events: &mut EventReader<R>) -> Result<HashMap<String, XgTask>, Error> {
     let mut tasks = HashMap::new();
     loop {
-        match try!(next_xml_event(events)) {
+        match next_xml_event(events)? {
             XmlEvent::StartElement { name, attributes, .. } => {
                 match &name.local_name[..] {
                     "Task" => {
                         let mut attrs = map_attributes(attributes);
-                        let name = try!(take_attr(&mut attrs, "Name"));
-                        let tool = try!(take_attr(&mut attrs, "Tool"));
-                        let working_dir = try!(take_attr(&mut attrs, "WorkingDir"));
+                        let name = take_attr(&mut attrs, "Name")?;
+                        let tool = take_attr(&mut attrs, "Tool")?;
+                        let working_dir = take_attr(&mut attrs, "WorkingDir")?;
                         // DependsOn
                         let depends_on: HashSet<String> = match attrs.remove("DependsOn") {
                             Some(v) => HashSet::from_iter(v.split(";").map(|v| v.to_string())),
@@ -270,7 +270,7 @@ fn parse_tasks<R: Read>(events: &mut EventReader<R>) -> Result<HashMap<String, X
                     }
                     _ => {}
                 }
-                try!(parse_skip(events, ()));
+                parse_skip(events, ())?;
             }
             XmlEvent::EndElement { .. } => {
                 return Ok(tasks);
@@ -283,7 +283,7 @@ fn parse_tasks<R: Read>(events: &mut EventReader<R>) -> Result<HashMap<String, X
 fn parse_skip<R: Read, T>(events: &mut EventReader<R>, result: T) -> Result<T, Error> {
     let mut depth: isize = 0;
     loop {
-        match try!(next_xml_event(events)) {
+        match next_xml_event(events)? {
             XmlEvent::StartElement { .. } => {
                 depth += 1;
             }
@@ -311,11 +311,13 @@ fn parse_create_graph(
     projects: Vec<XgProject>,
 ) -> Result<(), Error> {
     for project in projects.into_iter() {
-        let env = try!(envs.get(&project.env).ok_or_else(|| Error::new(
-            ErrorKind::InvalidInput,
-            XgParseError::EnvironmentNotFound(project.env.clone())
-        )));
-        try!(graph_project(graph, project, env));
+        let env = envs.get(&project.env).ok_or_else(|| {
+            Error::new(
+                ErrorKind::InvalidInput,
+                XgParseError::EnvironmentNotFound(project.env.clone()),
+            )
+        })?;
+        graph_project(graph, project, env)?;
     }
     Ok(())
 }
@@ -324,11 +326,10 @@ fn graph_project(graph: &mut XgGraph, project: XgProject, env: &XgEnvironment) -
     let mut nodes: Vec<NodeIndex> = Vec::new();
     let mut task_refs: HashMap<&str, NodeIndex> = HashMap::new();
     for (id, task) in project.tasks.iter() {
-        let tool = try!(
-            env.tools
-                .get(&task.tool)
-                .ok_or_else(|| Error::new(ErrorKind::InvalidInput, XgParseError::ToolNotFound(task.tool.clone())))
-        );
+        let tool = env
+            .tools
+            .get(&task.tool)
+            .ok_or_else(|| Error::new(ErrorKind::InvalidInput, XgParseError::ToolNotFound(task.tool.clone())))?;
         let node = graph.add_node(XgNode {
             title: task.title.as_ref().map_or_else(
                 || tool.output.as_ref().map_or_else(|| String::new(), |v| v.clone()),
@@ -341,7 +342,7 @@ fn graph_project(graph: &mut XgGraph, project: XgProject, env: &XgEnvironment) -
                 // Environment variables
                 env: env.variables.clone(),
             },
-            args: try!(cmd::native::parse(&tool.args)),
+            args: cmd::native::parse(&tool.args)?,
         });
         task_refs.insert(&id, node);
         nodes.push(node);
@@ -349,10 +350,12 @@ fn graph_project(graph: &mut XgGraph, project: XgProject, env: &XgEnvironment) -
     for (src_id, task) in project.tasks.iter() {
         let src = task_refs.get(&src_id[..]).unwrap();
         for dst_id in task.depends_on.iter() {
-            let dst = try!(task_refs.get(&dst_id[..]).ok_or_else(|| Error::new(
-                ErrorKind::InvalidInput,
-                XgParseError::DependencyNotFound(dst_id.clone())
-            )));
+            let dst = task_refs.get(&dst_id[..]).ok_or_else(|| {
+                Error::new(
+                    ErrorKind::InvalidInput,
+                    XgParseError::DependencyNotFound(dst_id.clone()),
+                )
+            })?;
             graph.add_edge(*src, *dst, ());
         }
     }

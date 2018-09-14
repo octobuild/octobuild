@@ -57,7 +57,7 @@ impl MemStream {
 
     pub fn copy<W: Write>(&self, writer: &mut W) -> Result<usize> {
         for block in self.iter() {
-            try!(writer.write(block));
+            writer.write(block)?;
         }
         Ok(self.size)
     }

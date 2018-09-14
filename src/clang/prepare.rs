@@ -32,7 +32,7 @@ pub fn create_tasks(command: CommandInfo, args: &[String]) -> Result<Vec<Compila
         // Support only compilation steps
         return Ok(Vec::new());
     }
-    let parsed_args = try!(parse_arguments(args));
+    let parsed_args = parse_arguments(args)?;
     // Source file name.
     let input_sources: Vec<PathBuf> = parsed_args
         .iter()
@@ -133,11 +133,11 @@ pub fn create_tasks(command: CommandInfo, args: &[String]) -> Result<Vec<Compila
         .map(|source| {
             Ok(CompilationTask {
                 shared: shared.clone(),
-                language: try!(
-                    language
-                        .as_ref()
-                        .map_or_else(
-                            || source
+                language: language
+                    .as_ref()
+                    .map_or_else(
+                        || {
+                            source
                                 .extension()
                                 .and_then(|ext| match ext.to_str() {
                                     Some(e) if e.eq_ignore_ascii_case("cpp") => Some("c++"),
@@ -145,13 +145,15 @@ pub fn create_tasks(command: CommandInfo, args: &[String]) -> Result<Vec<Compila
                                     Some(e) if e.eq_ignore_ascii_case("hpp") => Some("c++-header"),
                                     Some(e) if e.eq_ignore_ascii_case("h") => Some("c-header"),
                                     _ => None,
-                                }).map(|ext| ext.to_string()),
-                            |lang| Some(lang.clone())
-                        ).ok_or_else(|| format!(
+                                }).map(|ext| ext.to_string())
+                        },
+                        |lang| Some(lang.clone()),
+                    ).ok_or_else(|| {
+                        format!(
                             "Can't detect file language by extension: {}",
                             source.as_os_str().to_string_lossy()
-                        ))
-                ),
+                        )
+                    })?,
                 output_object: output_object
                     .as_ref()
                     .map_or_else(|| source.with_extension("o"), |path| path.clone()),

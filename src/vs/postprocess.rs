@@ -85,21 +85,21 @@ pub fn filter_preprocessed(
         state.ptr_read = state.buf_data.as_ptr();
         state.ptr_end = state.buf_data.as_ptr();
 
-        try!(state.parse_bom());
+        state.parse_bom()?;
         state.marker = match marker.as_ref() {
             Some(ref v) => match state.utf8 {
                 true => Some(Vec::from(v.as_bytes())),
-                false => Some(try!(Encoding::ANSI.to_bytes(&v.replace("\\", "/")))),
+                false => Some(Encoding::ANSI.to_bytes(&v.replace("\\", "/"))?),
             },
             None => None,
         };
         loop {
             if state.ptr_read == state.ptr_end {
-                if !try!(state.read()) {
+                if !state.read()? {
                     break;
                 }
             }
-            try!(state.parse_line());
+            state.parse_line()?;
             if state.done {
                 return state.copy_to_end();
             }
@@ -128,15 +128,15 @@ struct ScannerState<'a> {
 
 impl<'a> ScannerState<'a> {
     unsafe fn write(&mut self, data: &[u8]) -> Result<(), Error> {
-        try!(self.flush());
-        try!(self.writer.write(data));
+        self.flush()?;
+        self.writer.write(data)?;
         Ok(())
     }
 
     #[inline(always)]
     unsafe fn peek(&mut self) -> Result<Option<u8>, Error> {
         if self.ptr_read == self.ptr_end {
-            if !try!(self.read()) {
+            if !self.read()? {
                 return Ok(None);
             }
         }
@@ -151,28 +151,26 @@ impl<'a> ScannerState<'a> {
 
     unsafe fn read(&mut self) -> Result<bool, Error> {
         debug_assert!(self.ptr_read == self.ptr_end);
-        try!(self.flush());
+        self.flush()?;
         let base = self.buf_data.as_ptr();
         self.ptr_read = base;
         self.ptr_copy = base;
-        self.ptr_end = base.offset(try!(self.reader.read(&mut self.buf_data)) as isize);
+        self.ptr_end = base.offset(self.reader.read(&mut self.buf_data)? as isize);
         Ok(self.ptr_read != self.ptr_end)
     }
 
     unsafe fn copy_to_end(&mut self) -> Result<(), Error> {
-        try!(
-            self.writer
-                .write(slice::from_raw_parts(self.ptr_copy, delta(self.ptr_copy, self.ptr_end)))
-        );
+        self.writer
+            .write(slice::from_raw_parts(self.ptr_copy, delta(self.ptr_copy, self.ptr_end)))?;
         self.ptr_copy = self.buf_data.as_ptr();
         self.ptr_end = self.buf_data.as_ptr();
         loop {
-            match try!(self.reader.read(&mut self.buf_data)) {
+            match self.reader.read(&mut self.buf_data)? {
                 0 => {
                     return Ok(());
                 }
                 size => {
-                    try!(self.writer.write(&self.buf_data[0..size]));
+                    self.writer.write(&self.buf_data[0..size])?;
                 }
             }
         }
@@ -181,10 +179,10 @@ impl<'a> ScannerState<'a> {
     unsafe fn flush(&mut self) -> Result<(), Error> {
         if self.ptr_copy != self.ptr_read {
             if self.keep_headers {
-                try!(self.writer.write(slice::from_raw_parts(
+                self.writer.write(slice::from_raw_parts(
                     self.ptr_copy,
-                    delta(self.ptr_copy, self.ptr_read)
-                )));
+                    delta(self.ptr_copy, self.ptr_read),
+                ))?;
             }
             self.ptr_copy = self.ptr_read;
         }
@@ -194,7 +192,7 @@ impl<'a> ScannerState<'a> {
     unsafe fn parse_bom(&mut self) -> Result<(), Error> {
         let bom: [u8; 3] = [0xEF, 0xBB, 0xBF];
         for bom_char in bom.iter() {
-            match try!(self.peek()) {
+            match self.peek()? {
                 Some(c) if c == *bom_char => {
                     self.next();
                 }
@@ -211,14 +209,14 @@ impl<'a> ScannerState<'a> {
     }
 
     unsafe fn parse_line(&mut self) -> Result<(), Error> {
-        try!(self.parse_empty());
-        match try!(self.peek()) {
+        self.parse_empty()?;
+        match self.peek()? {
             Some(b'#') => {
                 self.next();
                 self.parse_directive()
             }
             Some(_) => {
-                try!(self.next_line());
+                self.next_line()?;
                 Ok(())
             }
             None => Ok(()),
@@ -237,7 +235,7 @@ impl<'a> ScannerState<'a> {
                 return Ok(());
             }
             self.ptr_read = self.ptr_end;
-            if !try!(self.read()) {
+            if !self.read()? {
                 return Ok(());
             }
         }
@@ -268,20 +266,20 @@ impl<'a> ScannerState<'a> {
                 last = 0;
             }
             self.ptr_read = self.ptr_end;
-            if !try!(self.read()) {
+            if !self.read()? {
                 return Ok(b"");
             }
         }
     }
 
     unsafe fn parse_directive(&mut self) -> Result<(), Error> {
-        try!(self.parse_spaces());
+        self.parse_spaces()?;
         let mut token = [0; 0x10];
-        match &try!(self.parse_token(&mut token))[..] {
+        match &self.parse_token(&mut token)?[..] {
             b"line" => self.parse_directive_line(),
             b"pragma" => self.parse_directive_pragma(),
             _ => {
-                try!(self.next_line());
+                self.next_line()?;
                 Ok(())
             }
         }
@@ -291,24 +289,24 @@ impl<'a> ScannerState<'a> {
         let mut line_token = [0; 0x10];
         let mut file_token = [0; 0x400];
         let mut file_raw = [0; 0x400];
-        try!(self.parse_spaces());
-        let line = try!(self.parse_token(&mut line_token));
-        try!(self.parse_spaces());
-        let (file, raw) = try!(self.parse_path(&mut file_token, &mut file_raw));
-        let eol = try!(self.next_line_eol());
+        self.parse_spaces()?;
+        let line = self.parse_token(&mut line_token)?;
+        self.parse_spaces()?;
+        let (file, raw) = self.parse_path(&mut file_token, &mut file_raw)?;
+        let eol = self.next_line_eol()?;
         self.entry_file = match self.entry_file.take() {
             Some(path) => {
                 if self.header_found && (path == file) {
                     self.done = true;
                     let mut mark = Vec::with_capacity(0x400);
-                    try!(mark.write(b"#pragma hdrstop"));
-                    try!(mark.write(&eol));
-                    try!(mark.write(b"#line "));
-                    try!(mark.write(&line));
-                    try!(mark.write(b" "));
-                    try!(mark.write(&raw));
-                    try!(mark.write(&eol));
-                    try!(self.write(&mark));
+                    mark.write(b"#pragma hdrstop")?;
+                    mark.write(&eol)?;
+                    mark.write(b"#line ")?;
+                    mark.write(&line)?;
+                    mark.write(b" ")?;
+                    mark.write(&raw)?;
+                    mark.write(&eol)?;
+                    self.write(&mark)?;
                 }
                 match &self.marker {
                     &Some(ref path) => {
@@ -326,17 +324,17 @@ impl<'a> ScannerState<'a> {
     }
 
     unsafe fn parse_directive_pragma(&mut self) -> Result<(), Error> {
-        try!(self.parse_spaces());
+        self.parse_spaces()?;
         let mut token = [0; 0x20];
-        match &try!(self.parse_token(&mut token))[..] {
+        match &self.parse_token(&mut token)?[..] {
             b"hdrstop" => {
                 if !self.keep_headers {
-                    try!(self.write(b"#pragma hdrstop"));
+                    self.write(b"#pragma hdrstop")?;
                 }
                 self.done = true;
             }
             _ => {
-                try!(self.next_line());
+                self.next_line()?;
             }
         }
         Ok(())
@@ -344,7 +342,7 @@ impl<'a> ScannerState<'a> {
 
     unsafe fn parse_escape(&mut self) -> Result<u8, Error> {
         self.next();
-        match try!(self.peek()) {
+        match self.peek()? {
             Some(c) => {
                 self.next();
                 match c {
@@ -371,7 +369,7 @@ impl<'a> ScannerState<'a> {
                     }
                 }
             }
-            if !try!(self.read()) {
+            if !self.read()? {
                 return Ok(());
             }
         }
@@ -390,7 +388,7 @@ impl<'a> ScannerState<'a> {
                     }
                 }
             }
-            if !try!(self.read()) {
+            if !self.read()? {
                 return Ok(());
             }
         }
@@ -416,7 +414,7 @@ impl<'a> ScannerState<'a> {
                 }
                 self.next();
             }
-            if !try!(self.read()) {
+            if !self.read()? {
                 return Ok(token);
             }
         }
@@ -427,7 +425,7 @@ impl<'a> ScannerState<'a> {
         token: &'t mut [u8],
         raw: &'r mut [u8],
     ) -> Result<(&'t [u8], &'r [u8]), Error> {
-        let quote = try!(self.peek()).unwrap();
+        let quote = self.peek()?.unwrap();
         raw[0] = quote;
         self.next();
         let mut token_offset = 0;
@@ -444,7 +442,7 @@ impl<'a> ScannerState<'a> {
                         raw[raw_offset + 0] = b'\\';
                         raw[raw_offset + 1] = c;
                         raw_offset += 2;
-                        token[token_offset] = match try!(self.parse_escape()) {
+                        token[token_offset] = match self.parse_escape()? {
                             b'\\' => b'/',
                             v => v,
                         };
@@ -465,7 +463,7 @@ impl<'a> ScannerState<'a> {
                     return Err(Error::new(ErrorKind::InvalidInput, PostprocessError::LiteralTooLong));
                 }
             }
-            if !try!(self.read()) {
+            if !self.read()? {
                 return Err(Error::new(ErrorKind::InvalidInput, PostprocessError::LiteralEof));
             }
         }

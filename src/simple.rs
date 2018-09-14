@@ -81,8 +81,8 @@ where
 fn print_task_result(result: BuildResult) -> Result<(), Error> {
     match result.result {
         &Ok(ref output) => {
-            try!(io::stdout().write_all(&output.stdout));
-            try!(io::stderr().write_all(&output.stderr));
+            io::stdout().write_all(&output.stdout)?;
+            io::stderr().write_all(&output.stderr)?;
         }
         &Err(_) => {}
     }
