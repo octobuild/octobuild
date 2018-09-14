@@ -35,7 +35,7 @@ pub const REVISION: &'static str = "{revision}";
 pub const RUSTC: &'static str = "{rustc}";
 "#,
             revision = try!(load_revision()),
-            rustc = version(),
+            rustc = version().unwrap(),
         ).into_bytes(),
     )
 }
