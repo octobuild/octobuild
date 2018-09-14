@@ -294,8 +294,6 @@ fn vs_identifier(_: &Path) -> Option<String> {
 
 #[cfg(windows)]
 fn vs_identifier(path: &Path) -> Option<String> {
-    // extern crate winapi;
-    extern crate kernel32;
     extern crate version;
 
     use winapi::ctypes::c_void;

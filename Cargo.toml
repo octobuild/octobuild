@@ -68,5 +68,4 @@ capnp = "0.7.4"
 [target.'cfg(windows)'.dependencies]
 winreg = "0.5"
 winapi = "0.3"
-kernel32-sys = "0.2.2"
 version-sys = { version = "0.0.1", git = "https://github.com/retep998/winapi-rs.git", rev = "bd08970c" }
