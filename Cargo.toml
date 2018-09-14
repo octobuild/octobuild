@@ -52,8 +52,8 @@ clap = "2.11.0"
 crossbeam = "0.4"
 
 byteorder = "1.2"
-log = "0.3.6"
-fern = "0.3.5"
+log = "0.4"
+fern = "0.5"
 daemon = "0.0.8"
 hyper = { version = "0.10", default-features = false }
 nickel = "0.10.1"

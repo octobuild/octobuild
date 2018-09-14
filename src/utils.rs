@@ -24,20 +24,19 @@ pub fn init_logger() {
     let log_file = env::current_exe().unwrap().with_extension("log");
 
     // Create a basic logger configuration
-    let logger_config = fern::DispatchConfig {
-        format: Box::new(|msg, level, _location| {
-            // This format just displays [{level}] {message}
-            format!("{} [{}] {}", time::now().rfc3339(), level, msg)
-        }),
+    fern::Dispatch::new()
+        .format(|out, message, record| {
+            out.finish(format_args!(
+                "{} [{}] {}", time::now().rfc3339(), record.level(), message
+            ))
+        })
         // Output to stdout and the log file in the temporary directory we made above to test
-        output: vec![fern::OutputConfig::stdout(), fern::OutputConfig::file(&log_file)],
+        .chain(io::stdout())
+        .chain(fern::log_file(&log_file).unwrap())
         // Only log messages Info and above
-        level: log::LogLevelFilter::Info,
-    };
-
-    if let Err(e) = fern::init_global_logger(logger_config, log::LogLevelFilter::Trace) {
-        panic!("Failed to initialize global logger: {}", e);
-    }
+        .level(log::LevelFilter::Info)
+        .apply()
+        .expect("Failed to initialize logging");
 }
 
 #[test]
