@@ -199,7 +199,7 @@ fn load_arguments<S: AsRef<str>, I: Iterator<Item = S>>(base: &Option<PathBuf>, 
             let mut data = Vec::new();
             file.read_to_end(&mut data)?;
             let text = decode_string(&data)?;
-            let mut args = cmd::native::parse(&text);
+            let mut args = cmd::native::parse(&text)?;
             result.append(&mut args);
         } else {
             result.push(item.as_ref().to_string());

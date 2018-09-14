@@ -1,6 +1,8 @@
+use std::io::Error;
+
 // Parsing command line arguments from singe line.
 // See also: http://msdn.microsoft.com/en-us/library/17w5ykft.aspx
-pub fn parse(cmd: &str) -> Vec<String> {
+pub fn parse(cmd: &str) -> Result<Vec<String>, Error> {
     let mut args: Vec<String> = Vec::new();
     let mut arg: String = String::new();
     let mut slash: usize = 0;
@@ -46,7 +48,7 @@ pub fn parse(cmd: &str) -> Vec<String> {
     if data {
         args.push(arg);
     }
-    args
+    return Ok(args);
 }
 
 fn add_slashes(mut line: String, count: usize) -> String {
@@ -58,43 +60,46 @@ fn add_slashes(mut line: String, count: usize) -> String {
 
 #[test]
 fn test_parse_1() {
-    assert_eq!(parse("\"abc\" d e"), ["abc", "d", "e"]);
+    assert_eq!(parse("\"abc\" d e").unwrap(), ["abc", "d", "e"]);
 }
 
 #[test]
 fn test_parse_2() {
-    assert_eq!(parse(" \"abc\" d e "), ["abc", "d", "e"]);
+    assert_eq!(parse(" \"abc\" d e ").unwrap(), ["abc", "d", "e"]);
 }
 
 #[test]
 fn test_parse_3() {
-    assert_eq!(parse("\"\" \"abc\" d e \"\""), ["", "abc", "d", "e", ""]);
+    assert_eq!(parse("\"\" \"abc\" d e \"\"").unwrap(), ["", "abc", "d", "e", ""]);
 }
 
 #[test]
 fn test_parse_4() {
-    assert_eq!(parse("a\\\\b d\"e f\"g h"), ["a\\\\b", "de fg", "h"]);
+    assert_eq!(parse("a\\\\b d\"e f\"g h").unwrap(), ["a\\\\b", "de fg", "h"]);
 }
 
 #[test]
 fn test_parse_5() {
-    assert_eq!(parse("a\\\\\\\"b c d"), ["a\\\"b", "c", "d"]);
+    assert_eq!(parse("a\\\\\\\"b c d").unwrap(), ["a\\\"b", "c", "d"]);
 }
 
 #[test]
 fn test_parse_6() {
-    assert_eq!(parse("a\\\\\\\\\"b c\" d e"), ["a\\\\b c", "d", "e"]);
+    assert_eq!(parse("a\\\\\\\\\"b c\" d e").unwrap(), ["a\\\\b c", "d", "e"]);
 }
 
 #[test]
 fn test_parse_7() {
-    assert_eq!(parse("C:\\Windows\\System32 d e"), ["C:\\Windows\\System32", "d", "e"]);
+    assert_eq!(
+        parse("C:\\Windows\\System32 d e").unwrap(),
+        ["C:\\Windows\\System32", "d", "e"]
+    );
 }
 
 #[test]
 fn test_parse_8() {
     assert_eq!(
-        parse("/TEST\"C:\\Windows\\System32\" d e"),
+        parse("/TEST\"C:\\Windows\\System32\" d e").unwrap(),
         ["/TESTC:\\Windows\\System32", "d", "e"]
     );
 }
@@ -102,7 +107,7 @@ fn test_parse_8() {
 #[test]
 fn test_parse_9() {
     assert_eq!(
-        parse("/Fp\"Debug\\HelloWorld.pch\" /Fo\"Debug\\\\\" /Gd"),
+        parse("/Fp\"Debug\\HelloWorld.pch\" /Fo\"Debug\\\\\" /Gd").unwrap(),
         ["/FpDebug\\HelloWorld.pch", "/FoDebug\\", "/Gd"]
     );
 }

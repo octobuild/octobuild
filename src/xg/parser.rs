@@ -342,7 +342,7 @@ fn graph_project(graph: &mut XgGraph, project: XgProject, env: &XgEnvironment) -
                 // Environment variables
                 env: env.variables.clone(),
             },
-            args: cmd::native::parse(&tool.args),
+            args: cmd::native::parse(&tool.args)?,
         });
         task_refs.insert(&id, node);
         nodes.push(node);
