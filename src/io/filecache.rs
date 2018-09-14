@@ -1,9 +1,9 @@
-extern crate lz4;
 extern crate filetime;
+extern crate lz4;
 
 use std::cmp::min;
-use std::fmt::{Display, Formatter};
 use std::ffi::OsString;
+use std::fmt::{Display, Formatter};
 use std::fs;
 use std::fs::{File, OpenOptions};
 use std::io::{Error, ErrorKind, Read, Seek, SeekFrom, Write};
@@ -11,12 +11,12 @@ use std::path::{Path, PathBuf};
 
 use self::filetime::FileTime;
 
-use super::super::config::Config;
 use super::super::compiler::OutputInfo;
+use super::super::config::Config;
 use super::super::utils::DEFAULT_BUF_SIZE;
 use super::binary::*;
-use super::statistic::Statistic;
 use super::counter::Counter;
+use super::statistic::Statistic;
 
 const HEADER: &'static [u8] = b"OBCF\x00\x03";
 const FOOTER: &'static [u8] = b"END\x00";
@@ -36,9 +36,7 @@ impl Display for CacheError {
             &CacheError::InvalidHeader(ref path) => write!(f, "invalid cache file header: {}", path.display()),
             &CacheError::InvalidFooter(ref path) => write!(f, "invalid cache file footer: {}", path.display()),
             &CacheError::PackedFilesMismatch(ref path) => {
-                write!(f,
-                       "unexpected count of packed cached files: {}",
-                       path.display())
+                write!(f, "unexpected count of packed cached files: {}", path.display())
             }
             &CacheError::MutexError(ref message) => write!(f, "mutex error: {}", message),
         }
@@ -79,13 +77,14 @@ impl FileCache {
         }
     }
 
-    pub fn run_cached<F: FnOnce() -> Result<OutputInfo, Error>, C: Fn() -> bool>(&self,
-                                                                                 statistic: &Statistic,
-                                                                                 hash: &str,
-                                                                                 outputs: &Vec<PathBuf>,
-                                                                                 worker: F,
-                                                                                 checker: C)
-                                                                                 -> Result<OutputInfo, Error> {
+    pub fn run_cached<F: FnOnce() -> Result<OutputInfo, Error>, C: Fn() -> bool>(
+        &self,
+        statistic: &Statistic,
+        hash: &str,
+        outputs: &Vec<PathBuf>,
+        worker: F,
+        checker: C,
+    ) -> Result<OutputInfo, Error> {
         let path = self.cache_dir.join(&hash[0..2]).join(&(hash[2..].to_string() + SUFFIX));
         // Try to read data from cache.
         match read_cache(statistic, &path, outputs) {
@@ -166,9 +165,11 @@ fn write_cache(statistic: &Statistic, path: &Path, paths: &Vec<PathBuf>, output:
         Some(parent) => try!(fs::create_dir_all(&parent)),
         None => (),
     }
-    let mut stream = try!(lz4::EncoderBuilder::new()
-        .level(1)
-        .build(Counter::writer(try!(File::create(path)))));
+    let mut stream = try!(
+        lz4::EncoderBuilder::new()
+            .level(1)
+            .build(Counter::writer(try!(File::create(path))))
+    );
     try!(stream.write_all(HEADER));
     try!(write_usize(&mut stream, paths.len()));
     for path in paths.iter() {
@@ -209,12 +210,16 @@ fn read_cache(statistic: &Statistic, path: &Path, paths: &Vec<PathBuf>) -> Resul
     try!(file.seek(SeekFrom::Start(0)));
     let mut stream = try!(lz4::Decoder::new(Counter::reader(file)));
     if try!(read_exact(&mut stream, HEADER.len())) != HEADER {
-        return Err(Error::new(ErrorKind::InvalidInput,
-                              CacheError::InvalidHeader(path.to_path_buf())));
+        return Err(Error::new(
+            ErrorKind::InvalidInput,
+            CacheError::InvalidHeader(path.to_path_buf()),
+        ));
     }
     if try!(read_usize(&mut stream)) != paths.len() {
-        return Err(Error::new(ErrorKind::InvalidInput,
-                              CacheError::PackedFilesMismatch(path.to_path_buf())));
+        return Err(Error::new(
+            ErrorKind::InvalidInput,
+            CacheError::PackedFilesMismatch(path.to_path_buf()),
+        ));
     }
     for path in paths.iter() {
         let mut temp_name = OsString::from("~tmp~");
@@ -231,13 +236,17 @@ fn read_cache(statistic: &Statistic, path: &Path, paths: &Vec<PathBuf>) -> Resul
     }
     let output = try!(read_output(&mut stream));
     if try!(read_exact(&mut stream, FOOTER.len())) != FOOTER {
-        return Err(Error::new(ErrorKind::InvalidInput,
-                              CacheError::InvalidFooter(path.to_path_buf())));
+        return Err(Error::new(
+            ErrorKind::InvalidInput,
+            CacheError::InvalidFooter(path.to_path_buf()),
+        ));
     }
     let mut eof = [0];
     if try!(stream.read(&mut eof)) != 0 {
-        return Err(Error::new(ErrorKind::InvalidInput,
-                              CacheError::InvalidFooter(path.to_path_buf())));
+        return Err(Error::new(
+            ErrorKind::InvalidInput,
+            CacheError::InvalidFooter(path.to_path_buf()),
+        ));
     }
     statistic.add_hit(stream.finish().0.len());
     Ok(output)

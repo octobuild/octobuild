@@ -1,26 +1,26 @@
-extern crate octobuild;
 extern crate daemon;
 extern crate fern;
-extern crate time;
-extern crate rustc_serialize;
 extern crate nickel;
+extern crate octobuild;
+extern crate rustc_serialize;
+extern crate time;
 #[macro_use]
 extern crate log;
 
-use octobuild::config::Config;
-use octobuild::cluster::common::{BuilderInfo, BuilderInfoUpdate, RPC_BUILDER_LIST, RPC_BUILDER_UPDATE};
-use daemon::State;
 use daemon::Daemon;
 use daemon::DaemonRunner;
-use nickel::{HttpRouter, MediaType, Middleware, MiddlewareResult, Nickel, NickelError, Request, Response};
+use daemon::State;
 use nickel::status::StatusCode;
+use nickel::{HttpRouter, MediaType, Middleware, MiddlewareResult, Nickel, NickelError, Request, Response};
+use octobuild::cluster::common::{BuilderInfo, BuilderInfoUpdate, RPC_BUILDER_LIST, RPC_BUILDER_UPDATE};
+use octobuild::config::Config;
 use rustc_serialize::json;
-use time::{Duration, Timespec};
 use std::io::Read;
 use std::net::{IpAddr, SocketAddr};
 use std::str::FromStr;
 use std::sync::mpsc::Receiver;
 use std::sync::{Arc, RwLock};
+use time::{Duration, Timespec};
 
 struct BuilderState {
     pub guid: String,
@@ -34,7 +34,9 @@ struct CoordinatorState {
 
 impl CoordinatorState {
     pub fn new() -> Self {
-        CoordinatorState { builders: RwLock::new(Vec::new()) }
+        CoordinatorState {
+            builders: RwLock::new(Vec::new()),
+        }
     }
 }
 
@@ -42,10 +44,11 @@ struct RpcAgentUpdateHandler(Arc<CoordinatorState>);
 struct RpcAgentListHandler(Arc<CoordinatorState>);
 
 impl<D> Middleware<D> for RpcAgentUpdateHandler {
-    fn invoke<'a, 'server>(&'a self,
-                           request: &mut Request<'a, 'server, D>,
-                           mut response: Response<'a, D>)
-                           -> MiddlewareResult<'a, D> {
+    fn invoke<'a, 'server>(
+        &'a self,
+        request: &mut Request<'a, 'server, D>,
+        mut response: Response<'a, D>,
+    ) -> MiddlewareResult<'a, D> {
         let mut payload = String::new();
         request.origin.read_to_string(&mut payload).unwrap();
         let mut update: BuilderInfoUpdate = json::decode(&payload).unwrap();
@@ -53,9 +56,11 @@ impl<D> Middleware<D> for RpcAgentUpdateHandler {
         let endpoint = match SocketAddr::from_str(&update.info.endpoint) {
             Ok(v) => v,
             Err(e) => {
-                return Err(NickelError::new(response,
-                                            format!("Can't parse endpoint address: {}", e),
-                                            StatusCode::BadRequest));
+                return Err(NickelError::new(
+                    response,
+                    format!("Can't parse endpoint address: {}", e),
+                    StatusCode::BadRequest,
+                ));
             }
         };
         if is_unspecified(&endpoint.ip()) {
@@ -81,20 +86,19 @@ impl<D> Middleware<D> for RpcAgentUpdateHandler {
 }
 
 impl<D> Middleware<D> for RpcAgentListHandler {
-    fn invoke<'a, 'server>(&'a self,
-                           _: &mut Request<'a, 'server, D>,
-                           mut response: Response<'a, D>)
-                           -> MiddlewareResult<'a, D> {
+    fn invoke<'a, 'server>(
+        &'a self,
+        _: &mut Request<'a, 'server, D>,
+        mut response: Response<'a, D>,
+    ) -> MiddlewareResult<'a, D> {
         let holder = self.0.builders.read().unwrap();
         let now = time::get_time();
-        let builders: Vec<&BuilderInfo> = holder.iter()
-            .filter_map(|e| {
-                match e.timeout >= now {
-                    true => Some(&e.info),
-                    false => None,
-                }
-            })
-            .collect();
+        let builders: Vec<&BuilderInfo> = holder
+            .iter()
+            .filter_map(|e| match e.timeout >= now {
+                true => Some(&e.info),
+                false => None,
+            }).collect();
 
         response.set(StatusCode::Ok);
         response.set(MediaType::Json);
@@ -110,9 +114,12 @@ fn is_unspecified(ip: &IpAddr) -> bool {
 }
 
 fn main() {
-    let daemon = Daemon { name: "octobuild_coordinator".to_string() };
+    let daemon = Daemon {
+        name: "octobuild_coordinator".to_string(),
+    };
 
-    daemon.run(move |rx: Receiver<State>| {
+    daemon
+        .run(move |rx: Receiver<State>| {
             octobuild::utils::init_logger();
 
             info!("Coordinator started.");
@@ -149,6 +156,5 @@ fn main() {
                 };
             }
             info!("Coordinator shutdowned.");
-        })
-        .unwrap();
+        }).unwrap();
 }

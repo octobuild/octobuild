@@ -43,14 +43,14 @@ impl Statistic {
         let remote_count = self.remote_count.load(Ordering::Relaxed);
         let total_count = hit_count + miss_count;
         format!(
-			"Cache statistic: hit {} of {} ({} %), remote {}, read {}, write {}, total {}",
-			hit_count,
-			total_count,
-			hit_count * 100 / max(total_count, 1),
-            remote_count   ,
+            "Cache statistic: hit {} of {} ({} %), remote {}, read {}, write {}, total {}",
+            hit_count,
+            total_count,
+            hit_count * 100 / max(total_count, 1),
+            remote_count,
             hit_bytes,
-			miss_bytes,
-			hit_bytes + miss_bytes,
-		)
+            miss_bytes,
+            hit_bytes + miss_bytes,
+        )
     }
 }

@@ -7,7 +7,9 @@ pub struct Lazy<T: Clone> {
 
 impl<T: Clone> Lazy<T> {
     pub fn new() -> Self {
-        Lazy { holder: RwLock::new(None) }
+        Lazy {
+            holder: RwLock::new(None),
+        }
     }
 
     pub fn get<F: FnOnce() -> T>(&self, factory: F) -> T {

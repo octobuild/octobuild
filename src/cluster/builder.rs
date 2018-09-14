@@ -2,9 +2,9 @@ use capnp;
 use capnp::message::{Allocator, Builder, ReaderOptions};
 use capnp::serialize_packed;
 
-use ::builder_capnp::compile_request;
-use ::builder_capnp::compile_response;
-use ::compiler::OutputInfo;
+use builder_capnp::compile_request;
+use builder_capnp::compile_response;
+use compiler::OutputInfo;
 
 use std::io;
 use std::io::{BufRead, Write};
@@ -29,22 +29,24 @@ impl CompileRequest {
         Self::read(try!(reader.get_root::<compile_request::Reader>()))
     }
 
-    pub fn stream_write<W: Write, A: Allocator>(&self,
-                                                stream: &mut W,
-                                                builder: &mut Builder<A>)
-                                                -> Result<(), io::Error> {
+    pub fn stream_write<W: Write, A: Allocator>(
+        &self,
+        stream: &mut W,
+        builder: &mut Builder<A>,
+    ) -> Result<(), io::Error> {
         self.write(builder.init_root::<compile_request::Builder>());
         serialize_packed::write_message(stream, builder)
     }
-
 
     pub fn read(reader: compile_request::Reader) -> Result<Self, capnp::Error> {
         let args = try!(reader.get_args());
         Ok(CompileRequest {
             toolchain: try!(reader.get_toolchain()).to_string(),
-            args: try!((0..args.len())
-                .map(|index| args.get(index).map(|value| value.to_string()))
-                .collect()),
+            args: try!(
+                (0..args.len())
+                    .map(|index| args.get(index).map(|value| value.to_string()))
+                    .collect()
+            ),
             preprocessed_data: try!(reader.get_preprocessed_data()).to_vec(),
             precompiled_hash: match reader.has_precompiled_hash() {
                 true => Some(try!(reader.get_precompiled_hash()).to_string()),
@@ -77,10 +79,11 @@ impl CompileResponse {
         Self::read(try!(reader.get_root::<compile_response::Reader>()))
     }
 
-    pub fn stream_write<W: Write, A: Allocator>(&self,
-                                                stream: &mut W,
-                                                builder: &mut Builder<A>)
-                                                -> Result<(), io::Error> {
+    pub fn stream_write<W: Write, A: Allocator>(
+        &self,
+        stream: &mut W,
+        builder: &mut Builder<A>,
+    ) -> Result<(), io::Error> {
         self.write(builder.init_root::<compile_response::Builder>());
         serialize_packed::write_message(stream, builder)
     }

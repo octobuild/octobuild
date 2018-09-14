@@ -6,19 +6,19 @@ use tempdir::TempDir;
 
 pub use super::super::compiler::*;
 
-use super::postprocess;
-use super::super::utils::filter;
 use super::super::io::memstream::MemStream;
 use super::super::io::tempfile::TempFile;
 use super::super::lazy::Lazy;
+use super::super::utils::filter;
+use super::postprocess;
 
+use self::regex::bytes::{NoExpand, Regex};
+use std::env;
 use std::fs::File;
 use std::io::{Cursor, Error, Read, Write};
-use std::env;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::Arc;
-use self::regex::bytes::{NoExpand, Regex};
 
 pub struct VsCompiler {
     temp_dir: Arc<TempDir>,
@@ -55,14 +55,16 @@ impl VsToolchain {
 
 impl Compiler for VsCompiler {
     fn resolve_toolchain(&self, command: &CommandInfo) -> Option<Arc<Toolchain>> {
-        if command.program
+        if command
+            .program
             .file_name()
             .and_then(|n| n.to_str())
             .map(|n| n.to_lowercase())
-            .map_or(false, |n| (n == "cl.exe") || (n == "cl")) {
+            .map_or(false, |n| (n == "cl.exe") || (n == "cl"))
+        {
             command.find_executable().and_then(|path| {
-                self.toolchains.resolve(&path,
-                                        |path| Arc::new(VsToolchain::new(path, &self.temp_dir)))
+                self.toolchains
+                    .resolve(&path, |path| Arc::new(VsToolchain::new(path, &self.temp_dir)))
             })
         } else {
             None
@@ -76,38 +78,41 @@ impl Compiler for VsCompiler {
 
     #[cfg(windows)]
     fn discovery_toolchains(&self) -> Vec<Arc<Toolchain>> {
-        use self::winreg::RegKey;
         use self::winreg::enums::*;
+        use self::winreg::RegKey;
 
-        lazy_static!{
-			static ref RE:self::regex::Regex = self::regex::Regex::new(r"^\d+\.\d+$").unwrap();
-		}
+        lazy_static! {
+            static ref RE: self::regex::Regex = self::regex::Regex::new(r"^\d+\.\d+$").unwrap();
+        }
 
-        const CL_BIN: &'static [&'static str] = &["bin/cl.exe",
-                                                  "bin/x86_arm/cl.exe",
-                                                  "bin/x86_amd64/cl.exe",
-                                                  "bin/amd64_x86/cl.exe",
-                                                  "bin/amd64_arm/cl.exe",
-                                                  "bin/amd64/cl.exe"];
-        const VC_REG: &'static [&'static str] = &["SOFTWARE\\Wow6432Node\\Microsoft\\VisualStudio\\SxS\\VC7",
-                                                  "SOFTWARE\\Microsoft\\VisualStudio\\SxS\\VC7"];
+        const CL_BIN: &'static [&'static str] = &[
+            "bin/cl.exe",
+            "bin/x86_arm/cl.exe",
+            "bin/x86_amd64/cl.exe",
+            "bin/amd64_x86/cl.exe",
+            "bin/amd64_arm/cl.exe",
+            "bin/amd64/cl.exe",
+        ];
+        const VC_REG: &'static [&'static str] = &[
+            "SOFTWARE\\Wow6432Node\\Microsoft\\VisualStudio\\SxS\\VC7",
+            "SOFTWARE\\Microsoft\\VisualStudio\\SxS\\VC7",
+        ];
 
-        VC_REG.iter()
-            .filter_map(|reg_path| RegKey::predef(HKEY_LOCAL_MACHINE).open_subkey_with_flags(reg_path, KEY_READ).ok())
-            .flat_map(|key| -> Vec<String> {
+        VC_REG
+            .iter()
+            .filter_map(|reg_path| {
+                RegKey::predef(HKEY_LOCAL_MACHINE)
+                    .open_subkey_with_flags(reg_path, KEY_READ)
+                    .ok()
+            }).flat_map(|key| -> Vec<String> {
                 key.enum_values()
                     .filter_map(|x| x.ok())
                     .map(|(name, _)| name)
                     .filter(|name| RE.is_match(&name))
                     .filter_map(|name: String| -> Option<String> { key.get_value(name).ok() })
                     .collect()
-            })
-            .map(|path| Path::new(&path).to_path_buf())
-            .map(|path| -> Vec<PathBuf> {
-                CL_BIN.iter()
-                    .map(|bin| path.join(bin))
-                    .collect()
-            })
+            }).map(|path| Path::new(&path).to_path_buf())
+            .map(|path| -> Vec<PathBuf> { CL_BIN.iter().map(|bin| path.join(bin)).collect() })
             .flat_map(|paths| paths.into_iter())
             .filter(|cl| cl.exists())
             .map(|cl| -> Arc<Toolchain> { Arc::new(VsToolchain::new(cl, &self.temp_dir)) })
@@ -129,20 +134,18 @@ impl Toolchain for VsToolchain {
         // Make parameters list for preprocessing.
         let mut args = filter(&task.shared.args, |arg: &Arg| -> Option<String> {
             match arg {
-                &Arg::Flag { ref scope, ref flag } => {
-                    match scope {
-                        &Scope::Preprocessor |
-                        &Scope::Shared => Some("/".to_string() + &flag),
-                        &Scope::Ignore | &Scope::Compiler => None,
-                    }
-                }
-                &Arg::Param { ref scope, ref flag, ref value } => {
-                    match scope {
-                        &Scope::Preprocessor |
-                        &Scope::Shared => Some("/".to_string() + &flag + &value),
-                        &Scope::Ignore | &Scope::Compiler => None,
-                    }
-                }
+                &Arg::Flag { ref scope, ref flag } => match scope {
+                    &Scope::Preprocessor | &Scope::Shared => Some("/".to_string() + &flag),
+                    &Scope::Ignore | &Scope::Compiler => None,
+                },
+                &Arg::Param {
+                    ref scope,
+                    ref flag,
+                    ref value,
+                } => match scope {
+                    &Scope::Preprocessor | &Scope::Shared => Some("/".to_string() + &flag + &value),
+                    &Scope::Ignore | &Scope::Compiler => None,
+                },
                 &Arg::Input { .. } => None,
                 &Arg::Output { .. } => None,
             }
@@ -156,16 +159,17 @@ impl Toolchain for VsToolchain {
         args.push(task.input_source.display().to_string());
 
         let mut command = task.shared.command.to_command();
-        command.args(&args)
-            .arg(&join_flag("/Fo", &task.output_object)); // /Fo option also set output path for #import directive
+        command.args(&args).arg(&join_flag("/Fo", &task.output_object)); // /Fo option also set output path for #import directive
         let output = try!(state.wrap_slow(|| command.output()));
         if output.status.success() {
             let mut content = MemStream::new();
             if task.shared.input_precompiled.is_some() || task.shared.output_precompiled.is_some() {
-                try!(postprocess::filter_preprocessed(&mut Cursor::new(output.stdout),
-                                                      &mut content,
-                                                      &task.shared.marker_precompiled,
-                                                      task.shared.output_precompiled.is_some()));
+                try!(postprocess::filter_preprocessed(
+                    &mut Cursor::new(output.stdout),
+                    &mut content,
+                    &task.shared.marker_precompiled,
+                    task.shared.output_precompiled.is_some()
+                ));
             } else {
                 try!(content.write(&output.stdout));
             };
@@ -183,26 +187,22 @@ impl Toolchain for VsToolchain {
     fn compile_prepare_step(&self, task: CompilationTask, preprocessed: MemStream) -> Result<CompileStep, Error> {
         let mut args = filter(&task.shared.args, |arg: &Arg| -> Option<String> {
             match arg {
-                &Arg::Flag { ref scope, ref flag } => {
-                    match scope {
-                        &Scope::Compiler | &Scope::Shared => Some("/".to_string() + &flag),
-                        &Scope::Preprocessor if task.shared.output_precompiled.is_some() => {
-                            Some("/".to_string() + &flag)
-                        }
-                        &Scope::Ignore |
-                        &Scope::Preprocessor => None,
+                &Arg::Flag { ref scope, ref flag } => match scope {
+                    &Scope::Compiler | &Scope::Shared => Some("/".to_string() + &flag),
+                    &Scope::Preprocessor if task.shared.output_precompiled.is_some() => Some("/".to_string() + &flag),
+                    &Scope::Ignore | &Scope::Preprocessor => None,
+                },
+                &Arg::Param {
+                    ref scope,
+                    ref flag,
+                    ref value,
+                } => match scope {
+                    &Scope::Compiler | &Scope::Shared => Some("/".to_string() + &flag + &value),
+                    &Scope::Preprocessor if task.shared.output_precompiled.is_some() => {
+                        Some("/".to_string() + &flag + &value)
                     }
-                }
-                &Arg::Param { ref scope, ref flag, ref value } => {
-                    match scope {
-                        &Scope::Compiler | &Scope::Shared => Some("/".to_string() + &flag + &value),
-                        &Scope::Preprocessor if task.shared.output_precompiled.is_some() => {
-                            Some("/".to_string() + &flag + &value)
-                        }
-                        &Scope::Ignore |
-                        &Scope::Preprocessor => None,
-                    }
-                }
+                    &Scope::Ignore | &Scope::Preprocessor => None,
+                },
                 &Arg::Input { .. } => None,
                 &Arg::Output { .. } => None,
             }
@@ -220,10 +220,13 @@ impl Toolchain for VsToolchain {
         let input_temp = TempFile::new_in(self.temp_dir.path(), ".i");
         try!(File::create(input_temp.path()).and_then(|mut s| task.preprocessed.copy(&mut s)));
         // Output file path
-        let output_object = task.output_object.expect("Visual Studio don't support compilation to stdout.");
+        let output_object = task
+            .output_object
+            .expect("Visual Studio don't support compilation to stdout.");
         // Run compiler.
         let mut command = Command::new(&self.path);
-        command.env_clear()
+        command
+            .env_clear()
             .current_dir(self.temp_dir.path())
             .arg("/c")
             .args(&task.args)
@@ -233,7 +236,8 @@ impl Toolchain for VsToolchain {
         // todo: #15 Need to make correct PATH variable for cl.exe manually
         for (name, value) in vec!["SystemDrive", "SystemRoot", "TEMP", "TMP", "PATH"]
             .iter()
-            .filter_map(|name| env::var(name).ok().map(|value| (name, value))) {
+            .filter_map(|name| env::var(name).ok().map(|value| (name, value)))
+        {
             command.env(name, value);
         }
         // Output files.
@@ -245,7 +249,8 @@ impl Toolchain for VsToolchain {
             &None => {}
         }
         // Save input file name for output filter.
-        let temp_file = input_temp.path()
+        let temp_file = input_temp
+            .path()
             .file_name()
             .and_then(|o| o.to_str())
             .map(|o| o.as_bytes())
@@ -261,12 +266,10 @@ impl Toolchain for VsToolchain {
         }
         // Execute.
         state.wrap_slow(|| {
-            command.output().map(|o| {
-                OutputInfo {
-                    status: o.status.code(),
-                    stdout: prepare_output(temp_file, o.stdout.clone(), o.status.code() == Some(0)),
-                    stderr: o.stderr,
-                }
+            command.output().map(|o| OutputInfo {
+                status: o.status.code(),
+                stdout: prepare_output(temp_file, o.stdout.clone(), o.status.code() == Some(0)),
+                stderr: o.stderr,
             })
         })
     }
@@ -275,13 +278,12 @@ impl Toolchain for VsToolchain {
     fn compile_memory(&self, state: &SharedState, mut task: CompileStep) -> Result<(OutputInfo, Vec<u8>), Error> {
         let output_temp = TempFile::new_in(self.temp_dir.path(), ".o");
         task.output_object = Some(output_temp.path().to_path_buf());
-        self.compile_step(state, task)
-            .and_then(|output| {
-                File::open(&output_temp.path()).and_then(|mut f| {
-                    let mut buffer = Vec::new();
-                    f.read_to_end(&mut buffer).map(|_| (output, buffer))
-                })
+        self.compile_step(state, task).and_then(|output| {
+            File::open(&output_temp.path()).and_then(|mut f| {
+                let mut buffer = Vec::new();
+                f.read_to_end(&mut buffer).map(|_| (output, buffer))
             })
+        })
     }
 }
 
@@ -296,14 +298,14 @@ fn vs_identifier(path: &Path) -> Option<String> {
     extern crate kernel32;
     extern crate version;
 
-    use winapi::shared::minwindef::{ DWORD, LPCVOID, LPVOID, WORD };
     use winapi::ctypes::c_void;
+    use winapi::shared::minwindef::{DWORD, LPCVOID, LPVOID, WORD};
 
     use std::convert::Into;
     use std::ffi::OsStr;
+    use std::os::windows::ffi::OsStrExt;
     use std::ptr;
     use std::slice;
-    use std::os::windows::ffi::OsStrExt;
 
     #[repr(C)]
     struct LANGANDCODEPAGE {
@@ -333,25 +335,33 @@ fn vs_identifier(path: &Path) -> Option<String> {
     let translation_key = unsafe {
         let mut value_size: DWORD = 0;
         let mut value_data: LPVOID = ptr::null_mut();
-        if version::VerQueryValueW(data.as_ptr() as LPCVOID,
-                                   utf16(OsStr::new("\\VarFileInfo\\Translation")).as_ptr(),
-                                   &mut value_data,
-                                   &mut value_size) == 0 {
+        if version::VerQueryValueW(
+            data.as_ptr() as LPCVOID,
+            utf16(OsStr::new("\\VarFileInfo\\Translation")).as_ptr(),
+            &mut value_data,
+            &mut value_size,
+        ) == 0
+        {
             return None;
         }
         let codepage = value_data as *const LANGANDCODEPAGE;
-        format!("\\StringFileInfo\\{:04X}{:04X}",
-                (*codepage).language,
-                (*codepage).codepage)
+        format!(
+            "\\StringFileInfo\\{:04X}{:04X}",
+            (*codepage).language,
+            (*codepage).codepage
+        )
     };
     // Read product version
     let product_version = unsafe {
         let mut value_size: DWORD = 0;
         let mut value_data: LPVOID = ptr::null_mut();
-        if version::VerQueryValueW(data.as_ptr() as LPCVOID,
-                                   utf16(OsStr::new(&(translation_key + "\\ProductVersion"))).as_ptr(),
-                                   &mut value_data,
-                                   &mut value_size) == 0 {
+        if version::VerQueryValueW(
+            data.as_ptr() as LPCVOID,
+            utf16(OsStr::new(&(translation_key + "\\ProductVersion"))).as_ptr(),
+            &mut value_data,
+            &mut value_size,
+        ) == 0
+        {
             return None;
         }
         if value_size == 0 {
@@ -382,8 +392,10 @@ fn read_executable_id(path: &Path) -> Result<String, Error> {
     try!(file.read_exact(&mut header[..]));
     // Check MZ header signature
     if header[0..2] != [0x4D, 0x5A] {
-        return Err(Error::new(ErrorKind::InvalidData,
-                              "Unexpected file type (MZ header signature not found)"));
+        return Err(Error::new(
+            ErrorKind::InvalidData,
+            "Unexpected file type (MZ header signature not found)",
+        ));
     }
     // Read PE header offset
     let pe_offset = try!(Cursor::new(&header[0x3C..0x40]).read_u32::<LittleEndian>()) as u64;
@@ -393,8 +405,10 @@ fn read_executable_id(path: &Path) -> Result<String, Error> {
     try!(file.read_exact(&mut header[..]));
     // Check PE header signature
     if header[0..4] != [0x50, 0x45, 0x00, 0x00] {
-        return Err(Error::new(ErrorKind::InvalidData,
-                              "Unexpected file type (PE header signature not found)"));
+        return Err(Error::new(
+            ErrorKind::InvalidData,
+            "Unexpected file type (PE header signature not found)",
+        ));
     }
     let pe_time_date_stamp = try!(Cursor::new(&header[0x08..0x0C]).read_u32::<LittleEndian>());
     let pe_size_of_image = try!(Cursor::new(&header[0x50..0x54]).read_u32::<LittleEndian>());
@@ -415,8 +429,8 @@ fn prepare_output(line: &[u8], mut buffer: Vec<u8>, success: bool) -> Vec<u8> {
     if success {
         // Remove some redundant lines
         lazy_static! {
-			static ref RE: Regex = Regex::new(r"(?m)^\S+[^:]*\(\d+\) : warning C4628: .*$\n?").unwrap();
-		}
+            static ref RE: Regex = Regex::new(r"(?m)^\S+[^:]*\(\d+\) : warning C4628: .*$\n?").unwrap();
+        }
         buffer = RE.replace_all(&buffer, NoExpand(b""))
     }
     buffer
@@ -433,7 +447,6 @@ fn join_flag(flag: &str, path: &Path) -> String {
     flag.to_string() + &path.to_str().unwrap()
 }
 
-
 #[cfg(test)]
 mod test {
     use std::io::Write;
@@ -448,41 +461,47 @@ mod test {
 
     #[test]
     fn test_prepare_output_simple() {
-        check_prepare_output(r#"BLABLABLA
+        check_prepare_output(
+            r#"BLABLABLA
 foo.c : warning C4411: foo bar
 "#,
-                             r#"foo.c : warning C4411: foo bar
+            r#"foo.c : warning C4411: foo bar
 "#,
-                             "BLABLABLA",
-                             true);
+            "BLABLABLA",
+            true,
+        );
     }
 
     #[test]
     fn test_prepare_output_c4628_remove() {
-        check_prepare_output(r#"BLABLABLA
+        check_prepare_output(
+            r#"BLABLABLA
 foo.c(41) : warning C4411: foo bar
 foo.c(42) : warning C4628: foo bar
 foo.c(43) : warning C4433: foo bar
 "#,
-                             r#"foo.c(41) : warning C4411: foo bar
+            r#"foo.c(41) : warning C4411: foo bar
 foo.c(43) : warning C4433: foo bar
 "#,
-                             "BLABLABLA",
-                             true);
+            "BLABLABLA",
+            true,
+        );
     }
 
     #[test]
     fn test_prepare_output_c4628_keep() {
-        check_prepare_output(r#"BLABLABLA
+        check_prepare_output(
+            r#"BLABLABLA
 foo.c(41) : warning C4411: foo bar
 foo.c(42) : warning C4628: foo bar
 foo.c(43) : warning C4433: foo bar
 "#,
-                             r#"foo.c(41) : warning C4411: foo bar
+            r#"foo.c(41) : warning C4411: foo bar
 foo.c(42) : warning C4628: foo bar
 foo.c(43) : warning C4433: foo bar
 "#,
-                             "BLABLABLA",
-                             false);
+            "BLABLABLA",
+            false,
+        );
     }
 }

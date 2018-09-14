@@ -63,18 +63,20 @@ pub fn parse(cmd: &str) -> Result<Vec<String>, Error> {
         args.push(arg);
     }
     if slash {
-        return Err(Error::new(ErrorKind::InvalidInput,
-                              "Unexpected line end: escape sequence is not finished"));
+        return Err(Error::new(
+            ErrorKind::InvalidInput,
+            "Unexpected line end: escape sequence is not finished",
+        ));
     }
     match quote {
-        Quote::Single => {
-            Err(Error::new(ErrorKind::InvalidInput,
-                           "Unexpected line end: single quote is not closed"))
-        }
-        Quote::Double => {
-            Err(Error::new(ErrorKind::InvalidInput,
-                           "Unexpected line end: double quote is not closed"))
-        }
+        Quote::Single => Err(Error::new(
+            ErrorKind::InvalidInput,
+            "Unexpected line end: single quote is not closed",
+        )),
+        Quote::Double => Err(Error::new(
+            ErrorKind::InvalidInput,
+            "Unexpected line end: double quote is not closed",
+        )),
         Quote::None => Ok(args),
     }
 }
@@ -91,8 +93,7 @@ fn test_parse_2() {
 
 #[test]
 fn test_parse_3() {
-    assert_eq!(parse("\"\" \"abc\" d e \"\"").unwrap(),
-               ["", "abc", "d", "e", ""]);
+    assert_eq!(parse("\"\" \"abc\" d e \"\"").unwrap(), ["", "abc", "d", "e", ""]);
 }
 
 #[test]
@@ -107,30 +108,34 @@ fn test_parse_5() {
 
 #[test]
 fn test_parse_6() {
-    assert_eq!(parse("a\\\\\\\\\"b c\" d e").unwrap(),
-               ["a\\\\b c", "d", "e"]);
+    assert_eq!(parse("a\\\\\\\\\"b c\" d e").unwrap(), ["a\\\\b c", "d", "e"]);
 }
 
 #[test]
 fn test_parse_7() {
-    assert_eq!(parse("C:\\Windows\\System32 d e").unwrap(),
-               ["C:\\Windows\\System32", "d", "e"]);
+    assert_eq!(
+        parse("C:\\Windows\\System32 d e").unwrap(),
+        ["C:\\Windows\\System32", "d", "e"]
+    );
 }
 
 #[test]
 fn test_parse_8() {
-    assert_eq!(parse("/TEST\"C:\\Windows\\System32\" d e").unwrap(),
-               ["/TESTC:\\Windows\\System32", "d", "e"]);
+    assert_eq!(
+        parse("/TEST\"C:\\Windows\\System32\" d e").unwrap(),
+        ["/TESTC:\\Windows\\System32", "d", "e"]
+    );
 }
 
 #[test]
 fn test_parse_9() {
-    assert_eq!(parse("begin ' some text \" foo\\ bar\\' end").unwrap(),
-               ["begin", " some text \" foo\\ bar\\", "end"]);
+    assert_eq!(
+        parse("begin ' some text \" foo\\ bar\\' end").unwrap(),
+        ["begin", " some text \" foo\\ bar\\", "end"]
+    );
 }
 
 #[test]
 fn test_parse_10() {
-    assert_eq!(parse("begin some\\ text end").unwrap(),
-               ["begin", "some text", "end"]);
+    assert_eq!(parse("begin some\\ text end").unwrap(), ["begin", "some text", "end"]);
 }

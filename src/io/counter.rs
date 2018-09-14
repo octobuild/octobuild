@@ -17,19 +17,13 @@ impl<S> Counter<S> {
 
 impl<R: Read> Counter<R> {
     pub fn reader(r: R) -> Counter<R> {
-        Counter {
-            stream: r,
-            size: 0,
-        }
+        Counter { stream: r, size: 0 }
     }
 }
 
 impl<W: Write> Counter<W> {
     pub fn writer(w: W) -> Counter<W> {
-        Counter {
-            stream: w,
-            size: 0,
-        }
+        Counter { stream: w, size: 0 }
     }
 }
 
