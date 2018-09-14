@@ -47,7 +47,7 @@ impl VsToolchain {
     pub fn new(path: PathBuf, temp_dir: &Arc<TempDir>) -> Self {
         VsToolchain {
             temp_dir: temp_dir.clone(),
-            path: path,
+            path,
             identifier: Lazy::new(),
         }
     }

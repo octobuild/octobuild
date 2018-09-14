@@ -122,11 +122,11 @@ pub fn create_tasks(command: CommandInfo, args: &[String]) -> Result<Vec<Compila
         }
     };
     let shared = Arc::new(CompilationArgs {
-        command: command,
+        command,
         args: parsed_args,
         output_precompiled: None,
-        marker_precompiled: marker_precompiled,
-        input_precompiled: input_precompiled,
+        marker_precompiled,
+        input_precompiled,
     });
     input_sources
         .into_iter()

@@ -30,7 +30,7 @@ impl BuilderInfoUpdate {
     pub fn new(info: BuilderInfo) -> Self {
         BuilderInfoUpdate {
             guid: Uuid::new_v4().to_string(),
-            info: info,
+            info,
         }
     }
 }

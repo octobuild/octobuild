@@ -101,27 +101,27 @@ pub enum Arg {
 impl Arg {
     pub fn flag<F: Into<String>>(scope: Scope, flag: F) -> Arg {
         Arg::Flag {
-            scope: scope,
+            scope,
             flag: flag.into(),
         }
     }
     pub fn param<F: Into<String>, V: Into<String>>(scope: Scope, flag: F, value: V) -> Arg {
         Arg::Param {
-            scope: scope,
+            scope,
             flag: flag.into(),
             value: value.into(),
         }
     }
     pub fn input<F: Into<String>, P: Into<String>>(kind: InputKind, flag: F, file: P) -> Arg {
         Arg::Input {
-            kind: kind,
+            kind,
             flag: flag.into(),
             file: file.into(),
         }
     }
     pub fn output<F: Into<String>, P: Into<String>>(kind: OutputKind, flag: F, file: P) -> Arg {
         Arg::Output {
-            kind: kind,
+            kind,
             flag: flag.into(),
             file: file.into(),
         }
@@ -389,8 +389,8 @@ impl CompileStep {
                 true => task.shared.input_precompiled.clone(),
                 false => None,
             },
-            args: args,
-            preprocessed: preprocessed,
+            args,
+            preprocessed,
         }
     }
 }

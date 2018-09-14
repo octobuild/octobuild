@@ -69,10 +69,10 @@ pub fn filter_preprocessed(
         ptr_read: ptr::null(),
         ptr_end: ptr::null(),
 
-        reader: reader,
-        writer: writer,
+        reader,
+        writer,
 
-        keep_headers: keep_headers,
+        keep_headers,
         marker: None,
         utf8: false,
         header_found: false,

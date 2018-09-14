@@ -41,11 +41,7 @@ impl MemStream {
     pub fn reader(&self) -> MemReader {
         let mut iter = self.iter();
         let last = iter.next();
-        MemReader {
-            offset: 0,
-            iter: iter,
-            last: last,
-        }
+        MemReader { offset: 0, iter, last }
     }
 
     pub fn iter(&self) -> Iter {
