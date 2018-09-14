@@ -1,5 +1,5 @@
-use std::mem;
 use std::io::{Error, ErrorKind, Read, Result, Write};
+use std::mem;
 
 /// Reads a single byte. Returns `Err` on EOF.
 fn read_byte(stream: &mut Read) -> Result<u8> {
@@ -38,7 +38,6 @@ fn read_array(stream: &mut Read, buf: &mut [u8]) -> Result<()> {
             return Err(Error::new(ErrorKind::InvalidInput, "Unexpected end of data"));
         }
         pos += size;
-
     }
     Ok(())
 }

@@ -1,13 +1,13 @@
-extern crate xml;
 extern crate petgraph;
+extern crate xml;
 
 use cmd;
 use compiler::{CommandEnv, CommandInfo};
 
+use std::collections::{HashMap, HashSet};
 use std::env;
 use std::fmt::{Display, Formatter};
 use std::io::{Error, ErrorKind, Read};
-use std::collections::{HashMap, HashSet};
 use std::iter::FromIterator;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -116,23 +116,21 @@ pub fn parse_build_set<R: Read>(graph: &mut XgGraph, events: &mut EventReader<R>
     let mut projects: Vec<XgProject> = Vec::new();
     loop {
         match try!(next_xml_event(events)) {
-            XmlEvent::StartElement { name, attributes, .. } => {
-                match &name.local_name[..] {
-                    "Environments" => {
-                        try!(parse_environments(events, &mut envs));
-                    }
-                    "Project" => {
-                        let mut attrs = map_attributes(attributes);
-                        projects.push(XgProject {
-                            env: try!(take_attr(&mut attrs, "Env")),
-                            tasks: try!(parse_tasks(events)),
-                        });
-                    }
-                    _ => {
-                        try!(parse_skip(events, ()));
-                    }
+            XmlEvent::StartElement { name, attributes, .. } => match &name.local_name[..] {
+                "Environments" => {
+                    try!(parse_environments(events, &mut envs));
                 }
-            }
+                "Project" => {
+                    let mut attrs = map_attributes(attributes);
+                    projects.push(XgProject {
+                        env: try!(take_attr(&mut attrs, "Env")),
+                        tasks: try!(parse_tasks(events)),
+                    });
+                }
+                _ => {
+                    try!(parse_skip(events, ()));
+                }
+            },
             XmlEvent::EndElement { .. } => {
                 break;
             }
@@ -142,23 +140,22 @@ pub fn parse_build_set<R: Read>(graph: &mut XgGraph, events: &mut EventReader<R>
     parse_create_graph(graph, envs, projects)
 }
 
-fn parse_environments<R: Read>(events: &mut EventReader<R>,
-                               envs: &mut HashMap<String, XgEnvironment>)
-                               -> Result<(), Error> {
+fn parse_environments<R: Read>(
+    events: &mut EventReader<R>,
+    envs: &mut HashMap<String, XgEnvironment>,
+) -> Result<(), Error> {
     loop {
         match try!(next_xml_event(events)) {
-            XmlEvent::StartElement { name, attributes, .. } => {
-                match &name.local_name[..] {
-                    "Environment" => {
-                        let mut attrs = map_attributes(attributes);
-                        let name = try!(take_attr(&mut attrs, "Name"));
-                        envs.insert(name, try!(parse_environment(events)));
-                    }
-                    _ => {
-                        try!(parse_skip(events, ()));
-                    }
+            XmlEvent::StartElement { name, attributes, .. } => match &name.local_name[..] {
+                "Environment" => {
+                    let mut attrs = map_attributes(attributes);
+                    let name = try!(take_attr(&mut attrs, "Name"));
+                    envs.insert(name, try!(parse_environment(events)));
                 }
-            }
+                _ => {
+                    try!(parse_skip(events, ()));
+                }
+            },
             XmlEvent::EndElement { .. } => {
                 return Ok(());
             }
@@ -223,13 +220,14 @@ fn parse_tools<R: Read>(events: &mut EventReader<R>, tools: &mut HashMap<String,
                         let mut attrs = map_attributes(attributes);
                         let name = try!(take_attr(&mut attrs, "Name"));
                         let exec = try!(take_attr(&mut attrs, "Path"));
-                        tools.insert(name,
-                                     XgTool {
-                                         exec: Path::new(&exec).to_path_buf(),
-                                         output: attrs.remove("OutputPrefix"),
-                                         args: attrs.remove("Params")
-                                             .unwrap_or_else(|| String::new()),
-                                     });
+                        tools.insert(
+                            name,
+                            XgTool {
+                                exec: Path::new(&exec).to_path_buf(),
+                                output: attrs.remove("OutputPrefix"),
+                                args: attrs.remove("Params").unwrap_or_else(|| String::new()),
+                            },
+                        );
                     }
                     _ => {}
                 }
@@ -260,14 +258,15 @@ fn parse_tasks<R: Read>(events: &mut EventReader<R>) -> Result<HashMap<String, X
                             _ => HashSet::new(),
                         };
 
-                        tasks.insert(name.clone(),
-                                     XgTask {
-                                         title: attrs.remove("Caption"),
-                                         tool: tool,
-                                         working_dir: Path::new(&working_dir).to_path_buf(),
-                                         depends_on: depends_on.into_iter()
-                                             .collect::<Vec<String>>(),
-                                     });
+                        tasks.insert(
+                            name.clone(),
+                            XgTask {
+                                title: attrs.remove("Caption"),
+                                tool: tool,
+                                working_dir: Path::new(&working_dir).to_path_buf(),
+                                depends_on: depends_on.into_iter().collect::<Vec<String>>(),
+                            },
+                        );
                     }
                     _ => {}
                 }
@@ -301,18 +300,21 @@ fn parse_skip<R: Read, T>(events: &mut EventReader<R>, result: T) -> Result<T, E
 }
 
 fn next_xml_event<R: Read>(reader: &mut EventReader<R>) -> Result<XmlEvent, Error> {
-    reader.next().map_err(|e| Error::new(ErrorKind::InvalidInput, XgParseError::XmlError(e)))
+    reader
+        .next()
+        .map_err(|e| Error::new(ErrorKind::InvalidInput, XgParseError::XmlError(e)))
 }
 
-fn parse_create_graph(graph: &mut XgGraph,
-                      envs: HashMap<String, XgEnvironment>,
-                      projects: Vec<XgProject>)
-                      -> Result<(), Error> {
+fn parse_create_graph(
+    graph: &mut XgGraph,
+    envs: HashMap<String, XgEnvironment>,
+    projects: Vec<XgProject>,
+) -> Result<(), Error> {
     for project in projects.into_iter() {
-        let env = try!(envs.get(&project.env).ok_or_else(|| {
-            Error::new(ErrorKind::InvalidInput,
-                       XgParseError::EnvironmentNotFound(project.env.clone()))
-        }));
+        let env = try!(envs.get(&project.env).ok_or_else(|| Error::new(
+            ErrorKind::InvalidInput,
+            XgParseError::EnvironmentNotFound(project.env.clone())
+        )));
         try!(graph_project(graph, project, env));
     }
     Ok(())
@@ -322,15 +324,16 @@ fn graph_project(graph: &mut XgGraph, project: XgProject, env: &XgEnvironment) -
     let mut nodes: Vec<NodeIndex> = Vec::new();
     let mut task_refs: HashMap<&str, NodeIndex> = HashMap::new();
     for (id, task) in project.tasks.iter() {
-        let tool = try!(env.tools.get(&task.tool).ok_or_else(|| {
-            Error::new(ErrorKind::InvalidInput,
-                       XgParseError::ToolNotFound(task.tool.clone()))
-        }));
+        let tool = try!(
+            env.tools
+                .get(&task.tool)
+                .ok_or_else(|| Error::new(ErrorKind::InvalidInput, XgParseError::ToolNotFound(task.tool.clone())))
+        );
         let node = graph.add_node(XgNode {
-            title: task.title
-                .as_ref()
-                .map_or_else(|| tool.output.as_ref().map_or_else(|| String::new(), |v| v.clone()),
-                             |v| v.clone()),
+            title: task.title.as_ref().map_or_else(
+                || tool.output.as_ref().map_or_else(|| String::new(), |v| v.clone()),
+                |v| v.clone(),
+            ),
             command: CommandInfo {
                 program: tool.exec.clone(),
                 // Working directory
@@ -346,10 +349,10 @@ fn graph_project(graph: &mut XgGraph, project: XgProject, env: &XgEnvironment) -
     for (src_id, task) in project.tasks.iter() {
         let src = task_refs.get(&src_id[..]).unwrap();
         for dst_id in task.depends_on.iter() {
-            let dst = try!(task_refs.get(&dst_id[..]).ok_or_else(|| {
-                Error::new(ErrorKind::InvalidInput,
-                           XgParseError::DependencyNotFound(dst_id.clone()))
-            }));
+            let dst = try!(task_refs.get(&dst_id[..]).ok_or_else(|| Error::new(
+                ErrorKind::InvalidInput,
+                XgParseError::DependencyNotFound(dst_id.clone())
+            )));
             graph.add_edge(*src, *dst, ());
         }
     }
@@ -361,10 +364,9 @@ fn map_attributes(attributes: Vec<xml::attribute::OwnedAttribute>) -> HashMap<St
 }
 
 fn take_attr(attrs: &mut HashMap<String, String>, attr: &'static str) -> Result<String, Error> {
-    attrs.remove(attr).ok_or_else(|| {
-        Error::new(ErrorKind::InvalidInput,
-                   XgParseError::AttributeNotFound(attr))
-    })
+    attrs
+        .remove(attr)
+        .ok_or_else(|| Error::new(ErrorKind::InvalidInput, XgParseError::AttributeNotFound(attr)))
 }
 
 #[test]
@@ -372,7 +374,8 @@ fn test_parse_smoke() {
     use std::fs::File;
     use std::io::BufReader;
 
-    parse(&mut Graph::new(),
-          BufReader::new(File::open("tests/graph-parser.xml").unwrap()))
-        .unwrap();
+    parse(
+        &mut Graph::new(),
+        BufReader::new(File::open("tests/graph-parser.xml").unwrap()),
+    ).unwrap();
 }

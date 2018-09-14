@@ -1,35 +1,35 @@
+extern crate log;
 extern crate octobuild;
 extern crate petgraph;
 extern crate regex;
-extern crate log;
 #[macro_use]
 extern crate lazy_static;
 
-use octobuild::config::Config;
-use octobuild::xg;
-use octobuild::xg::parser::{XgGraph, XgNode};
-use octobuild::version;
 use octobuild::cluster::client::RemoteCompiler;
 use octobuild::compiler::*;
+use octobuild::config::Config;
+use octobuild::version;
+use octobuild::xg;
+use octobuild::xg::parser::{XgGraph, XgNode};
 
 use octobuild::simple::create_temp_dir;
 use octobuild::simple::supported_compilers;
-use octobuild::worker::validate_graph;
 use octobuild::worker::execute_graph;
+use octobuild::worker::validate_graph;
 use octobuild::worker::{BuildAction, BuildGraph, BuildResult, BuildTask};
 
-use petgraph::{EdgeDirection, Graph};
 use petgraph::graph::NodeIndex;
+use petgraph::{EdgeDirection, Graph};
 use regex::Regex;
 
-use std::fs::File;
 use std::env;
-use std::io::{BufReader, Error, ErrorKind, Write};
+use std::fs::File;
 use std::io;
+use std::io::{BufReader, Error, ErrorKind, Write};
 use std::iter::FromIterator;
 use std::path::{Path, PathBuf};
-use std::sync::Arc;
 use std::process;
+use std::sync::Arc;
 
 fn main() {
     println!("xgConsole ({}):", version::full_version());
@@ -44,12 +44,10 @@ fn main() {
     }
 
     process::exit(match execute(&args[1..]) {
-        Ok(result) => {
-            match result {
-                Some(r) => r,
-                None => 501,
-            }
-        }
+        Ok(result) => match result {
+            Some(r) => r,
+            None => 501,
+        },
         Err(e) => {
             println!("FATAL ERROR: {}", e);
             500
@@ -59,8 +57,8 @@ fn main() {
 
 fn is_flag(arg: &str) -> bool {
     lazy_static! {
-		static ref RE: Regex = Regex::new(r"^/\w+([=].*)?$").unwrap();
-	}
+        static ref RE: Regex = Regex::new(r"^/\w+([=].*)?$").unwrap();
+    }
     RE.is_match(arg)
 }
 
@@ -97,7 +95,11 @@ fn expand_files(mut files: Vec<PathBuf>, arg: &str) -> Vec<PathBuf> {
         let expr = mask_to_regex(&mask.to_lowercase());
         for entry in try!(fs::read_dir(dir)) {
             let entry = try!(entry);
-            if entry.file_name().to_str().map_or(false, |s| expr.is_match(&s.to_lowercase())) {
+            if entry
+                .file_name()
+                .to_str()
+                .map_or(false, |s| expr.is_match(&s.to_lowercase()))
+            {
                 result.push(entry.path());
             }
         }
@@ -105,7 +107,8 @@ fn expand_files(mut files: Vec<PathBuf>, arg: &str) -> Vec<PathBuf> {
     }
 
     let path = Path::new(arg).to_path_buf();
-    let mask = path.file_name()
+    let mask = path
+        .file_name()
         .map_or(None, |name| name.to_str())
         .map_or(None, |s| Some(s.to_string()));
     match mask {
@@ -129,9 +132,9 @@ fn expand_files(mut files: Vec<PathBuf>, arg: &str) -> Vec<PathBuf> {
 fn execute(args: &[String]) -> Result<Option<i32>, Error> {
     let config = try!(Config::new());
     let state = SharedState::new(&config);
-    let compiler = RemoteCompiler::new(&config.coordinator,
-                                       supported_compilers(&try!(create_temp_dir())));
-    let files = args.iter()
+    let compiler = RemoteCompiler::new(&config.coordinator, supported_compilers(&try!(create_temp_dir())));
+    let files = args
+        .iter()
         .filter(|a| !is_flag(a))
         .fold(Vec::new(), |state, a| expand_files(state, &a));
     if files.len() == 0 {
@@ -162,7 +165,11 @@ fn prepare_graph<C: Compiler>(compiler: &C, graph: XgGraph) -> Result<BuildGraph
     let mut result: BuildGraph = Graph::new();
     for raw_node in graph.raw_nodes().iter() {
         let node: &XgNode = &raw_node.weight;
-        let args: Vec<String> = node.args.iter().map(|ref arg| expand_arg(&arg, &env_resolver)).collect();
+        let args: Vec<String> = node
+            .args
+            .iter()
+            .map(|ref arg| expand_arg(&arg, &env_resolver))
+            .collect();
         let command = node.command.clone();
 
         let actions = BuildAction::create_tasks(compiler, command.clone(), &args, &node.title);
@@ -209,11 +216,10 @@ fn prepare_graph<C: Compiler>(compiler: &C, graph: XgGraph) -> Result<BuildGraph
 }
 
 fn print_task_result(result: BuildResult) -> Result<(), Error> {
-    println!("#{} {}/{}: {}",
-             result.worker,
-             result.completed,
-             result.total,
-             result.task.title);
+    println!(
+        "#{} {}/{}: {}",
+        result.worker, result.completed, result.total, result.task.title
+    );
     match result.result {
         &Ok(ref output) => {
             try!(io::stdout().write_all(&output.stdout));
@@ -229,26 +235,24 @@ fn expand_arg<F: Fn(&str) -> Option<String>>(arg: &str, resolver: &F) -> String 
     let mut suffix = arg;
     loop {
         match suffix.find("$(") {
-            Some(begin) => {
-                match suffix[begin..].find(")") {
-                    Some(end) => {
-                        let name = &suffix[begin + 2..begin + end];
-                        match resolver(name) {
-                            Some(ref value) => {
-                                result = result + &suffix[..begin] + &value;
-                            }
-                            None => {
-                                result = result + &suffix[..begin + end + 1];
-                            }
+            Some(begin) => match suffix[begin..].find(")") {
+                Some(end) => {
+                    let name = &suffix[begin + 2..begin + end];
+                    match resolver(name) {
+                        Some(ref value) => {
+                            result = result + &suffix[..begin] + &value;
                         }
-                        suffix = &suffix[begin + end + 1..];
+                        None => {
+                            result = result + &suffix[..begin + end + 1];
+                        }
                     }
-                    None => {
-                        result = result + suffix;
-                        break;
-                    }
+                    suffix = &suffix[begin + end + 1..];
                 }
-            }
+                None => {
+                    result = result + suffix;
+                    break;
+                }
+            },
             None => {
                 result = result + suffix;
                 break;
@@ -260,19 +264,20 @@ fn expand_arg<F: Fn(&str) -> Option<String>>(arg: &str, resolver: &F) -> String 
 
 #[test]
 fn test_parse_vars() {
-    assert_eq!(expand_arg("A$(test)$(inner)$(none)B",
-                          &|name: &str| -> Option<String> {
-        match name {
-            "test" => Some("foo".to_string()),
-            "inner" => Some("$(bar)".to_string()),
-            "none" => None,
-            _ => {
-                assert!(false, format!("Unexpected value: {}", name));
-                None
+    assert_eq!(
+        expand_arg("A$(test)$(inner)$(none)B", &|name: &str| -> Option<String> {
+            match name {
+                "test" => Some("foo".to_string()),
+                "inner" => Some("$(bar)".to_string()),
+                "none" => None,
+                _ => {
+                    assert!(false, format!("Unexpected value: {}", name));
+                    None
+                }
             }
-        }
-    }),
-               "Afoo$(bar)$(none)B");
+        }),
+        "Afoo$(bar)$(none)B"
+    );
 }
 
 #[test]

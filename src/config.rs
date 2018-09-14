@@ -1,8 +1,9 @@
-extern crate yaml_rust;
 extern crate num_cpus;
+extern crate yaml_rust;
 
 use hyper::Url;
 
+use std::collections::BTreeMap;
 use std::env;
 use std::error::Error;
 use std::fs::File;
@@ -11,7 +12,6 @@ use std::io::{ErrorKind, Read, Result};
 use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4, ToSocketAddrs};
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
-use std::collections::BTreeMap;
 
 use self::yaml_rust::{Yaml, YamlEmitter, YamlLoader};
 
@@ -48,14 +48,12 @@ impl Config {
 
     pub fn get_coordinator_addrs(&self) -> Result<Vec<SocketAddr>> {
         match &self.coordinator {
-            &Some(ref url) => {
-                url.with_default_port(|url| match url.scheme() {
-                        "http" => Ok(80),
-                        _ => Err(()),
-                    })
-                    .and_then(|host| host.to_socket_addrs())
-                    .map(|iter| iter.collect())
-            }
+            &Some(ref url) => url
+                .with_default_port(|url| match url.scheme() {
+                    "http" => Ok(80),
+                    _ => Err(()),
+                }).and_then(|host| host.to_socket_addrs())
+                .map(|iter| iter.collect()),
             &None => Ok(Vec::new()),
         }
     }
@@ -65,58 +63,33 @@ impl Config {
     }
 
     fn load(local: &Option<Yaml>, global: &Option<Yaml>, defaults: bool) -> Result<Self> {
-        let cache_limit_mb = get_config(local,
-                                        global,
-                                        PARAM_CACHE_LIMIT,
-                                        |v| v.as_i64().map(|v| v as u32))
-            .unwrap_or(16 * 1024);
+        let cache_limit_mb =
+            get_config(local, global, PARAM_CACHE_LIMIT, |v| v.as_i64().map(|v| v as u32)).unwrap_or(16 * 1024);
         let cache_path = match defaults {
-                true => None,
-                false => {
-                    env::var("OCTOBUILD_CACHE").ok().and_then(|v| {
-                        if v == "" {
-                            None
-                        } else {
-                            Some(v)
-                        }
-                    })
-                }
-            }
-            .or_else(|| {
-                get_config(local,
-                           global,
-                           PARAM_CACHE_PATH,
-                           |v| v.as_str().map(|v| v.to_string()))
-            })
-            .unwrap_or(DEFAULT_CACHE_DIR.to_string());
-        let process_limit = get_config(local,
-                                       global,
-                                       PARAM_PROCESS_LIMIT,
-                                       |v| v.as_i64().map(|v| v as usize))
+            true => None,
+            false => env::var("OCTOBUILD_CACHE")
+                .ok()
+                .and_then(|v| if v == "" { None } else { Some(v) }),
+        }.or_else(|| get_config(local, global, PARAM_CACHE_PATH, |v| v.as_str().map(|v| v.to_string())))
+        .unwrap_or(DEFAULT_CACHE_DIR.to_string());
+        let process_limit = get_config(local, global, PARAM_PROCESS_LIMIT, |v| v.as_i64().map(|v| v as usize))
             .unwrap_or_else(|| num_cpus::get());
         let coordinator = get_config(local, global, PARAM_COORDINATOR, |v| match v.is_null() {
             true => None,
-            false => {
-                v.as_str().and_then(|v| {
-                    Url::parse(v)
-                        .map(|mut v| {
-                            v.set_path("");
-                            v
-                        })
-                        .ok()
-                })
-            }
+            false => v.as_str().and_then(|v| {
+                Url::parse(v)
+                    .map(|mut v| {
+                        v.set_path("");
+                        v
+                    }).ok()
+            }),
         });
-        let helper_bind = get_config(local,
-                                     global,
-                                     PARAM_HELPER_BIND,
-                                     |v| v.as_str().and_then(|v| FromStr::from_str(v).ok()))
-            .unwrap_or_else(|| SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::new(0, 0, 0, 0), 0)));
-        let coordinator_bind = get_config(local,
-                                          global,
-                                          PARAM_COORDINATOR_BIND,
-                                          |v| v.as_str().and_then(|v| FromStr::from_str(v).ok()))
-            .unwrap_or_else(|| SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::new(0, 0, 0, 0), 3000)));
+        let helper_bind = get_config(local, global, PARAM_HELPER_BIND, |v| {
+            v.as_str().and_then(|v| FromStr::from_str(v).ok())
+        }).unwrap_or_else(|| SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::new(0, 0, 0, 0), 0)));
+        let coordinator_bind = get_config(local, global, PARAM_COORDINATOR_BIND, |v| {
+            v.as_str().and_then(|v| FromStr::from_str(v).ok())
+        }).unwrap_or_else(|| SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::new(0, 0, 0, 0), 3000)));
 
         Ok(Config {
             process_limit: process_limit,
@@ -132,32 +105,50 @@ impl Config {
         let mut content = String::new();
 
         let mut y = BTreeMap::new();
-        y.insert(Yaml::String(PARAM_PROCESS_LIMIT.to_string()),
-                 Yaml::Integer(self.process_limit as i64));
-        y.insert(Yaml::String(PARAM_CACHE_LIMIT.to_string()),
-                 Yaml::Integer(self.cache_limit_mb as i64));
-        y.insert(Yaml::String(PARAM_CACHE_PATH.to_string()),
-                 Yaml::String(self.cache_dir.to_str().unwrap().to_string()));
-        y.insert(Yaml::String(PARAM_COORDINATOR.to_string()),
-                 self.coordinator.as_ref().map_or(Yaml::Null, |v| Yaml::String(v.as_str().to_string())));
-        y.insert(Yaml::String(PARAM_HELPER_BIND.to_string()),
-                 Yaml::String(self.helper_bind.to_string()));
-        y.insert(Yaml::String(PARAM_COORDINATOR_BIND.to_string()),
-                 Yaml::String(self.coordinator_bind.to_string()));
+        y.insert(
+            Yaml::String(PARAM_PROCESS_LIMIT.to_string()),
+            Yaml::Integer(self.process_limit as i64),
+        );
+        y.insert(
+            Yaml::String(PARAM_CACHE_LIMIT.to_string()),
+            Yaml::Integer(self.cache_limit_mb as i64),
+        );
+        y.insert(
+            Yaml::String(PARAM_CACHE_PATH.to_string()),
+            Yaml::String(self.cache_dir.to_str().unwrap().to_string()),
+        );
+        y.insert(
+            Yaml::String(PARAM_COORDINATOR.to_string()),
+            self.coordinator
+                .as_ref()
+                .map_or(Yaml::Null, |v| Yaml::String(v.as_str().to_string())),
+        );
+        y.insert(
+            Yaml::String(PARAM_HELPER_BIND.to_string()),
+            Yaml::String(self.helper_bind.to_string()),
+        );
+        y.insert(
+            Yaml::String(PARAM_COORDINATOR_BIND.to_string()),
+            Yaml::String(self.coordinator_bind.to_string()),
+        );
         YamlEmitter::new(&mut content).dump(&Yaml::Hash(y)).unwrap();
         println!("{}", content);
     }
 
     pub fn help() {
         println!("Octobuild configuration:");
-        println!("  system config path: {}",
-                 get_global_config_path()
-                     .map(|v| v.to_str().unwrap().to_string())
-                     .unwrap_or("none".to_string()));
-        println!("  user config path:   {}",
-                 get_local_config_path()
-                     .map(|v| v.to_str().unwrap().to_string())
-                     .unwrap_or("none".to_string()));
+        println!(
+            "  system config path: {}",
+            get_global_config_path()
+                .map(|v| v.to_str().unwrap().to_string())
+                .unwrap_or("none".to_string())
+        );
+        println!(
+            "  user config path:   {}",
+            get_local_config_path()
+                .map(|v| v.to_str().unwrap().to_string())
+                .unwrap_or("none".to_string())
+        );
         println!("");
         println!("Actual configuration:");
         match Config::new() {
@@ -183,7 +174,8 @@ impl Config {
 }
 
 fn get_config<F, T>(local: &Option<Yaml>, global: &Option<Yaml>, param: &str, op: F) -> Option<T>
-    where F: Fn(&Yaml) -> Option<T>
+where
+    F: Fn(&Yaml) -> Option<T>,
 {
     None.or_else(|| local.as_ref().and_then(|i| op(&i[param])))
         .or_else(|| global.as_ref().and_then(|i| op(&i[param])))
@@ -205,7 +197,9 @@ fn get_local_config_path() -> Option<PathBuf> {
 
 #[cfg(windows)]
 fn get_global_config_path() -> Option<PathBuf> {
-    env::var("ProgramData").ok().map(|v| Path::new(&v).join("octobuild").join(CONFIG_FILE_NAME))
+    env::var("ProgramData")
+        .ok()
+        .map(|v| Path::new(&v).join("octobuild").join(CONFIG_FILE_NAME))
 }
 
 #[cfg(unix)]

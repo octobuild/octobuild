@@ -1,10 +1,10 @@
-use std::collections::VecDeque;
-use std::collections::vec_deque;
 use std::cmp::min;
-use std::mem;
-use std::ptr;
+use std::collections::vec_deque;
+use std::collections::VecDeque;
 use std::io::Result;
 pub use std::io::{Read, Write};
+use std::mem;
+use std::ptr;
 
 const BLOCK_SIZE: usize = 0x10000 - 0x100;
 
@@ -71,8 +71,10 @@ impl MemStream {
             };
             let block = self.blocks.back_mut().unwrap();
             let copy_size = min(buf.len() - src_offset, BLOCK_SIZE - dst_offset);
-            memcpy(&buf[src_offset..src_offset + copy_size],
-                   &mut block[dst_offset..dst_offset + copy_size]);
+            memcpy(
+                &buf[src_offset..src_offset + copy_size],
+                &mut block[dst_offset..dst_offset + copy_size],
+            );
             self.size += copy_size;
             src_offset += copy_size;
         }
@@ -156,8 +158,10 @@ impl<'a> Read for MemReader<'a> {
                         continue;
                     }
                     let copy_size = min(buf.len() - dst_offset, block.len() - self.offset);
-                    memcpy(&block[self.offset..self.offset + copy_size],
-                           &mut buf[dst_offset..dst_offset + copy_size]);
+                    memcpy(
+                        &block[self.offset..self.offset + copy_size],
+                        &mut buf[dst_offset..dst_offset + copy_size],
+                    );
                     // add code here
                     self.offset += copy_size;
                     dst_offset += copy_size;
@@ -175,7 +179,7 @@ impl<'a> Read for MemReader<'a> {
 mod test {
     extern crate rand;
 
-    use super::{BLOCK_SIZE, MemStream};
+    use super::{MemStream, BLOCK_SIZE};
     use std::io::{Read, Write};
 
     fn check_stream(write_size: usize, read_size: usize) {
@@ -198,7 +202,7 @@ mod test {
         {
             let mut actual = Vec::new();
             let mut reader = writer.reader();
-            let mut block = vec!(0; read_size);
+            let mut block = vec![0; read_size];
             loop {
                 let size = reader.read(&mut block).unwrap();
                 if size == 0 {

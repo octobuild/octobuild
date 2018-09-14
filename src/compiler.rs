@@ -5,21 +5,21 @@ use crypto::md5::Md5;
 use ipc::Semaphore;
 
 use std::cmp::max;
-use std::collections::HashMap;
 use std::collections::hash_map;
+use std::collections::HashMap;
 use std::env;
-use std::iter::FromIterator;
 use std::fmt::{Display, Formatter};
 use std::io::{Error, ErrorKind};
+use std::iter::FromIterator;
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, RwLock};
 use std::process::{Command, Output};
+use std::sync::{Arc, RwLock};
 
-use ::config::Config;
-use ::io::memstream::MemStream;
-use ::io::statistic::Statistic;
-use ::cache::{Cache, FileHasher};
-use ::builder_capnp::output_info;
+use builder_capnp::output_info;
+use cache::{Cache, FileHasher};
+use config::Config;
+use io::memstream::MemStream;
+use io::statistic::Statistic;
 
 #[derive(Debug)]
 pub enum CompilerError {
@@ -50,10 +50,7 @@ impl ::std::error::Error for CompilerError {
 }
 
 // Scope of command line argument.
-#[derive(Copy)]
-#[derive(Clone)]
-#[derive(Debug)]
-#[derive(PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub enum Scope {
     // Preprocessing argument
     Preprocessor,
@@ -65,27 +62,20 @@ pub enum Scope {
     Ignore,
 }
 
-#[derive(Copy)]
-#[derive(Clone)]
-#[derive(Debug)]
-#[derive(PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub enum InputKind {
     Source,
     Marker,
     Precompiled,
 }
 
-#[derive(Copy)]
-#[derive(Clone)]
-#[derive(Debug)]
-#[derive(PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub enum OutputKind {
     Object,
     Marker,
 }
 
-#[derive(Debug)]
-#[derive(PartialEq)]
+#[derive(Debug, PartialEq)]
 pub enum Arg {
     Flag {
         scope: Scope,
@@ -143,8 +133,7 @@ pub struct CommandEnv {
     map: HashMap<String, String>,
 }
 
-#[derive(Clone)]
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct CommandInfo {
     // Program executable
     pub program: PathBuf,
@@ -227,7 +216,9 @@ impl CommandInfo {
     }
 
     pub fn current_dir_join(&self, path: &Path) -> PathBuf {
-        self.current_dir.as_ref().map_or_else(|| path.to_path_buf(), |cwd| cwd.join(path))
+        self.current_dir
+            .as_ref()
+            .map_or_else(|| path.to_path_buf(), |cwd| cwd.join(path))
     }
 
     pub fn to_command(&self) -> Command {
@@ -267,10 +258,12 @@ impl CommandInfo {
         }
         // Check current catalog
         if allow_current_dir || executable.parent().map_or(false, |path| path.as_os_str().len() > 0) {
-            match self.current_dir
+            match self
+                .current_dir
                 .as_ref()
                 .map(|c| c.join(&executable))
-                .and_then(|c| fn_find_exec(c)) {
+                .and_then(|c| fn_find_exec(c))
+            {
                 Some(exe) => {
                     return Some(exe);
                 }
@@ -361,8 +354,7 @@ pub struct CompilationArgs {
     pub marker_precompiled: Option<String>,
 }
 
-#[derive(Clone)]
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct CompilationTask {
     // Compilation  arguments.
     pub shared: Arc<CompilationArgs>,
@@ -424,25 +416,26 @@ pub trait Toolchain: Send + Sync {
     // Compile preprocessed file.
     fn compile_memory(&self, state: &SharedState, mut task: CompileStep) -> Result<(OutputInfo, Vec<u8>), Error> {
         task.output_object = None;
-        self.compile_step(state, task)
-            .map(|output| {
-                (OutputInfo {
+        self.compile_step(state, task).map(|output| {
+            (
+                OutputInfo {
                     status: output.status,
                     stderr: output.stderr,
                     stdout: Vec::new(),
                 },
-                 output.stdout)
-            })
+                output.stdout,
+            )
+        })
     }
 
     fn compile_task(&self, state: &SharedState, task: CompilationTask) -> Result<OutputInfo, Error> {
-        self.preprocess_step(state, &task).and_then(|preprocessed| match preprocessed {
-            PreprocessResult::Success(preprocessed) => {
-                self.compile_prepare_step(task, preprocessed)
-                    .and_then(|task| self.compile_step_cached(state, task))
-            }
-            PreprocessResult::Failed(output) => Ok(output),
-        })
+        self.preprocess_step(state, &task)
+            .and_then(|preprocessed| match preprocessed {
+                PreprocessResult::Success(preprocessed) => self
+                    .compile_prepare_step(task, preprocessed)
+                    .and_then(|task| self.compile_step_cached(state, task)),
+                PreprocessResult::Failed(output) => Ok(output),
+            })
     }
 
     fn compile_step_cached(&self, state: &SharedState, task: CompileStep) -> Result<OutputInfo, Error> {
@@ -486,11 +479,13 @@ pub trait Toolchain: Send + Sync {
         }
 
         // Try to get files from cache or run
-        state.cache.run_file_cached(&state.statistic,
-                                    &hasher.result_str(),
-                                    &outputs,
-                                    || -> Result<OutputInfo, Error> { self.compile_step(state, task) },
-                                    || true)
+        state.cache.run_file_cached(
+            &state.statistic,
+            &hasher.result_str(),
+            &outputs,
+            || -> Result<OutputInfo, Error> { self.compile_step(state, task) },
+            || true,
+        )
     }
 }
 
@@ -545,21 +540,20 @@ pub trait Compiler: Send + Sync {
     // Discovery local toolchains.
     fn discovery_toolchains(&self) -> Vec<Arc<Toolchain>>;
 
-    fn create_tasks(&self,
-                    command: CommandInfo,
-                    args: &[String])
-                    -> Result<Vec<(Arc<Toolchain>, CompilationTask)>, Error> {
+    fn create_tasks(
+        &self,
+        command: CommandInfo,
+        args: &[String],
+    ) -> Result<Vec<(Arc<Toolchain>, CompilationTask)>, Error> {
         self.resolve_toolchain(&command)
-            .ok_or(Error::new(ErrorKind::InvalidInput,
-                              CompilerError::ToolchainNotFound(command.program.clone())))
-            .and_then(|toolchain| {
-                toolchain.create_tasks(command, args)
+            .ok_or(Error::new(
+                ErrorKind::InvalidInput,
+                CompilerError::ToolchainNotFound(command.program.clone()),
+            )).and_then(|toolchain| {
+                toolchain
+                    .create_tasks(command, args)
                     .map_err(|e| Error::new(ErrorKind::InvalidInput, CompilerError::InvalidArguments(e)))
-                    .map(|tasks| {
-                        tasks.into_iter()
-                            .map(|task| (toolchain.clone(), task))
-                            .collect()
-                    })
+                    .map(|tasks| tasks.into_iter().map(|task| (toolchain.clone(), task)).collect())
             })
     }
 }
@@ -570,7 +564,9 @@ pub struct ToolchainHolder {
 
 impl ToolchainHolder {
     pub fn new() -> Self {
-        ToolchainHolder { toolchains: Arc::new(RwLock::new(HashMap::new())) }
+        ToolchainHolder {
+            toolchains: Arc::new(RwLock::new(HashMap::new())),
+        }
     }
 
     pub fn to_vec(&self) -> Vec<Arc<Toolchain>> {
@@ -590,9 +586,12 @@ impl ToolchainHolder {
         }
         {
             let mut write_lock = self.toolchains.write().unwrap();
-            Some(write_lock.entry(path.to_path_buf())
-                .or_insert_with(|| factory(path.to_path_buf()))
-                .clone())
+            Some(
+                write_lock
+                    .entry(path.to_path_buf())
+                    .or_insert_with(|| factory(path.to_path_buf()))
+                    .clone(),
+            )
         }
     }
 }
@@ -609,13 +608,16 @@ fn fn_find_exec_native(mut path: PathBuf) -> Option<PathBuf> {
     if path.is_file() {
         return Some(path.to_path_buf());
     }
-    if path.extension().and_then(|ext| ext.to_str()).map_or(true, |s| s.to_lowercase() != "exe") {
-        let name_with_ext = path.file_name()
-            .map(|n| {
-                let mut name = n.to_os_string();
-                name.push(".exe");
-                name
-            });
+    if path
+        .extension()
+        .and_then(|ext| ext.to_str())
+        .map_or(true, |s| s.to_lowercase() != "exe")
+    {
+        let name_with_ext = path.file_name().map(|n| {
+            let mut name = n.to_os_string();
+            name.push(".exe");
+            name
+        });
         match name_with_ext {
             Some(n) => {
                 path.set_file_name(n);

@@ -1,39 +1,40 @@
-extern crate octobuild;
 extern crate capnp;
 extern crate crypto;
 extern crate daemon;
 extern crate fern;
 extern crate hyper;
+extern crate nickel;
+extern crate octobuild;
 extern crate rustc_serialize;
 extern crate tempdir;
-extern crate nickel;
 #[macro_use]
 extern crate log;
 
-use octobuild::config::Config;
-use octobuild::compiler::*;
-use octobuild::cluster::builder::{CompileRequest, CompileResponse};
-use octobuild::cluster::common::{BuilderInfo, BuilderInfoUpdate, RPC_BUILDER_TASK, RPC_BUILDER_UPDATE,
-                                 RPC_BUILDER_UPLOAD};
-use octobuild::simple::create_temp_dir;
-use octobuild::simple::supported_compilers;
-use octobuild::version;
-use octobuild::io::memstream::MemStream;
-use octobuild::io::tempfile::TempFile;
-use octobuild::utils::DEFAULT_BUF_SIZE;
-use daemon::State;
-use daemon::Daemon;
-use daemon::DaemonRunner;
-use hyper::{Client, Url};
 use crypto::digest::Digest;
 use crypto::md5::Md5;
-use nickel::{HttpRouter, ListeningServer, MediaType, Middleware, MiddlewareResult, Nickel, NickelError, Request,
-             Response};
-use nickel::status::StatusCode;
+use daemon::Daemon;
+use daemon::DaemonRunner;
+use daemon::State;
 use hyper::method::Method;
-use rustc_serialize::json;
+use hyper::{Client, Url};
+use nickel::status::StatusCode;
+use nickel::{
+    HttpRouter, ListeningServer, MediaType, Middleware, MiddlewareResult, Nickel, NickelError, Request, Response,
+};
+use octobuild::cluster::builder::{CompileRequest, CompileResponse};
+use octobuild::cluster::common::{
+    BuilderInfo, BuilderInfoUpdate, RPC_BUILDER_TASK, RPC_BUILDER_UPDATE, RPC_BUILDER_UPLOAD,
+};
+use octobuild::compiler::*;
+use octobuild::config::Config;
+use octobuild::io::memstream::MemStream;
+use octobuild::io::tempfile::TempFile;
+use octobuild::simple::create_temp_dir;
+use octobuild::simple::supported_compilers;
+use octobuild::utils::DEFAULT_BUF_SIZE;
+use octobuild::version;
 use rustc_serialize::hex::FromHex;
-use tempdir::TempDir;
+use rustc_serialize::json;
 use std::collections::HashMap;
 use std::error::Error;
 use std::fs;
@@ -43,12 +44,13 @@ use std::io::{BufReader, Read, Write};
 use std::iter::FromIterator;
 use std::net::SocketAddr;
 use std::path::PathBuf;
-use std::sync::mpsc::Receiver;
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::mpsc::Receiver;
 use std::sync::{Arc, Mutex};
-use std::time::Duration;
 use std::thread;
 use std::thread::JoinHandle;
+use std::time::Duration;
+use tempdir::TempDir;
 
 use capnp::message;
 
@@ -90,11 +92,15 @@ impl BuilderService {
         });
 
         let mut http = Nickel::new();
-        http.add_route(Method::Head,
-                       RPC_BUILDER_UPLOAD.to_string() + "/:hash",
-                       RpcBuilderUploadHandler(state.clone()));
-        http.post(RPC_BUILDER_UPLOAD.to_string() + "/:hash",
-                  RpcBuilderUploadHandler(state.clone()));
+        http.add_route(
+            Method::Head,
+            RPC_BUILDER_UPLOAD.to_string() + "/:hash",
+            RpcBuilderUploadHandler(state.clone()),
+        );
+        http.post(
+            RPC_BUILDER_UPLOAD.to_string() + "/:hash",
+            RpcBuilderUploadHandler(state.clone()),
+        );
         http.post(RPC_BUILDER_TASK, RpcBuilderTaskHandler(state.clone()));
 
         let listener = http.listen(config.helper_bind).unwrap();
@@ -107,20 +113,23 @@ impl BuilderService {
 
         let done = Arc::new(AtomicBool::new(false));
         BuilderService {
-            anoncer: Some(BuilderService::thread_anoncer(state.clone(),
-                                                         config.coordinator.unwrap(),
-                                                         done.clone(),
-                                                         listener.socket())),
+            anoncer: Some(BuilderService::thread_anoncer(
+                state.clone(),
+                config.coordinator.unwrap(),
+                done.clone(),
+                listener.socket(),
+            )),
             done: done,
             listener: Some(listener),
         }
     }
 
-    fn thread_anoncer(state: Arc<BuilderState>,
-                      coordinator: Url,
-                      done: Arc<AtomicBool>,
-                      endpoint: SocketAddr)
-                      -> JoinHandle<()> {
+    fn thread_anoncer(
+        state: Arc<BuilderState>,
+        coordinator: Url,
+        done: Arc<AtomicBool>,
+        endpoint: SocketAddr,
+    ) -> JoinHandle<()> {
         thread::spawn(move || {
             let info = BuilderInfoUpdate::new(BuilderInfo {
                 name: state.name.clone(),
@@ -131,13 +140,14 @@ impl BuilderService {
 
             let client = Client::new();
             while !done.load(Ordering::Relaxed) {
-                match client.post(coordinator.join(RPC_BUILDER_UPDATE).unwrap())
+                match client
+                    .post(coordinator.join(RPC_BUILDER_UPDATE).unwrap())
                     .body(&json::encode(&info).unwrap())
-                    .send() {
+                    .send()
+                {
                     Ok(_) => {}
                     Err(e) => {
-                        info!("Builder: can't send info to coordinator: {}",
-                              e.description());
+                        info!("Builder: can't send info to coordinator: {}", e.description());
                     }
                 }
                 thread::sleep(Duration::from_secs(1));
@@ -147,9 +157,12 @@ impl BuilderService {
 
     fn discovery_toolchains(temp_dir: &Arc<TempDir>) -> HashMap<String, Arc<Toolchain>> {
         let compiler = supported_compilers(temp_dir);
-        HashMap::from_iter(compiler.discovery_toolchains()
-            .into_iter()
-            .filter_map(|toolchain| toolchain.identifier().map(|name| (name, toolchain))))
+        HashMap::from_iter(
+            compiler
+                .discovery_toolchains()
+                .into_iter()
+                .filter_map(|toolchain| toolchain.identifier().map(|name| (name, toolchain))),
+        )
     }
 }
 
@@ -162,10 +175,11 @@ impl<'a, R: 'a + Read> Read for ReadWrapper<'a, R> {
 }
 
 impl<D> Middleware<D> for RpcBuilderTaskHandler {
-    fn invoke<'a, 'server>(&'a self,
-                           req: &mut Request<'a, 'server, D>,
-                           mut res: Response<'a, D>)
-                           -> MiddlewareResult<'a, D> {
+    fn invoke<'a, 'server>(
+        &'a self,
+        req: &mut Request<'a, 'server, D>,
+        mut res: Response<'a, D>,
+    ) -> MiddlewareResult<'a, D> {
         let state = self.0.as_ref();
         // Receive compilation request.
         {
@@ -177,15 +191,19 @@ impl<D> Middleware<D> for RpcBuilderTaskHandler {
             let precompiled: Option<PathBuf> = match request.precompiled_hash {
                 Some(ref hash) => {
                     if !is_valid_md5(hash) {
-                        return Err(NickelError::new(res,
-                                                    format!("Invalid hash value: {}", hash),
-                                                    StatusCode::BadRequest));
+                        return Err(NickelError::new(
+                            res,
+                            format!("Invalid hash value: {}", hash),
+                            StatusCode::BadRequest,
+                        ));
                     }
                     let path = state.precompiled_dir.join(hash.to_string() + PRECOMPILED_SUFFIX);
                     if !path.exists() {
-                        return Err(NickelError::new(res,
-                                                    format!("Precompiled file not found: {}", hash),
-                                                    StatusCode::FailedDependency));
+                        return Err(NickelError::new(
+                            res,
+                            format!("Precompiled file not found: {}", hash),
+                            StatusCode::FailedDependency,
+                        ));
                     }
                     Some(path)
                 }
@@ -203,7 +221,9 @@ impl<D> Middleware<D> for RpcBuilderTaskHandler {
             let response = CompileResponse::from(toolchain.compile_memory(&state.shared, compile_step));
 
             let mut payload = Vec::new();
-            response.stream_write(&mut payload, &mut message::Builder::new_default()).unwrap();
+            response
+                .stream_write(&mut payload, &mut message::Builder::new_default())
+                .unwrap();
 
             res.set(StatusCode::Ok);
             res.set(MediaType::Bin);
@@ -213,27 +233,34 @@ impl<D> Middleware<D> for RpcBuilderTaskHandler {
 }
 
 impl<D> Middleware<D> for RpcBuilderUploadHandler {
-    fn invoke<'a, 'server>(&'a self,
-                           request: &mut Request<'a, 'server, D>,
-                           mut response: Response<'a, D>)
-                           -> MiddlewareResult<'a, D> {
+    fn invoke<'a, 'server>(
+        &'a self,
+        request: &mut Request<'a, 'server, D>,
+        mut response: Response<'a, D>,
+    ) -> MiddlewareResult<'a, D> {
         let state = self.0.as_ref();
         // Receive compilation request.
         let hash = match request.param("hash") {
             Some(v) => v.to_string(),
             None => {
-                return Err(NickelError::new(response, "Hash is not defined", StatusCode::BadRequest));
+                return Err(NickelError::new(
+                    response,
+                    "Hash is not defined",
+                    StatusCode::BadRequest,
+                ));
             }
         };
         if !is_valid_md5(&hash) {
-            return Err(NickelError::new(response,
-                                        format!("Invalid hash value: {}", hash),
-                                        StatusCode::BadRequest));
+            return Err(NickelError::new(
+                response,
+                format!("Invalid hash value: {}", hash),
+                StatusCode::BadRequest,
+            ));
         }
-        info!("Received upload from ({}, {}): {} ",
-              request.origin.method,
-              hash,
-              request.origin.remote_addr);
+        info!(
+            "Received upload from ({}, {}): {} ",
+            request.origin.method, hash, request.origin.remote_addr
+        );
 
         let path = state.precompiled_dir.join(hash.clone() + PRECOMPILED_SUFFIX);
         if path.exists() {
@@ -263,9 +290,11 @@ impl<D> Middleware<D> for RpcBuilderUploadHandler {
         let mut temp = match File::create(tempory.path()) {
             Ok(f) => f,
             Err(e) => {
-                return Err(NickelError::new(response,
-                                            format!("Can't create file: {}", e),
-                                            StatusCode::InternalServerError));
+                return Err(NickelError::new(
+                    response,
+                    format!("Can't create file: {}", e),
+                    StatusCode::InternalServerError,
+                ));
             }
         };
         let mut buf: [u8; DEFAULT_BUF_SIZE] = [0; DEFAULT_BUF_SIZE];
@@ -274,9 +303,11 @@ impl<D> Middleware<D> for RpcBuilderUploadHandler {
             let size = match request.origin.read(&mut buf) {
                 Ok(v) => v,
                 Err(e) => {
-                    return Err(NickelError::new(response,
-                                                format!("Can't parse request body: {}", e),
-                                                StatusCode::InternalServerError));
+                    return Err(NickelError::new(
+                        response,
+                        format!("Can't parse request body: {}", e),
+                        StatusCode::InternalServerError,
+                    ));
                 }
             };
             if size <= 0 {
@@ -286,17 +317,21 @@ impl<D> Middleware<D> for RpcBuilderUploadHandler {
             match temp.write(&buf[0..size]) {
                 Ok(_) => {}
                 Err(e) => {
-                    return Err(NickelError::new(response,
-                                                format!("Can't write file: {}", e),
-                                                StatusCode::InternalServerError));
+                    return Err(NickelError::new(
+                        response,
+                        format!("Can't write file: {}", e),
+                        StatusCode::InternalServerError,
+                    ));
                 }
             }
             hasher.input(&buf[0..size]);
         }
         if hasher.result_str() != hash {
-            return Err(NickelError::new(response,
-                                        format!("Content hash mismatch: {}, {}", hash, total_size),
-                                        StatusCode::BadRequest));
+            return Err(NickelError::new(
+                response,
+                format!("Content hash mismatch: {}, {}", hash, total_size),
+                StatusCode::BadRequest,
+            ));
         }
         drop(temp);
 
@@ -304,9 +339,11 @@ impl<D> Middleware<D> for RpcBuilderUploadHandler {
             Ok(_) => {}
             Err(e) => {
                 if !path.exists() {
-                    return Err(NickelError::new(response,
-                                                format!("Can't rename file: {}", e),
-                                                StatusCode::InternalServerError));
+                    return Err(NickelError::new(
+                        response,
+                        format!("Can't rename file: {}", e),
+                        StatusCode::InternalServerError,
+                    ));
                 }
             }
         }
@@ -317,7 +354,9 @@ impl<D> Middleware<D> for RpcBuilderUploadHandler {
 }
 
 fn is_valid_md5(hash: &str) -> bool {
-    hash.from_hex().ok().map_or(false, |v| v.len() == Md5::new().output_bytes())
+    hash.from_hex()
+        .ok()
+        .map_or(false, |v| v.len() == Md5::new().output_bytes())
 }
 
 impl BuilderState {
@@ -362,9 +401,12 @@ fn get_name() -> String {
 }
 
 fn main() {
-    let daemon = Daemon { name: "octobuild_Builder".to_string() };
+    let daemon = Daemon {
+        name: "octobuild_Builder".to_string(),
+    };
 
-    daemon.run(move |rx: Receiver<State>| {
+    daemon
+        .run(move |rx: Receiver<State>| {
             octobuild::utils::init_logger();
 
             info!("Builder started.");
@@ -387,6 +429,5 @@ fn main() {
                 };
             }
             info!("Builder shutdowned.");
-        })
-        .unwrap();
+        }).unwrap();
 }

@@ -1,12 +1,12 @@
-use ::compiler::*;
-use ::cluster::client::RemoteCompiler;
-use ::config::Config;
+use cluster::client::RemoteCompiler;
+use compiler::*;
+use config::Config;
 
-use ::clang::compiler::ClangCompiler;
-use ::vs::compiler::VsCompiler;
+use clang::compiler::ClangCompiler;
+use vs::compiler::VsCompiler;
 
-use ::worker::execute_graph;
-use ::worker::{BuildAction, BuildGraph, BuildResult, BuildTask};
+use worker::execute_graph;
+use worker::{BuildAction, BuildGraph, BuildResult, BuildTask};
 
 use petgraph::Graph;
 use tempdir::TempDir;
@@ -29,8 +29,9 @@ pub fn create_temp_dir() -> Result<Arc<TempDir>, Error> {
 }
 
 pub fn simple_compile<C, F>(exec: &str, factory: F) -> i32
-    where C: Compiler,
-          F: FnOnce(&Config) -> Result<C, Error>
+where
+    C: Compiler,
+    F: FnOnce(&Config) -> Result<C, Error>,
 {
     let config = match Config::new() {
         Ok(v) => v,
@@ -57,7 +58,8 @@ pub fn simple_compile<C, F>(exec: &str, factory: F) -> i32
 }
 
 pub fn compile<C>(config: &Config, state: &SharedState, exec: &str, compiler: C) -> Result<Option<i32>, Error>
-    where C: Compiler
+where
+    C: Compiler,
 {
     let args = Vec::from_iter(env::args());
     let command_info = CommandInfo::simple(Path::new(exec));
@@ -75,7 +77,6 @@ pub fn compile<C>(config: &Config, state: &SharedState, exec: &str, compiler: C)
     println!("{}", state.statistic.to_string());
     result
 }
-
 
 fn print_task_result(result: BuildResult) -> Result<(), Error> {
     match result.result {

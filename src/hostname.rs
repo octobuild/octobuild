@@ -4,8 +4,7 @@ pub fn get_host_name() -> Result<String, ()> {
 
 #[cfg(windows)]
 fn get_host_name_native() -> Result<String, ()> {
-
-    use winapi::shared::minwindef::{ DWORD, FALSE };
+    use winapi::shared::minwindef::{DWORD, FALSE};
 
     extern crate kernel32;
 
@@ -41,10 +40,7 @@ fn get_host_name_native() -> Result<String, ()> {
         let capacity = buf.capacity();
         buf.set_len(capacity);
     }
-    let err = unsafe {
-        gethostname(buf.as_mut_ptr() as *mut libc::c_char,
-                    buf.len() as libc::size_t)
-    } as isize;
+    let err = unsafe { gethostname(buf.as_mut_ptr() as *mut libc::c_char, buf.len() as libc::size_t) } as isize;
     match err {
         0 => {
             let mut i = 0;

@@ -11,12 +11,7 @@ pub fn parse(cmd: &str) -> Result<Vec<String>, Error> {
     for c in cmd.chars() {
         match c {
             ' ' | '\t' | '\n' | '\r' => {
-                arg = add_slashes(arg,
-                                  if quote && ((slash % 2) == 0) {
-                                      slash / 2
-                                  } else {
-                                      slash
-                                  });
+                arg = add_slashes(arg, if quote && ((slash % 2) == 0) { slash / 2 } else { slash });
                 slash = 0;
                 if quote {
                     arg.push(c);
@@ -42,24 +37,14 @@ pub fn parse(cmd: &str) -> Result<Vec<String>, Error> {
                 data = true;
             }
             _ => {
-                arg = add_slashes(arg,
-                                  if quote && ((slash % 2) == 0) {
-                                      slash / 2
-                                  } else {
-                                      slash
-                                  });
+                arg = add_slashes(arg, if quote && ((slash % 2) == 0) { slash / 2 } else { slash });
                 slash = 0;
                 arg.push(c);
                 data = true;
             }
         }
     }
-    arg = add_slashes(arg,
-                      if quote && ((slash % 2) == 0) {
-                          slash / 2
-                      } else {
-                          slash
-                      });
+    arg = add_slashes(arg, if quote && ((slash % 2) == 0) { slash / 2 } else { slash });
     if data {
         args.push(arg);
     }
@@ -85,14 +70,12 @@ fn test_parse_2() {
 
 #[test]
 fn test_parse_3() {
-    assert_eq!(parse("\"\" \"abc\" d e \"\"").unwrap(),
-               ["", "abc", "d", "e", ""]);
+    assert_eq!(parse("\"\" \"abc\" d e \"\"").unwrap(), ["", "abc", "d", "e", ""]);
 }
 
 #[test]
 fn test_parse_4() {
-    assert_eq!(parse("a\\\\b d\"e f\"g h").unwrap(),
-               ["a\\\\b", "de fg", "h"]);
+    assert_eq!(parse("a\\\\b d\"e f\"g h").unwrap(), ["a\\\\b", "de fg", "h"]);
 }
 
 #[test]
@@ -102,24 +85,29 @@ fn test_parse_5() {
 
 #[test]
 fn test_parse_6() {
-    assert_eq!(parse("a\\\\\\\\\"b c\" d e").unwrap(),
-               ["a\\\\b c", "d", "e"]);
+    assert_eq!(parse("a\\\\\\\\\"b c\" d e").unwrap(), ["a\\\\b c", "d", "e"]);
 }
 
 #[test]
 fn test_parse_7() {
-    assert_eq!(parse("C:\\Windows\\System32 d e").unwrap(),
-               ["C:\\Windows\\System32", "d", "e"]);
+    assert_eq!(
+        parse("C:\\Windows\\System32 d e").unwrap(),
+        ["C:\\Windows\\System32", "d", "e"]
+    );
 }
 
 #[test]
 fn test_parse_8() {
-    assert_eq!(parse("/TEST\"C:\\Windows\\System32\" d e").unwrap(),
-               ["/TESTC:\\Windows\\System32", "d", "e"]);
+    assert_eq!(
+        parse("/TEST\"C:\\Windows\\System32\" d e").unwrap(),
+        ["/TESTC:\\Windows\\System32", "d", "e"]
+    );
 }
 
 #[test]
 fn test_parse_9() {
-    assert_eq!(parse("/Fp\"Debug\\HelloWorld.pch\" /Fo\"Debug\\\\\" /Gd").unwrap(),
-               ["/FpDebug\\HelloWorld.pch", "/FoDebug\\", "/Gd"]);
+    assert_eq!(
+        parse("/Fp\"Debug\\HelloWorld.pch\" /Fo\"Debug\\\\\" /Gd").unwrap(),
+        ["/FpDebug\\HelloWorld.pch", "/FoDebug\\", "/Gd"]
+    );
 }

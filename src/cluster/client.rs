@@ -1,26 +1,27 @@
 use capnp::message;
-use hyper::{Client, Url};
 use hyper::client::Body;
 use hyper::status::StatusCode;
+use hyper::{Client, Url};
 use rand;
 use rustc_serialize::json;
 use time;
 use time::{Duration, Timespec};
 
-use ::cache::FileHasher;
-use ::io::memstream::MemStream;
-use ::cluster::common::{BuilderInfo, RPC_BUILDER_LIST, RPC_BUILDER_TASK, RPC_BUILDER_UPLOAD};
-use ::cluster::builder::{CompileRequest, CompileResponse};
-use ::compiler::{CommandInfo, CompilationTask, CompileStep, Compiler, OutputInfo, PreprocessResult, SharedState,
-                 Toolchain};
+use cache::FileHasher;
+use cluster::builder::{CompileRequest, CompileResponse};
+use cluster::common::{BuilderInfo, RPC_BUILDER_LIST, RPC_BUILDER_TASK, RPC_BUILDER_UPLOAD};
+use compiler::{
+    CommandInfo, CompilationTask, CompileStep, Compiler, OutputInfo, PreprocessResult, SharedState, Toolchain,
+};
+use io::memstream::MemStream;
 
 use std::fs;
 use std::fs::File;
 use std::io::{BufReader, Error, ErrorKind, Read, Write};
+use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::str::FromStr;
 use std::sync::{Arc, RwLock};
-use std::net::SocketAddr;
 
 pub struct RemoteCompiler<C: Compiler> {
     shared: Arc<RemoteShared>,
@@ -64,14 +65,14 @@ impl RemoteSharedMut {
         match base_url {
             &Some(ref base_url) => {
                 let client = Client::new();
-                client.get(base_url.join(RPC_BUILDER_LIST).unwrap())
+                client
+                    .get(base_url.join(RPC_BUILDER_LIST).unwrap())
                     .send()
                     .map_err(|e| Error::new(ErrorKind::Other, e))
                     .and_then(|mut response| {
                         let mut payload = String::new();
                         response.read_to_string(&mut payload).map(|_| payload)
-                    })
-                    .and_then(|payload| json::decode(&payload).map_err(|e| Error::new(ErrorKind::InvalidData, e)))
+                    }).and_then(|payload| json::decode(&payload).map_err(|e| Error::new(ErrorKind::InvalidData, e)))
             }
             &None => Ok(Vec::new()),
         }
@@ -86,14 +87,12 @@ impl<C: Compiler> Compiler for RemoteCompiler<C> {
 
     // Resolve toolchain for command execution.
     fn resolve_toolchain(&self, command: &CommandInfo) -> Option<Arc<Toolchain>> {
-        self.local
-            .resolve_toolchain(command)
-            .map(|local| -> Arc<Toolchain> {
-                Arc::new(RemoteToolchain {
-                    shared: self.shared.clone(),
-                    local: local,
-                })
+        self.local.resolve_toolchain(command).map(|local| -> Arc<Toolchain> {
+            Arc::new(RemoteToolchain {
+                shared: self.shared.clone(),
+                local: local,
             })
+        })
     }
 }
 
@@ -107,12 +106,19 @@ impl<'a, R: 'a + Read> Read for ReadWrapper<'a, R> {
 
 impl RemoteToolchain {
     fn compile_remote(&self, state: &SharedState, task: &CompileStep) -> Result<CompileResponse, Error> {
-        let name = try!(self.identifier().ok_or(Error::new(ErrorKind::Other, "Can't get toolchain name")));
-        let addr = try!(self.remote_endpoint(&name)
-            .ok_or(Error::new(ErrorKind::Other, "Can't find helper for toolchain")));
+        let name = try!(
+            self.identifier()
+                .ok_or(Error::new(ErrorKind::Other, "Can't get toolchain name"))
+        );
+        let addr = try!(
+            self.remote_endpoint(&name)
+                .ok_or(Error::new(ErrorKind::Other, "Can't find helper for toolchain"))
+        );
         if task.output_precompiled.is_some() {
-            return Err(Error::new(ErrorKind::Other,
-                                  "Remote precompiled header generation is not supported"));
+            return Err(Error::new(
+                ErrorKind::Other,
+                "Remote precompiled header generation is not supported",
+            ));
         }
 
         let base_url = get_base_url(&addr);
@@ -127,8 +133,7 @@ impl RemoteToolchain {
         try!(request.stream_write(&mut request_payload, &mut message::Builder::new_default()));
         self.shared
             .client
-            .post(base_url.join(RPC_BUILDER_TASK)
-                .unwrap())
+            .post(base_url.join(RPC_BUILDER_TASK).unwrap())
             .body(&request_payload[..])
             .send()
             .map_err(|e| Error::new(ErrorKind::Other, e))
@@ -151,30 +156,33 @@ impl RemoteToolchain {
             })
     }
 
-    fn upload_precompiled(&self,
-                          state: &SharedState,
-                          precompiled: &Option<PathBuf>,
-                          base_url: &Url)
-                          -> Result<Option<String>, Error> {
+    fn upload_precompiled(
+        &self,
+        state: &SharedState,
+        precompiled: &Option<PathBuf>,
+        base_url: &Url,
+    ) -> Result<Option<String>, Error> {
         match precompiled {
             &Some(ref path) => {
                 // Get precompiled header file hash
                 let meta = try!(state.cache.file_hash(&path));
                 // Check is precompiled header uploaded
                 // todo: this is workaround for https://github.com/hyperium/hyper/issues/838
-                match try!(self.shared
-                    .client
-                    .head(base_url.join(&format!("{}/{}", RPC_BUILDER_UPLOAD, meta.hash))
-                        .unwrap())
-                    .send()
-                    .map(|response| response.status)
-                    .map_err(|e| Error::new(ErrorKind::BrokenPipe, e))) {
+                match try!(
+                    self.shared
+                        .client
+                        .head(base_url.join(&format!("{}/{}", RPC_BUILDER_UPLOAD, meta.hash)).unwrap())
+                        .send()
+                        .map(|response| response.status)
+                        .map_err(|e| Error::new(ErrorKind::BrokenPipe, e))
+                ) {
                     StatusCode::Ok | StatusCode::Accepted => return Ok(Some(meta.hash)),
                     _ => {}
                 }
                 let mut file = try!(File::open(path));
                 // Upload precompiled header
-                match try!(self.shared
+                match try!(
+                    self.shared
                     .client
                     .post(base_url.join(&format!("{}/{}", RPC_BUILDER_UPLOAD, meta.hash))
                         .unwrap())
@@ -183,12 +191,13 @@ impl RemoteToolchain {
                     .body(Body::SizedBody(&mut file, meta.size))
                     .send()
                     .map(|response| response.status)
-                    .map_err(|e| Error::new(ErrorKind::BrokenPipe, e))) {
+                    .map_err(|e| Error::new(ErrorKind::BrokenPipe, e))
+                ) {
                     StatusCode::Ok | StatusCode::Accepted => Ok(Some(meta.hash)),
-                    status => {
-                        Err(Error::new(ErrorKind::BrokenPipe,
-                                       format!("Can't upload precompiled header: {}", status)))
-                    }
+                    status => Err(Error::new(
+                        ErrorKind::BrokenPipe,
+                        format!("Can't upload precompiled header: {}", status),
+                    )),
                 }
             }
             &None => Ok(None),
@@ -252,12 +261,10 @@ impl Toolchain for RemoteToolchain {
 
     fn compile_step(&self, state: &SharedState, task: CompileStep) -> Result<OutputInfo, Error> {
         match self.compile_remote(state, &task) {
-            Ok(response) => {
-                match response {
-                    CompileResponse::Success(output, _) => Ok(output),
-                    CompileResponse::Err(err) => Err(err),
-                }
-            }
+            Ok(response) => match response {
+                CompileResponse::Success(output, _) => Ok(output),
+                CompileResponse::Err(err) => Err(err),
+            },
             Err(e) => {
                 trace!("Fallback to local build: {}", e);
                 self.local.compile_step(state, task)
@@ -275,20 +282,15 @@ fn get_base_url(addr: &SocketAddr) -> Url {
 
 fn write_output(path: &Option<PathBuf>, success: bool, output: &[u8]) -> Result<(), Error> {
     match path {
-        &Some(ref path) => {
-            match success {
-                true => {
-                    File::create(path)
-                        .and_then(|mut f| f.write(&output))
-                        .or_else(|e| {
-                            drop(fs::remove_file(path));
-                            Err(e)
-                        })
-                        .map(|_| ())
-                }
-                false => fs::remove_file(path),
-            }
-        }
+        &Some(ref path) => match success {
+            true => File::create(path)
+                .and_then(|mut f| f.write(&output))
+                .or_else(|e| {
+                    drop(fs::remove_file(path));
+                    Err(e)
+                }).map(|_| ()),
+            false => fs::remove_file(path),
+        },
         &None => Ok(()),
     }
 }

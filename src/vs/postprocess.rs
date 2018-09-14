@@ -26,10 +26,7 @@ impl Display for PostprocessError {
             &PostprocessError::LiteralEof => write!(f, "unexpected end of stream in literal"),
             &PostprocessError::LiteralTooLong => write!(f, "literal too long"),
             &PostprocessError::EscapeEof => write!(f, "unexpected end of escape sequence"),
-            &PostprocessError::MarkerNotFound => {
-                write!(f,
-                       "can't find precompiled header marker in preprocessed file")
-            }
+            &PostprocessError::MarkerNotFound => write!(f, "can't find precompiled header marker in preprocessed file"),
             &PostprocessError::InvalidLiteral => write!(f, "can't create string from literal"),
             &PostprocessError::TokenTooLong => write!(f, "token too long"),
         }
@@ -54,21 +51,18 @@ impl ::std::error::Error for PostprocessError {
     }
 }
 
-#[derive(PartialEq)]
-#[derive(Hash)]
-#[derive(Eq)]
-#[derive(Clone)]
-#[derive(Debug)]
+#[derive(PartialEq, Hash, Eq, Clone, Debug)]
 pub enum Include<T> {
     Quoted(T),
     Angle(T),
 }
 
-pub fn filter_preprocessed(reader: &mut Read,
-                           writer: &mut Write,
-                           marker: &Option<String>,
-                           keep_headers: bool)
-                           -> Result<(), Error> {
+pub fn filter_preprocessed(
+    reader: &mut Read,
+    writer: &mut Write,
+    marker: &Option<String>,
+    keep_headers: bool,
+) -> Result<(), Error> {
     let mut state = ScannerState {
         buf_data: [0; BUF_SIZE],
         ptr_copy: ptr::null(),
@@ -93,12 +87,10 @@ pub fn filter_preprocessed(reader: &mut Read,
 
         try!(state.parse_bom());
         state.marker = match marker.as_ref() {
-            Some(ref v) => {
-                match state.utf8 {
-                    true => Some(Vec::from(v.as_bytes())),
-                    false => Some(try!(Encoding::ANSI.to_bytes(&v.replace("\\", "/")))),
-                }
-            }
+            Some(ref v) => match state.utf8 {
+                true => Some(Vec::from(v.as_bytes())),
+                false => Some(try!(Encoding::ANSI.to_bytes(&v.replace("\\", "/")))),
+            },
             None => None,
         };
         loop {
@@ -168,7 +160,10 @@ impl<'a> ScannerState<'a> {
     }
 
     unsafe fn copy_to_end(&mut self) -> Result<(), Error> {
-        try!(self.writer.write(slice::from_raw_parts(self.ptr_copy, delta(self.ptr_copy, self.ptr_end))));
+        try!(
+            self.writer
+                .write(slice::from_raw_parts(self.ptr_copy, delta(self.ptr_copy, self.ptr_end)))
+        );
         self.ptr_copy = self.buf_data.as_ptr();
         self.ptr_end = self.buf_data.as_ptr();
         loop {
@@ -186,7 +181,10 @@ impl<'a> ScannerState<'a> {
     unsafe fn flush(&mut self) -> Result<(), Error> {
         if self.ptr_copy != self.ptr_read {
             if self.keep_headers {
-                try!(self.writer.write(slice::from_raw_parts(self.ptr_copy, delta(self.ptr_copy, self.ptr_read))));
+                try!(self.writer.write(slice::from_raw_parts(
+                    self.ptr_copy,
+                    delta(self.ptr_copy, self.ptr_read)
+                )));
             }
             self.ptr_copy = self.ptr_read;
         }
@@ -229,9 +227,11 @@ impl<'a> ScannerState<'a> {
 
     unsafe fn next_line(&mut self) -> Result<(), Error> {
         loop {
-            let end = libc::memchr(self.ptr_read as *const libc::c_void,
-                                   b'\n' as i32,
-                                   delta(self.ptr_read, self.ptr_end)) as *const u8;
+            let end = libc::memchr(
+                self.ptr_read as *const libc::c_void,
+                b'\n' as i32,
+                delta(self.ptr_read, self.ptr_end),
+            ) as *const u8;
             if end != ptr::null() {
                 self.ptr_read = end.offset(1);
                 return Ok(());
@@ -246,9 +246,11 @@ impl<'a> ScannerState<'a> {
     unsafe fn next_line_eol(&mut self) -> Result<&'static [u8], Error> {
         let mut last: u8 = 0;
         loop {
-            let end = libc::memchr(self.ptr_read as *const libc::c_void,
-                                   b'\n' as i32,
-                                   delta(self.ptr_read, self.ptr_end)) as *const u8;
+            let end = libc::memchr(
+                self.ptr_read as *const libc::c_void,
+                b'\n' as i32,
+                delta(self.ptr_read, self.ptr_end),
+            ) as *const u8;
             if end != ptr::null() {
                 if end != &self.buf_data[0] {
                     last = *end.offset(-1);
@@ -420,10 +422,11 @@ impl<'a> ScannerState<'a> {
         }
     }
 
-    unsafe fn parse_path<'t, 'r>(&mut self,
-                                 token: &'t mut [u8],
-                                 raw: &'r mut [u8])
-                                 -> Result<(&'t [u8], &'r [u8]), Error> {
+    unsafe fn parse_path<'t, 'r>(
+        &mut self,
+        token: &'t mut [u8],
+        raw: &'r mut [u8],
+    ) -> Result<(&'t [u8], &'r [u8]), Error> {
         let quote = try!(self.peek()).unwrap();
         raw[0] = quote;
         self.next();
@@ -492,10 +495,7 @@ mod test {
         let mut stream: Vec<u8> = Vec::new();
         stream.write(&original.replace("\n", eol).as_bytes()[..]).unwrap();
         match super::filter_preprocessed(&mut Cursor::new(stream), &mut writer, marker, keep_headers) {
-            Ok(_) => {
-                assert_eq!(String::from_utf8_lossy(&writer),
-                           expected.replace("\n", eol))
-            }
+            Ok(_) => assert_eq!(String::from_utf8_lossy(&writer), expected.replace("\n", eol)),
             Err(e) => {
                 panic!(e);
             }
@@ -509,7 +509,8 @@ mod test {
 
     #[test]
     fn test_filter_precompiled_keep() {
-        check_filter(r#"#line 1 "sample.cpp"
+        check_filter(
+            r#"#line 1 "sample.cpp"
 #line 1 "e:/work/octobuild/test_cl/sample header.h"
 # pragma once
 void hello();
@@ -519,7 +520,7 @@ int main(int argc, char **argv) {
 	return 0;
 }
 "#,
-                     r#"#line 1 "sample.cpp"
+            r#"#line 1 "sample.cpp"
 #line 1 "e:/work/octobuild/test_cl/sample header.h"
 # pragma once
 void hello();
@@ -531,13 +532,15 @@ int main(int argc, char **argv) {
 	return 0;
 }
 "#,
-                     Some("sample header.h".to_string()),
-                     true)
+            Some("sample header.h".to_string()),
+            true,
+        )
     }
 
     #[test]
     fn test_filter_precompiled_remove() {
-        check_filter(r#"#line 1 "sample.cpp"
+        check_filter(
+            r#"#line 1 "sample.cpp"
 #line 1 "e:/work/octobuild/test_cl/sample header.h"
 # pragma once
 void hello1();
@@ -548,20 +551,22 @@ int main(int argc, char **argv) {
 	return 0;
 }
 "#,
-                     r#"#pragma hdrstop
+            r#"#pragma hdrstop
 #line 2 "sample.cpp"
 
 int main(int argc, char **argv) {
 	return 0;
 }
 "#,
-                     Some("sample header.h".to_string()),
-                     false);
+            Some("sample header.h".to_string()),
+            false,
+        );
     }
 
     #[test]
     fn test_filter_precompiled_case() {
-        check_filter(r#"#line 1 "sample.cpp"
+        check_filter(
+            r#"#line 1 "sample.cpp"
 #line 1 "e:/work/octobuild/test_cl/StdAfx.h"
 # pragma once
 void hello1();
@@ -572,20 +577,22 @@ int main(int argc, char **argv) {
     return 0;
 }
 "#,
-                     r#"#pragma hdrstop
+            r#"#pragma hdrstop
 #line 2 "sample.cpp"
 
 int main(int argc, char **argv) {
     return 0;
 }
 "#,
-                     Some("STDafx.h".to_string()),
-                     false);
+            Some("STDafx.h".to_string()),
+            false,
+        );
     }
 
     #[test]
     fn test_filter_precompiled_hdrstop() {
-        check_filter(r#"#line 1 "sample.cpp"
+        check_filter(
+            r#"#line 1 "sample.cpp"
  #line 1 "e:/work/octobuild/test_cl/sample header.h"
 void hello();
 # pragma  hdrstop
@@ -597,7 +604,7 @@ int main(int argc, char **argv) {
 	return 0;
 }
 "#,
-                     r#"#pragma hdrstop
+            r#"#pragma hdrstop
 void data();
 # pragma once
 #line 2 "sample.cpp"
@@ -606,13 +613,15 @@ int main(int argc, char **argv) {
 	return 0;
 }
 "#,
-                     None,
-                     false);
+            None,
+            false,
+        );
     }
 
     #[test]
     fn test_filter_precompiled_hdrstop_keep() {
-        check_filter(r#"#line 1 "sample.cpp"
+        check_filter(
+            r#"#line 1 "sample.cpp"
  #line 1 "e:/work/octobuild/test_cl/sample header.h"
 void hello();
 # pragma  hdrstop
@@ -624,7 +633,7 @@ int main(int argc, char **argv) {
 	return 0;
 }
 "#,
-                     r#"#line 1 "sample.cpp"
+            r#"#line 1 "sample.cpp"
  #line 1 "e:/work/octobuild/test_cl/sample header.h"
 void hello();
 # pragma  hdrstop
@@ -636,13 +645,15 @@ int main(int argc, char **argv) {
 	return 0;
 }
 "#,
-                     None,
-                     true);
+            None,
+            true,
+        );
     }
 
     #[test]
     fn test_filter_precompiled_winpath() {
-        check_filter(r#"#line 1 "sample.cpp"
+        check_filter(
+            r#"#line 1 "sample.cpp"
 #line 1 "e:\\work\\octobuild\\test_cl\\sample header.h"
 # pragma once
 void hello();
@@ -652,7 +663,7 @@ int main(int argc, char **argv) {
 	return 0;
 }
 "#,
-                     r#"#line 1 "sample.cpp"
+            r#"#line 1 "sample.cpp"
 #line 1 "e:\\work\\octobuild\\test_cl\\sample header.h"
 # pragma once
 void hello();
@@ -664,7 +675,8 @@ int main(int argc, char **argv) {
 	return 0;
 }
 "#,
-                     Some("e:\\work\\octobuild\\test_cl\\sample header.h".to_string()),
-                     true);
+            Some("e:\\work\\octobuild\\test_cl\\sample header.h".to_string()),
+            true,
+        );
     }
 }
