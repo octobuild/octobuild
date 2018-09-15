@@ -152,12 +152,13 @@ pub struct SharedState {
 pub struct CompilerGroup(Vec<Box<Compiler>>);
 
 impl SharedState {
-    pub fn new(config: &Config) -> Self {
-        SharedState {
-            semaphore: Semaphore::new("octobuild-worker", max(config.process_limit, 1 as usize)).unwrap(), /* todo: Remove unwrap() */
+    pub fn new(config: &Config) -> Result<Self, Error> {
+        let semaphore = Semaphore::new("octobuild-worker", max(config.process_limit, 1 as usize))?;
+        Ok(SharedState {
+            semaphore,
             statistic: Statistic::new(),
             cache: Cache::new(&config),
-        }
+        })
     }
 
     pub fn wrap_slow<T, F: FnOnce() -> T>(&self, func: F) -> T {

@@ -86,7 +86,7 @@ impl BuilderService {
         let temp_dir = create_temp_dir().ok().expect("Can't create temporary directory");
         let state = Arc::new(BuilderState {
             name: get_name(),
-            shared: SharedState::new(&config),
+            shared: SharedState::new(&config).unwrap(),
             toolchains: BuilderService::discovery_toolchains(&temp_dir),
             precompiled_dir: config.cache_dir,
             precompiled: Mutex::new(HashMap::new()),
