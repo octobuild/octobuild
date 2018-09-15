@@ -22,7 +22,8 @@ ln -s $WORKSPACE $WINEPREFIX/dosdevices/w:
 export WIXSHARP_WIXDIR="W:/target/wixsharp/Wix_bin/bin"
 export WIXSHARP_DIR="W:/target/wixsharp"
 
-7z x -y -otarget/wixsharp/ .jenkins/distrib/WixSharp.1.0.35.0.7z
+wget -P target https://github.com/oleg-shilo/wixsharp/releases/download/v1.9.1.0/WixSharp.1.9.1.0.7z
+7z x -y -otarget/wixsharp/ target/WixSharp.1.9.1.0.7z
 
 wine target/wixsharp/cscs.exe wixcs/setup.cs
 chmod 644 target/*.msi
