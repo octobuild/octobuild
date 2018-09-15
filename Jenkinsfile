@@ -21,7 +21,7 @@ if (env.TAG_NAME != null) {
 }
 
 parallel 'Linux': {
-  node ('linux') {
+  node {
     stage ('Linux: Checkout') {
       checkout scm
       sh 'git reset --hard'
@@ -81,7 +81,7 @@ popd
 
 def windowsBuild(String stageName, String arch) {
   return {
-    node ('linux') {
+    node {
       stage ("$stageName: Checkout") {
         checkout scm
         sh "git reset --hard"
@@ -126,7 +126,7 @@ done
 }
 
 if (env.TAG_NAME != null) {
-  node ('linux') {
+  node {
     checkout scm
     sh "git reset --hard"
     sh "git clean -ffdx"
