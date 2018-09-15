@@ -40,12 +40,18 @@ where
             return 501;
         }
     };
-    let state = SharedState::new(&config);
+    let state = match SharedState::new(&config) {
+        Ok(v) => v,
+        Err(e) => {
+            error!("FATAL ERROR: Can't create shared state {}", e);
+            return 502;
+        }
+    };
     let compiler = match factory(&config) {
         Ok(v) => v,
         Err(e) => {
             error!("FATAL ERROR: Can't create compiler instance {}", e);
-            return 502;
+            return 503;
         }
     };
     match compile(&config, &state, exec, compiler) {

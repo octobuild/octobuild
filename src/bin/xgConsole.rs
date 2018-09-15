@@ -131,7 +131,7 @@ fn expand_files(mut files: Vec<PathBuf>, arg: &str) -> Vec<PathBuf> {
 
 fn execute(args: &[String]) -> Result<Option<i32>, Error> {
     let config = Config::new()?;
-    let state = SharedState::new(&config);
+    let state = SharedState::new(&config)?;
     let compiler = RemoteCompiler::new(&config.coordinator, supported_compilers(&create_temp_dir()?));
     let files = args
         .iter()
