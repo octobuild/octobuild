@@ -16,13 +16,12 @@ wine reg add "HKLM\\Software\\Microsoft\\Windows NT\\CurrentVersion\\ProfileList
 */
 rustVersion = "1.13.0"
 
-def TAG_NAME = getParameter("TAG_NAME")
-if (TAG_NAME != null) {
-  echo "Build tag: $TAG_NAME"
+if (env.TAG_NAME != null) {
+  echo "Build tag: $env.TAG_NAME"
 }
 
 parallel 'Linux': {
-  node ('linux') {
+  node {
     stage ('Linux: Checkout') {
       checkout scm
       sh 'git reset --hard'
@@ -82,7 +81,7 @@ popd
 
 def windowsBuild(String stageName, String arch) {
   return {
-    node ('linux') {
+    node {
       stage ("$stageName: Checkout") {
         checkout scm
         sh "git reset --hard"
@@ -126,8 +125,8 @@ done
   }
 }
 
-if (TAG_NAME != null) {
-  node ('linux') {
+if (env.TAG_NAME != null) {
+  node {
     checkout scm
     sh "git reset --hard"
     sh "git clean -ffdx"
@@ -135,7 +134,6 @@ if (TAG_NAME != null) {
 
     stage ("Publish: github") {
       withEnv([
-        "TAG_NAME=$TAG_NAME",
         "GITHUB_USER=bozaro",
         "GITHUB_REPO=octobuild",
       ]) {
@@ -147,9 +145,9 @@ mkdir -p "\$GOPATH"
 
 go get github.com/aktau/github-release
 
-github-release info --tag $TAG_NAME || github-release release --tag $TAG_NAME --draft
+github-release info --tag $env.TAG_NAME || github-release release --tag $env.TAG_NAME --draft
 for i in target/*.msi target/*.deb; do
-  github-release upload --tag $TAG_NAME --file \$i --name `basename \$i`
+  github-release upload --tag $env.TAG_NAME --file \$i --name `basename \$i`
 done
 """
         }
@@ -168,7 +166,7 @@ scp -B -o StrictHostKeyChecking=no target/*.dsc target/*.tar.gz target/*.deb tar
     stage ("Publish: nuget") {
       withCredentials([[$class: 'UsernamePasswordMultiBinding', credentialsId: '133e2d6f-04ac-4d18-8505-3025dd652355', passwordVariable: 'NUGET_TOKEN', usernameVariable: 'NUGET_REPO']]) {
           sh """
-nuget pack choco/octobuild.nuspec -OutputDirectory target -Properties version=$TAG_NAME
+nuget pack choco/octobuild.nuspec -OutputDirectory target -Properties version=$env.TAG_NAME
 
 for i in target/*.nupkg; do
   nuget push \$i -Source "\$NUGET_REPO" -ApiKey "\$NUGET_TOKEN"
@@ -190,13 +188,5 @@ void withRustEnv(List envVars = [], def body) {
   // Invoke the body closure we're passed within the environment we've created.
   withEnv(jobEnv) {
     body.call()
-  }
-}
-
-String getParameter(String name) {
-  try {
-    return getProperty(name);
-  } catch (MissingPropertyException e) {
-    return null;
   }
 }
