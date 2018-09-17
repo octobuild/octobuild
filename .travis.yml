@@ -1,6 +1,10 @@
+# Required variables for release publishing:
+# GITHUB_TOKEN - GitHub token
+# BINTRAY_USER - Bintray username
+# BINTRAY_TOKEN - Bintray token
+
 language: rust
-dist: bionic
-cache: cargo
+dist: xenial
 
 os:
   - windows
@@ -8,25 +12,26 @@ os:
   - osx
 
 matrix:
+  fast_finish: true
   include:
-    - name: "Clippy Linux"
+    - name: "Rustfmt"
+      os: linux
+      env: RUSTFMT=true
+      if: tag IS NOT present
+
+    - name: "Linux Clippy"
       os: linux
       env: CLIPPY=true
       if: tag IS NOT present
 
-    - name: "Clippy OSX"
+    - name: "OSX Clippy"
       os: osx
       env: CLIPPY=true
       if: tag IS NOT present
 
-    - name: "Clippy Windows"
+    - name: "Windows Clippy"
       os: windows
       env: CLIPPY=true
-      if: tag IS NOT present
-
-    - name: "Rustfmt"
-      os: linux
-      env: RUSTFMT=true
       if: tag IS NOT present
 
 addons:
@@ -40,3 +45,21 @@ addons:
 
 install: ci/install.sh
 script: ci/script.sh
+before_deploy: ci/before_deploy.sh
+
+deploy:
+  - provider: releases
+    api-key: ${GITHUB_TOKEN}
+    file_glob: true
+    file: target/deploy/*
+    skip_cleanup: true
+    on:
+      tags: true
+  - provider: bintray
+    file: bintray-descriptor.json
+    user: ${BINTRAY_USER}
+    key: ${BINTRAY_TOKEN}
+    skip_cleanup: true
+    on:
+      condition: ${TRAVIS_OS_NAME} = linux
+      tags: true
