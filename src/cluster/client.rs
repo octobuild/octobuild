@@ -3,7 +3,7 @@ use hyper::client::Body;
 use hyper::status::StatusCode;
 use hyper::{Client, Url};
 use rand;
-use rustc_serialize::json;
+use serde_json;
 use time;
 use time::{Duration, Timespec};
 
@@ -65,14 +65,12 @@ impl RemoteSharedMut {
         match base_url {
             &Some(ref base_url) => {
                 let client = Client::new();
-                client
+                let mut response = client
                     .get(base_url.join(RPC_BUILDER_LIST).unwrap())
                     .send()
-                    .map_err(|e| Error::new(ErrorKind::Other, e))
-                    .and_then(|mut response| {
-                        let mut payload = String::new();
-                        response.read_to_string(&mut payload).map(|_| payload)
-                    }).and_then(|payload| json::decode(&payload).map_err(|e| Error::new(ErrorKind::InvalidData, e)))
+                    .map_err(|e| Error::new(ErrorKind::Other, e))?;
+
+                serde_json::from_reader(response).map_err(|e| Error::new(ErrorKind::InvalidData, e))
             }
             &None => Ok(Vec::new()),
         }

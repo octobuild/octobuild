@@ -16,7 +16,9 @@ extern crate local_encoding;
 extern crate petgraph;
 extern crate rand;
 extern crate regex;
-extern crate rustc_serialize;
+#[macro_use]
+extern crate serde_derive;
+extern crate serde_json;
 extern crate tempdir;
 extern crate time;
 extern crate uuid;

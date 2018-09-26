@@ -2,11 +2,12 @@ extern crate capnp;
 extern crate crypto;
 extern crate daemon;
 extern crate fern;
+extern crate hex;
 extern crate hostname;
 extern crate hyper;
 extern crate nickel;
 extern crate octobuild;
-extern crate rustc_serialize;
+extern crate serde_json;
 extern crate tempdir;
 #[macro_use]
 extern crate log;
@@ -34,8 +35,6 @@ use octobuild::simple::create_temp_dir;
 use octobuild::simple::supported_compilers;
 use octobuild::utils::DEFAULT_BUF_SIZE;
 use octobuild::version;
-use rustc_serialize::hex::FromHex;
-use rustc_serialize::json;
 use std::collections::HashMap;
 use std::error::Error;
 use std::fs;
@@ -143,7 +142,7 @@ impl BuilderService {
             while !done.load(Ordering::Relaxed) {
                 match client
                     .post(coordinator.join(RPC_BUILDER_UPDATE).unwrap())
-                    .body(&json::encode(&info).unwrap())
+                    .body(&serde_json::to_string(&info).unwrap())
                     .send()
                 {
                     Ok(_) => {}
@@ -355,7 +354,7 @@ impl<D> Middleware<D> for RpcBuilderUploadHandler {
 }
 
 fn is_valid_md5(hash: &str) -> bool {
-    hash.from_hex()
+    hex::decode(hash)
         .ok()
         .map_or(false, |v| v.len() == Md5::new().output_bytes())
 }
