@@ -2,7 +2,7 @@ extern crate daemon;
 extern crate fern;
 extern crate nickel;
 extern crate octobuild;
-extern crate rustc_serialize;
+extern crate serde_json;
 extern crate time;
 #[macro_use]
 extern crate log;
@@ -14,8 +14,6 @@ use nickel::status::StatusCode;
 use nickel::{HttpRouter, MediaType, Middleware, MiddlewareResult, Nickel, NickelError, Request, Response};
 use octobuild::cluster::common::{BuilderInfo, BuilderInfoUpdate, RPC_BUILDER_LIST, RPC_BUILDER_UPDATE};
 use octobuild::config::Config;
-use rustc_serialize::json;
-use std::io::Read;
 use std::net::{IpAddr, SocketAddr};
 use std::str::FromStr;
 use std::sync::mpsc::Receiver;
@@ -49,9 +47,7 @@ impl<D> Middleware<D> for RpcAgentUpdateHandler {
         request: &mut Request<'a, 'server, D>,
         mut response: Response<'a, D>,
     ) -> MiddlewareResult<'a, D> {
-        let mut payload = String::new();
-        request.origin.read_to_string(&mut payload).unwrap();
-        let mut update: BuilderInfoUpdate = json::decode(&payload).unwrap();
+        let mut update: BuilderInfoUpdate = serde_json::from_reader(&mut request.origin).unwrap();
         // Fix inspecified endpoint IP address.
         let endpoint = match SocketAddr::from_str(&update.info.endpoint) {
             Ok(v) => v,
@@ -66,12 +62,14 @@ impl<D> Middleware<D> for RpcAgentUpdateHandler {
         if is_unspecified(&endpoint.ip()) {
             update.info.endpoint = SocketAddr::new(request.origin.remote_addr.ip(), endpoint.port()).to_string();
         }
+
+        let payload: String;
         // Update information.
         {
             let mut holder = self.0.builders.write().unwrap();
             let now = time::get_time();
             holder.retain(|e| (e.guid != update.guid) && (e.timeout >= now));
-            payload = json::encode(&update.info).unwrap();
+            payload = serde_json::to_string(&update.info).unwrap();
             holder.push(BuilderState {
                 guid: update.guid,
                 info: update.info,
@@ -102,7 +100,7 @@ impl<D> Middleware<D> for RpcAgentListHandler {
 
         response.set(StatusCode::Ok);
         response.set(MediaType::Json);
-        response.send(json::encode(&builders).unwrap())
+        response.send(serde_json::to_string(&builders).unwrap())
     }
 }
 

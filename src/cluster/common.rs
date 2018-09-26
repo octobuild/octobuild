@@ -6,7 +6,7 @@ pub const RPC_BUILDER_LIST: &'static str = "/rpc/v1/builder/list";
 pub const RPC_BUILDER_TASK: &'static str = "/rpc/v1/builder/task";
 pub const RPC_BUILDER_UPLOAD: &'static str = "/rpc/v1/builder/upload";
 
-#[derive(RustcEncodable, RustcDecodable)]
+#[derive(Serialize, Deserialize)]
 pub struct BuilderInfo {
     // Agent name
     pub name: String,
@@ -18,7 +18,7 @@ pub struct BuilderInfo {
     pub toolchains: Vec<String>,
 }
 
-#[derive(RustcEncodable, RustcDecodable)]
+#[derive(Serialize, Deserialize)]
 pub struct BuilderInfoUpdate {
     // Hidden unique Id for builder update information
     pub guid: String,
