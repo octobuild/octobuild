@@ -2,12 +2,18 @@ language: rust
 dist: bionic
 cache: cargo
 
+matrix:
+  include:
+    - os: windows
+    - os: linux
+
 addons:
   apt:
     packages:
       - capnproto
 
 install:
+  - if [ "$TRAVIS_OS_NAME" = "windows" ]; then choco install capnproto; fi
   - rustup component add rustfmt
 
 script:
