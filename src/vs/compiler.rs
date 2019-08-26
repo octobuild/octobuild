@@ -104,14 +104,16 @@ impl Compiler for VsCompiler {
                 RegKey::predef(HKEY_LOCAL_MACHINE)
                     .open_subkey_with_flags(reg_path, KEY_READ)
                     .ok()
-            }).flat_map(|key| -> Vec<String> {
+            })
+            .flat_map(|key| -> Vec<String> {
                 key.enum_values()
                     .filter_map(|x| x.ok())
                     .map(|(name, _)| name)
                     .filter(|name| RE.is_match(&name))
                     .filter_map(|name: String| -> Option<String> { key.get_value(name).ok() })
                     .collect()
-            }).map(|path| Path::new(&path).to_path_buf())
+            })
+            .map(|path| Path::new(&path).to_path_buf())
             .map(|path| -> Vec<PathBuf> { CL_BIN.iter().map(|bin| path.join(bin)).collect() })
             .flat_map(|paths| paths.into_iter())
             .filter(|cl| cl.exists())

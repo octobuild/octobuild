@@ -53,7 +53,8 @@ impl Config {
                 .with_default_port(|url| match url.scheme() {
                     "http" => Ok(80),
                     _ => Err(()),
-                }).and_then(|host| host.to_socket_addrs())
+                })
+                .and_then(|host| host.to_socket_addrs())
                 .map(|iter| iter.collect()),
             &None => Ok(Vec::new()),
         }
@@ -71,7 +72,8 @@ impl Config {
             false => env::var("OCTOBUILD_CACHE")
                 .ok()
                 .and_then(|v| if v == "" { None } else { Some(v) }),
-        }.or_else(|| get_config(local, global, PARAM_CACHE_PATH, |v| v.as_str().map(|v| v.to_string())))
+        }
+        .or_else(|| get_config(local, global, PARAM_CACHE_PATH, |v| v.as_str().map(|v| v.to_string())))
         .unwrap_or(DEFAULT_CACHE_DIR.to_string());
         let process_limit = get_config(local, global, PARAM_PROCESS_LIMIT, |v| v.as_i64().map(|v| v as usize))
             .unwrap_or_else(|| num_cpus::get());
@@ -82,15 +84,18 @@ impl Config {
                     .map(|mut v| {
                         v.set_path("");
                         v
-                    }).ok()
+                    })
+                    .ok()
             }),
         });
         let helper_bind = get_config(local, global, PARAM_HELPER_BIND, |v| {
             v.as_str().and_then(|v| FromStr::from_str(v).ok())
-        }).unwrap_or_else(|| SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::new(0, 0, 0, 0), 0)));
+        })
+        .unwrap_or_else(|| SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::new(0, 0, 0, 0), 0)));
         let coordinator_bind = get_config(local, global, PARAM_COORDINATOR_BIND, |v| {
             v.as_str().and_then(|v| FromStr::from_str(v).ok())
-        }).unwrap_or_else(|| SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::new(0, 0, 0, 0), 3000)));
+        })
+        .unwrap_or_else(|| SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::new(0, 0, 0, 0), 3000)));
 
         Ok(Config {
             process_limit,

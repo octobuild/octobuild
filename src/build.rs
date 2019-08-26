@@ -36,7 +36,8 @@ pub const RUSTC: &'static str = "{rustc}";
 "#,
             revision = load_revision()?,
             rustc = version().unwrap(),
-        ).into_bytes(),
+        )
+        .into_bytes(),
     )
 }
 
@@ -59,7 +60,8 @@ REVISION={revision}
             arch = arch,
             revision = load_revision()?,
             version = env::var("CARGO_PKG_VERSION").unwrap(),
-        ).into_bytes(),
+        )
+        .into_bytes(),
     )
 }
 

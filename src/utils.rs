@@ -27,7 +27,10 @@ pub fn init_logger() {
     fern::Dispatch::new()
         .format(|out, message, record| {
             out.finish(format_args!(
-                "{} [{}] {}", time::now().rfc3339(), record.level(), message
+                "{} [{}] {}",
+                time::now().rfc3339(),
+                record.level(),
+                message
             ))
         })
         // Output to stdout and the log file in the temporary directory we made above to test

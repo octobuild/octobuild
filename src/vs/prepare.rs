@@ -28,7 +28,8 @@ pub fn create_tasks(command: CommandInfo, args: &[String]) -> Result<Vec<Compila
                         Some(Path::new(file).to_path_buf())
                     }
                     _ => None,
-                }).collect();
+                })
+                .collect();
             if input_sources.len() == 0 {
                 return Err(format!("Can't find source file path."));
             }
@@ -101,17 +102,14 @@ pub fn create_tasks(command: CommandInfo, args: &[String]) -> Result<Vec<Compila
                 ParamValue::Many(v) => {
                     return Err(format!("Found too many output object files: {:?}", v));
                 }
-            }.map(|path| cwd.as_ref().map(|cwd| cwd.join(&path)).unwrap_or(path));
+            }
+            .map(|path| cwd.as_ref().map(|cwd| cwd.join(&path)).unwrap_or(path));
             // Language
             let language: Option<String> = match find_param(&parsed_args, |arg: &Arg| -> Option<String> {
                 match arg {
                     &Arg::Param {
                         ref flag, ref value, ..
-                    }
-                        if *flag == "T" =>
-                    {
-                        Some(value.clone())
-                    }
+                    } if *flag == "T" => Some(value.clone()),
                     _ => None,
                 }
             }) {
@@ -144,10 +142,12 @@ pub fn create_tasks(command: CommandInfo, args: &[String]) -> Result<Vec<Compila
                                             Some(e) if e.eq_ignore_ascii_case("cpp") => Some("P"),
                                             Some(e) if e.eq_ignore_ascii_case("c") => Some("C"),
                                             _ => None,
-                                        }).map(|ext| ext.to_string())
+                                        })
+                                        .map(|ext| ext.to_string())
                                 },
                                 |lang| Some(lang.clone()),
-                            ).ok_or_else(|| {
+                            )
+                            .ok_or_else(|| {
                                 format!(
                                     "Can't detect file language by extension: {}",
                                     input_source.to_string_lossy()
@@ -156,7 +156,8 @@ pub fn create_tasks(command: CommandInfo, args: &[String]) -> Result<Vec<Compila
                         output_object: get_output_object(&input_source, &output_object)?,
                         input_source,
                     })
-                }).collect()
+                })
+                .collect()
         })
 }
 

@@ -41,23 +41,27 @@ fn main() {
                 .value_name("header")
                 .takes_value(true)
                 .help("Precompiled header marker (like StdAfx.h)"),
-        ).arg(
+        )
+        .arg(
             Arg::with_name(KEEP)
                 .short("k")
                 .long("keep")
                 .help("Keep header before precompiled header marker"),
-        ).arg(
+        )
+        .arg(
             Arg::with_name(COUNT)
                 .short("c")
                 .long("count")
                 .default_value("1")
                 .help("Iteration count"),
-        ).arg(
+        )
+        .arg(
             Arg::with_name(INPUT)
                 .required(true)
                 .index(1)
                 .help("Preprocessed input file"),
-        ).get_matches();
+        )
+        .get_matches();
 
     let inputs = matches.values_of_lossy(INPUT).unwrap();
     let marker = matches.value_of(MARKER).map(|s| s.to_string());

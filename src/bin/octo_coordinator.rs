@@ -96,7 +96,8 @@ impl<D> Middleware<D> for RpcAgentListHandler {
             .filter_map(|e| match e.timeout >= now {
                 true => Some(&e.info),
                 false => None,
-            }).collect();
+            })
+            .collect();
 
         response.set(StatusCode::Ok);
         response.set(MediaType::Json);
@@ -154,5 +155,6 @@ fn main() {
                 };
             }
             info!("Coordinator shutdowned.");
-        }).unwrap();
+        })
+        .unwrap();
 }

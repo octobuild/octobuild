@@ -17,7 +17,8 @@ pub fn create_tasks(command: CommandInfo, args: &[String]) -> Result<Vec<Compila
         .find(|v| match v as &str {
             "--analyze" => true,
             _ => false,
-        }).is_some()
+        })
+        .is_some()
     {
         // Support only compilation steps
         return Ok(Vec::new());
@@ -27,7 +28,8 @@ pub fn create_tasks(command: CommandInfo, args: &[String]) -> Result<Vec<Compila
         .find(|v| match v as &str {
             "-c" => true,
             _ => false,
-        }).is_none()
+        })
+        .is_none()
     {
         // Support only compilation steps
         return Ok(Vec::new());
@@ -39,7 +41,8 @@ pub fn create_tasks(command: CommandInfo, args: &[String]) -> Result<Vec<Compila
         .filter_map(|arg| match arg {
             &Arg::Input { ref kind, ref file, .. } if *kind == InputKind::Source => Some(Path::new(file).to_path_buf()),
             _ => None,
-        }).collect();
+        })
+        .collect();
     if input_sources.len() == 0 {
         return Err(format!("Can't find source file path."));
     }
@@ -64,13 +67,10 @@ pub fn create_tasks(command: CommandInfo, args: &[String]) -> Result<Vec<Compila
         .filter_map(|arg| match arg {
             &Arg::Param {
                 ref flag, ref value, ..
-            }
-                if *flag == "include" =>
-            {
-                Some(value.clone())
-            }
+            } if *flag == "include" => Some(value.clone()),
             _ => None,
-        }).next();
+        })
+        .next();
     // Output object file name.
     let output_object = match find_param(&parsed_args, |arg: &Arg| -> Option<PathBuf> {
         match arg {
@@ -96,11 +96,7 @@ pub fn create_tasks(command: CommandInfo, args: &[String]) -> Result<Vec<Compila
         match arg {
             &Arg::Param {
                 ref flag, ref value, ..
-            }
-                if *flag == "x" =>
-            {
-                Some(value.clone())
-            }
+            } if *flag == "x" => Some(value.clone()),
             _ => None,
         }
     }) {
@@ -145,10 +141,12 @@ pub fn create_tasks(command: CommandInfo, args: &[String]) -> Result<Vec<Compila
                                     Some(e) if e.eq_ignore_ascii_case("hpp") => Some("c++-header"),
                                     Some(e) if e.eq_ignore_ascii_case("h") => Some("c-header"),
                                     _ => None,
-                                }).map(|ext| ext.to_string())
+                                })
+                                .map(|ext| ext.to_string())
                         },
                         |lang| Some(lang.clone()),
-                    ).ok_or_else(|| {
+                    )
+                    .ok_or_else(|| {
                         format!(
                             "Can't detect file language by extension: {}",
                             source.as_os_str().to_string_lossy()
@@ -159,7 +157,8 @@ pub fn create_tasks(command: CommandInfo, args: &[String]) -> Result<Vec<Compila
                     .map_or_else(|| source.with_extension("o"), |path| path.clone()),
                 input_source: source,
             })
-        }).collect()
+        })
+        .collect()
 }
 
 fn find_param<T, R, F: Fn(&T) -> Option<R>>(args: &Vec<T>, filter: F) -> ParamValue<R> {
