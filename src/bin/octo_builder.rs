@@ -64,7 +64,7 @@ struct BuilderState {
     name: String,
     shared: SharedState,
     precompiled_dir: PathBuf,
-    toolchains: HashMap<String, Arc<Toolchain>>,
+    toolchains: HashMap<String, Arc<dyn Toolchain>>,
     precompiled: Mutex<HashMap<String, Arc<PrecompiledFile>>>,
 }
 
@@ -155,7 +155,7 @@ impl BuilderService {
         })
     }
 
-    fn discovery_toolchains(temp_dir: &Arc<TempDir>) -> HashMap<String, Arc<Toolchain>> {
+    fn discovery_toolchains(temp_dir: &Arc<TempDir>) -> HashMap<String, Arc<dyn Toolchain>> {
         let compiler = supported_compilers(temp_dir);
         HashMap::from_iter(
             compiler
@@ -217,7 +217,7 @@ impl<D> Middleware<D> for RpcBuilderTaskHandler {
                 preprocessed: MemStream::from(request.preprocessed_data),
             };
 
-            let toolchain: Arc<Toolchain> = state.toolchains.get(&request.toolchain).unwrap().clone();
+            let toolchain: Arc<dyn Toolchain> = state.toolchains.get(&request.toolchain).unwrap().clone();
             let response = CompileResponse::from(toolchain.compile_memory(&state.shared, compile_step));
 
             let mut payload = Vec::new();

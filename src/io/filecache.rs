@@ -53,7 +53,7 @@ impl ::std::error::Error for CacheError {
         }
     }
 
-    fn cause(&self) -> Option<&::std::error::Error> {
+    fn cause(&self) -> Option<&dyn (::std::error::Error)> {
         None
     }
 }
@@ -250,24 +250,24 @@ fn read_cache(statistic: &Statistic, path: &Path, paths: &Vec<PathBuf>) -> Resul
     Ok(output)
 }
 
-fn write_blob(stream: &mut Write, blob: &[u8]) -> Result<(), Error> {
+fn write_blob(stream: &mut dyn Write, blob: &[u8]) -> Result<(), Error> {
     write_usize(stream, blob.len())?;
     stream.write_all(blob)?;
     Ok(())
 }
 
-fn read_blob(stream: &mut Read) -> Result<Vec<u8>, Error> {
+fn read_blob(stream: &mut dyn Read) -> Result<Vec<u8>, Error> {
     let size = read_usize(stream)?;
     read_exact(stream, size)
 }
 
-fn write_output(stream: &mut Write, output: &OutputInfo) -> Result<(), Error> {
+fn write_output(stream: &mut dyn Write, output: &OutputInfo) -> Result<(), Error> {
     write_blob(stream, &output.stdout)?;
     write_blob(stream, &output.stderr)?;
     Ok(())
 }
 
-fn read_output(stream: &mut Read) -> Result<OutputInfo, Error> {
+fn read_output(stream: &mut dyn Read) -> Result<OutputInfo, Error> {
     let stdout = read_blob(stream)?;
     let stderr = read_blob(stream)?;
     Ok(OutputInfo {

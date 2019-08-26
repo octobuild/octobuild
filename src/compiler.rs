@@ -44,7 +44,7 @@ impl ::std::error::Error for CompilerError {
         }
     }
 
-    fn cause(&self) -> Option<&::std::error::Error> {
+    fn cause(&self) -> Option<&dyn (::std::error::Error)> {
         None
     }
 }
@@ -149,7 +149,7 @@ pub struct SharedState {
     pub statistic: Statistic,
 }
 
-pub struct CompilerGroup(Vec<Box<Compiler>>);
+pub struct CompilerGroup(Vec<Box<dyn Compiler>>);
 
 impl SharedState {
     pub fn new(config: &Config) -> Result<Self, Error> {
@@ -503,11 +503,11 @@ impl CompilerGroup {
 
 impl Compiler for CompilerGroup {
     // Resolve toolchain for command execution.
-    fn resolve_toolchain(&self, command: &CommandInfo) -> Option<Arc<Toolchain>> {
+    fn resolve_toolchain(&self, command: &CommandInfo) -> Option<Arc<dyn Toolchain>> {
         self.0.iter().filter_map(|c| c.resolve_toolchain(command)).next()
     }
     // Discovery local toolchains.
-    fn discovery_toolchains(&self) -> Vec<Arc<Toolchain>> {
+    fn discovery_toolchains(&self) -> Vec<Arc<dyn Toolchain>> {
         self.0.iter().flat_map(|c| c.discovery_toolchains()).collect()
     }
 }
@@ -537,15 +537,15 @@ impl<D: Digest + ?Sized> Hasher for D {}
 
 pub trait Compiler: Send + Sync {
     // Resolve toolchain for command execution.
-    fn resolve_toolchain(&self, command: &CommandInfo) -> Option<Arc<Toolchain>>;
+    fn resolve_toolchain(&self, command: &CommandInfo) -> Option<Arc<dyn Toolchain>>;
     // Discovery local toolchains.
-    fn discovery_toolchains(&self) -> Vec<Arc<Toolchain>>;
+    fn discovery_toolchains(&self) -> Vec<Arc<dyn Toolchain>>;
 
     fn create_tasks(
         &self,
         command: CommandInfo,
         args: &[String],
-    ) -> Result<Vec<(Arc<Toolchain>, CompilationTask)>, Error> {
+    ) -> Result<Vec<(Arc<dyn Toolchain>, CompilationTask)>, Error> {
         self.resolve_toolchain(&command)
             .ok_or(Error::new(
                 ErrorKind::InvalidInput,
@@ -561,7 +561,7 @@ pub trait Compiler: Send + Sync {
 }
 
 pub struct ToolchainHolder {
-    toolchains: Arc<RwLock<HashMap<PathBuf, Arc<Toolchain>>>>,
+    toolchains: Arc<RwLock<HashMap<PathBuf, Arc<dyn Toolchain>>>>,
 }
 
 impl ToolchainHolder {
@@ -571,12 +571,16 @@ impl ToolchainHolder {
         }
     }
 
-    pub fn to_vec(&self) -> Vec<Arc<Toolchain>> {
+    pub fn to_vec(&self) -> Vec<Arc<dyn Toolchain>> {
         let read_lock = self.toolchains.read().unwrap();
         read_lock.values().map(|v| v.clone()).collect()
     }
 
-    pub fn resolve<F: FnOnce(PathBuf) -> Arc<Toolchain>>(&self, path: &Path, factory: F) -> Option<Arc<Toolchain>> {
+    pub fn resolve<F: FnOnce(PathBuf) -> Arc<dyn Toolchain>>(
+        &self,
+        path: &Path,
+        factory: F,
+    ) -> Option<Arc<dyn Toolchain>> {
         {
             let read_lock = self.toolchains.read().unwrap();
             match read_lock.get(path) {

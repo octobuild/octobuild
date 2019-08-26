@@ -54,7 +54,7 @@ impl VsToolchain {
 }
 
 impl Compiler for VsCompiler {
-    fn resolve_toolchain(&self, command: &CommandInfo) -> Option<Arc<Toolchain>> {
+    fn resolve_toolchain(&self, command: &CommandInfo) -> Option<Arc<dyn Toolchain>> {
         if command
             .program
             .file_name()
@@ -77,7 +77,7 @@ impl Compiler for VsCompiler {
     }
 
     #[cfg(windows)]
-    fn discovery_toolchains(&self) -> Vec<Arc<Toolchain>> {
+    fn discovery_toolchains(&self) -> Vec<Arc<dyn Toolchain>> {
         use self::winreg::enums::*;
         use self::winreg::RegKey;
 
@@ -117,7 +117,7 @@ impl Compiler for VsCompiler {
             .map(|path| -> Vec<PathBuf> { CL_BIN.iter().map(|bin| path.join(bin)).collect() })
             .flat_map(|paths| paths.into_iter())
             .filter(|cl| cl.exists())
-            .map(|cl| -> Arc<Toolchain> { Arc::new(VsToolchain::new(cl, &self.temp_dir)) })
+            .map(|cl| -> Arc<dyn Toolchain> { Arc::new(VsToolchain::new(cl, &self.temp_dir)) })
             .filter(|toolchain| toolchain.identifier().is_some())
             .collect()
     }
@@ -300,7 +300,6 @@ fn vs_identifier(path: &Path) -> Option<String> {
     use winapi::shared::minwindef::{DWORD, LPCVOID, LPVOID, WORD};
     use winapi::um::winver;
 
-    use std::convert::Into;
     use std::ffi::OsStr;
     use std::os::windows::ffi::OsStrExt;
     use std::ptr;

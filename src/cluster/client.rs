@@ -41,7 +41,7 @@ struct RemoteShared {
 
 struct RemoteToolchain {
     shared: Arc<RemoteShared>,
-    local: Arc<Toolchain>,
+    local: Arc<dyn Toolchain>,
 }
 
 impl<C: Compiler> RemoteCompiler<C> {
@@ -65,7 +65,7 @@ impl RemoteSharedMut {
         match base_url {
             &Some(ref base_url) => {
                 let client = Client::new();
-                let mut response = client
+                let response = client
                     .get(base_url.join(RPC_BUILDER_LIST).unwrap())
                     .send()
                     .map_err(|e| Error::new(ErrorKind::Other, e))?;
@@ -79,18 +79,20 @@ impl RemoteSharedMut {
 
 impl<C: Compiler> Compiler for RemoteCompiler<C> {
     // Discovery local toolchains.
-    fn discovery_toolchains(&self) -> Vec<Arc<Toolchain>> {
+    fn discovery_toolchains(&self) -> Vec<Arc<dyn Toolchain>> {
         self.local.discovery_toolchains()
     }
 
     // Resolve toolchain for command execution.
-    fn resolve_toolchain(&self, command: &CommandInfo) -> Option<Arc<Toolchain>> {
-        self.local.resolve_toolchain(command).map(|local| -> Arc<Toolchain> {
-            Arc::new(RemoteToolchain {
-                shared: self.shared.clone(),
-                local,
+    fn resolve_toolchain(&self, command: &CommandInfo) -> Option<Arc<dyn Toolchain>> {
+        self.local
+            .resolve_toolchain(command)
+            .map(|local| -> Arc<dyn Toolchain> {
+                Arc::new(RemoteToolchain {
+                    shared: self.shared.clone(),
+                    local,
+                })
             })
-        })
     }
 }
 

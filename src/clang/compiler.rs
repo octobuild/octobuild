@@ -47,7 +47,7 @@ impl ClangToolchain {
 }
 
 impl Compiler for ClangCompiler {
-    fn resolve_toolchain(&self, command: &CommandInfo) -> Option<Arc<Toolchain>> {
+    fn resolve_toolchain(&self, command: &CommandInfo) -> Option<Arc<dyn Toolchain>> {
         if command
             .program
             .file_name()
@@ -62,7 +62,7 @@ impl Compiler for ClangCompiler {
         }
     }
 
-    fn discovery_toolchains(&self) -> Vec<Arc<Toolchain>> {
+    fn discovery_toolchains(&self) -> Vec<Arc<dyn Toolchain>> {
         env::var_os("PATH")
             .map_or(Vec::new(), |paths| env::split_paths(&paths).collect())
             .iter()
@@ -71,7 +71,7 @@ impl Compiler for ClangCompiler {
             .flat_map(|read_dir| read_dir)
             .filter_map(|entry| entry.ok())
             .filter(|entry| RE_CLANG.is_match(entry.file_name().to_string_lossy().as_bytes()))
-            .map(|entry| -> Arc<Toolchain> { Arc::new(ClangToolchain::new(entry.path())) })
+            .map(|entry| -> Arc<dyn Toolchain> { Arc::new(ClangToolchain::new(entry.path())) })
             .collect()
     }
 }

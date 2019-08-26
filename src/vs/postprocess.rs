@@ -46,7 +46,7 @@ impl ::std::error::Error for PostprocessError {
         }
     }
 
-    fn cause(&self) -> Option<&::std::error::Error> {
+    fn cause(&self) -> Option<&dyn (::std::error::Error)> {
         None
     }
 }
@@ -58,8 +58,8 @@ pub enum Include<T> {
 }
 
 pub fn filter_preprocessed(
-    reader: &mut Read,
-    writer: &mut Write,
+    reader: &mut dyn Read,
+    writer: &mut dyn Write,
     marker: &Option<String>,
     keep_headers: bool,
 ) -> Result<(), Error> {
@@ -114,8 +114,8 @@ struct ScannerState<'a> {
     ptr_read: *const u8,
     ptr_end: *const u8,
 
-    reader: &'a mut Read,
-    writer: &'a mut Write,
+    reader: &'a mut dyn Read,
+    writer: &'a mut dyn Write,
 
     keep_headers: bool,
     marker: Option<Vec<u8>>,
@@ -401,7 +401,7 @@ impl<'a> ScannerState<'a> {
                 let c: u8 = *self.ptr_read;
                 match c {
                     // end-of-line ::= newline | carriage-return | carriage-return newline
-                    b'a'...b'z' | b'A'...b'Z' | b'0'...b'9' | b'_' => {
+                    b'a'..=b'z' | b'A'..=b'Z' | b'0'..=b'9' | b'_' => {
                         if offset >= token.len() {
                             return Err(Error::new(ErrorKind::InvalidInput, PostprocessError::TokenTooLong));
                         }

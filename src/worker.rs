@@ -20,7 +20,7 @@ pub struct BuildTask {
 pub enum BuildAction {
     Empty,
     Exec(CommandInfo, Vec<String>),
-    Compilation(Arc<Toolchain>, CompilationTask),
+    Compilation(Arc<dyn Toolchain>, CompilationTask),
 }
 
 pub struct BuildResult<'a> {
