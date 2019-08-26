@@ -177,10 +177,10 @@ impl RemoteToolchain {
                 }
                 let mut file = File::open(path)?;
                 // Upload precompiled header
-                match self.shared
+                match self
+                    .shared
                     .client
-                    .post(base_url.join(&format!("{}/{}", RPC_BUILDER_UPLOAD, meta.hash))
-                        .unwrap())
+                    .post(base_url.join(&format!("{}/{}", RPC_BUILDER_UPLOAD, meta.hash)).unwrap())
                     // todo: this is workaround for https://github.com/hyperium/hyper/issues/838
                     //.header(Expect::Continue)
                     .body(Body::SizedBody(&mut file, meta.size))
@@ -283,7 +283,8 @@ fn write_output(path: &Option<PathBuf>, success: bool, output: &[u8]) -> Result<
                 .or_else(|e| {
                     drop(fs::remove_file(path));
                     Err(e)
-                }).map(|_| ()),
+                })
+                .map(|_| ()),
             false => fs::remove_file(path),
         },
         &None => Ok(()),

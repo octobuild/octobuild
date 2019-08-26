@@ -429,5 +429,6 @@ fn main() {
                 };
             }
             info!("Builder shutdowned.");
-        }).unwrap();
+        })
+        .unwrap();
 }

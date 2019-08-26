@@ -380,5 +380,6 @@ fn test_parse_smoke() {
     parse(
         &mut Graph::new(),
         BufReader::new(File::open("tests/graph-parser.xml").unwrap()),
-    ).unwrap();
+    )
+    .unwrap();
 }

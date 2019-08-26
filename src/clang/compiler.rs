@@ -169,7 +169,8 @@ impl Toolchain for ClangToolchain {
                     task.output_object
                         .as_ref()
                         .map_or("-".to_string(), |path| path.display().to_string()),
-                ).stdin(Stdio::piped())
+                )
+                .stdin(Stdio::piped())
                 .stdout(Stdio::piped())
                 .stderr(Stdio::piped())
                 .spawn()
@@ -177,7 +178,8 @@ impl Toolchain for ClangToolchain {
                     task.preprocessed.copy(child.stdin.as_mut().unwrap())?;
                     let _ = task.preprocessed;
                     child.wait_with_output()
-                }).map(|o| OutputInfo::new(o))
+                })
+                .map(|o| OutputInfo::new(o))
         })
     }
 }
@@ -220,7 +222,8 @@ fn execute(command: &mut Command) -> Result<PreprocessResult, Error> {
             .map_or(Ok(MemStream::new()), |mut stream| {
                 let mut ret = MemStream::new();
                 io::copy(&mut stream, &mut ret).map(|_| ret)
-            }).unwrap_or(MemStream::new())
+            })
+            .unwrap_or(MemStream::new())
     }
 
     fn read_stderr<T: Read + Send + 'static>(stream: Option<T>) -> Receiver<Result<Vec<u8>, Error>> {

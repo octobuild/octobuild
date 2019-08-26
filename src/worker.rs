@@ -75,7 +75,8 @@ impl BuildAction {
                     .into_iter()
                     .map(|(toolchain, task)| BuildAction::Compilation(toolchain, task))
                     .collect()
-            }).unwrap_or_else(|e| {
+            })
+            .unwrap_or_else(|e| {
                 println!("Can't use octobuild for task {}: {}", title, e);
                 Vec::new()
             });
@@ -145,7 +146,8 @@ where
             .send(TaskMessage {
                 index,
                 task: graph.node_weight(index).unwrap().clone(),
-            }).map_err(|e| Error::new(ErrorKind::Other, e))?;
+            })
+            .map_err(|e| Error::new(ErrorKind::Other, e))?;
     }
 
     for message in rx_result.iter() {
@@ -165,7 +167,8 @@ where
                     .send(TaskMessage {
                         index: source,
                         task: graph.node_weight(source).unwrap().clone(),
-                    }).map_err(|e| Error::new(ErrorKind::Other, e))?;
+                    })
+                    .map_err(|e| Error::new(ErrorKind::Other, e))?;
             }
         }
 
@@ -284,7 +287,8 @@ mod test {
         execute_graph(&state, graph, 2, |_| {
             assert!(false);
             Ok(())
-        }).unwrap();
+        })
+        .unwrap();
     }
 
     #[test]
@@ -302,7 +306,8 @@ mod test {
         execute_graph(&state, graph, 4, |r| {
             result.lock().unwrap().push(r.task.title.clone());
             Ok(())
-        }).unwrap();
+        })
+        .unwrap();
 
         let actual: Vec<String> = result.lock().unwrap().clone();
         assert_eq!(actual, vec!["task 1".to_string()]);
@@ -328,7 +333,8 @@ mod test {
         execute_graph(&state, graph, 4, |r| {
             result.lock().unwrap().push(r.task.title.clone());
             Ok(())
-        }).unwrap();
+        })
+        .unwrap();
 
         let actual: Vec<String> = result.lock().unwrap().clone();
         assert_eq!(actual, vec!["task 1".to_string(), "task 2".to_string()]);

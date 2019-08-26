@@ -550,7 +550,8 @@ pub trait Compiler: Send + Sync {
             .ok_or(Error::new(
                 ErrorKind::InvalidInput,
                 CompilerError::ToolchainNotFound(command.program.clone()),
-            )).and_then(|toolchain| {
+            ))
+            .and_then(|toolchain| {
                 toolchain
                     .create_tasks(command, args)
                     .map_err(|e| Error::new(ErrorKind::InvalidInput, CompilerError::InvalidArguments(e)))

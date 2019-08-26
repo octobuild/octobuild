@@ -42,11 +42,9 @@ impl CompileRequest {
         let args = reader.get_args()?;
         Ok(CompileRequest {
             toolchain: reader.get_toolchain()?.to_string(),
-            args: try!(
-                (0..args.len())
-                    .map(|index| args.get(index).map(|value| value.to_string()))
-                    .collect()
-            ),
+            args: try!((0..args.len())
+                .map(|index| args.get(index).map(|value| value.to_string()))
+                .collect()),
             preprocessed_data: reader.get_preprocessed_data()?.to_vec(),
             precompiled_hash: match reader.has_precompiled_hash() {
                 true => Some(reader.get_precompiled_hash()?.to_string()),
