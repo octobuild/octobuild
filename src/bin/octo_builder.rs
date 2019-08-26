@@ -4,37 +4,13 @@ extern crate daemon;
 extern crate fern;
 extern crate hex;
 extern crate hostname;
-extern crate hyper;
+#[macro_use]
+extern crate log;
 extern crate nickel;
 extern crate octobuild;
 extern crate serde_json;
 extern crate tempdir;
-#[macro_use]
-extern crate log;
 
-use crypto::digest::Digest;
-use crypto::md5::Md5;
-use daemon::Daemon;
-use daemon::DaemonRunner;
-use daemon::State;
-use hyper::method::Method;
-use hyper::{Client, Url};
-use nickel::status::StatusCode;
-use nickel::{
-    HttpRouter, ListeningServer, MediaType, Middleware, MiddlewareResult, Nickel, NickelError, Request, Response,
-};
-use octobuild::cluster::builder::{CompileRequest, CompileResponse};
-use octobuild::cluster::common::{
-    BuilderInfo, BuilderInfoUpdate, RPC_BUILDER_TASK, RPC_BUILDER_UPDATE, RPC_BUILDER_UPLOAD,
-};
-use octobuild::compiler::*;
-use octobuild::config::Config;
-use octobuild::io::memstream::MemStream;
-use octobuild::io::tempfile::TempFile;
-use octobuild::simple::create_temp_dir;
-use octobuild::simple::supported_compilers;
-use octobuild::utils::DEFAULT_BUF_SIZE;
-use octobuild::version;
 use std::collections::HashMap;
 use std::error::Error;
 use std::fs;
@@ -50,9 +26,32 @@ use std::sync::{Arc, Mutex};
 use std::thread;
 use std::thread::JoinHandle;
 use std::time::Duration;
-use tempdir::TempDir;
 
 use capnp::message;
+use crypto::digest::Digest;
+use crypto::md5::Md5;
+use daemon::Daemon;
+use daemon::DaemonRunner;
+use daemon::State;
+use nickel::hyper::method::Method;
+use nickel::status::StatusCode;
+use nickel::{
+    HttpRouter, ListeningServer, MediaType, Middleware, MiddlewareResult, Nickel, NickelError, Request, Response,
+};
+use tempdir::TempDir;
+
+use octobuild::cluster::builder::{CompileRequest, CompileResponse};
+use octobuild::cluster::common::{
+    BuilderInfo, BuilderInfoUpdate, RPC_BUILDER_TASK, RPC_BUILDER_UPDATE, RPC_BUILDER_UPLOAD,
+};
+use octobuild::compiler::*;
+use octobuild::config::Config;
+use octobuild::io::memstream::MemStream;
+use octobuild::io::tempfile::TempFile;
+use octobuild::simple::create_temp_dir;
+use octobuild::simple::supported_compilers;
+use octobuild::utils::DEFAULT_BUF_SIZE;
+use octobuild::version;
 
 struct BuilderService {
     done: Arc<AtomicBool>,
@@ -75,6 +74,7 @@ struct PrecompiledFile {
 const PRECOMPILED_SUFFIX: &'static str = ".pch";
 
 struct RpcBuilderTaskHandler(Arc<BuilderState>);
+
 struct RpcBuilderUploadHandler(Arc<BuilderState>);
 
 impl BuilderService {
@@ -126,7 +126,7 @@ impl BuilderService {
 
     fn thread_anoncer(
         state: Arc<BuilderState>,
-        coordinator: Url,
+        coordinator: reqwest::Url,
         done: Arc<AtomicBool>,
         endpoint: SocketAddr,
     ) -> JoinHandle<()> {
@@ -138,11 +138,11 @@ impl BuilderService {
                 toolchains: state.toolchain_names(),
             });
 
-            let client = Client::new();
+            let client = reqwest::Client::new();
             while !done.load(Ordering::Relaxed) {
                 match client
                     .post(coordinator.join(RPC_BUILDER_UPDATE).unwrap())
-                    .body(&serde_json::to_string(&info).unwrap())
+                    .body(serde_json::to_string(&info).unwrap())
                     .send()
                 {
                     Ok(_) => {}
