@@ -1,8 +1,14 @@
+use std::fs;
+use std::fs::File;
+use std::io::{BufReader, Error, ErrorKind, Read, Write};
+use std::net::SocketAddr;
+use std::path::PathBuf;
+use std::str::FromStr;
+use std::sync::{Arc, RwLock};
+
 use capnp::message;
-use hyper::client::Body;
-use hyper::status::StatusCode;
-use hyper::{Client, Url};
 use rand;
+use reqwest::{Client, StatusCode};
 use serde_json;
 use time;
 use time::{Duration, Timespec};
@@ -14,14 +20,6 @@ use compiler::{
     CommandInfo, CompilationTask, CompileStep, Compiler, OutputInfo, PreprocessResult, SharedState, Toolchain,
 };
 use io::memstream::MemStream;
-
-use std::fs;
-use std::fs::File;
-use std::io::{BufReader, Error, ErrorKind, Read, Write};
-use std::net::SocketAddr;
-use std::path::PathBuf;
-use std::str::FromStr;
-use std::sync::{Arc, RwLock};
 
 pub struct RemoteCompiler<C: Compiler> {
     shared: Arc<RemoteShared>,
@@ -35,7 +33,7 @@ struct RemoteSharedMut {
 
 struct RemoteShared {
     mutable: RwLock<RemoteSharedMut>,
-    base_url: Option<Url>,
+    base_url: Option<reqwest::Url>,
     client: Client,
 }
 
@@ -45,7 +43,7 @@ struct RemoteToolchain {
 }
 
 impl<C: Compiler> RemoteCompiler<C> {
-    pub fn new(base_url: &Option<Url>, compiler: C) -> Self {
+    pub fn new(base_url: &Option<reqwest::Url>, compiler: C) -> Self {
         RemoteCompiler {
             shared: Arc::new(RemoteShared {
                 mutable: RwLock::new(RemoteSharedMut {
@@ -61,14 +59,12 @@ impl<C: Compiler> RemoteCompiler<C> {
 }
 
 impl RemoteSharedMut {
-    fn receive_builders(&self, base_url: &Option<Url>) -> Result<Vec<BuilderInfo>, Error> {
+    fn receive_builders(&self, base_url: &Option<reqwest::Url>) -> Result<Vec<BuilderInfo>, Error> {
         match base_url {
             &Some(ref base_url) => {
-                let client = Client::new();
-                let response = client
-                    .get(base_url.join(RPC_BUILDER_LIST).unwrap())
-                    .send()
-                    .map_err(|e| Error::new(ErrorKind::Other, e))?;
+                let client = reqwest::Client::new();
+                let url = base_url.join(RPC_BUILDER_LIST).unwrap();
+                let response = client.get(url).send().map_err(|e| Error::new(ErrorKind::Other, e))?;
 
                 serde_json::from_reader(response).map_err(|e| Error::new(ErrorKind::InvalidData, e))
             }
@@ -78,11 +74,6 @@ impl RemoteSharedMut {
 }
 
 impl<C: Compiler> Compiler for RemoteCompiler<C> {
-    // Discovery local toolchains.
-    fn discovery_toolchains(&self) -> Vec<Arc<dyn Toolchain>> {
-        self.local.discovery_toolchains()
-    }
-
     // Resolve toolchain for command execution.
     fn resolve_toolchain(&self, command: &CommandInfo) -> Option<Arc<dyn Toolchain>> {
         self.local
@@ -93,6 +84,11 @@ impl<C: Compiler> Compiler for RemoteCompiler<C> {
                     local,
                 })
             })
+    }
+
+    // Discovery local toolchains.
+    fn discovery_toolchains(&self) -> Vec<Arc<dyn Toolchain>> {
+        self.local.discovery_toolchains()
     }
 }
 
@@ -132,7 +128,7 @@ impl RemoteToolchain {
         self.shared
             .client
             .post(base_url.join(RPC_BUILDER_TASK).unwrap())
-            .body(&request_payload[..])
+            .body(request_payload)
             .send()
             .map_err(|e| Error::new(ErrorKind::Other, e))
             .and_then(|mut response| {
@@ -158,7 +154,7 @@ impl RemoteToolchain {
         &self,
         state: &SharedState,
         precompiled: &Option<PathBuf>,
-        base_url: &Url,
+        base_url: &reqwest::Url,
     ) -> Result<Option<String>, Error> {
         match precompiled {
             &Some(ref path) => {
@@ -171,13 +167,13 @@ impl RemoteToolchain {
                     .client
                     .head(base_url.join(&format!("{}/{}", RPC_BUILDER_UPLOAD, meta.hash)).unwrap())
                     .send()
-                    .map(|response| response.status)
+                    .map(|response| response.status())
                     .map_err(|e| Error::new(ErrorKind::BrokenPipe, e))?
                 {
-                    StatusCode::Ok | StatusCode::Accepted => return Ok(Some(meta.hash)),
+                    StatusCode::OK | StatusCode::ACCEPTED => return Ok(Some(meta.hash)),
                     _ => {}
                 }
-                let mut file = File::open(path)?;
+                let file = File::open(path)?;
                 // Upload precompiled header
                 match self
                     .shared
@@ -185,12 +181,12 @@ impl RemoteToolchain {
                     .post(base_url.join(&format!("{}/{}", RPC_BUILDER_UPLOAD, meta.hash)).unwrap())
                     // todo: this is workaround for https://github.com/hyperium/hyper/issues/838
                     //.header(Expect::Continue)
-                    .body(Body::SizedBody(&mut file, meta.size))
+                    .body(reqwest::Body::sized(file, meta.size))
                     .send()
-                    .map(|response| response.status)
+                    .map(|response| response.status())
                     .map_err(|e| Error::new(ErrorKind::BrokenPipe, e))?
                 {
-                    StatusCode::Ok | StatusCode::Accepted => Ok(Some(meta.hash)),
+                    StatusCode::OK | StatusCode::ACCEPTED => Ok(Some(meta.hash)),
                     status => Err(Error::new(
                         ErrorKind::BrokenPipe,
                         format!("Can't upload precompiled header: {}", status),
@@ -270,8 +266,8 @@ impl Toolchain for RemoteToolchain {
     }
 }
 
-fn get_base_url(addr: &SocketAddr) -> Url {
-    let mut url = Url::from_str("http://localhost").unwrap();
+fn get_base_url(addr: &SocketAddr) -> reqwest::Url {
+    let mut url = reqwest::Url::from_str("http://localhost").unwrap();
     url.set_ip_host(addr.ip()).unwrap();
     url.set_port(Some(addr.port())).unwrap();
     url

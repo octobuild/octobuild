@@ -2,8 +2,6 @@ extern crate dirs;
 extern crate num_cpus;
 extern crate yaml_rust;
 
-use hyper::Url;
-
 use std::env;
 use std::error::Error;
 use std::fs::File;
@@ -17,7 +15,7 @@ use self::yaml_rust::yaml::Hash;
 use self::yaml_rust::{Yaml, YamlEmitter, YamlLoader};
 
 pub struct Config {
-    pub coordinator: Option<Url>,
+    pub coordinator: Option<reqwest::Url>,
     pub helper_bind: SocketAddr,
     pub coordinator_bind: SocketAddr,
 
@@ -80,7 +78,7 @@ impl Config {
         let coordinator = get_config(local, global, PARAM_COORDINATOR, |v| match v.is_null() {
             true => None,
             false => v.as_str().and_then(|v| {
-                Url::parse(v)
+                reqwest::Url::parse(v)
                     .map(|mut v| {
                         v.set_path("");
                         v
@@ -155,7 +153,7 @@ impl Config {
                 .map(|v| v.to_str().unwrap().to_string())
                 .unwrap_or("none".to_string())
         );
-        println!("");
+        println!();
         println!("Actual configuration:");
         match Config::new() {
             Ok(c) => {
@@ -165,7 +163,7 @@ impl Config {
                 println!("  ERROR: {}", e.description());
             }
         }
-        println!("");
+        println!();
         println!("Default configuration:");
         match Config::defaults() {
             Ok(c) => {
@@ -175,7 +173,7 @@ impl Config {
                 println!("  ERROR: {}", e.description());
             }
         }
-        println!("");
+        println!();
     }
 }
 

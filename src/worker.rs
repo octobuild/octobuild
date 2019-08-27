@@ -223,7 +223,7 @@ where
         for worker_id in 0..num_cpus {
             let local_rx_task = mutex_rx_task.clone();
             let local_tx_result = tx_result.clone();
-            scope.spawn(move || loop {
+            scope.spawn(move |_| loop {
                 let message = match local_rx_task.lock().unwrap().recv() {
                     Ok(v) => v,
                     Err(_) => {
@@ -255,6 +255,7 @@ where
         }
         result
     })
+    .unwrap()
 }
 
 fn execute_compiler(state: &SharedState, task: &BuildTask) -> Result<OutputInfo, Error> {
