@@ -72,7 +72,7 @@ impl Compiler for VsCompiler {
     }
 
     #[cfg(unix)]
-    fn discovery_toolchains(&self) -> Vec<Arc<Toolchain>> {
+    fn discovery_toolchains(&self) -> Vec<Arc<dyn Toolchain>> {
         Vec::new()
     }
 
