@@ -1,11 +1,3 @@
-pub use super::super::compiler::*;
-
-use super::super::io::memstream::MemStream;
-use super::super::lazy::Lazy;
-
-use regex;
-use regex::Regex;
-
 use std::env;
 use std::io;
 use std::io::{Error, Read};
@@ -14,6 +6,15 @@ use std::process::{Command, Stdio};
 use std::sync::mpsc::{channel, Receiver};
 use std::sync::Arc;
 use std::thread;
+
+use regex;
+use regex::Regex;
+
+use lazy_static::lazy_static;
+
+pub use super::super::compiler::*;
+use super::super::io::memstream::MemStream;
+use super::super::lazy::Lazy;
 
 lazy_static! {
     static ref RE_CLANG: regex::bytes::Regex =

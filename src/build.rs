@@ -1,6 +1,3 @@
-extern crate capnpc;
-extern crate rustc_version;
-
 use std::env;
 use std::env::consts::ARCH;
 use std::fs::File;
@@ -31,8 +28,8 @@ fn save_version() -> Result<(), Error> {
     f.write_all(
         &format!(
             r#"
-pub const REVISION: &'static str = "{revision}";
-pub const RUSTC: &'static str = "{rustc}";
+pub const REVISION: &str = "{revision}";
+pub const RUSTC: &str = "{rustc}";
 "#,
             revision = load_revision()?,
             rustc = version().unwrap(),

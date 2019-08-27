@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 use std::slice::Iter;
 use std::sync::Arc;
 
-use compiler::{Arg, CommandInfo, CompilationArgs, CompilationTask, InputKind, OutputKind, Scope};
+use crate::compiler::{Arg, CommandInfo, CompilationArgs, CompilationTask, InputKind, OutputKind, Scope};
 
 enum ParamValue<T> {
     None,

@@ -1,6 +1,3 @@
-extern crate octobuild;
-extern crate test;
-
 use std::fs::File;
 use std::io::{Cursor, Read};
 

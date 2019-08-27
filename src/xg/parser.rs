@@ -1,9 +1,3 @@
-extern crate petgraph;
-extern crate xml;
-
-use cmd;
-use compiler::{CommandEnv, CommandInfo};
-
 use std::collections::{HashMap, HashSet};
 use std::env;
 use std::fmt::{Display, Formatter};
@@ -12,10 +6,12 @@ use std::iter::FromIterator;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-use self::petgraph::graph::{Graph, NodeIndex};
+use crate::cmd;
+use crate::compiler::{CommandEnv, CommandInfo};
 
-use self::xml::reader::EventReader;
-use self::xml::reader::XmlEvent;
+use petgraph::graph::{Graph, NodeIndex};
+use xml::reader::EventReader;
+use xml::reader::XmlEvent;
 
 #[derive(Debug)]
 pub struct XgNode {
@@ -34,7 +30,7 @@ pub enum XgParseError {
     DependencyNotFound(String),
     InvalidStreamFormat,
     EndOfStream,
-    XmlError(self::xml::reader::Error),
+    XmlError(xml::reader::Error),
 }
 
 impl Display for XgParseError {
@@ -104,7 +100,7 @@ pub fn parse<R: Read>(graph: &mut XgGraph, reader: R) -> Result<(), Error> {
                 return match &name.local_name[..] {
                     "BuildSet" => parse_build_set(graph, &mut parser),
                     _ => Err(Error::new(ErrorKind::InvalidInput, XgParseError::InvalidStreamFormat)),
-                }
+                };
             }
             _ => {}
         }

@@ -1,5 +1,3 @@
-extern crate octobuild;
-
 use octobuild::clang::compiler::ClangCompiler;
 use octobuild::simple::simple_compile;
 use std::process;

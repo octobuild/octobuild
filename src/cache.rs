@@ -1,11 +1,7 @@
-extern crate filetime;
-
 use std::fs;
 use std::fs::File;
 use std::io::{Error, ErrorKind};
 use std::path::{Path, PathBuf};
-
-use self::filetime::FileTime;
 
 use super::compiler::OutputInfo;
 use super::config::Config;
@@ -13,6 +9,8 @@ use super::io::filecache::FileCache;
 use super::io::memcache::MemCache;
 use super::io::statistic::Statistic;
 use super::utils::hash_stream;
+
+use filetime::FileTime;
 
 pub struct Cache {
     file_cache: FileCache,
@@ -27,7 +25,7 @@ pub struct FileHash {
 }
 
 pub trait FileHasher {
-    fn file_hash(&self, &Path) -> Result<FileHash, Error>;
+    fn file_hash(&self, path: &Path) -> Result<FileHash, Error>;
 }
 
 impl Cache {

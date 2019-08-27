@@ -1,10 +1,11 @@
+use serde_derive::{Deserialize, Serialize};
 use uuid::Uuid;
 
-pub const RPC_BUILDER_UPDATE: &'static str = "/rpc/v1/builder/update";
-pub const RPC_BUILDER_LIST: &'static str = "/rpc/v1/builder/list";
+pub const RPC_BUILDER_UPDATE: &str = "/rpc/v1/builder/update";
+pub const RPC_BUILDER_LIST: &str = "/rpc/v1/builder/list";
 
-pub const RPC_BUILDER_TASK: &'static str = "/rpc/v1/builder/task";
-pub const RPC_BUILDER_UPLOAD: &'static str = "/rpc/v1/builder/upload";
+pub const RPC_BUILDER_TASK: &str = "/rpc/v1/builder/task";
+pub const RPC_BUILDER_UPLOAD: &str = "/rpc/v1/builder/upload";
 
 #[derive(Serialize, Deserialize)]
 pub struct BuilderInfo {

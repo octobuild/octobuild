@@ -1,14 +1,14 @@
-use crossbeam;
-use petgraph::graph::NodeIndex;
-use petgraph::{EdgeDirection, Graph};
-
-use compiler::{CommandInfo, CompilationTask, Compiler, OutputInfo, SharedState, Toolchain};
-
 use std::borrow::Cow;
 use std::cmp::{max, min};
 use std::io::{Error, ErrorKind};
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::sync::{Arc, Mutex};
+
+use crossbeam;
+use petgraph::graph::NodeIndex;
+use petgraph::{EdgeDirection, Graph};
+
+use crate::compiler::{CommandInfo, CompilationTask, Compiler, OutputInfo, SharedState, Toolchain};
 
 pub type BuildGraph = Graph<Arc<BuildTask>, ()>;
 
@@ -274,12 +274,12 @@ fn execute_compiler(state: &SharedState, task: &BuildTask) -> Result<OutputInfo,
 
 #[cfg(test)]
 mod test {
-    use super::*;
-
-    use compiler::SharedState;
-    use config::Config;
-
     use std::sync::{Arc, Mutex};
+
+    use crate::compiler::SharedState;
+    use crate::config::Config;
+
+    use super::*;
 
     #[test]
     fn test_execute_graph_empty() {
@@ -313,6 +313,7 @@ mod test {
         let actual: Vec<String> = result.lock().unwrap().clone();
         assert_eq!(actual, vec!["task 1".to_string()]);
     }
+
     // Test for #19 issue (https://github.com/bozaro/octobuild/issues/19)
     #[test]
     fn test_execute_graph_no_hang() {

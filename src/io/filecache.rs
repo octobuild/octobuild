@@ -1,6 +1,3 @@
-extern crate filetime;
-extern crate lz4;
-
 use std::cmp::min;
 use std::ffi::OsString;
 use std::fmt::{Display, Formatter};
@@ -9,7 +6,7 @@ use std::fs::{File, OpenOptions};
 use std::io::{Error, ErrorKind, Read, Seek, SeekFrom, Write};
 use std::path::{Path, PathBuf};
 
-use self::filetime::FileTime;
+use filetime::FileTime;
 
 use super::super::compiler::OutputInfo;
 use super::super::config::Config;
@@ -18,9 +15,9 @@ use super::binary::*;
 use super::counter::Counter;
 use super::statistic::Statistic;
 
-const HEADER: &'static [u8] = b"OBCF\x00\x03";
-const FOOTER: &'static [u8] = b"END\x00";
-const SUFFIX: &'static str = ".lz4";
+const HEADER: &[u8] = b"OBCF\x00\x03";
+const FOOTER: &[u8] = b"END\x00";
+const SUFFIX: &str = ".lz4";
 
 #[derive(Debug)]
 pub enum CacheError {

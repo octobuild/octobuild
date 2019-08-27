@@ -1,16 +1,3 @@
-extern crate capnp;
-extern crate crypto;
-extern crate daemon;
-extern crate fern;
-extern crate hex;
-extern crate hostname;
-#[macro_use]
-extern crate log;
-extern crate nickel;
-extern crate octobuild;
-extern crate serde_json;
-extern crate tempdir;
-
 use std::collections::HashMap;
 use std::error::Error;
 use std::fs;
@@ -33,6 +20,7 @@ use crypto::md5::Md5;
 use daemon::Daemon;
 use daemon::DaemonRunner;
 use daemon::State;
+use log::info;
 use nickel::hyper::method::Method;
 use nickel::status::StatusCode;
 use nickel::{
@@ -71,7 +59,7 @@ struct PrecompiledFile {
     lock: Mutex<()>,
 }
 
-const PRECOMPILED_SUFFIX: &'static str = ".pch";
+const PRECOMPILED_SUFFIX: &str = ".pch";
 
 struct RpcBuilderTaskHandler(Arc<BuilderState>);
 

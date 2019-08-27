@@ -7,19 +7,20 @@ use std::str::FromStr;
 use std::sync::{Arc, RwLock};
 
 use capnp::message;
+use log::{trace, warn};
 use rand;
 use reqwest::{Client, StatusCode};
 use serde_json;
 use time;
 use time::{Duration, Timespec};
 
-use cache::FileHasher;
-use cluster::builder::{CompileRequest, CompileResponse};
-use cluster::common::{BuilderInfo, RPC_BUILDER_LIST, RPC_BUILDER_TASK, RPC_BUILDER_UPLOAD};
-use compiler::{
+use crate::cache::FileHasher;
+use crate::cluster::builder::{CompileRequest, CompileResponse};
+use crate::cluster::common::{BuilderInfo, RPC_BUILDER_LIST, RPC_BUILDER_TASK, RPC_BUILDER_UPLOAD};
+use crate::compiler::{
     CommandInfo, CompilationTask, CompileStep, Compiler, OutputInfo, PreprocessResult, SharedState, Toolchain,
 };
-use io::memstream::MemStream;
+use crate::io::memstream::MemStream;
 
 pub struct RemoteCompiler<C: Compiler> {
     shared: Arc<RemoteShared>,

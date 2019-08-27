@@ -1,22 +1,21 @@
-use cluster::client::RemoteCompiler;
-use compiler::*;
-use config::Config;
-
-use clang::compiler::ClangCompiler;
-use vs::compiler::VsCompiler;
-
-use worker::execute_graph;
-use worker::{BuildAction, BuildGraph, BuildResult, BuildTask};
-
-use petgraph::Graph;
-use tempdir::TempDir;
-
 use std::env;
 use std::io;
 use std::io::{Error, Write};
 use std::iter::FromIterator;
 use std::path::Path;
 use std::sync::Arc;
+
+use log::error;
+use petgraph::Graph;
+use tempdir::TempDir;
+
+use crate::clang::compiler::ClangCompiler;
+use crate::cluster::client::RemoteCompiler;
+use crate::compiler::*;
+use crate::config::Config;
+use crate::vs::compiler::VsCompiler;
+use crate::worker::execute_graph;
+use crate::worker::{BuildAction, BuildGraph, BuildResult, BuildTask};
 
 pub fn supported_compilers(temp_dir: &Arc<TempDir>) -> CompilerGroup {
     CompilerGroup::new()

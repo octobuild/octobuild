@@ -1,12 +1,9 @@
-extern crate clap;
-extern crate octobuild;
-
 use clap::{App, AppSettings, Arg};
 use std::fs::File;
 use std::io::{Cursor, Read};
 
-use self::octobuild::version::{AUTHORS, VERSION};
-use self::octobuild::vs::postprocess;
+use octobuild::version::{AUTHORS, VERSION};
+use octobuild::vs::postprocess;
 
 fn bench_filter(path: &str, marker: &Option<String>, keep_headers: bool, num: usize) -> Vec<u8> {
     let mut source = Vec::new();
@@ -24,10 +21,10 @@ fn bench_filter(path: &str, marker: &Option<String>, keep_headers: bool, num: us
 }
 
 fn main() {
-    const MARKER: &'static str = "marker";
-    const INPUT: &'static str = "input";
-    const COUNT: &'static str = "count";
-    const KEEP: &'static str = "keep";
+    const MARKER: &str = "marker";
+    const INPUT: &str = "input";
+    const COUNT: &str = "count";
+    const KEEP: &str = "keep";
 
     let matches = App::new("filter_cl")
         .setting(AppSettings::ArgRequiredElseHelp)
