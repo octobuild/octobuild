@@ -1,24 +1,18 @@
-extern crate daemon;
-extern crate fern;
-extern crate nickel;
-extern crate octobuild;
-extern crate serde_json;
-extern crate time;
-#[macro_use]
-extern crate log;
-
-use daemon::Daemon;
-use daemon::DaemonRunner;
-use daemon::State;
-use nickel::status::StatusCode;
-use nickel::{HttpRouter, MediaType, Middleware, MiddlewareResult, Nickel, NickelError, Request, Response};
-use octobuild::cluster::common::{BuilderInfo, BuilderInfoUpdate, RPC_BUILDER_LIST, RPC_BUILDER_UPDATE};
-use octobuild::config::Config;
 use std::net::{IpAddr, SocketAddr};
 use std::str::FromStr;
 use std::sync::mpsc::Receiver;
 use std::sync::{Arc, RwLock};
+
+use daemon::Daemon;
+use daemon::DaemonRunner;
+use daemon::State;
+use log::info;
+use nickel::status::StatusCode;
+use nickel::{HttpRouter, MediaType, Middleware, MiddlewareResult, Nickel, NickelError, Request, Response};
 use time::{Duration, Timespec};
+
+use octobuild::cluster::common::{BuilderInfo, BuilderInfoUpdate, RPC_BUILDER_LIST, RPC_BUILDER_UPDATE};
+use octobuild::config::Config;
 
 struct BuilderState {
     pub guid: String,
@@ -39,6 +33,7 @@ impl CoordinatorState {
 }
 
 struct RpcAgentUpdateHandler(Arc<CoordinatorState>);
+
 struct RpcAgentListHandler(Arc<CoordinatorState>);
 
 impl<D> Middleware<D> for RpcAgentUpdateHandler {

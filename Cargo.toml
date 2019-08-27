@@ -3,6 +3,7 @@ name = "octobuild"
 build = "src/build.rs"
 version = "0.1.15"
 authors = [ "Artem V. Navrotskiy <bozaro@users.noreply.github.com>" ]
+edition = "2018"
 
 [profile.bench]
 debug = true

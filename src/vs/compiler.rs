@@ -1,24 +1,21 @@
-extern crate regex;
-#[cfg(windows)]
-extern crate winreg;
-
-use tempdir::TempDir;
-
-pub use super::super::compiler::*;
-
-use super::super::io::memstream::MemStream;
-use super::super::io::tempfile::TempFile;
-use super::super::lazy::Lazy;
-use super::super::utils::filter;
-use super::postprocess;
-
-use self::regex::bytes::{NoExpand, Regex};
 use std::env;
 use std::fs::File;
 use std::io::{Cursor, Error, Read, Write};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::Arc;
+
+use regex::bytes::{NoExpand, Regex};
+use tempdir::TempDir;
+
+use lazy_static::lazy_static;
+
+pub use super::super::compiler::*;
+use super::super::io::memstream::MemStream;
+use super::super::io::tempfile::TempFile;
+use super::super::lazy::Lazy;
+use super::super::utils::filter;
+use super::postprocess;
 
 pub struct VsCompiler {
     temp_dir: Arc<TempDir>,
@@ -78,14 +75,14 @@ impl Compiler for VsCompiler {
 
     #[cfg(windows)]
     fn discovery_toolchains(&self) -> Vec<Arc<dyn Toolchain>> {
-        use self::winreg::enums::*;
-        use self::winreg::RegKey;
+        use winreg::enums::*;
+        use winreg::RegKey;
 
         lazy_static! {
-            static ref RE: self::regex::Regex = self::regex::Regex::new(r"^\d+\.\d+$").unwrap();
+            static ref RE: regex::Regex = regex::Regex::new(r"^\d+\.\d+$").unwrap();
         }
 
-        const CL_BIN: &'static [&'static str] = &[
+        const CL_BIN: &[&str] = &[
             "bin/cl.exe",
             "bin/x86_arm/cl.exe",
             "bin/x86_amd64/cl.exe",
@@ -93,7 +90,7 @@ impl Compiler for VsCompiler {
             "bin/amd64_arm/cl.exe",
             "bin/amd64/cl.exe",
         ];
-        const VC_REG: &'static [&'static str] = &[
+        const VC_REG: &[&str] = &[
             "SOFTWARE\\Wow6432Node\\Microsoft\\VisualStudio\\SxS\\VC7",
             "SOFTWARE\\Microsoft\\VisualStudio\\SxS\\VC7",
         ];
@@ -299,6 +296,8 @@ fn vs_identifier(path: &Path) -> Option<String> {
     use winapi::ctypes::c_void;
     use winapi::shared::minwindef::{DWORD, LPCVOID, LPVOID, WORD};
     use winapi::um::winver;
+
+    use log::warn;
 
     use std::ffi::OsStr;
     use std::os::windows::ffi::OsStrExt;

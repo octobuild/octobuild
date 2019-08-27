@@ -1,7 +1,3 @@
-extern crate dirs;
-extern crate num_cpus;
-extern crate yaml_rust;
-
 use std::env;
 use std::error::Error;
 use std::fs::File;
@@ -11,8 +7,8 @@ use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4, ToSocketAddrs};
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 
-use self::yaml_rust::yaml::Hash;
-use self::yaml_rust::{Yaml, YamlEmitter, YamlLoader};
+use yaml_rust::yaml::Hash;
+use yaml_rust::{Yaml, YamlEmitter, YamlLoader};
 
 pub struct Config {
     pub coordinator: Option<reqwest::Url>,
@@ -24,19 +20,19 @@ pub struct Config {
     pub cache_limit_mb: u32,
 }
 
-const CONFIG_FILE_NAME: &'static str = "octobuild.conf";
+const CONFIG_FILE_NAME: &str = "octobuild.conf";
 
 #[cfg(windows)]
-const DEFAULT_CACHE_DIR: &'static str = "~/.octobuild";
+const DEFAULT_CACHE_DIR: &str = "~/.octobuild";
 #[cfg(unix)]
-const DEFAULT_CACHE_DIR: &'static str = "~/.cache/octobuild";
+const DEFAULT_CACHE_DIR: &str = "~/.cache/octobuild";
 
-const PARAM_HELPER_BIND: &'static str = "helper_bind";
-const PARAM_COORDINATOR_BIND: &'static str = "coordinator_bind";
-const PARAM_COORDINATOR: &'static str = "coordinator";
-const PARAM_CACHE_LIMIT: &'static str = "cache_limit_mb";
-const PARAM_CACHE_PATH: &'static str = "cache_path";
-const PARAM_PROCESS_LIMIT: &'static str = "process_limit";
+const PARAM_HELPER_BIND: &str = "helper_bind";
+const PARAM_COORDINATOR_BIND: &str = "coordinator_bind";
+const PARAM_COORDINATOR: &str = "coordinator";
+const PARAM_CACHE_LIMIT: &str = "cache_limit_mb";
+const PARAM_CACHE_PATH: &str = "cache_path";
+const PARAM_PROCESS_LIMIT: &str = "process_limit";
 
 impl Config {
     pub fn new() -> Result<Self> {

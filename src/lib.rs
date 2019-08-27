@@ -1,31 +1,6 @@
-extern crate byteorder;
-extern crate capnp;
-extern crate crossbeam;
-extern crate crypto;
-extern crate fern;
-extern crate ipc;
-#[macro_use]
-extern crate lazy_static;
-extern crate libc;
-extern crate local_encoding;
-#[macro_use]
-extern crate log;
-extern crate nickel;
-extern crate petgraph;
-extern crate rand;
-extern crate regex;
-extern crate reqwest;
-#[macro_use]
-extern crate serde_derive;
-extern crate serde_json;
-extern crate tempdir;
-extern crate time;
-extern crate uuid;
-#[cfg(windows)]
-extern crate winapi;
 include!(concat!(env!("OUT_DIR"), "/version.rs"));
 
-pub const VERSION: &'static str = env!("CARGO_PKG_VERSION");
+pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 #[allow(dead_code)]
 pub mod builder_capnp {

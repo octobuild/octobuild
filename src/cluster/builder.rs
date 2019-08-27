@@ -1,13 +1,13 @@
+use std::io;
+use std::io::{BufRead, Write};
+
 use capnp;
 use capnp::message::{Allocator, Builder, ReaderOptions};
 use capnp::serialize_packed;
 
-use builder_capnp::compile_request;
-use builder_capnp::compile_response;
-use compiler::OutputInfo;
-
-use std::io;
-use std::io::{BufRead, Write};
+use crate::builder_capnp::compile_request;
+use crate::builder_capnp::compile_response;
+use crate::compiler::OutputInfo;
 
 #[derive(Debug)]
 pub struct CompileRequest {
@@ -39,12 +39,12 @@ impl CompileRequest {
     }
 
     pub fn read(reader: compile_request::Reader) -> Result<Self, capnp::Error> {
-        let args = reader.get_args()?;
+        let args: ::capnp::text_list::Reader = reader.get_args()?;
         Ok(CompileRequest {
             toolchain: reader.get_toolchain()?.to_string(),
-            args: try!((0..args.len())
-                .map(|index| args.get(index).map(|value| value.to_string()))
-                .collect()),
+            args: (0..args.len())
+                .map(|index| args.get(index).unwrap().to_string())
+                .collect(),
             preprocessed_data: reader.get_preprocessed_data()?.to_vec(),
             precompiled_hash: match reader.has_precompiled_hash() {
                 true => Some(reader.get_precompiled_hash()?.to_string()),

@@ -173,8 +173,6 @@ impl<'a> Read for MemReader<'a> {
 
 #[cfg(test)]
 mod test {
-    extern crate rand;
-
     use super::{MemStream, BLOCK_SIZE};
     use std::io::{Read, Write};
 

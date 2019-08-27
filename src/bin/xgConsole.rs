@@ -1,27 +1,3 @@
-extern crate log;
-extern crate octobuild;
-extern crate petgraph;
-extern crate regex;
-#[macro_use]
-extern crate lazy_static;
-
-use octobuild::cluster::client::RemoteCompiler;
-use octobuild::compiler::*;
-use octobuild::config::Config;
-use octobuild::version;
-use octobuild::xg;
-use octobuild::xg::parser::{XgGraph, XgNode};
-
-use octobuild::simple::create_temp_dir;
-use octobuild::simple::supported_compilers;
-use octobuild::worker::execute_graph;
-use octobuild::worker::validate_graph;
-use octobuild::worker::{BuildAction, BuildGraph, BuildResult, BuildTask};
-
-use petgraph::graph::NodeIndex;
-use petgraph::{EdgeDirection, Graph};
-use regex::Regex;
-
 use std::env;
 use std::fs::File;
 use std::io;
@@ -30,6 +6,23 @@ use std::iter::FromIterator;
 use std::path::{Path, PathBuf};
 use std::process;
 use std::sync::Arc;
+
+use petgraph::graph::NodeIndex;
+use petgraph::{EdgeDirection, Graph};
+use regex::Regex;
+
+use lazy_static::lazy_static;
+use octobuild::cluster::client::RemoteCompiler;
+use octobuild::compiler::*;
+use octobuild::config::Config;
+use octobuild::simple::create_temp_dir;
+use octobuild::simple::supported_compilers;
+use octobuild::version;
+use octobuild::worker::execute_graph;
+use octobuild::worker::validate_graph;
+use octobuild::worker::{BuildAction, BuildGraph, BuildResult, BuildTask};
+use octobuild::xg;
+use octobuild::xg::parser::{XgGraph, XgNode};
 
 fn main() {
     println!("xgConsole ({}):", version::full_version());

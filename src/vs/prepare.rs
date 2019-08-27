@@ -1,13 +1,13 @@
-use local_encoding::{Encoder, Encoding};
-
 use std::fs::File;
 use std::io::{Error, ErrorKind, Read};
 use std::iter::FromIterator;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-use cmd;
-use compiler::{Arg, CommandInfo, CompilationArgs, CompilationTask, InputKind, OutputKind, Scope};
+use local_encoding::{Encoder, Encoding};
+
+use crate::cmd;
+use crate::compiler::{Arg, CommandInfo, CompilationArgs, CompilationTask, InputKind, OutputKind, Scope};
 
 enum ParamValue<T> {
     None,

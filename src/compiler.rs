@@ -1,9 +1,3 @@
-use capnp;
-
-use crypto::digest::Digest;
-use crypto::md5::Md5;
-use ipc::Semaphore;
-
 use std::cmp::max;
 use std::collections::hash_map;
 use std::collections::HashMap;
@@ -15,11 +9,16 @@ use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 use std::sync::{Arc, RwLock};
 
-use builder_capnp::output_info;
-use cache::{Cache, FileHasher};
-use config::Config;
-use io::memstream::MemStream;
-use io::statistic::Statistic;
+use capnp;
+use crypto::digest::Digest;
+use crypto::md5::Md5;
+use ipc::Semaphore;
+
+use crate::builder_capnp::output_info;
+use crate::cache::{Cache, FileHasher};
+use crate::config::Config;
+use crate::io::memstream::MemStream;
+use crate::io::statistic::Statistic;
 
 #[derive(Debug)]
 pub enum CompilerError {

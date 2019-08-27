@@ -1,10 +1,8 @@
-extern crate uuid;
-
 use std::fs;
 use std::io::Error;
 use std::path::{Path, PathBuf};
 
-use self::uuid::Uuid;
+use uuid::Uuid;
 
 pub struct TempFile {
     path: Option<PathBuf>,
