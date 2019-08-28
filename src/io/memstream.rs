@@ -10,6 +10,7 @@ const BLOCK_SIZE: usize = 0x10000 - 0x100;
 
 type Block = [u8; BLOCK_SIZE];
 
+#[derive(Default)]
 pub struct MemStream {
     size: usize,
     blocks: VecDeque<Block>,
@@ -28,14 +29,15 @@ pub struct MemReader<'a> {
 
 impl MemStream {
     pub fn new() -> Self {
-        MemStream {
-            size: 0,
-            blocks: VecDeque::new(),
-        }
+        Default::default()
     }
 
     pub fn len(&self) -> usize {
-        return self.size;
+        self.size
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.size == 0
     }
 
     pub fn reader(&self) -> MemReader {
@@ -57,7 +59,7 @@ impl MemStream {
 
     pub fn copy<W: Write>(&self, writer: &mut W) -> Result<usize> {
         for block in self.iter() {
-            writer.write(block)?;
+            writer.write_all(block)?;
         }
         Ok(self.size)
     }
@@ -206,7 +208,7 @@ mod test {
                 if size == 0 {
                     break;
                 }
-                actual.write(&block[0..size]).unwrap();
+                actual.write_all(&block[0..size]).unwrap();
             }
             assert_eq!(expected.len(), actual.len());
             assert_eq!(expected, actual);

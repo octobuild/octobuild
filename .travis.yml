@@ -1,21 +1,35 @@
 language: rust
 dist: bionic
-cache: cargo
+cache: rust
+
+os:
+  - windows
+  - linux
+  - osx
 
 matrix:
   include:
-    - os: windows
-    - os: linux
+    - name: "Clippy Linux"
+      os: linux
+      env: CLIPPY=true
+    - name: "Clippy OSX"
+      os: osx
+      env: CLIPPY=true
+    - name: "Clippy Windows"
+      os: windows
+      env: CLIPPY=true
+    - name: "Rustfmt"
+      os: linux
+      env: RUSTFMT=true
 
 addons:
   apt:
     packages:
       - capnproto
+  homebrew:
+    packages:
+      - capnp
+    update: true
 
-install:
-  - if [ "$TRAVIS_OS_NAME" = "windows" ]; then choco install capnproto; fi
-  - rustup component add rustfmt
-
-script:
-  - cargo test --verbose
-  - cargo fmt --all -- --check
+install: ci/install.sh
+script: ci/script.sh

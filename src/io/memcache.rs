@@ -35,15 +35,14 @@ where
             Err(e) => panic!("Mutex error: {}", e),
         };
 
-        let result = match entry_lock.lock() {
+        let lock = entry_lock.lock();
+        match lock {
             Ok(mut entry) => {
                 let value = worker(entry.take());
                 *entry = Some(value.clone());
                 value
             }
             Err(e) => panic!("Mutex error: {}", e),
-        };
-
-        result
+        }
     }
 }

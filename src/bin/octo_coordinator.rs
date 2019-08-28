@@ -93,9 +93,12 @@ impl<D> Middleware<D> for RpcAgentListHandler {
         let now = time::get_time();
         let builders: Vec<&BuilderInfo> = holder
             .iter()
-            .filter_map(|e| match e.timeout >= now {
-                true => Some(&e.info),
-                false => None,
+            .filter_map(|e| {
+                if e.timeout >= now {
+                    Some(&e.info)
+                } else {
+                    None
+                }
             })
             .collect();
 
@@ -107,8 +110,8 @@ impl<D> Middleware<D> for RpcAgentListHandler {
 
 fn is_unspecified(ip: &IpAddr) -> bool {
     match ip {
-        &IpAddr::V4(ref ip) => ip.octets() == [0, 0, 0, 0],
-        &IpAddr::V6(ref ip) => ip.is_unspecified(),
+        IpAddr::V4(ref ip) => ip.octets() == [0, 0, 0, 0],
+        IpAddr::V6(ref ip) => ip.is_unspecified(),
     }
 }
 
@@ -144,11 +147,8 @@ fn main() {
                     }
                     State::Stop => {
                         info!("Coordinator: Stoping");
-                        match web.take() {
-                            Some(v) => {
-                                v.detach();
-                            }
-                            None => {}
+                        if let Some(v) = web.take() {
+                            v.detach();
                         }
                         info!("Coordinator: Stoped");
                     }

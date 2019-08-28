@@ -9,7 +9,6 @@ edition = "2018"
 debug = true
 
 [profile.release]
-panic = "abort"
 debug = true
 
 [[bin]]
@@ -56,12 +55,14 @@ reqwest = "0.9"
 byteorder = "1.2"
 log = "0.4"
 fern = "0.5"
-daemon = "0.0.8"
+# daemon-rs doesn't compile on osx, see https://github.com/bozaro/daemon-rs/pull/9
+daemon = { git = "https://github.com/slonopotamus/daemon-rs", branch = "travis-madness" }
 nickel = "0.11"
 hex = "0.3"
 time = "0.1"
 local-encoding = "0.2.0"
-ipc = { git = "https://github.com/alexcrichton/ipc-rs" }
+# ipc-rs doesn't compile on osx, see https://github.com/alexcrichton/ipc-rs/pull/4
+ipc = { git = "https://github.com/slonopotamus/ipc-rs", branch = "mac-win-travis" }
 
 serde = "1.0"
 serde_derive = "1.0"

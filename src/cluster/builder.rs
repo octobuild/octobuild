@@ -49,9 +49,10 @@ impl CompileRequest {
                 .map(|index| args.get(index).unwrap().to_string())
                 .collect(),
             preprocessed_data: reader.get_preprocessed_data()?.to_vec(),
-            precompiled_hash: match reader.has_precompiled_hash() {
-                true => Some(reader.get_precompiled_hash()?.to_string()),
-                false => None,
+            precompiled_hash: if reader.has_precompiled_hash() {
+                Some(reader.get_precompiled_hash()?.to_string())
+            } else {
+                None
             },
         })
     }
@@ -66,11 +67,8 @@ impl CompileRequest {
                     .set(index as u32, &self.args.get(index).unwrap());
             }
         }
-        match self.precompiled_hash {
-            Some(ref value) => {
-                builder.set_precompiled_hash(value);
-            }
-            None => {}
+        if let Some(ref value) = self.precompiled_hash {
+            builder.set_precompiled_hash(value);
         }
     }
 }
@@ -108,10 +106,10 @@ impl CompileResponse {
 
     pub fn write(&self, mut builder: compile_response::Builder) {
         match self {
-            &CompileResponse::Success(ref success, ref content) => {
+            CompileResponse::Success(ref success, ref content) => {
                 success.write(builder.reborrow().init_success(), content)
             }
-            &CompileResponse::Err(ref _err) => {
+            CompileResponse::Err(ref _err) => {
                 builder.reborrow().init_error();
             }
         }

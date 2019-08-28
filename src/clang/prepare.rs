@@ -14,14 +14,7 @@ enum ParamValue<T> {
 }
 
 pub fn create_tasks(command: CommandInfo, args: &[String]) -> Result<Vec<CompilationTask>, String> {
-    if args
-        .iter()
-        .find(|v| match v as &str {
-            "--analyze" => true,
-            _ => false,
-        })
-        .is_some()
-    {
+    if args.iter().any(|v| v == "--analyze") {
         // Support only compilation steps
         return Ok(Vec::new());
     }
@@ -41,19 +34,19 @@ pub fn create_tasks(command: CommandInfo, args: &[String]) -> Result<Vec<Compila
     let input_sources: Vec<PathBuf> = parsed_args
         .iter()
         .filter_map(|arg| match arg {
-            &Arg::Input {
+            Arg::Input {
                 ref kind, ref file, ..
             } if *kind == InputKind::Source => Some(Path::new(file).to_path_buf()),
             _ => None,
         })
         .collect();
-    if input_sources.len() == 0 {
-        return Err(format!("Can't find source file path."));
+    if input_sources.is_empty() {
+        return Err("Can't find source file path.".to_string());
     }
     // Precompiled header file name.
     let input_precompiled = match find_param(&parsed_args, |arg: &Arg| -> Option<PathBuf> {
         match arg {
-            &Arg::Input {
+            Arg::Input {
                 ref kind, ref file, ..
             } if *kind == InputKind::Precompiled => Some(Path::new(file).to_path_buf()),
             _ => None,
@@ -69,7 +62,7 @@ pub fn create_tasks(command: CommandInfo, args: &[String]) -> Result<Vec<Compila
     let marker_precompiled = parsed_args
         .iter()
         .filter_map(|arg| match arg {
-            &Arg::Param {
+            Arg::Param {
                 ref flag,
                 ref value,
                 ..
@@ -80,7 +73,7 @@ pub fn create_tasks(command: CommandInfo, args: &[String]) -> Result<Vec<Compila
     // Output object file name.
     let output_object = match find_param(&parsed_args, |arg: &Arg| -> Option<PathBuf> {
         match arg {
-            &Arg::Output {
+            Arg::Output {
                 ref kind, ref file, ..
             } if *kind == OutputKind::Object => Some(Path::new(file).to_path_buf()),
             _ => None,
@@ -100,7 +93,7 @@ pub fn create_tasks(command: CommandInfo, args: &[String]) -> Result<Vec<Compila
     // Language
     let language: Option<String> = match find_param(&parsed_args, |arg: &Arg| -> Option<String> {
         match arg {
-            &Arg::Param {
+            Arg::Param {
                 ref flag,
                 ref value,
                 ..
@@ -169,7 +162,7 @@ pub fn create_tasks(command: CommandInfo, args: &[String]) -> Result<Vec<Compila
         .collect()
 }
 
-fn find_param<T, R, F: Fn(&T) -> Option<R>>(args: &Vec<T>, filter: F) -> ParamValue<R> {
+fn find_param<T, R, F: Fn(&T) -> Option<R>>(args: &[T], filter: F) -> ParamValue<R> {
     let mut found = Vec::from_iter(args.iter().filter_map(filter));
     match found.len() {
         0 => ParamValue::None,
@@ -182,22 +175,17 @@ fn parse_arguments(args: &[String]) -> Result<Vec<Arg>, String> {
     let mut result: Vec<Arg> = Vec::new();
     let mut errors: Vec<String> = Vec::new();
     let mut iter = args.iter();
-    loop {
-        match parse_argument(&mut iter) {
-            Some(parse_result) => match parse_result {
-                Ok(arg) => {
-                    result.push(arg);
-                }
-                Err(e) => {
-                    errors.push(e);
-                }
-            },
-            None => {
-                break;
+    while let Some(parse_result) = parse_argument(&mut iter) {
+        match parse_result {
+            Ok(arg) => {
+                result.push(arg);
+            }
+            Err(e) => {
+                errors.push(e);
             }
         }
     }
-    if errors.len() > 0 {
+    if !errors.is_empty() {
         return Err(format!(
             "Found unknown command line arguments: {:?}",
             errors
@@ -209,7 +197,7 @@ fn parse_arguments(args: &[String]) -> Result<Vec<Arg>, String> {
 fn parse_argument(iter: &mut Iter<String>) -> Option<Result<Arg, String>> {
     match iter.next() {
         Some(arg) => Some(if arg.starts_with("--") {
-            let (key, value) = match arg.find("=") {
+            let (key, value) = match arg.find('=') {
                 Some(position) => (&arg[1..position], arg[position + 1..].to_string()),
                 None => match iter.next() {
                     Some(v) => (&arg[1..], v.clone()),
@@ -226,14 +214,15 @@ fn parse_argument(iter: &mut Iter<String>) -> Option<Result<Arg, String>> {
             let flag = &arg[1..];
             match is_spaceable_param(flag) {
                 Some((prefix, scope, next_flag)) => {
-                    let value = match flag == prefix {
-                        true => match iter.next() {
+                    let value = if flag == prefix {
+                        match iter.next() {
                             Some(v) if next_flag == has_param_prefix(v) => v.to_string(),
                             _ => {
                                 return Some(Err(arg.to_string()));
                             }
-                        },
-                        false => flag[prefix.len()..].to_string(),
+                        }
+                    } else {
+                        flag[prefix.len()..].to_string()
                     };
                     match flag {
                         "o" => Ok(Arg::output(OutputKind::Object, prefix, value)),
@@ -244,11 +233,11 @@ fn parse_argument(iter: &mut Iter<String>) -> Option<Result<Arg, String>> {
                     "c" => Ok(Arg::flag(Scope::Ignore, flag)),
                     "pipe" => Ok(Arg::flag(Scope::Shared, flag)),
                     "nostdinc++" => Ok(Arg::flag(Scope::Shared, flag)),
-                    s if s.starts_with("f") => Ok(Arg::flag(Scope::Shared, flag)),
-                    s if s.starts_with("g") => Ok(Arg::flag(Scope::Shared, flag)),
-                    s if s.starts_with("O") => Ok(Arg::flag(Scope::Shared, flag)),
-                    s if s.starts_with("W") => Ok(Arg::flag(Scope::Shared, flag)),
-                    s if s.starts_with("m") => Ok(Arg::flag(Scope::Shared, flag)),
+                    s if s.starts_with('f') => Ok(Arg::flag(Scope::Shared, flag)),
+                    s if s.starts_with('g') => Ok(Arg::flag(Scope::Shared, flag)),
+                    s if s.starts_with('O') => Ok(Arg::flag(Scope::Shared, flag)),
+                    s if s.starts_with('W') => Ok(Arg::flag(Scope::Shared, flag)),
+                    s if s.starts_with('m') => Ok(Arg::flag(Scope::Shared, flag)),
                     s if s.starts_with("std=") => Ok(Arg::flag(Scope::Shared, flag)),
                     _ => Err(arg.to_string()),
                 },
@@ -289,8 +278,8 @@ fn is_spaceable_param(flag: &str) -> Option<(&str, Scope, bool)> {
     }
 }
 
-fn has_param_prefix(arg: &String) -> bool {
-    arg.starts_with("-")
+fn has_param_prefix(arg: &str) -> bool {
+    arg.starts_with('-')
 }
 
 #[test]
@@ -300,7 +289,7 @@ fn test_parse_argument_precompile() {
          -fno-math-errno -fno-rtti -g3 -gdwarf-3 -O2 -D_LINUX64 -IEngine/Source \
          -IDeveloper/Public -I Runtime/Core/Private -D IS_PROGRAM=1 -D UNICODE \
          -DIS_MONOLITHIC=1 -std=c++11 -o CorePrivatePCH.h.pch CorePrivatePCH.h"
-            .split(" ")
+            .split(' ')
             .map(|x| x.to_string()),
     );
     assert_eq!(
@@ -341,7 +330,7 @@ fn test_parse_argument_compile() {
          -Wsequence-point -mmmx -msse -msse2 -fno-math-errno -fno-rtti -g3 -gdwarf-3 -O2 -D \
          IS_PROGRAM=1 -D UNICODE -DIS_MONOLITHIC=1 -x c++ -std=c++11 -include CorePrivatePCH.h \
          -o Module.Core.cpp.o Module.Core.cpp"
-            .split(" ")
+            .split(' ')
             .map(|x| x.to_string()),
     );
     assert_eq!(

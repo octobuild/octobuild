@@ -142,23 +142,23 @@ impl Toolchain for VsToolchain {
         // Make parameters list for preprocessing.
         let mut args = filter(&task.shared.args, |arg: &Arg| -> Option<String> {
             match arg {
-                &Arg::Flag {
+                Arg::Flag {
                     ref scope,
                     ref flag,
                 } => match scope {
-                    &Scope::Preprocessor | &Scope::Shared => Some("/".to_string() + &flag),
-                    &Scope::Ignore | &Scope::Compiler => None,
+                    Scope::Preprocessor | &Scope::Shared => Some("/".to_string() + &flag),
+                    Scope::Ignore | &Scope::Compiler => None,
                 },
-                &Arg::Param {
+                Arg::Param {
                     ref scope,
                     ref flag,
                     ref value,
                 } => match scope {
-                    &Scope::Preprocessor | &Scope::Shared => Some("/".to_string() + &flag + &value),
-                    &Scope::Ignore | &Scope::Compiler => None,
+                    Scope::Preprocessor | &Scope::Shared => Some("/".to_string() + &flag + &value),
+                    Scope::Ignore | &Scope::Compiler => None,
                 },
-                &Arg::Input { .. } => None,
-                &Arg::Output { .. } => None,
+                Arg::Input { .. } => None,
+                Arg::Output { .. } => None,
             }
         });
 
@@ -184,7 +184,7 @@ impl Toolchain for VsToolchain {
                     task.shared.output_precompiled.is_some(),
                 )?;
             } else {
-                content.write(&output.stdout)?;
+                content.write_all(&output.stdout)?;
             };
             Ok(PreprocessResult::Success(content))
         } else {
@@ -204,29 +204,29 @@ impl Toolchain for VsToolchain {
     ) -> Result<CompileStep, Error> {
         let mut args = filter(&task.shared.args, |arg: &Arg| -> Option<String> {
             match arg {
-                &Arg::Flag {
+                Arg::Flag {
                     ref scope,
                     ref flag,
                 } => match scope {
-                    &Scope::Compiler | &Scope::Shared => Some("/".to_string() + &flag),
-                    &Scope::Preprocessor if task.shared.output_precompiled.is_some() => {
+                    Scope::Compiler | &Scope::Shared => Some("/".to_string() + &flag),
+                    Scope::Preprocessor if task.shared.output_precompiled.is_some() => {
                         Some("/".to_string() + &flag)
                     }
-                    &Scope::Ignore | &Scope::Preprocessor => None,
+                    Scope::Ignore | &Scope::Preprocessor => None,
                 },
-                &Arg::Param {
+                Arg::Param {
                     ref scope,
                     ref flag,
                     ref value,
                 } => match scope {
-                    &Scope::Compiler | &Scope::Shared => Some("/".to_string() + &flag + &value),
-                    &Scope::Preprocessor if task.shared.output_precompiled.is_some() => {
+                    Scope::Compiler | &Scope::Shared => Some("/".to_string() + &flag + &value),
+                    Scope::Preprocessor if task.shared.output_precompiled.is_some() => {
                         Some("/".to_string() + &flag + &value)
                     }
-                    &Scope::Ignore | &Scope::Preprocessor => None,
+                    Scope::Ignore | &Scope::Preprocessor => None,
                 },
-                &Arg::Input { .. } => None,
-                &Arg::Output { .. } => None,
+                Arg::Input { .. } => None,
+                Arg::Output { .. } => None,
             }
         });
         args.push("/nologo".to_string());
@@ -264,11 +264,11 @@ impl Toolchain for VsToolchain {
         }
         // Output files.
         match &task.output_precompiled {
-            &Some(ref path) => {
+            Some(ref path) => {
                 assert!(path.is_absolute());
                 command.arg(join_flag("/Fp", path));
             }
-            &None => {}
+            None => {}
         }
         // Save input file name for output filter.
         let temp_file = input_temp
@@ -279,12 +279,12 @@ impl Toolchain for VsToolchain {
             .unwrap_or(b"");
         // Use precompiled header
         match &task.input_precompiled {
-            &Some(ref path) => {
+            Some(ref path) => {
                 assert!(path.is_absolute());
                 command.arg("/Yu");
                 command.arg(join_flag("/Fp", path));
             }
-            &None => {}
+            None => {}
         }
         // Execute.
         state.wrap_slow(|| {
@@ -431,7 +431,7 @@ fn read_executable_id(path: &Path) -> Result<String, Error> {
         ));
     }
     // Read PE header offset
-    let pe_offset = Cursor::new(&header[0x3C..0x40]).read_u32::<LittleEndian>()? as u64;
+    let pe_offset = u64::from(Cursor::new(&header[0x3C..0x40]).read_u32::<LittleEndian>()?);
     // Read PE header
     file.seek(SeekFrom::Start(pe_offset))?;
     header.resize(0x54, 0);
@@ -452,10 +452,10 @@ fn read_executable_id(path: &Path) -> Result<String, Error> {
 fn prepare_output(line: &[u8], mut buffer: Vec<u8>, success: bool) -> Vec<u8> {
     // Remove strage file name from output
     let mut begin =
-        match (line.len() < buffer.len()) && buffer.starts_with(line) && is_eol(buffer[line.len()])
-        {
-            true => line.len(),
-            false => 0,
+        if (line.len() < buffer.len()) && buffer.starts_with(line) && is_eol(buffer[line.len()]) {
+            line.len()
+        } else {
+            0
         };
     while begin < buffer.len() && is_eol(buffer[begin]) {
         begin += 1;
@@ -480,7 +480,7 @@ fn is_eol(c: u8) -> bool {
 }
 
 fn join_flag(flag: &str, path: &Path) -> String {
-    flag.to_string() + &path.to_str().unwrap()
+    flag.to_string() + path.to_str().unwrap()
 }
 
 #[cfg(test)]
@@ -489,7 +489,7 @@ mod test {
 
     fn check_prepare_output(original: &str, expected: &str, line: &str, success: bool) {
         let mut stream: Vec<u8> = Vec::new();
-        stream.write(&original.as_bytes()[..]).unwrap();
+        stream.write_all(&original.as_bytes()[..]).unwrap();
 
         let result = super::prepare_output(line.as_bytes(), stream, success);
         assert_eq!(String::from_utf8_lossy(&result), expected);

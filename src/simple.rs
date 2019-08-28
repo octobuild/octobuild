@@ -24,7 +24,7 @@ pub fn supported_compilers(temp_dir: &Arc<TempDir>) -> CompilerGroup {
 }
 
 pub fn create_temp_dir() -> Result<Arc<TempDir>, Error> {
-    TempDir::new("octobuild").map(|t| Arc::new(t))
+    TempDir::new("octobuild").map(Arc::new)
 }
 
 pub fn simple_compile<C, F>(exec: &str, factory: F) -> i32
@@ -90,11 +90,11 @@ where
 
 fn print_task_result(result: BuildResult) -> Result<(), Error> {
     match result.result {
-        &Ok(ref output) => {
+        Ok(ref output) => {
             io::stdout().write_all(&output.stdout)?;
             io::stderr().write_all(&output.stderr)?;
         }
-        &Err(_) => {}
+        Err(_) => {}
     }
     Ok(())
 }

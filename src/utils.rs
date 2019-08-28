@@ -10,7 +10,7 @@ use time;
 
 pub const DEFAULT_BUF_SIZE: usize = 1024 * 64;
 
-pub fn filter<T, R, F: Fn(&T) -> Option<R>>(args: &Vec<T>, filter: F) -> Vec<R> {
+pub fn filter<T, R, F: Fn(&T) -> Option<R>>(args: &[T], filter: F) -> Vec<R> {
     Vec::from_iter(args.iter().filter_map(filter))
 }
 

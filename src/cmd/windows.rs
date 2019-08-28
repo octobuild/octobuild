@@ -30,7 +30,7 @@ pub fn parse(cmd: &str) -> Result<Vec<String>, Error> {
                 }
             }
             '\\' => {
-                slash = slash + 1;
+                slash += 1;
                 data = true;
             }
             '"' => {
@@ -69,7 +69,7 @@ pub fn parse(cmd: &str) -> Result<Vec<String>, Error> {
     if data {
         args.push(arg);
     }
-    return Ok(args);
+    Ok(args)
 }
 
 fn add_slashes(mut line: String, count: usize) -> String {

@@ -52,7 +52,7 @@ impl<C: Compiler> RemoteCompiler<C> {
                     cooldown: Timespec { sec: 0, nsec: 0 },
                     builders: Arc::new(Vec::new()),
                 }),
-                base_url: base_url.as_ref().map(|u| u.clone()),
+                base_url: base_url.as_ref().cloned(),
                 client: Client::new(),
             }),
             local: compiler,
@@ -63,7 +63,7 @@ impl<C: Compiler> RemoteCompiler<C> {
 impl RemoteSharedMut {
     fn receive_builders(&self, base_url: &Option<reqwest::Url>) -> Result<Vec<BuilderInfo>, Error> {
         match base_url {
-            &Some(ref base_url) => {
+            Some(ref base_url) => {
                 let client = reqwest::Client::new();
                 let url = base_url.join(RPC_BUILDER_LIST).unwrap();
                 let response = client
@@ -73,7 +73,7 @@ impl RemoteSharedMut {
 
                 serde_json::from_reader(response).map_err(|e| Error::new(ErrorKind::InvalidData, e))
             }
-            &None => Ok(Vec::new()),
+            None => Ok(Vec::new()),
         }
     }
 }
@@ -113,11 +113,10 @@ impl RemoteToolchain {
     ) -> Result<CompileResponse, Error> {
         let name = self
             .identifier()
-            .ok_or(Error::new(ErrorKind::Other, "Can't get toolchain name"))?;
-        let addr = self.remote_endpoint(&name).ok_or(Error::new(
-            ErrorKind::Other,
-            "Can't find helper for toolchain",
-        ))?;
+            .ok_or_else(|| Error::new(ErrorKind::Other, "Can't get toolchain name"))?;
+        let addr = self
+            .remote_endpoint(&name)
+            .ok_or_else(|| Error::new(ErrorKind::Other, "Can't find helper for toolchain"))?;
         if task.output_precompiled.is_some() {
             return Err(Error::new(
                 ErrorKind::Other,
@@ -151,11 +150,8 @@ impl RemoteToolchain {
                 )
                 .map_err(|e| Error::new(ErrorKind::InvalidData, e))
                 .and_then(|result| {
-                    match result {
-                        CompileResponse::Success(ref output, ref content) => {
-                            write_output(&task.output_object, output.success(), content)?;
-                        }
-                        _ => {}
+                    if let CompileResponse::Success(ref output, ref content) = result {
+                        write_output(&task.output_object, output.success(), content)?;
                     }
                     state.statistic.inc_remote();
                     Ok(result)
@@ -170,7 +166,7 @@ impl RemoteToolchain {
         base_url: &reqwest::Url,
     ) -> Result<Option<String>, Error> {
         match precompiled {
-            &Some(ref path) => {
+            Some(ref path) => {
                 // Get precompiled header file hash
                 let meta = state.cache.file_hash(&path)?;
                 // Check is precompiled header uploaded
@@ -214,7 +210,7 @@ impl RemoteToolchain {
                     )),
                 }
             }
-            &None => Ok(None),
+            None => Ok(None),
         }
     }
 
@@ -241,7 +237,7 @@ impl RemoteToolchain {
                     warn!("Can't receive toolchains from coordinator: {}", e);
                 }
             }
-            return holder.builders.clone();
+            holder.builders.clone()
         }
     }
     // Resolve toolchain for command execution.
@@ -308,28 +304,31 @@ fn get_base_url(addr: &SocketAddr) -> reqwest::Url {
 
 fn write_output(path: &Option<PathBuf>, success: bool, output: &[u8]) -> Result<(), Error> {
     match path {
-        &Some(ref path) => match success {
-            true => File::create(path)
-                .and_then(|mut f| f.write(&output))
-                .or_else(|e| {
-                    drop(fs::remove_file(path));
-                    Err(e)
-                })
-                .map(|_| ()),
-            false => fs::remove_file(path),
-        },
-        &None => Ok(()),
+        Some(ref path) => {
+            if success {
+                File::create(path)
+                    .and_then(|mut f| f.write(&output))
+                    .or_else(|e| {
+                        drop(fs::remove_file(path));
+                        Err(e)
+                    })
+                    .map(|_| ())
+            } else {
+                fs::remove_file(path)
+            }
+        }
+        None => Ok(()),
     }
 }
 
 fn get_random_builder<F: Fn(&BuilderInfo) -> bool>(
-    builders: &Vec<BuilderInfo>,
+    builders: &[BuilderInfo],
     filter: F,
 ) -> Option<&BuilderInfo> {
     let filtered: Vec<&BuilderInfo> = builders.iter().filter(|b| filter(b)).collect();
-    if filtered.len() > 0 {
-        Some(filtered[rand::random::<usize>() % filtered.len()].clone())
-    } else {
-        None
+    if filtered.is_empty() {
+        return None;
     }
+
+    Some(filtered[rand::random::<usize>() % filtered.len()])
 }

@@ -40,7 +40,7 @@ impl Cache {
         &self,
         statistic: &Statistic,
         hash: &str,
-        outputs: &Vec<PathBuf>,
+        outputs: &[PathBuf],
         worker: F,
         checker: C,
     ) -> Result<OutputInfo, Error> {
@@ -65,18 +65,14 @@ impl FileHasher for Cache {
                     }
                 };
                 // Validate cached value.
-                match cached {
-                    Some(result) => match result {
-                        Ok(value) => {
-                            if value.size == stat.len()
-                                && value.modified == FileTime::from_last_modification_time(&stat)
-                            {
-                                return Ok(value);
-                            }
+                if let Some(result) = cached {
+                    if let Ok(value) = result {
+                        if value.size == stat.len()
+                            && value.modified == FileTime::from_last_modification_time(&stat)
+                        {
+                            return Ok(value);
                         }
-                        Err(_) => {}
-                    },
-                    None => {}
+                    }
                 }
                 // Calculate hash value.
                 let hash = match generate_file_hash(path) {

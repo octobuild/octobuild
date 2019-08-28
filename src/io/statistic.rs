@@ -2,6 +2,7 @@ use std::cmp::max;
 
 use std::sync::atomic::{AtomicUsize, Ordering};
 
+#[derive(Default)]
 pub struct Statistic {
     pub hit_count: AtomicUsize,
     pub hit_bytes: AtomicUsize,
@@ -12,13 +13,7 @@ pub struct Statistic {
 
 impl Statistic {
     pub fn new() -> Self {
-        Statistic {
-            hit_count: AtomicUsize::new(0),
-            hit_bytes: AtomicUsize::new(0),
-            miss_count: AtomicUsize::new(0),
-            miss_bytes: AtomicUsize::new(0),
-            remote_count: AtomicUsize::new(0),
-        }
+        Default::default()
     }
 
     pub fn add_hit(&self, bytes: usize) {
