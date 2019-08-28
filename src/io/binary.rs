@@ -6,7 +6,10 @@ fn read_byte(stream: &mut dyn Read) -> Result<u8> {
     let mut buf = [0];
     let size = stream.read(&mut buf)?;
     if size <= 0 {
-        return Err(Error::new(ErrorKind::InvalidInput, "Unexpected end of data"));
+        return Err(Error::new(
+            ErrorKind::InvalidInput,
+            "Unexpected end of data",
+        ));
     }
     Ok(buf[0])
 }
@@ -35,7 +38,10 @@ fn read_array(stream: &mut dyn Read, buf: &mut [u8]) -> Result<()> {
     while pos < buf.len() {
         let size = stream.read(&mut buf[pos..])?;
         if size <= 0 {
-            return Err(Error::new(ErrorKind::InvalidInput, "Unexpected end of data"));
+            return Err(Error::new(
+                ErrorKind::InvalidInput,
+                "Unexpected end of data",
+            ));
         }
         pos += size;
     }

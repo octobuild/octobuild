@@ -18,7 +18,8 @@ use crate::cache::FileHasher;
 use crate::cluster::builder::{CompileRequest, CompileResponse};
 use crate::cluster::common::{BuilderInfo, RPC_BUILDER_LIST, RPC_BUILDER_TASK, RPC_BUILDER_UPLOAD};
 use crate::compiler::{
-    CommandInfo, CompilationTask, CompileStep, Compiler, OutputInfo, PreprocessResult, SharedState, Toolchain,
+    CommandInfo, CompilationTask, CompileStep, Compiler, OutputInfo, PreprocessResult, SharedState,
+    Toolchain,
 };
 use crate::io::memstream::MemStream;
 
@@ -65,7 +66,10 @@ impl RemoteSharedMut {
             &Some(ref base_url) => {
                 let client = reqwest::Client::new();
                 let url = base_url.join(RPC_BUILDER_LIST).unwrap();
-                let response = client.get(url).send().map_err(|e| Error::new(ErrorKind::Other, e))?;
+                let response = client
+                    .get(url)
+                    .send()
+                    .map_err(|e| Error::new(ErrorKind::Other, e))?;
 
                 serde_json::from_reader(response).map_err(|e| Error::new(ErrorKind::InvalidData, e))
             }
@@ -102,13 +106,18 @@ impl<'a, R: 'a + Read> Read for ReadWrapper<'a, R> {
 }
 
 impl RemoteToolchain {
-    fn compile_remote(&self, state: &SharedState, task: &CompileStep) -> Result<CompileResponse, Error> {
+    fn compile_remote(
+        &self,
+        state: &SharedState,
+        task: &CompileStep,
+    ) -> Result<CompileResponse, Error> {
         let name = self
             .identifier()
             .ok_or(Error::new(ErrorKind::Other, "Can't get toolchain name"))?;
-        let addr = self
-            .remote_endpoint(&name)
-            .ok_or(Error::new(ErrorKind::Other, "Can't find helper for toolchain"))?;
+        let addr = self.remote_endpoint(&name).ok_or(Error::new(
+            ErrorKind::Other,
+            "Can't find helper for toolchain",
+        ))?;
         if task.output_precompiled.is_some() {
             return Err(Error::new(
                 ErrorKind::Other,
@@ -136,18 +145,21 @@ impl RemoteToolchain {
                 // Receive compilation result.
                 let mut options = ::capnp::message::ReaderOptions::new();
                 options.traversal_limit_in_words(1024 * 1024 * 1024);
-                CompileResponse::stream_read(&mut BufReader::new(ReadWrapper(&mut response)), options)
-                    .map_err(|e| Error::new(ErrorKind::InvalidData, e))
-                    .and_then(|result| {
-                        match result {
-                            CompileResponse::Success(ref output, ref content) => {
-                                write_output(&task.output_object, output.success(), content)?;
-                            }
-                            _ => {}
+                CompileResponse::stream_read(
+                    &mut BufReader::new(ReadWrapper(&mut response)),
+                    options,
+                )
+                .map_err(|e| Error::new(ErrorKind::InvalidData, e))
+                .and_then(|result| {
+                    match result {
+                        CompileResponse::Success(ref output, ref content) => {
+                            write_output(&task.output_object, output.success(), content)?;
                         }
-                        state.statistic.inc_remote();
-                        Ok(result)
-                    })
+                        _ => {}
+                    }
+                    state.statistic.inc_remote();
+                    Ok(result)
+                })
             })
     }
 
@@ -166,7 +178,11 @@ impl RemoteToolchain {
                 match self
                     .shared
                     .client
-                    .head(base_url.join(&format!("{}/{}", RPC_BUILDER_UPLOAD, meta.hash)).unwrap())
+                    .head(
+                        base_url
+                            .join(&format!("{}/{}", RPC_BUILDER_UPLOAD, meta.hash))
+                            .unwrap(),
+                    )
                     .send()
                     .map(|response| response.status())
                     .map_err(|e| Error::new(ErrorKind::BrokenPipe, e))?
@@ -179,7 +195,11 @@ impl RemoteToolchain {
                 match self
                     .shared
                     .client
-                    .post(base_url.join(&format!("{}/{}", RPC_BUILDER_UPLOAD, meta.hash)).unwrap())
+                    .post(
+                        base_url
+                            .join(&format!("{}/{}", RPC_BUILDER_UPLOAD, meta.hash))
+                            .unwrap(),
+                    )
                     // todo: this is workaround for https://github.com/hyperium/hyper/issues/838
                     //.header(Expect::Continue)
                     .body(reqwest::Body::sized(file, meta.size))
@@ -239,17 +259,29 @@ impl Toolchain for RemoteToolchain {
     }
 
     // Parse compiler arguments.
-    fn create_tasks(&self, command: CommandInfo, args: &[String]) -> Result<Vec<CompilationTask>, String> {
+    fn create_tasks(
+        &self,
+        command: CommandInfo,
+        args: &[String],
+    ) -> Result<Vec<CompilationTask>, String> {
         self.local.create_tasks(command, args)
     }
 
     // Preprocessing source file.
-    fn preprocess_step(&self, state: &SharedState, task: &CompilationTask) -> Result<PreprocessResult, Error> {
+    fn preprocess_step(
+        &self,
+        state: &SharedState,
+        task: &CompilationTask,
+    ) -> Result<PreprocessResult, Error> {
         self.local.preprocess_step(state, task)
     }
 
     // Compile preprocessed file.
-    fn compile_prepare_step(&self, task: CompilationTask, preprocessed: MemStream) -> Result<CompileStep, Error> {
+    fn compile_prepare_step(
+        &self,
+        task: CompilationTask,
+        preprocessed: MemStream,
+    ) -> Result<CompileStep, Error> {
         self.local.compile_prepare_step(task, preprocessed)
     }
 
@@ -290,7 +322,10 @@ fn write_output(path: &Option<PathBuf>, success: bool, output: &[u8]) -> Result<
     }
 }
 
-fn get_random_builder<F: Fn(&BuilderInfo) -> bool>(builders: &Vec<BuilderInfo>, filter: F) -> Option<&BuilderInfo> {
+fn get_random_builder<F: Fn(&BuilderInfo) -> bool>(
+    builders: &Vec<BuilderInfo>,
+    filter: F,
+) -> Option<&BuilderInfo> {
     let filtered: Vec<&BuilderInfo> = builders.iter().filter(|b| filter(b)).collect();
     if filtered.len() > 0 {
         Some(filtered[rand::random::<usize>() % filtered.len()].clone())

@@ -29,8 +29,12 @@ pub enum CompilerError {
 impl Display for CompilerError {
     fn fmt(&self, f: &mut Formatter) -> Result<(), ::std::fmt::Error> {
         match self {
-            &CompilerError::InvalidArguments(ref arg) => write!(f, "can't parse command line arguments: {}", arg),
-            &CompilerError::ToolchainNotFound(ref arg) => write!(f, "can't find toolchain for: {}", arg.display()),
+            &CompilerError::InvalidArguments(ref arg) => {
+                write!(f, "can't parse command line arguments: {}", arg)
+            }
+            &CompilerError::ToolchainNotFound(ref arg) => {
+                write!(f, "can't find toolchain for: {}", arg.display())
+            }
         }
     }
 }
@@ -170,15 +174,20 @@ impl SharedState {
 
 impl CommandEnv {
     pub fn new() -> Self {
-        CommandEnv { map: HashMap::new() }
+        CommandEnv {
+            map: HashMap::new(),
+        }
     }
 
     pub fn get<K: Into<String>>(&self, key: K) -> Option<&str> {
-        self.map.get(&CommandEnv::normalize_key(key.into())).map(|s| s.as_str())
+        self.map
+            .get(&CommandEnv::normalize_key(key.into()))
+            .map(|s| s.as_str())
     }
 
     pub fn insert<K: Into<String>, V: Into<String>>(&mut self, key: K, value: V) -> Option<String> {
-        self.map.insert(CommandEnv::normalize_key(key.into()), value.into())
+        self.map
+            .insert(CommandEnv::normalize_key(key.into()), value.into())
     }
 
     pub fn iter(&self) -> hash_map::Iter<String, String> {
@@ -257,7 +266,11 @@ impl CommandInfo {
             return fn_find_exec(executable);
         }
         // Check current catalog
-        if allow_current_dir || executable.parent().map_or(false, |path| path.as_os_str().len() > 0) {
+        if allow_current_dir
+            || executable
+                .parent()
+                .map_or(false, |path| path.as_os_str().len() > 0)
+        {
             match self
                 .current_dir
                 .as_ref()
@@ -380,7 +393,12 @@ pub struct CompileStep {
 }
 
 impl CompileStep {
-    pub fn new(task: CompilationTask, preprocessed: MemStream, args: Vec<String>, use_precompiled: bool) -> Self {
+    pub fn new(
+        task: CompilationTask,
+        preprocessed: MemStream,
+        args: Vec<String>,
+        use_precompiled: bool,
+    ) -> Self {
         assert!(use_precompiled || task.shared.input_precompiled.is_none());
         CompileStep {
             output_object: Some(task.output_object),
@@ -405,16 +423,32 @@ pub trait Toolchain: Send + Sync {
     fn identifier(&self) -> Option<String>;
 
     // Parse compiler arguments.
-    fn create_tasks(&self, command: CommandInfo, args: &[String]) -> Result<Vec<CompilationTask>, String>;
+    fn create_tasks(
+        &self,
+        command: CommandInfo,
+        args: &[String],
+    ) -> Result<Vec<CompilationTask>, String>;
     // Preprocessing source file.
-    fn preprocess_step(&self, state: &SharedState, task: &CompilationTask) -> Result<PreprocessResult, Error>;
+    fn preprocess_step(
+        &self,
+        state: &SharedState,
+        task: &CompilationTask,
+    ) -> Result<PreprocessResult, Error>;
     // Compile preprocessed file.
-    fn compile_prepare_step(&self, task: CompilationTask, preprocessed: MemStream) -> Result<CompileStep, Error>;
+    fn compile_prepare_step(
+        &self,
+        task: CompilationTask,
+        preprocessed: MemStream,
+    ) -> Result<CompileStep, Error>;
 
     // Compile preprocessed file.
     fn compile_step(&self, state: &SharedState, task: CompileStep) -> Result<OutputInfo, Error>;
     // Compile preprocessed file.
-    fn compile_memory(&self, state: &SharedState, mut task: CompileStep) -> Result<(OutputInfo, Vec<u8>), Error> {
+    fn compile_memory(
+        &self,
+        state: &SharedState,
+        mut task: CompileStep,
+    ) -> Result<(OutputInfo, Vec<u8>), Error> {
         task.output_object = None;
         self.compile_step(state, task).map(|output| {
             (
@@ -428,7 +462,11 @@ pub trait Toolchain: Send + Sync {
         })
     }
 
-    fn compile_task(&self, state: &SharedState, task: CompilationTask) -> Result<OutputInfo, Error> {
+    fn compile_task(
+        &self,
+        state: &SharedState,
+        task: CompilationTask,
+    ) -> Result<OutputInfo, Error> {
         self.preprocess_step(state, &task)
             .and_then(|preprocessed| match preprocessed {
                 PreprocessResult::Success(preprocessed) => self
@@ -438,7 +476,11 @@ pub trait Toolchain: Send + Sync {
             })
     }
 
-    fn compile_step_cached(&self, state: &SharedState, task: CompileStep) -> Result<OutputInfo, Error> {
+    fn compile_step_cached(
+        &self,
+        state: &SharedState,
+        task: CompileStep,
+    ) -> Result<OutputInfo, Error> {
         let mut hasher = Md5::new();
         // Get hash from preprocessed data
         hasher.hash_u64(task.preprocessed.len() as u64);
@@ -503,11 +545,17 @@ impl CompilerGroup {
 impl Compiler for CompilerGroup {
     // Resolve toolchain for command execution.
     fn resolve_toolchain(&self, command: &CommandInfo) -> Option<Arc<dyn Toolchain>> {
-        self.0.iter().filter_map(|c| c.resolve_toolchain(command)).next()
+        self.0
+            .iter()
+            .filter_map(|c| c.resolve_toolchain(command))
+            .next()
     }
     // Discovery local toolchains.
     fn discovery_toolchains(&self) -> Vec<Arc<dyn Toolchain>> {
-        self.0.iter().flat_map(|c| c.discovery_toolchains()).collect()
+        self.0
+            .iter()
+            .flat_map(|c| c.discovery_toolchains())
+            .collect()
     }
 }
 
@@ -553,8 +601,15 @@ pub trait Compiler: Send + Sync {
             .and_then(|toolchain| {
                 toolchain
                     .create_tasks(command, args)
-                    .map_err(|e| Error::new(ErrorKind::InvalidInput, CompilerError::InvalidArguments(e)))
-                    .map(|tasks| tasks.into_iter().map(|task| (toolchain.clone(), task)).collect())
+                    .map_err(|e| {
+                        Error::new(ErrorKind::InvalidInput, CompilerError::InvalidArguments(e))
+                    })
+                    .map(|tasks| {
+                        tasks
+                            .into_iter()
+                            .map(|task| (toolchain.clone(), task))
+                            .collect()
+                    })
             })
     }
 }
@@ -643,7 +698,9 @@ fn fn_find_exec_native(path: PathBuf) -> Option<PathBuf> {
         return None;
     }
     match path.metadata() {
-        Ok(ref meta) if meta.is_file() && (meta.permissions().mode() & 0o100 == 0o100) => Some(path),
+        Ok(ref meta) if meta.is_file() && (meta.permissions().mode() & 0o100 == 0o100) => {
+            Some(path)
+        }
         _ => None,
     }
 }

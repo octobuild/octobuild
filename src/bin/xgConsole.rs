@@ -125,13 +125,19 @@ fn expand_files(mut files: Vec<PathBuf>, arg: &str) -> Vec<PathBuf> {
 fn execute(args: &[String]) -> Result<Option<i32>, Error> {
     let config = Config::new()?;
     let state = SharedState::new(&config)?;
-    let compiler = RemoteCompiler::new(&config.coordinator, supported_compilers(&create_temp_dir()?));
+    let compiler = RemoteCompiler::new(
+        &config.coordinator,
+        supported_compilers(&create_temp_dir()?),
+    );
     let files = args
         .iter()
         .filter(|a| !is_flag(a))
         .fold(Vec::new(), |state, a| expand_files(state, &a));
     if files.len() == 0 {
-        return Err(Error::new(ErrorKind::InvalidInput, "Build task files not found"));
+        return Err(Error::new(
+            ErrorKind::InvalidInput,
+            "Build task files not found",
+        ));
     }
 
     let mut graph = Graph::new();
@@ -200,7 +206,9 @@ fn prepare_graph<C: Compiler>(compiler: &C, graph: XgGraph) -> Result<BuildGraph
     assert!(depends.len() == result.node_count());
     for i in 0..depends.len() {
         let node_a = NodeIndex::new(i);
-        for neighbor in graph.neighbors_directed(depends.get(i).unwrap().clone(), EdgeDirection::Outgoing) {
+        for neighbor in
+            graph.neighbors_directed(depends.get(i).unwrap().clone(), EdgeDirection::Outgoing)
+        {
             let node_b = remap.get(neighbor.index()).unwrap();
             result.add_edge(node_a, node_b.clone(), ());
         }
@@ -258,17 +266,20 @@ fn expand_arg<F: Fn(&str) -> Option<String>>(arg: &str, resolver: &F) -> String 
 #[test]
 fn test_parse_vars() {
     assert_eq!(
-        expand_arg("A$(test)$(inner)$(none)B", &|name: &str| -> Option<String> {
-            match name {
-                "test" => Some("foo".to_string()),
-                "inner" => Some("$(bar)".to_string()),
-                "none" => None,
-                _ => {
-                    assert!(false, format!("Unexpected value: {}", name));
-                    None
+        expand_arg(
+            "A$(test)$(inner)$(none)B",
+            &|name: &str| -> Option<String> {
+                match name {
+                    "test" => Some("foo".to_string()),
+                    "inner" => Some("$(bar)".to_string()),
+                    "none" => None,
+                    _ => {
+                        assert!(false, format!("Unexpected value: {}", name));
+                        None
+                    }
                 }
             }
-        }),
+        ),
         "Afoo$(bar)$(none)B"
     );
 }

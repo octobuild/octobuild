@@ -11,13 +11,20 @@ use rustc_version::version;
 fn save_platform() -> Result<(), Error> {
     let root_dir = env::var("CARGO_MANIFEST_DIR").unwrap();
     let profile = env::var("PROFILE").unwrap();
-    let dest_path = Path::new(&root_dir).join("target").join(&profile).join("target.txt");
+    let dest_path = Path::new(&root_dir)
+        .join("target")
+        .join(&profile)
+        .join("target.txt");
     let mut f = File::create(&dest_path)?;
     f.write_all(env::var("TARGET").unwrap().as_bytes())
 }
 
 fn load_revision() -> Result<String, Error> {
-    let output = Command::new("git").arg("log").arg("-n1").arg("--format=%H").output()?;
+    let output = Command::new("git")
+        .arg("log")
+        .arg("-n1")
+        .arg("--format=%H")
+        .output()?;
     Ok(String::from_utf8(output.stdout).unwrap().trim().to_string())
 }
 
@@ -41,7 +48,10 @@ pub const RUSTC: &str = "{rustc}";
 fn save_control() -> Result<(), Error> {
     let root_dir = env::var("CARGO_MANIFEST_DIR").unwrap();
     let profile = env::var("PROFILE").unwrap();
-    let dest_path = Path::new(&root_dir).join("target").join(&profile).join("version.sh");
+    let dest_path = Path::new(&root_dir)
+        .join("target")
+        .join(&profile)
+        .join("version.sh");
     let arch = match ARCH {
         "x86_64" => "amd64",
         other => other,

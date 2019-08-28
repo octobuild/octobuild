@@ -13,7 +13,13 @@ fn bench_filter(path: &str, marker: &Option<String>, keep_headers: bool, num: us
     let mut result = Vec::with_capacity(source.len());
     for _ in 0..num {
         result.clear();
-        postprocess::filter_preprocessed(&mut Cursor::new(source.clone()), &mut result, &marker, keep_headers).unwrap();
+        postprocess::filter_preprocessed(
+            &mut Cursor::new(source.clone()),
+            &mut result,
+            &marker,
+            keep_headers,
+        )
+        .unwrap();
         total += result.len();
     }
     assert_eq!(total / num, result.len());
@@ -63,7 +69,11 @@ fn main() {
     let inputs = matches.values_of_lossy(INPUT).unwrap();
     let marker = matches.value_of(MARKER).map(|s| s.to_string());
     let keep = matches.is_present(KEEP);
-    let count = matches.value_of(COUNT).unwrap_or("1").parse::<usize>().unwrap();
+    let count = matches
+        .value_of(COUNT)
+        .unwrap_or("1")
+        .parse::<usize>()
+        .unwrap();
 
     for input in inputs.iter() {
         bench_filter(input, &marker, keep, count);

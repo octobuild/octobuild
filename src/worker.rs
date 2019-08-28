@@ -90,7 +90,9 @@ impl BuildAction {
         match self {
             &BuildAction::Empty => Cow::Borrowed(""),
             &BuildAction::Exec(_, ref args) => Cow::Owned(format!("{:?}", args)),
-            &BuildAction::Compilation(_, ref task) => Cow::Borrowed(task.input_source.to_str().unwrap_or("")),
+            &BuildAction::Compilation(_, ref task) => {
+                Cow::Borrowed(task.input_source.to_str().unwrap_or(""))
+            }
         }
     }
 }
@@ -246,7 +248,8 @@ where
         drop(tx_result);
         // Run all tasks.
         let mut count: usize = 0;
-        let result = execute_until_failed(&graph, tx_task, &rx_result, &mut count, &update_progress);
+        let result =
+            execute_until_failed(&graph, tx_task, &rx_result, &mut count, &update_progress);
         // Cleanup task queue.
         for _ in mutex_rx_task.lock().unwrap().iter() {}
         // Wait for in progress task completion.
@@ -265,10 +268,16 @@ fn execute_compiler(state: &SharedState, task: &BuildTask) -> Result<OutputInfo,
             stderr: Vec::new(),
             stdout: Vec::new(),
         }),
-        &BuildAction::Exec(ref command, ref args) => {
-            state.wrap_slow(|| command.to_command().args(args).output().map(|o| OutputInfo::new(o)))
+        &BuildAction::Exec(ref command, ref args) => state.wrap_slow(|| {
+            command
+                .to_command()
+                .args(args)
+                .output()
+                .map(|o| OutputInfo::new(o))
+        }),
+        &BuildAction::Compilation(ref toolchain, ref task) => {
+            toolchain.compile_task(state, task.clone())
         }
-        &BuildAction::Compilation(ref toolchain, ref task) => toolchain.compile_task(state, task.clone()),
     }
 }
 

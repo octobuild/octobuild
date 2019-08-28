@@ -30,11 +30,17 @@ pub enum CacheError {
 impl Display for CacheError {
     fn fmt(&self, f: &mut Formatter) -> Result<(), ::std::fmt::Error> {
         match self {
-            &CacheError::InvalidHeader(ref path) => write!(f, "invalid cache file header: {}", path.display()),
-            &CacheError::InvalidFooter(ref path) => write!(f, "invalid cache file footer: {}", path.display()),
-            &CacheError::PackedFilesMismatch(ref path) => {
-                write!(f, "unexpected count of packed cached files: {}", path.display())
+            &CacheError::InvalidHeader(ref path) => {
+                write!(f, "invalid cache file header: {}", path.display())
             }
+            &CacheError::InvalidFooter(ref path) => {
+                write!(f, "invalid cache file footer: {}", path.display())
+            }
+            &CacheError::PackedFilesMismatch(ref path) => write!(
+                f,
+                "unexpected count of packed cached files: {}",
+                path.display()
+            ),
             &CacheError::MutexError(ref message) => write!(f, "mutex error: {}", message),
         }
     }
@@ -82,7 +88,10 @@ impl FileCache {
         worker: F,
         checker: C,
     ) -> Result<OutputInfo, Error> {
-        let path = self.cache_dir.join(&hash[0..2]).join(&(hash[2..].to_string() + SUFFIX));
+        let path = self
+            .cache_dir
+            .join(&hash[0..2])
+            .join(&(hash[2..].to_string() + SUFFIX));
         // Try to read data from cache.
         match read_cache(statistic, &path, outputs) {
             Ok(output) => return Ok(output),
@@ -143,7 +152,10 @@ fn write_cached_file<W: Write>(stream: &mut W, path: &PathBuf) -> Result<(), Err
             break;
         }
         if size <= 0 {
-            return Err(Error::new(ErrorKind::BrokenPipe, "Unexpected end of stream"));
+            return Err(Error::new(
+                ErrorKind::BrokenPipe,
+                "Unexpected end of stream",
+            ));
         }
         if need_size < size as u64 {
             return Err(Error::new(ErrorKind::BrokenPipe, "Expected end of stream"));
@@ -154,7 +166,12 @@ fn write_cached_file<W: Write>(stream: &mut W, path: &PathBuf) -> Result<(), Err
     Ok(())
 }
 
-fn write_cache(statistic: &Statistic, path: &Path, paths: &Vec<PathBuf>, output: &OutputInfo) -> Result<(), Error> {
+fn write_cache(
+    statistic: &Statistic,
+    path: &Path,
+    paths: &Vec<PathBuf>,
+    output: &OutputInfo,
+) -> Result<(), Error> {
     if !output.success() {
         return Ok(());
     }
@@ -199,8 +216,15 @@ fn read_cached_file<R: Read>(stream: &mut R, path: &PathBuf) -> Result<(), Error
     Ok(())
 }
 
-fn read_cache(statistic: &Statistic, path: &Path, paths: &Vec<PathBuf>) -> Result<OutputInfo, Error> {
-    let mut file = OpenOptions::new().read(true).write(true).open(Path::new(path))?;
+fn read_cache(
+    statistic: &Statistic,
+    path: &Path,
+    paths: &Vec<PathBuf>,
+) -> Result<OutputInfo, Error> {
+    let mut file = OpenOptions::new()
+        .read(true)
+        .write(true)
+        .open(Path::new(path))?;
     file.write(&[4])?;
     file.seek(SeekFrom::Start(0))?;
     let mut stream = lz4::Decoder::new(Counter::reader(file))?;

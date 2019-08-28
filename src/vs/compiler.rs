@@ -60,8 +60,9 @@ impl Compiler for VsCompiler {
             .map_or(false, |n| (n == "cl.exe") || (n == "cl"))
         {
             command.find_executable().and_then(|path| {
-                self.toolchains
-                    .resolve(&path, |path| Arc::new(VsToolchain::new(path, &self.temp_dir)))
+                self.toolchains.resolve(&path, |path| {
+                    Arc::new(VsToolchain::new(path, &self.temp_dir))
+                })
             })
         } else {
             None
@@ -125,15 +126,26 @@ impl Toolchain for VsToolchain {
         self.identifier.get(|| vs_identifier(&self.path))
     }
 
-    fn create_tasks(&self, command: CommandInfo, args: &[String]) -> Result<Vec<CompilationTask>, String> {
+    fn create_tasks(
+        &self,
+        command: CommandInfo,
+        args: &[String],
+    ) -> Result<Vec<CompilationTask>, String> {
         super::prepare::create_tasks(command, args)
     }
 
-    fn preprocess_step(&self, state: &SharedState, task: &CompilationTask) -> Result<PreprocessResult, Error> {
+    fn preprocess_step(
+        &self,
+        state: &SharedState,
+        task: &CompilationTask,
+    ) -> Result<PreprocessResult, Error> {
         // Make parameters list for preprocessing.
         let mut args = filter(&task.shared.args, |arg: &Arg| -> Option<String> {
             match arg {
-                &Arg::Flag { ref scope, ref flag } => match scope {
+                &Arg::Flag {
+                    ref scope,
+                    ref flag,
+                } => match scope {
                     &Scope::Preprocessor | &Scope::Shared => Some("/".to_string() + &flag),
                     &Scope::Ignore | &Scope::Compiler => None,
                 },
@@ -158,7 +170,9 @@ impl Toolchain for VsToolchain {
         args.push(task.input_source.display().to_string());
 
         let mut command = task.shared.command.to_command();
-        command.args(&args).arg(&join_flag("/Fo", &task.output_object)); // /Fo option also set output path for #import directive
+        command
+            .args(&args)
+            .arg(&join_flag("/Fo", &task.output_object)); // /Fo option also set output path for #import directive
         let output = state.wrap_slow(|| command.output())?;
         if output.status.success() {
             let mut content = MemStream::new();
@@ -183,12 +197,21 @@ impl Toolchain for VsToolchain {
     }
 
     // Compile preprocessed file.
-    fn compile_prepare_step(&self, task: CompilationTask, preprocessed: MemStream) -> Result<CompileStep, Error> {
+    fn compile_prepare_step(
+        &self,
+        task: CompilationTask,
+        preprocessed: MemStream,
+    ) -> Result<CompileStep, Error> {
         let mut args = filter(&task.shared.args, |arg: &Arg| -> Option<String> {
             match arg {
-                &Arg::Flag { ref scope, ref flag } => match scope {
+                &Arg::Flag {
+                    ref scope,
+                    ref flag,
+                } => match scope {
                     &Scope::Compiler | &Scope::Shared => Some("/".to_string() + &flag),
-                    &Scope::Preprocessor if task.shared.output_precompiled.is_some() => Some("/".to_string() + &flag),
+                    &Scope::Preprocessor if task.shared.output_precompiled.is_some() => {
+                        Some("/".to_string() + &flag)
+                    }
                     &Scope::Ignore | &Scope::Preprocessor => None,
                 },
                 &Arg::Param {
@@ -274,7 +297,11 @@ impl Toolchain for VsToolchain {
     }
 
     // Compile preprocessed file.
-    fn compile_memory(&self, state: &SharedState, mut task: CompileStep) -> Result<(OutputInfo, Vec<u8>), Error> {
+    fn compile_memory(
+        &self,
+        state: &SharedState,
+        mut task: CompileStep,
+    ) -> Result<(OutputInfo, Vec<u8>), Error> {
         let output_temp = TempFile::new_in(self.temp_dir.path(), ".o");
         task.output_object = Some(output_temp.path().to_path_buf());
         self.compile_step(state, task).and_then(|output| {
@@ -311,7 +338,11 @@ fn vs_identifier(path: &Path) -> Option<String> {
     };
 
     fn utf16<'a, T: Into<&'a OsStr>>(value: T) -> Vec<u16> {
-        value.into().encode_wide().chain(Some(0).into_iter()).collect()
+        value
+            .into()
+            .encode_wide()
+            .chain(Some(0).into_iter())
+            .collect()
     };
 
     let path_raw = utf16(path.as_os_str());
@@ -324,7 +355,9 @@ fn vs_identifier(path: &Path) -> Option<String> {
     let mut data: Vec<u8> = Vec::with_capacity(size as usize);
     unsafe {
         data.set_len(size as usize);
-        if winver::GetFileVersionInfoW(path_raw.as_ptr(), 0, size, data.as_mut_ptr() as *mut c_void) == 0 {
+        if winver::GetFileVersionInfoW(path_raw.as_ptr(), 0, size, data.as_mut_ptr() as *mut c_void)
+            == 0
+        {
             return None;
         }
     }
@@ -364,7 +397,10 @@ fn vs_identifier(path: &Path) -> Option<String> {
         if value_size == 0 {
             return None;
         }
-        String::from_utf16_lossy(slice::from_raw_parts(value_data as *mut u16, (value_size - 1) as usize))
+        String::from_utf16_lossy(slice::from_raw_parts(
+            value_data as *mut u16,
+            (value_size - 1) as usize,
+        ))
     };
     let executable_id = match read_executable_id(path) {
         Ok(id) => id,
@@ -415,10 +451,12 @@ fn read_executable_id(path: &Path) -> Result<String, Error> {
 
 fn prepare_output(line: &[u8], mut buffer: Vec<u8>, success: bool) -> Vec<u8> {
     // Remove strage file name from output
-    let mut begin = match (line.len() < buffer.len()) && buffer.starts_with(line) && is_eol(buffer[line.len()]) {
-        true => line.len(),
-        false => 0,
-    };
+    let mut begin =
+        match (line.len() < buffer.len()) && buffer.starts_with(line) && is_eol(buffer[line.len()])
+        {
+            true => line.len(),
+            false => 0,
+        };
     while begin < buffer.len() && is_eol(buffer[begin]) {
         begin += 1;
     }
@@ -426,7 +464,8 @@ fn prepare_output(line: &[u8], mut buffer: Vec<u8>, success: bool) -> Vec<u8> {
     if success {
         // Remove some redundant lines
         lazy_static! {
-            static ref RE: Regex = Regex::new(r"(?m)^\S+[^:]*\(\d+\) : warning C4628: .*$\n?").unwrap();
+            static ref RE: Regex =
+                Regex::new(r"(?m)^\S+[^:]*\(\d+\) : warning C4628: .*$\n?").unwrap();
         }
         buffer = RE.replace_all(&buffer, NoExpand(b"")).to_vec()
     }

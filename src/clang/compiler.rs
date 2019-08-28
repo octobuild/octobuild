@@ -82,11 +82,19 @@ impl Toolchain for ClangToolchain {
         self.identifier.get(|| clang_identifier(&self.path))
     }
 
-    fn create_tasks(&self, command: CommandInfo, args: &[String]) -> Result<Vec<CompilationTask>, String> {
+    fn create_tasks(
+        &self,
+        command: CommandInfo,
+        args: &[String],
+    ) -> Result<Vec<CompilationTask>, String> {
         super::prepare::create_tasks(command, args)
     }
 
-    fn preprocess_step(&self, state: &SharedState, task: &CompilationTask) -> Result<PreprocessResult, Error> {
+    fn preprocess_step(
+        &self,
+        state: &SharedState,
+        task: &CompilationTask,
+    ) -> Result<PreprocessResult, Error> {
         let mut args = Vec::new();
         args.push("-E".to_string());
         args.push("-x".to_string());
@@ -96,7 +104,10 @@ impl Toolchain for ClangToolchain {
         // Make parameters list for preprocessing.
         for arg in task.shared.args.iter() {
             match arg {
-                &Arg::Flag { ref scope, ref flag } => match scope {
+                &Arg::Flag {
+                    ref scope,
+                    ref flag,
+                } => match scope {
                     &Scope::Preprocessor | &Scope::Shared => {
                         args.push("-".to_string() + &flag);
                     }
@@ -127,13 +138,20 @@ impl Toolchain for ClangToolchain {
     }
 
     // Compile preprocessed file.
-    fn compile_prepare_step(&self, task: CompilationTask, preprocessed: MemStream) -> Result<CompileStep, Error> {
+    fn compile_prepare_step(
+        &self,
+        task: CompilationTask,
+        preprocessed: MemStream,
+    ) -> Result<CompileStep, Error> {
         let mut args = Vec::new();
         args.push("-x".to_string());
         args.push(task.language.clone());
         for arg in task.shared.args.iter() {
             match arg {
-                &Arg::Flag { ref scope, ref flag } => match scope {
+                &Arg::Flag {
+                    ref scope,
+                    ref flag,
+                } => match scope {
                     &Scope::Compiler | &Scope::Shared => {
                         args.push("-".to_string() + &flag);
                     }
@@ -201,13 +219,19 @@ fn clang_identifier(clang: &Path) -> Option<String> {
     let filename = clang.file_name()?.to_string_lossy();
     let cap: regex::bytes::Captures = RE_CLANG.captures_iter(filename.as_bytes()).next()?;
     let base_name = String::from_utf8_lossy(cap.get(1)?.as_bytes()).into_owned();
-    let output = Command::new(clang.as_os_str()).arg("--version").output().ok()?;
+    let output = Command::new(clang.as_os_str())
+        .arg("--version")
+        .output()
+        .ok()?;
 
     if !output.status.success() {
         return None;
     }
 
-    clang_parse_version(&base_name, &String::from_utf8_lossy(&output.stdout).to_string())
+    clang_parse_version(
+        &base_name,
+        &String::from_utf8_lossy(&output.stdout).to_string(),
+    )
 }
 
 fn execute(command: &mut Command) -> Result<PreprocessResult, Error> {
@@ -227,7 +251,9 @@ fn execute(command: &mut Command) -> Result<PreprocessResult, Error> {
             .unwrap_or(MemStream::new())
     }
 
-    fn read_stderr<T: Read + Send + 'static>(stream: Option<T>) -> Receiver<Result<Vec<u8>, Error>> {
+    fn read_stderr<T: Read + Send + 'static>(
+        stream: Option<T>,
+    ) -> Receiver<Result<Vec<u8>, Error>> {
         let (tx, rx) = channel();
         match stream {
             Some(mut stream) => {

@@ -24,7 +24,8 @@ use log::info;
 use nickel::hyper::method::Method;
 use nickel::status::StatusCode;
 use nickel::{
-    HttpRouter, ListeningServer, MediaType, Middleware, MiddlewareResult, Nickel, NickelError, Request, Response,
+    HttpRouter, ListeningServer, MediaType, Middleware, MiddlewareResult, Nickel, NickelError,
+    Request, Response,
 };
 use tempdir::TempDir;
 
@@ -70,7 +71,9 @@ impl BuilderService {
         let config = Config::new().unwrap();
         info!("Helper bind to address: {}", config.helper_bind);
 
-        let temp_dir = create_temp_dir().ok().expect("Can't create temporary directory");
+        let temp_dir = create_temp_dir()
+            .ok()
+            .expect("Can't create temporary directory");
         let state = Arc::new(BuilderState {
             name: get_name(),
             shared: SharedState::new(&config).unwrap(),
@@ -135,7 +138,10 @@ impl BuilderService {
                 {
                     Ok(_) => {}
                     Err(e) => {
-                        info!("Builder: can't send info to coordinator: {}", e.description());
+                        info!(
+                            "Builder: can't send info to coordinator: {}",
+                            e.description()
+                        );
                     }
                 }
                 thread::sleep(Duration::from_secs(1));
@@ -185,7 +191,9 @@ impl<D> Middleware<D> for RpcBuilderTaskHandler {
                             StatusCode::BadRequest,
                         ));
                     }
-                    let path = state.precompiled_dir.join(hash.to_string() + PRECOMPILED_SUFFIX);
+                    let path = state
+                        .precompiled_dir
+                        .join(hash.to_string() + PRECOMPILED_SUFFIX);
                     if !path.exists() {
                         return Err(NickelError::new(
                             res,
@@ -205,8 +213,10 @@ impl<D> Middleware<D> for RpcBuilderTaskHandler {
                 preprocessed: MemStream::from(request.preprocessed_data),
             };
 
-            let toolchain: Arc<dyn Toolchain> = state.toolchains.get(&request.toolchain).unwrap().clone();
-            let response = CompileResponse::from(toolchain.compile_memory(&state.shared, compile_step));
+            let toolchain: Arc<dyn Toolchain> =
+                state.toolchains.get(&request.toolchain).unwrap().clone();
+            let response =
+                CompileResponse::from(toolchain.compile_memory(&state.shared, compile_step));
 
             let mut payload = Vec::new();
             response
@@ -250,7 +260,9 @@ impl<D> Middleware<D> for RpcBuilderUploadHandler {
             request.origin.method, hash, request.origin.remote_addr
         );
 
-        let path = state.precompiled_dir.join(hash.clone() + PRECOMPILED_SUFFIX);
+        let path = state
+            .precompiled_dir
+            .join(hash.clone() + PRECOMPILED_SUFFIX);
         if path.exists() {
             // File is already uploaded
             response.set(StatusCode::Accepted);
@@ -359,7 +371,11 @@ impl BuilderState {
             .lock()
             .unwrap()
             .entry(hash.to_string())
-            .or_insert_with(|| Arc::new(PrecompiledFile { lock: Mutex::new(()) }))
+            .or_insert_with(|| {
+                Arc::new(PrecompiledFile {
+                    lock: Mutex::new(()),
+                })
+            })
             .clone()
     }
 }

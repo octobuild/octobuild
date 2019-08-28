@@ -59,18 +59,28 @@ impl Config {
     }
 
     fn load(local: &Option<Yaml>, global: &Option<Yaml>, defaults: bool) -> Result<Self> {
-        let cache_limit_mb =
-            get_config(local, global, PARAM_CACHE_LIMIT, |v| v.as_i64().map(|v| v as u32)).unwrap_or(16 * 1024);
+        let cache_limit_mb = get_config(local, global, PARAM_CACHE_LIMIT, |v| {
+            v.as_i64().map(|v| v as u32)
+        })
+        .unwrap_or(16 * 1024);
         let cache_path = match defaults {
             true => None,
-            false => env::var("OCTOBUILD_CACHE")
-                .ok()
-                .and_then(|v| if v == "" { None } else { Some(v) }),
+            false => {
+                env::var("OCTOBUILD_CACHE")
+                    .ok()
+                    .and_then(|v| if v == "" { None } else { Some(v) })
+            }
         }
-        .or_else(|| get_config(local, global, PARAM_CACHE_PATH, |v| v.as_str().map(|v| v.to_string())))
+        .or_else(|| {
+            get_config(local, global, PARAM_CACHE_PATH, |v| {
+                v.as_str().map(|v| v.to_string())
+            })
+        })
         .unwrap_or(DEFAULT_CACHE_DIR.to_string());
-        let process_limit = get_config(local, global, PARAM_PROCESS_LIMIT, |v| v.as_i64().map(|v| v as usize))
-            .unwrap_or_else(|| num_cpus::get());
+        let process_limit = get_config(local, global, PARAM_PROCESS_LIMIT, |v| {
+            v.as_i64().map(|v| v as usize)
+        })
+        .unwrap_or_else(|| num_cpus::get());
         let coordinator = get_config(local, global, PARAM_COORDINATOR, |v| match v.is_null() {
             true => None,
             false => v.as_str().and_then(|v| {
@@ -204,14 +214,21 @@ fn get_global_config_path() -> Option<PathBuf> {
 
 #[cfg(unix)]
 fn get_global_config_path() -> Option<PathBuf> {
-    Some(Path::new("/etc/octobuild").join(CONFIG_FILE_NAME).to_path_buf())
+    Some(
+        Path::new("/etc/octobuild")
+            .join(CONFIG_FILE_NAME)
+            .to_path_buf(),
+    )
 }
 
 fn replace_home(path: &str) -> Result<PathBuf> {
     if path.starts_with("~/") {
         dirs::home_dir()
             .map(|v| v.join(&path[2..]))
-            .ok_or(io::Error::new(ErrorKind::NotFound, "Can't determinate user HOME path"))
+            .ok_or(io::Error::new(
+                ErrorKind::NotFound,
+                "Can't determinate user HOME path",
+            ))
     } else {
         Ok(Path::new(path).to_path_buf())
     }

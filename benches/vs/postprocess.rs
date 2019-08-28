@@ -9,7 +9,13 @@ fn bench_filter(b: &mut Bencher, path: &str, marker: Option<String>, keep_header
     File::open(path).unwrap().read_to_end(&mut source).unwrap();
     b.iter(|| {
         let mut result = Vec::with_capacity(source.len());
-        postprocess::filter_preprocessed(&mut Cursor::new(source.clone()), &mut result, &marker, keep_headers).unwrap();
+        postprocess::filter_preprocessed(
+            &mut Cursor::new(source.clone()),
+            &mut result,
+            &marker,
+            keep_headers,
+        )
+        .unwrap();
         result
     });
 }

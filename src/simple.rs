@@ -62,7 +62,12 @@ where
     }
 }
 
-pub fn compile<C>(config: &Config, state: &SharedState, exec: &str, compiler: C) -> Result<Option<i32>, Error>
+pub fn compile<C>(
+    config: &Config,
+    state: &SharedState,
+    exec: &str,
+    compiler: C,
+) -> Result<Option<i32>, Error>
 where
     C: Compiler,
 {

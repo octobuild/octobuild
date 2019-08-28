@@ -93,7 +93,10 @@ fn test_parse_2() {
 
 #[test]
 fn test_parse_3() {
-    assert_eq!(parse("\"\" \"abc\" d e \"\"").unwrap(), ["", "abc", "d", "e", ""]);
+    assert_eq!(
+        parse("\"\" \"abc\" d e \"\"").unwrap(),
+        ["", "abc", "d", "e", ""]
+    );
 }
 
 #[test]
@@ -108,7 +111,10 @@ fn test_parse_5() {
 
 #[test]
 fn test_parse_6() {
-    assert_eq!(parse("a\\\\\\\\\"b c\" d e").unwrap(), ["a\\\\b c", "d", "e"]);
+    assert_eq!(
+        parse("a\\\\\\\\\"b c\" d e").unwrap(),
+        ["a\\\\b c", "d", "e"]
+    );
 }
 
 #[test]
@@ -137,5 +143,8 @@ fn test_parse_9() {
 
 #[test]
 fn test_parse_10() {
-    assert_eq!(parse("begin some\\ text end").unwrap(), ["begin", "some text", "end"]);
+    assert_eq!(
+        parse("begin some\\ text end").unwrap(),
+        ["begin", "some text", "end"]
+    );
 }

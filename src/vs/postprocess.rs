@@ -26,7 +26,10 @@ impl Display for PostprocessError {
             &PostprocessError::LiteralEof => write!(f, "unexpected end of stream in literal"),
             &PostprocessError::LiteralTooLong => write!(f, "literal too long"),
             &PostprocessError::EscapeEof => write!(f, "unexpected end of escape sequence"),
-            &PostprocessError::MarkerNotFound => write!(f, "can't find precompiled header marker in preprocessed file"),
+            &PostprocessError::MarkerNotFound => write!(
+                f,
+                "can't find precompiled header marker in preprocessed file"
+            ),
             &PostprocessError::InvalidLiteral => write!(f, "can't create string from literal"),
             &PostprocessError::TokenTooLong => write!(f, "token too long"),
         }
@@ -40,7 +43,9 @@ impl ::std::error::Error for PostprocessError {
             &PostprocessError::LiteralEof => "unexpected end of stream in literal",
             &PostprocessError::LiteralTooLong => "literal too long",
             &PostprocessError::EscapeEof => "unexpected end of escape sequence",
-            &PostprocessError::MarkerNotFound => "can't find precompiled header marker in preprocessed file",
+            &PostprocessError::MarkerNotFound => {
+                "can't find precompiled header marker in preprocessed file"
+            }
             &PostprocessError::InvalidLiteral => "can't create string from literal",
             &PostprocessError::TokenTooLong => "token too long",
         }
@@ -104,7 +109,10 @@ pub fn filter_preprocessed(
                 return state.copy_to_end();
             }
         }
-        Err(Error::new(ErrorKind::InvalidInput, PostprocessError::MarkerNotFound))
+        Err(Error::new(
+            ErrorKind::InvalidInput,
+            PostprocessError::MarkerNotFound,
+        ))
     }
 }
 
@@ -160,8 +168,10 @@ impl<'a> ScannerState<'a> {
     }
 
     unsafe fn copy_to_end(&mut self) -> Result<(), Error> {
-        self.writer
-            .write(slice::from_raw_parts(self.ptr_copy, delta(self.ptr_copy, self.ptr_end)))?;
+        self.writer.write(slice::from_raw_parts(
+            self.ptr_copy,
+            delta(self.ptr_copy, self.ptr_end),
+        ))?;
         self.ptr_copy = self.buf_data.as_ptr();
         self.ptr_end = self.buf_data.as_ptr();
         loop {
@@ -352,7 +362,10 @@ impl<'a> ScannerState<'a> {
                     c => Ok(c),
                 }
             }
-            None => Err(Error::new(ErrorKind::InvalidInput, PostprocessError::EscapeEof)),
+            None => Err(Error::new(
+                ErrorKind::InvalidInput,
+                PostprocessError::EscapeEof,
+            )),
         }
     }
 
@@ -403,7 +416,10 @@ impl<'a> ScannerState<'a> {
                     // end-of-line ::= newline | carriage-return | carriage-return newline
                     b'a'..=b'z' | b'A'..=b'Z' | b'0'..=b'9' | b'_' => {
                         if offset >= token.len() {
-                            return Err(Error::new(ErrorKind::InvalidInput, PostprocessError::TokenTooLong));
+                            return Err(Error::new(
+                                ErrorKind::InvalidInput,
+                                PostprocessError::TokenTooLong,
+                            ));
                         }
                         token[offset] = c;
                         offset += 1;
@@ -436,7 +452,10 @@ impl<'a> ScannerState<'a> {
                 match c {
                     // end-of-line ::= newline | carriage-return | carriage-return newline
                     b'\n' | b'\r' => {
-                        return Err(Error::new(ErrorKind::InvalidInput, PostprocessError::LiteralEol));
+                        return Err(Error::new(
+                            ErrorKind::InvalidInput,
+                            PostprocessError::LiteralEol,
+                        ));
                     }
                     b'\\' => {
                         raw[raw_offset + 0] = b'\\';
@@ -460,11 +479,17 @@ impl<'a> ScannerState<'a> {
                     }
                 }
                 if (raw_offset >= raw.len() - 2) || (token_offset >= token.len() - 1) {
-                    return Err(Error::new(ErrorKind::InvalidInput, PostprocessError::LiteralTooLong));
+                    return Err(Error::new(
+                        ErrorKind::InvalidInput,
+                        PostprocessError::LiteralTooLong,
+                    ));
                 }
             }
             if !self.read()? {
-                return Err(Error::new(ErrorKind::InvalidInput, PostprocessError::LiteralEof));
+                return Err(Error::new(
+                    ErrorKind::InvalidInput,
+                    PostprocessError::LiteralEof,
+                ));
             }
         }
     }
@@ -488,12 +513,28 @@ unsafe fn delta(beg: *const u8, end: *const u8) -> usize {
 mod test {
     use std::io::{Cursor, Write};
 
-    fn check_filter_pass(original: &str, expected: &str, marker: &Option<String>, keep_headers: bool, eol: &str) {
+    fn check_filter_pass(
+        original: &str,
+        expected: &str,
+        marker: &Option<String>,
+        keep_headers: bool,
+        eol: &str,
+    ) {
         let mut writer: Vec<u8> = Vec::new();
         let mut stream: Vec<u8> = Vec::new();
-        stream.write(&original.replace("\n", eol).as_bytes()[..]).unwrap();
-        match super::filter_preprocessed(&mut Cursor::new(stream), &mut writer, marker, keep_headers) {
-            Ok(_) => assert_eq!(String::from_utf8_lossy(&writer), expected.replace("\n", eol)),
+        stream
+            .write(&original.replace("\n", eol).as_bytes()[..])
+            .unwrap();
+        match super::filter_preprocessed(
+            &mut Cursor::new(stream),
+            &mut writer,
+            marker,
+            keep_headers,
+        ) {
+            Ok(_) => assert_eq!(
+                String::from_utf8_lossy(&writer),
+                expected.replace("\n", eol)
+            ),
             Err(e) => {
                 panic!(e);
             }

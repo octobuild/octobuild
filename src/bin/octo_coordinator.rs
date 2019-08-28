@@ -8,10 +8,14 @@ use daemon::DaemonRunner;
 use daemon::State;
 use log::info;
 use nickel::status::StatusCode;
-use nickel::{HttpRouter, MediaType, Middleware, MiddlewareResult, Nickel, NickelError, Request, Response};
+use nickel::{
+    HttpRouter, MediaType, Middleware, MiddlewareResult, Nickel, NickelError, Request, Response,
+};
 use time::{Duration, Timespec};
 
-use octobuild::cluster::common::{BuilderInfo, BuilderInfoUpdate, RPC_BUILDER_LIST, RPC_BUILDER_UPDATE};
+use octobuild::cluster::common::{
+    BuilderInfo, BuilderInfoUpdate, RPC_BUILDER_LIST, RPC_BUILDER_UPDATE,
+};
 use octobuild::config::Config;
 
 struct BuilderState {
@@ -55,7 +59,8 @@ impl<D> Middleware<D> for RpcAgentUpdateHandler {
             }
         };
         if is_unspecified(&endpoint.ip()) {
-            update.info.endpoint = SocketAddr::new(request.origin.remote_addr.ip(), endpoint.port()).to_string();
+            update.info.endpoint =
+                SocketAddr::new(request.origin.remote_addr.ip(), endpoint.port()).to_string();
         }
 
         let payload: String;

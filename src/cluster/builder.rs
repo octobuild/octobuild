@@ -24,7 +24,10 @@ pub enum CompileResponse {
 }
 
 impl CompileRequest {
-    pub fn stream_read<R: BufRead>(stream: &mut R, options: ReaderOptions) -> Result<Self, capnp::Error> {
+    pub fn stream_read<R: BufRead>(
+        stream: &mut R,
+        options: ReaderOptions,
+    ) -> Result<Self, capnp::Error> {
         let reader = serialize_packed::read_message(stream, options)?;
         Self::read(reader.get_root::<compile_request::Reader>()?)
     }
@@ -59,7 +62,8 @@ impl CompileRequest {
         {
             let mut args = builder.reborrow().init_args(self.args.len() as u32);
             for index in 0..self.args.len() {
-                args.reborrow().set(index as u32, &self.args.get(index).unwrap());
+                args.reborrow()
+                    .set(index as u32, &self.args.get(index).unwrap());
             }
         }
         match self.precompiled_hash {
@@ -72,7 +76,10 @@ impl CompileRequest {
 }
 
 impl CompileResponse {
-    pub fn stream_read<R: BufRead>(stream: &mut R, options: ReaderOptions) -> Result<Self, capnp::Error> {
+    pub fn stream_read<R: BufRead>(
+        stream: &mut R,
+        options: ReaderOptions,
+    ) -> Result<Self, capnp::Error> {
         let reader = serialize_packed::read_message(stream, options)?;
         Self::read(reader.get_root::<compile_response::Reader>()?)
     }

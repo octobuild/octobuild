@@ -44,7 +44,8 @@ impl Cache {
         worker: F,
         checker: C,
     ) -> Result<OutputInfo, Error> {
-        self.file_cache.run_cached(statistic, hash, outputs, worker, checker)
+        self.file_cache
+            .run_cached(statistic, hash, outputs, worker, checker)
     }
 
     pub fn cleanup(&self) -> Result<(), Error> {

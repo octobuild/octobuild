@@ -7,7 +7,9 @@ use std::sync::Arc;
 use local_encoding::{Encoder, Encoding};
 
 use crate::cmd;
-use crate::compiler::{Arg, CommandInfo, CompilationArgs, CompilationTask, InputKind, OutputKind, Scope};
+use crate::compiler::{
+    Arg, CommandInfo, CompilationArgs, CompilationTask, InputKind, OutputKind, Scope,
+};
 
 enum ParamValue<T> {
     None,
@@ -24,9 +26,9 @@ pub fn create_tasks(command: CommandInfo, args: &[String]) -> Result<Vec<Compila
             let input_sources: Vec<PathBuf> = parsed_args
                 .iter()
                 .filter_map(|arg| match arg {
-                    &Arg::Input { ref kind, ref file, .. } if *kind == InputKind::Source => {
-                        Some(Path::new(file).to_path_buf())
-                    }
+                    &Arg::Input {
+                        ref kind, ref file, ..
+                    } if *kind == InputKind::Source => Some(Path::new(file).to_path_buf()),
                     _ => None,
                 })
                 .collect();
@@ -36,9 +38,9 @@ pub fn create_tasks(command: CommandInfo, args: &[String]) -> Result<Vec<Compila
             // Precompiled header file name.
             let precompiled_file = match find_param(&parsed_args, |arg: &Arg| -> Option<PathBuf> {
                 match *arg {
-                    Arg::Input { ref kind, ref file, .. } if *kind == InputKind::Precompiled => {
-                        Some(Path::new(file).to_path_buf())
-                    }
+                    Arg::Input {
+                        ref kind, ref file, ..
+                    } if *kind == InputKind::Precompiled => Some(Path::new(file).to_path_buf()),
                     _ => None,
                 }
             }) {
@@ -55,10 +57,12 @@ pub fn create_tasks(command: CommandInfo, args: &[String]) -> Result<Vec<Compila
             let output_precompiled;
             match find_param(&parsed_args, |arg: &Arg| -> Option<(bool, String)> {
                 match *arg {
-                    Arg::Input { ref kind, ref file, .. } if *kind == InputKind::Marker => Some((true, file.clone())),
-                    Arg::Output { ref kind, ref file, .. } if *kind == OutputKind::Marker => {
-                        Some((false, file.clone()))
-                    }
+                    Arg::Input {
+                        ref kind, ref file, ..
+                    } if *kind == InputKind::Marker => Some((true, file.clone())),
+                    Arg::Output {
+                        ref kind, ref file, ..
+                    } if *kind == OutputKind::Marker => Some((false, file.clone())),
                     _ => None,
                 }
             }) {
@@ -89,36 +93,40 @@ pub fn create_tasks(command: CommandInfo, args: &[String]) -> Result<Vec<Compila
                 }
             };
             // Output object file name.
-            let output_object: Option<PathBuf> = match find_param(&parsed_args, |arg: &Arg| -> Option<PathBuf> {
-                match *arg {
-                    Arg::Output { ref kind, ref file, .. } if *kind == OutputKind::Object => {
-                        Some(Path::new(file).to_path_buf())
+            let output_object: Option<PathBuf> =
+                match find_param(&parsed_args, |arg: &Arg| -> Option<PathBuf> {
+                    match *arg {
+                        Arg::Output {
+                            ref kind, ref file, ..
+                        } if *kind == OutputKind::Object => Some(Path::new(file).to_path_buf()),
+                        _ => None,
                     }
-                    _ => None,
+                }) {
+                    ParamValue::None => None,
+                    ParamValue::Single(v) => Some(v),
+                    ParamValue::Many(v) => {
+                        return Err(format!("Found too many output object files: {:?}", v));
+                    }
                 }
-            }) {
-                ParamValue::None => None,
-                ParamValue::Single(v) => Some(v),
-                ParamValue::Many(v) => {
-                    return Err(format!("Found too many output object files: {:?}", v));
-                }
-            }
-            .map(|path| cwd.as_ref().map(|cwd| cwd.join(&path)).unwrap_or(path));
+                .map(|path| cwd.as_ref().map(|cwd| cwd.join(&path)).unwrap_or(path));
             // Language
-            let language: Option<String> = match find_param(&parsed_args, |arg: &Arg| -> Option<String> {
-                match arg {
-                    &Arg::Param {
-                        ref flag, ref value, ..
-                    } if *flag == "T" => Some(value.clone()),
-                    _ => None,
-                }
-            }) {
-                ParamValue::None => None,
-                ParamValue::Single(v) => Some(v.clone()),
-                ParamValue::Many(v) => {
-                    return Err(format!("Found too many output object files: {:?}", v));
-                }
-            };
+            let language: Option<String> =
+                match find_param(&parsed_args, |arg: &Arg| -> Option<String> {
+                    match arg {
+                        &Arg::Param {
+                            ref flag,
+                            ref value,
+                            ..
+                        } if *flag == "T" => Some(value.clone()),
+                        _ => None,
+                    }
+                }) {
+                    ParamValue::None => None,
+                    ParamValue::Single(v) => Some(v.clone()),
+                    ParamValue::Many(v) => {
+                        return Err(format!("Found too many output object files: {:?}", v));
+                    }
+                };
             let shared = Arc::new(CompilationArgs {
                 args: parsed_args,
                 input_precompiled: input_precompiled.map(|path| command.current_dir_join(&path)),
@@ -161,7 +169,10 @@ pub fn create_tasks(command: CommandInfo, args: &[String]) -> Result<Vec<Compila
         })
 }
 
-fn get_output_object(input_source: &Path, output_object: &Option<PathBuf>) -> Result<PathBuf, String> {
+fn get_output_object(
+    input_source: &Path,
+    output_object: &Option<PathBuf>,
+) -> Result<PathBuf, String> {
     output_object.as_ref().map_or_else(
         || Ok(input_source.with_extension("obj")),
         |path| match path.is_dir() {
@@ -188,7 +199,10 @@ fn find_param<T, R, F: Fn(&T) -> Option<R>>(args: &Vec<T>, filter: F) -> ParamVa
     }
 }
 
-fn load_arguments<S: AsRef<str>, I: Iterator<Item = S>>(base: &Option<PathBuf>, iter: I) -> Result<Vec<String>, Error> {
+fn load_arguments<S: AsRef<str>, I: Iterator<Item = S>>(
+    base: &Option<PathBuf>,
+    iter: I,
+) -> Result<Vec<String>, Error> {
     let mut result: Vec<String> = Vec::new();
     for item in iter {
         if item.as_ref().starts_with("@") {
@@ -256,12 +270,17 @@ fn parse_arguments<S: AsRef<str>, I: Iterator<Item = S>>(mut iter: I) -> Result<
         }
     }
     if errors.len() > 0 {
-        return Err(format!("Found unknown command line arguments: {:?}", errors));
+        return Err(format!(
+            "Found unknown command line arguments: {:?}",
+            errors
+        ));
     }
     Ok(result)
 }
 
-fn parse_argument<S: AsRef<str>, I: Iterator<Item = S>>(iter: &mut I) -> Option<Result<Arg, String>> {
+fn parse_argument<S: AsRef<str>, I: Iterator<Item = S>>(
+    iter: &mut I,
+) -> Option<Result<Arg, String>> {
     match iter.next() {
         Some(arg) => Some(if has_param_prefix(arg.as_ref()) {
             let flag = &arg.as_ref()[1..];
@@ -299,7 +318,9 @@ fn parse_argument<S: AsRef<str>, I: Iterator<Item = S>>(iter: &mut I) -> Option<
                     s if s.starts_with("arch:") => Ok(Arg::flag(Scope::Shared, flag)),
                     s if s.starts_with("errorReport:") => Ok(Arg::flag(Scope::Shared, flag)),
                     s if s.starts_with("Fo") => Ok(Arg::output(OutputKind::Object, "Fo", &s[2..])),
-                    s if s.starts_with("Fp") => Ok(Arg::input(InputKind::Precompiled, "Fp", &s[2..])),
+                    s if s.starts_with("Fp") => {
+                        Ok(Arg::input(InputKind::Precompiled, "Fp", &s[2..]))
+                    }
                     s if s.starts_with("Yc") => Ok(Arg::output(OutputKind::Marker, "Yc", &s[2..])),
                     s if s.starts_with("Yu") => Ok(Arg::input(InputKind::Marker, "Yu", &s[2..])),
                     s if s.starts_with("Yl") => Ok(Arg::flag(Scope::Shared, flag)),

@@ -36,10 +36,16 @@ pub enum XgParseError {
 impl Display for XgParseError {
     fn fmt(&self, f: &mut Formatter) -> Result<(), ::std::fmt::Error> {
         match self {
-            &XgParseError::AttributeNotFound(ref attr) => write!(f, "attribute not found: {}", attr),
-            &XgParseError::EnvironmentNotFound(ref id) => write!(f, "сan't find environment with id: {}", id),
+            &XgParseError::AttributeNotFound(ref attr) => {
+                write!(f, "attribute not found: {}", attr)
+            }
+            &XgParseError::EnvironmentNotFound(ref id) => {
+                write!(f, "сan't find environment with id: {}", id)
+            }
             &XgParseError::ToolNotFound(ref id) => write!(f, "сan't find tool with id: {}", id),
-            &XgParseError::DependencyNotFound(ref id) => write!(f, "сan't find task for dependency with id: {}", id),
+            &XgParseError::DependencyNotFound(ref id) => {
+                write!(f, "сan't find task for dependency with id: {}", id)
+            }
             &XgParseError::InvalidStreamFormat => write!(f, "unexpected XML-stream root element"),
             &XgParseError::EndOfStream => write!(f, "unexpended end of stream"),
             &XgParseError::XmlError(ref e) => write!(f, "xml reading error: {}", e),
@@ -99,7 +105,10 @@ pub fn parse<R: Read>(graph: &mut XgGraph, reader: R) -> Result<(), Error> {
             XmlEvent::StartElement { name, .. } => {
                 return match &name.local_name[..] {
                     "BuildSet" => parse_build_set(graph, &mut parser),
-                    _ => Err(Error::new(ErrorKind::InvalidInput, XgParseError::InvalidStreamFormat)),
+                    _ => Err(Error::new(
+                        ErrorKind::InvalidInput,
+                        XgParseError::InvalidStreamFormat,
+                    )),
                 };
             }
             _ => {}
@@ -107,12 +116,17 @@ pub fn parse<R: Read>(graph: &mut XgGraph, reader: R) -> Result<(), Error> {
     }
 }
 
-pub fn parse_build_set<R: Read>(graph: &mut XgGraph, events: &mut EventReader<R>) -> Result<(), Error> {
+pub fn parse_build_set<R: Read>(
+    graph: &mut XgGraph,
+    events: &mut EventReader<R>,
+) -> Result<(), Error> {
     let mut envs: HashMap<String, XgEnvironment> = HashMap::new();
     let mut projects: Vec<XgProject> = Vec::new();
     loop {
         match next_xml_event(events)? {
-            XmlEvent::StartElement { name, attributes, .. } => match &name.local_name[..] {
+            XmlEvent::StartElement {
+                name, attributes, ..
+            } => match &name.local_name[..] {
                 "Environments" => {
                     parse_environments(events, &mut envs)?;
                 }
@@ -142,7 +156,9 @@ fn parse_environments<R: Read>(
 ) -> Result<(), Error> {
     loop {
         match next_xml_event(events)? {
-            XmlEvent::StartElement { name, attributes, .. } => match &name.local_name[..] {
+            XmlEvent::StartElement {
+                name, attributes, ..
+            } => match &name.local_name[..] {
                 "Environment" => {
                     let mut attrs = map_attributes(attributes);
                     let name = take_attr(&mut attrs, "Name")?;
@@ -184,10 +200,15 @@ fn parse_environment<R: Read>(events: &mut EventReader<R>) -> Result<XgEnvironme
     })
 }
 
-fn parse_variables<R: Read>(events: &mut EventReader<R>, variables: &mut CommandEnv) -> Result<(), Error> {
+fn parse_variables<R: Read>(
+    events: &mut EventReader<R>,
+    variables: &mut CommandEnv,
+) -> Result<(), Error> {
     loop {
         match next_xml_event(events)? {
-            XmlEvent::StartElement { name, attributes, .. } => {
+            XmlEvent::StartElement {
+                name, attributes, ..
+            } => {
                 match &name.local_name[..] {
                     "Variable" => {
                         let mut attrs = map_attributes(attributes);
@@ -207,10 +228,15 @@ fn parse_variables<R: Read>(events: &mut EventReader<R>, variables: &mut Command
     }
 }
 
-fn parse_tools<R: Read>(events: &mut EventReader<R>, tools: &mut HashMap<String, XgTool>) -> Result<(), Error> {
+fn parse_tools<R: Read>(
+    events: &mut EventReader<R>,
+    tools: &mut HashMap<String, XgTool>,
+) -> Result<(), Error> {
     loop {
         match next_xml_event(events)? {
-            XmlEvent::StartElement { name, attributes, .. } => {
+            XmlEvent::StartElement {
+                name, attributes, ..
+            } => {
                 match &name.local_name[..] {
                     "Tool" => {
                         let mut attrs = map_attributes(attributes);
@@ -241,7 +267,9 @@ fn parse_tasks<R: Read>(events: &mut EventReader<R>) -> Result<HashMap<String, X
     let mut tasks = HashMap::new();
     loop {
         match next_xml_event(events)? {
-            XmlEvent::StartElement { name, attributes, .. } => {
+            XmlEvent::StartElement {
+                name, attributes, ..
+            } => {
                 match &name.local_name[..] {
                     "Task" => {
                         let mut attrs = map_attributes(attributes);
@@ -318,17 +346,27 @@ fn parse_create_graph(
     Ok(())
 }
 
-fn graph_project(graph: &mut XgGraph, project: XgProject, env: &XgEnvironment) -> Result<(), Error> {
+fn graph_project(
+    graph: &mut XgGraph,
+    project: XgProject,
+    env: &XgEnvironment,
+) -> Result<(), Error> {
     let mut nodes: Vec<NodeIndex> = Vec::new();
     let mut task_refs: HashMap<&str, NodeIndex> = HashMap::new();
     for (id, task) in project.tasks.iter() {
-        let tool = env
-            .tools
-            .get(&task.tool)
-            .ok_or_else(|| Error::new(ErrorKind::InvalidInput, XgParseError::ToolNotFound(task.tool.clone())))?;
+        let tool = env.tools.get(&task.tool).ok_or_else(|| {
+            Error::new(
+                ErrorKind::InvalidInput,
+                XgParseError::ToolNotFound(task.tool.clone()),
+            )
+        })?;
         let node = graph.add_node(XgNode {
             title: task.title.as_ref().map_or_else(
-                || tool.output.as_ref().map_or_else(|| String::new(), |v| v.clone()),
+                || {
+                    tool.output
+                        .as_ref()
+                        .map_or_else(|| String::new(), |v| v.clone())
+                },
                 |v| v.clone(),
             ),
             command: CommandInfo {
@@ -363,9 +401,12 @@ fn map_attributes(attributes: Vec<xml::attribute::OwnedAttribute>) -> HashMap<St
 }
 
 fn take_attr(attrs: &mut HashMap<String, String>, attr: &'static str) -> Result<String, Error> {
-    attrs
-        .remove(attr)
-        .ok_or_else(|| Error::new(ErrorKind::InvalidInput, XgParseError::AttributeNotFound(attr)))
+    attrs.remove(attr).ok_or_else(|| {
+        Error::new(
+            ErrorKind::InvalidInput,
+            XgParseError::AttributeNotFound(attr),
+        )
+    })
 }
 
 #[test]
