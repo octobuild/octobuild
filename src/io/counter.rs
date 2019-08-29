@@ -10,6 +10,10 @@ impl<S> Counter<S> {
         self.size
     }
 
+    pub fn is_empty(&self) -> bool {
+        self.size == 0
+    }
+
     pub fn unwrap(self) -> S {
         self.stream
     }

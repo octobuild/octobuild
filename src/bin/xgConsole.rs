@@ -31,7 +31,7 @@ fn main() {
         println!("  {}", arg);
     }
     if args.len() == 1 {
-        println!("");
+        println!();
         Config::help();
         return;
     }
@@ -80,7 +80,7 @@ fn expand_files(mut files: Vec<PathBuf>, arg: &str) -> Vec<PathBuf> {
         }
         result.push_str(&regex::escape(&mask[begin..]));
         result.push_str("$");
-        return Regex::new(&result).unwrap();
+        Regex::new(&result).unwrap()
     }
 
     fn find_files(dir: &Path, mask: &str) -> Result<Vec<PathBuf>, Error> {
@@ -100,14 +100,11 @@ fn expand_files(mut files: Vec<PathBuf>, arg: &str) -> Vec<PathBuf> {
     }
 
     let path = Path::new(arg).to_path_buf();
-    let mask = path
-        .file_name()
-        .map_or(None, |name| name.to_str())
-        .map_or(None, |s| Some(s.to_string()));
+    let mask = path.file_name().and_then(|name| name.to_str());
     match mask {
         Some(ref mask) if mask.contains(|c| c == '?' || c == '*') => {
-            match find_files(path.parent().unwrap_or(Path::new(".")), mask) {
-                Ok(ref mut found) if found.len() > 0 => {
+            match find_files(path.parent().unwrap_or_else(|| Path::new(".")), mask) {
+                Ok(ref mut found) if !found.is_empty() => {
                     files.append(found);
                 }
                 _ => {
@@ -133,7 +130,7 @@ fn execute(args: &[String]) -> Result<Option<i32>, Error> {
         .iter()
         .filter(|a| !is_flag(a))
         .fold(Vec::new(), |state, a| expand_files(state, &a));
-    if files.len() == 0 {
+    if files.is_empty() {
         return Err(Error::new(
             ErrorKind::InvalidInput,
             "Build task files not found",
@@ -222,11 +219,11 @@ fn print_task_result(result: BuildResult) -> Result<(), Error> {
         result.worker, result.completed, result.total, result.task.title
     );
     match result.result {
-        &Ok(ref output) => {
+        Ok(ref output) => {
             io::stdout().write_all(&output.stdout)?;
             io::stderr().write_all(&output.stderr)?;
         }
-        &Err(_) => {}
+        Err(_) => {}
     }
     Ok(())
 }
@@ -236,26 +233,27 @@ fn expand_arg<F: Fn(&str) -> Option<String>>(arg: &str, resolver: &F) -> String 
     let mut suffix = arg;
     loop {
         match suffix.find("$(") {
-            Some(begin) => match suffix[begin..].find(")") {
+            Some(begin) => match suffix[begin..].find(')') {
                 Some(end) => {
                     let name = &suffix[begin + 2..begin + end];
                     match resolver(name) {
                         Some(ref value) => {
-                            result = result + &suffix[..begin] + &value;
+                            result += &suffix[..begin];
+                            result += &value;
                         }
                         None => {
-                            result = result + &suffix[..begin + end + 1];
+                            result += &suffix[..=begin + end];
                         }
                     }
                     suffix = &suffix[begin + end + 1..];
                 }
                 None => {
-                    result = result + suffix;
+                    result += suffix;
                     break;
                 }
             },
             None => {
-                result = result + suffix;
+                result += suffix;
                 break;
             }
         }
@@ -278,7 +276,7 @@ fn test_parse_vars() {
                         None
                     }
                 }
-            }
+            },
         ),
         "Afoo$(bar)$(none)B"
     );

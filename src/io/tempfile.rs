@@ -28,7 +28,7 @@ impl TempFile {
     }
 
     /// Access the wrapped `std::path::Path` to the temporary file.
-    pub fn path<'a>(&'a self) -> &'a Path {
+    pub fn path(&self) -> &Path {
         self.path.as_ref().unwrap()
     }
 

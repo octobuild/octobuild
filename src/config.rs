@@ -42,15 +42,15 @@ impl Config {
     }
 
     pub fn get_coordinator_addrs(&self) -> Result<Vec<SocketAddr>> {
-        match &self.coordinator {
-            &Some(ref url) => url
+        match self.coordinator {
+            Some(ref url) => url
                 .with_default_port(|url| match url.scheme() {
                     "http" => Ok(80),
                     _ => Err(()),
                 })
                 .and_then(|host| host.to_socket_addrs())
                 .map(|iter| iter.collect()),
-            &None => Ok(Vec::new()),
+            None => Ok(Vec::new()),
         }
     }
 
@@ -63,34 +63,36 @@ impl Config {
             v.as_i64().map(|v| v as u32)
         })
         .unwrap_or(16 * 1024);
-        let cache_path = match defaults {
-            true => None,
-            false => {
-                env::var("OCTOBUILD_CACHE")
-                    .ok()
-                    .and_then(|v| if v == "" { None } else { Some(v) })
-            }
+        let cache_path = if defaults {
+            None
+        } else {
+            env::var("OCTOBUILD_CACHE")
+                .ok()
+                .and_then(|v| if v == "" { None } else { Some(v) })
         }
         .or_else(|| {
             get_config(local, global, PARAM_CACHE_PATH, |v| {
                 v.as_str().map(|v| v.to_string())
             })
         })
-        .unwrap_or(DEFAULT_CACHE_DIR.to_string());
+        .unwrap_or_else(|| DEFAULT_CACHE_DIR.to_string());
         let process_limit = get_config(local, global, PARAM_PROCESS_LIMIT, |v| {
             v.as_i64().map(|v| v as usize)
         })
-        .unwrap_or_else(|| num_cpus::get());
-        let coordinator = get_config(local, global, PARAM_COORDINATOR, |v| match v.is_null() {
-            true => None,
-            false => v.as_str().and_then(|v| {
-                reqwest::Url::parse(v)
-                    .map(|mut v| {
-                        v.set_path("");
-                        v
-                    })
-                    .ok()
-            }),
+        .unwrap_or_else(num_cpus::get);
+        let coordinator = get_config(local, global, PARAM_COORDINATOR, |v| {
+            if v.is_null() {
+                None
+            } else {
+                v.as_str().and_then(|v| {
+                    reqwest::Url::parse(v)
+                        .map(|mut v| {
+                            v.set_path("");
+                            v
+                        })
+                        .ok()
+                })
+            }
         });
         let helper_bind = get_config(local, global, PARAM_HELPER_BIND, |v| {
             v.as_str().and_then(|v| FromStr::from_str(v).ok())
@@ -121,7 +123,7 @@ impl Config {
         );
         y.insert(
             Yaml::String(PARAM_CACHE_LIMIT.to_string()),
-            Yaml::Integer(self.cache_limit_mb as i64),
+            Yaml::Integer(i64::from(self.cache_limit_mb)),
         );
         y.insert(
             Yaml::String(PARAM_CACHE_PATH.to_string()),
@@ -151,13 +153,13 @@ impl Config {
             "  system config path: {}",
             get_global_config_path()
                 .map(|v| v.to_str().unwrap().to_string())
-                .unwrap_or("none".to_string())
+                .unwrap_or_else(|| "none".to_string())
         );
         println!(
             "  user config path:   {}",
             get_local_config_path()
                 .map(|v| v.to_str().unwrap().to_string())
-                .unwrap_or("none".to_string())
+                .unwrap_or_else(|| "none".to_string())
         );
         println!();
         println!("Actual configuration:");
@@ -225,10 +227,7 @@ fn replace_home(path: &str) -> Result<PathBuf> {
     if path.starts_with("~/") {
         dirs::home_dir()
             .map(|v| v.join(&path[2..]))
-            .ok_or(io::Error::new(
-                ErrorKind::NotFound,
-                "Can't determinate user HOME path",
-            ))
+            .ok_or_else(|| io::Error::new(ErrorKind::NotFound, "Can't determinate user HOME path"))
     } else {
         Ok(Path::new(path).to_path_buf())
     }

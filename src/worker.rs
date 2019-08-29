@@ -80,7 +80,7 @@ impl BuildAction {
                 println!("Can't use octobuild for task {}: {}", title, e);
                 Vec::new()
             });
-        if actions.len() == 0 {
+        if actions.is_empty() {
             return vec![BuildAction::Exec(command, args.to_vec())];
         }
         actions
@@ -88,9 +88,9 @@ impl BuildAction {
 
     pub fn title(self: &Self) -> Cow<str> {
         match self {
-            &BuildAction::Empty => Cow::Borrowed(""),
-            &BuildAction::Exec(_, ref args) => Cow::Owned(format!("{:?}", args)),
-            &BuildAction::Compilation(_, ref task) => {
+            BuildAction::Empty => Cow::Borrowed(""),
+            BuildAction::Exec(_, ref args) => Cow::Owned(format!("{:?}", args)),
+            BuildAction::Compilation(_, ref task) => {
                 Cow::Borrowed(task.input_source.to_str().unwrap_or(""))
             }
         }
@@ -111,7 +111,7 @@ pub fn validate_graph<N, E>(graph: Graph<N, E>) -> Result<Graph<N, E>, Error> {
     let mut i: usize = 0;
     while i < queue.len() {
         let index = queue[i];
-        if (!completed[index.index()]) && (is_ready(&graph, &completed, &index)) {
+        if (!completed[index.index()]) && (is_ready(&graph, &completed, index)) {
             completed[index.index()] = true;
             for neighbor in graph.neighbors_directed(index, EdgeDirection::Incoming) {
                 queue.push(neighbor);
@@ -121,7 +121,7 @@ pub fn validate_graph<N, E>(graph: Graph<N, E>) -> Result<Graph<N, E>, Error> {
                 return Ok(graph);
             }
         }
-        i = i + 1;
+        i += 1;
     }
     Err(Error::new(
         ErrorKind::InvalidInput,
@@ -164,7 +164,7 @@ where
         completed[message.index.index()] = true;
 
         for source in graph.neighbors_directed(message.index, EdgeDirection::Incoming) {
-            if is_ready(graph, &completed, &source) {
+            if is_ready(graph, &completed, source) {
                 tx_task
                     .send(TaskMessage {
                         index: source,
@@ -181,8 +181,8 @@ where
     panic!("Unexpected end of result pipe");
 }
 
-fn is_ready<N, E>(graph: &Graph<N, E>, completed: &Vec<bool>, source: &NodeIndex) -> bool {
-    for neighbor in graph.neighbors_directed(*source, EdgeDirection::Outgoing) {
+fn is_ready<N, E>(graph: &Graph<N, E>, completed: &[bool], source: NodeIndex) -> bool {
+    for neighbor in graph.neighbors_directed(source, EdgeDirection::Outgoing) {
         if !completed[neighbor.index()] {
             return false;
         }
@@ -225,22 +225,18 @@ where
         for worker_id in 0..num_cpus {
             let local_rx_task = mutex_rx_task.clone();
             let local_tx_result = tx_result.clone();
-            scope.spawn(move |_| loop {
-                let message = match local_rx_task.lock().unwrap().recv() {
-                    Ok(v) => v,
-                    Err(_) => {
-                        break;
-                    }
-                };
-                match local_tx_result.send(ResultMessage {
-                    index: message.index,
-                    worker: worker_id,
-                    result: execute_compiler(state, &message.task),
-                    task: message.task,
-                }) {
-                    Ok(_) => {}
-                    Err(_) => {
-                        break;
+            scope.spawn(move |_| {
+                while let Ok(message) = local_rx_task.lock().unwrap().recv() {
+                    match local_tx_result.send(ResultMessage {
+                        index: message.index,
+                        worker: worker_id,
+                        result: execute_compiler(state, &message.task),
+                        task: message.task,
+                    }) {
+                        Ok(_) => {}
+                        Err(_) => {
+                            break;
+                        }
                     }
                 }
             });
@@ -263,19 +259,19 @@ where
 
 fn execute_compiler(state: &SharedState, task: &BuildTask) -> Result<OutputInfo, Error> {
     match &task.action {
-        &BuildAction::Empty => Ok(OutputInfo {
+        BuildAction::Empty => Ok(OutputInfo {
             status: Some(0),
             stderr: Vec::new(),
             stdout: Vec::new(),
         }),
-        &BuildAction::Exec(ref command, ref args) => state.wrap_slow(|| {
+        BuildAction::Exec(ref command, ref args) => state.wrap_slow(|| {
             command
                 .to_command()
                 .args(args)
                 .output()
-                .map(|o| OutputInfo::new(o))
+                .map(OutputInfo::new)
         }),
-        &BuildAction::Compilation(ref toolchain, ref task) => {
+        BuildAction::Compilation(ref toolchain, ref task) => {
             toolchain.compile_task(state, task.clone())
         }
     }
@@ -295,8 +291,7 @@ mod test {
         let state = SharedState::new(&Config::defaults().unwrap()).unwrap();
         let graph = BuildGraph::new();
         execute_graph(&state, graph, 2, |_| {
-            assert!(false);
-            Ok(())
+            unreachable!();
         })
         .unwrap();
     }

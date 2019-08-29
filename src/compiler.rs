@@ -29,10 +29,10 @@ pub enum CompilerError {
 impl Display for CompilerError {
     fn fmt(&self, f: &mut Formatter) -> Result<(), ::std::fmt::Error> {
         match self {
-            &CompilerError::InvalidArguments(ref arg) => {
+            CompilerError::InvalidArguments(ref arg) => {
                 write!(f, "can't parse command line arguments: {}", arg)
             }
-            &CompilerError::ToolchainNotFound(ref arg) => {
+            CompilerError::ToolchainNotFound(ref arg) => {
                 write!(f, "can't find toolchain for: {}", arg.display())
             }
         }
@@ -42,8 +42,8 @@ impl Display for CompilerError {
 impl ::std::error::Error for CompilerError {
     fn description(&self) -> &str {
         match self {
-            &CompilerError::InvalidArguments(_) => "can't parse command line arguments",
-            &CompilerError::ToolchainNotFound(_) => "can't find toolchain",
+            CompilerError::InvalidArguments(_) => "can't parse command line arguments",
+            CompilerError::ToolchainNotFound(_) => "can't find toolchain",
         }
     }
 
@@ -131,7 +131,7 @@ impl Arg {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct CommandEnv {
     map: HashMap<String, String>,
 }
@@ -152,6 +152,7 @@ pub struct SharedState {
     pub statistic: Statistic,
 }
 
+#[derive(Default)]
 pub struct CompilerGroup(Vec<Box<dyn Compiler>>);
 
 impl SharedState {
@@ -174,9 +175,7 @@ impl SharedState {
 
 impl CommandEnv {
     pub fn new() -> Self {
-        CommandEnv {
-            map: HashMap::new(),
-        }
+        Default::default()
     }
 
     pub fn get<K: Into<String>>(&self, key: K) -> Option<&str> {
@@ -236,12 +235,9 @@ impl CommandInfo {
         for (key, value) in self.env.iter() {
             command.env(key.clone(), value.clone());
         }
-        match self.current_dir {
-            Some(ref v) => {
-                command.current_dir(&v);
-            }
-            _ => {}
-        };
+        if let Some(ref v) = self.current_dir {
+            command.current_dir(&v);
+        }
         command
     }
 
@@ -258,9 +254,7 @@ impl CommandInfo {
     fn find_executable_native(&self, allow_current_dir: bool) -> Option<PathBuf> {
         let executable = self.program.clone();
         // Can't execute directory
-        if executable.file_name().is_none() {
-            return None;
-        }
+        executable.file_name()?;
         // Check absolute path
         if executable.is_absolute() {
             return fn_find_exec(executable);
@@ -269,33 +263,24 @@ impl CommandInfo {
         if allow_current_dir
             || executable
                 .parent()
-                .map_or(false, |path| path.as_os_str().len() > 0)
+                .map_or(false, |path| !path.as_os_str().is_empty())
         {
-            match self
+            if let Some(exe) = self
                 .current_dir
                 .as_ref()
                 .map(|c| c.join(&executable))
-                .and_then(|c| fn_find_exec(c))
+                .and_then(fn_find_exec)
             {
-                Some(exe) => {
-                    return Some(exe);
-                }
-                None => {}
+                return Some(exe);
             }
         }
         // Check path environment variable
-        match self.env.get("PATH") {
-            Some(paths) => {
-                for path in env::split_paths(&paths) {
-                    match fn_find_exec(path.join(&executable)) {
-                        Some(exe) => {
-                            return Some(exe);
-                        }
-                        None => {}
-                    }
+        if let Some(paths) = self.env.get("PATH") {
+            for path in env::split_paths(&paths) {
+                if let Some(exe) = fn_find_exec(path.join(&executable)) {
+                    return Some(exe);
                 }
             }
-            None => {}
         }
         None
     }
@@ -327,9 +312,10 @@ impl OutputInfo {
     pub fn read(reader: output_info::Reader) -> Result<(Self, Vec<u8>), capnp::Error> {
         let content = reader.get_content()?.to_vec();
         let output = OutputInfo {
-            status: match reader.get_undefined() {
-                false => Some(reader.get_status()),
-                true => None,
+            status: if reader.get_undefined() {
+                Some(reader.get_status())
+            } else {
+                None
             },
             stdout: reader.get_stdout()?.to_vec(),
             stderr: reader.get_stderr()?.to_vec(),
@@ -403,9 +389,10 @@ impl CompileStep {
         CompileStep {
             output_object: Some(task.output_object),
             output_precompiled: task.shared.output_precompiled.clone(),
-            input_precompiled: match use_precompiled {
-                true => task.shared.input_precompiled.clone(),
-                false => None,
+            input_precompiled: if use_precompiled {
+                task.shared.input_precompiled.clone()
+            } else {
+                None
             },
             args,
             preprocessed,
@@ -500,24 +487,19 @@ pub trait Toolchain: Send + Sync {
             }
         }
         // Store output precompiled flag
-        hasher.hash_u8(match task.output_precompiled.is_some() {
-            true => 1,
-            false => 0,
+        hasher.hash_u8(if task.output_precompiled.is_some() {
+            1
+        } else {
+            0
         });
 
         // Output files list
         let mut outputs: Vec<PathBuf> = Vec::new();
-        match task.output_object {
-            Some(ref path) => {
-                outputs.push(path.clone());
-            }
-            None => {}
+        if let Some(ref path) = task.output_object {
+            outputs.push(path.clone());
         }
-        match task.output_precompiled {
-            Some(ref path) => {
-                outputs.push(path.clone());
-            }
-            None => {}
+        if let Some(ref path) = task.output_precompiled {
+            outputs.push(path.clone());
         }
 
         // Try to get files from cache or run
@@ -533,7 +515,7 @@ pub trait Toolchain: Send + Sync {
 
 impl CompilerGroup {
     pub fn new() -> Self {
-        CompilerGroup(Vec::new())
+        Default::default()
     }
 
     pub fn add<C: 'static + Compiler>(mut self: Self, compiler: C) -> Self {
@@ -565,7 +547,7 @@ trait Hasher: Digest {
         let mut buf: [u8; 8] = [0; 8];
         for i in 0..buf.len() {
             buf[i] = (n & 0xFF) as u8;
-            n = n >> 8;
+            n >>= 8;
         }
         self.input(&buf);
     }
@@ -594,10 +576,12 @@ pub trait Compiler: Send + Sync {
         args: &[String],
     ) -> Result<Vec<(Arc<dyn Toolchain>, CompilationTask)>, Error> {
         self.resolve_toolchain(&command)
-            .ok_or(Error::new(
-                ErrorKind::InvalidInput,
-                CompilerError::ToolchainNotFound(command.program.clone()),
-            ))
+            .ok_or_else(|| {
+                Error::new(
+                    ErrorKind::InvalidInput,
+                    CompilerError::ToolchainNotFound(command.program.clone()),
+                )
+            })
             .and_then(|toolchain| {
                 toolchain
                     .create_tasks(command, args)
@@ -614,6 +598,7 @@ pub trait Compiler: Send + Sync {
     }
 }
 
+#[derive(Default)]
 pub struct ToolchainHolder {
     toolchains: Arc<RwLock<HashMap<PathBuf, Arc<dyn Toolchain>>>>,
 }
@@ -627,7 +612,7 @@ impl ToolchainHolder {
 
     pub fn to_vec(&self) -> Vec<Arc<dyn Toolchain>> {
         let read_lock = self.toolchains.read().unwrap();
-        read_lock.values().map(|v| v.clone()).collect()
+        read_lock.values().cloned().collect()
     }
 
     pub fn resolve<F: FnOnce(PathBuf) -> Arc<dyn Toolchain>>(
@@ -637,11 +622,8 @@ impl ToolchainHolder {
     ) -> Option<Arc<dyn Toolchain>> {
         {
             let read_lock = self.toolchains.read().unwrap();
-            match read_lock.get(path) {
-                Some(t) => {
-                    return Some(t.clone());
-                }
-                None => {}
+            if let Some(t) = read_lock.get(path) {
+                return Some(t.clone());
             }
         }
         {
@@ -678,14 +660,11 @@ fn fn_find_exec_native(mut path: PathBuf) -> Option<PathBuf> {
             name.push(".exe");
             name
         });
-        match name_with_ext {
-            Some(n) => {
-                path.set_file_name(n);
-                if path.is_file() {
-                    return Some(path);
-                }
+        if let Some(n) = name_with_ext {
+            path.set_file_name(n);
+            if path.is_file() {
+                return Some(path);
             }
-            None => {}
         }
     }
     None

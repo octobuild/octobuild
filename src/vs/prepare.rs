@@ -26,14 +26,14 @@ pub fn create_tasks(command: CommandInfo, args: &[String]) -> Result<Vec<Compila
             let input_sources: Vec<PathBuf> = parsed_args
                 .iter()
                 .filter_map(|arg| match arg {
-                    &Arg::Input {
+                    Arg::Input {
                         ref kind, ref file, ..
                     } if *kind == InputKind::Source => Some(Path::new(file).to_path_buf()),
                     _ => None,
                 })
                 .collect();
-            if input_sources.len() == 0 {
-                return Err(format!("Can't find source file path."));
+            if input_sources.is_empty() {
+                return Err("Can't find source file path.".to_string());
             }
             // Precompiled header file name.
             let precompiled_file = match find_param(&parsed_args, |arg: &Arg| -> Option<PathBuf> {
@@ -76,7 +76,7 @@ pub fn create_tasks(command: CommandInfo, args: &[String]) -> Result<Vec<Compila
                         Some(v) => v,
                         None => Path::new(&path).with_extension(".pch").to_path_buf(),
                     };
-                    marker_precompiled = if path.len() > 0 { Some(path) } else { None };
+                    marker_precompiled = if path.is_empty() { None } else { Some(path) };
                     if input {
                         output_precompiled = None;
                         input_precompiled = Some(precompiled_path);
@@ -113,7 +113,7 @@ pub fn create_tasks(command: CommandInfo, args: &[String]) -> Result<Vec<Compila
             let language: Option<String> =
                 match find_param(&parsed_args, |arg: &Arg| -> Option<String> {
                     match arg {
-                        &Arg::Param {
+                        Arg::Param {
                             ref flag,
                             ref value,
                             ..
@@ -175,22 +175,25 @@ fn get_output_object(
 ) -> Result<PathBuf, String> {
     output_object.as_ref().map_or_else(
         || Ok(input_source.with_extension("obj")),
-        |path| match path.is_dir() {
-            true => input_source
-                .file_name()
-                .map(|name| path.join(name).with_extension("obj"))
-                .ok_or_else(|| {
-                    format!(
-                        "Input file path does not contains file name: {}",
-                        input_source.to_string_lossy()
-                    )
-                }),
-            false => Ok(path.clone()),
+        |path| {
+            if path.is_dir() {
+                input_source
+                    .file_name()
+                    .map(|name| path.join(name).with_extension("obj"))
+                    .ok_or_else(|| {
+                        format!(
+                            "Input file path does not contains file name: {}",
+                            input_source.to_string_lossy()
+                        )
+                    })
+            } else {
+                Ok(path.clone())
+            }
         },
     )
 }
 
-fn find_param<T, R, F: Fn(&T) -> Option<R>>(args: &Vec<T>, filter: F) -> ParamValue<R> {
+fn find_param<T, R, F: Fn(&T) -> Option<R>>(args: &[T], filter: F) -> ParamValue<R> {
     let mut found = Vec::from_iter(args.iter().filter_map(filter));
     match found.len() {
         0 => ParamValue::None,
@@ -205,10 +208,10 @@ fn load_arguments<S: AsRef<str>, I: Iterator<Item = S>>(
 ) -> Result<Vec<String>, Error> {
     let mut result: Vec<String> = Vec::new();
     for item in iter {
-        if item.as_ref().starts_with("@") {
+        if item.as_ref().starts_with('@') {
             let path = match base {
-                &Some(ref p) => p.join(&item.as_ref()[1..]),
-                &None => Path::new(&item.as_ref()[1..]).to_path_buf(),
+                Some(ref p) => p.join(&item.as_ref()[1..]),
+                None => Path::new(&item.as_ref()[1..]).to_path_buf(),
             };
             let mut file = File::open(path)?;
             let mut data = Vec::new();
@@ -245,7 +248,7 @@ fn decode_utf16<F: Fn(u16, u16) -> u16>(data: &[u8], endian: F) -> Result<String
     }
     let mut i = 0;
     while i < data.len() {
-        utf16.push(endian(data[i] as u16, data[i + 1] as u16));
+        utf16.push(endian(u16::from(data[i]), u16::from(data[i + 1])));
         i += 2;
     }
     String::from_utf16(&utf16).map_err(|e| Error::new(ErrorKind::InvalidInput, e))
@@ -254,22 +257,17 @@ fn decode_utf16<F: Fn(u16, u16) -> u16>(data: &[u8], endian: F) -> Result<String
 fn parse_arguments<S: AsRef<str>, I: Iterator<Item = S>>(mut iter: I) -> Result<Vec<Arg>, String> {
     let mut result: Vec<Arg> = Vec::new();
     let mut errors: Vec<String> = Vec::new();
-    loop {
-        match parse_argument(&mut iter) {
-            Some(parse_result) => match parse_result {
-                Ok(arg) => {
-                    result.push(arg);
-                }
-                Err(e) => {
-                    errors.push(e);
-                }
-            },
-            None => {
-                break;
+    while let Some(parse_result) = parse_argument(&mut iter) {
+        match parse_result {
+            Ok(arg) => {
+                result.push(arg);
+            }
+            Err(e) => {
+                errors.push(e);
             }
         }
     }
-    if errors.len() > 0 {
+    if !errors.is_empty() {
         return Err(format!(
             "Found unknown command line arguments: {:?}",
             errors
@@ -304,11 +302,11 @@ fn parse_argument<S: AsRef<str>, I: Iterator<Item = S>>(
                 None => match flag {
                     "c" | "nologo" => Ok(Arg::flag(Scope::Ignore, flag)),
                     "bigobj" => Ok(Arg::flag(Scope::Compiler, flag)),
-                    s if s.starts_with("T") => Ok(Arg::param(Scope::Ignore, "T", &s[1..])),
-                    s if s.starts_with("O") => Ok(Arg::flag(Scope::Shared, flag)),
-                    s if s.starts_with("G") => Ok(Arg::flag(Scope::Shared, flag)),
+                    s if s.starts_with('T') => Ok(Arg::param(Scope::Ignore, "T", &s[1..])),
+                    s if s.starts_with('O') => Ok(Arg::flag(Scope::Shared, flag)),
+                    s if s.starts_with('G') => Ok(Arg::flag(Scope::Shared, flag)),
                     s if s.starts_with("RTC") => Ok(Arg::flag(Scope::Shared, flag)),
-                    s if s.starts_with("Z") => Ok(Arg::flag(Scope::Shared, flag)),
+                    s if s.starts_with('Z') => Ok(Arg::flag(Scope::Shared, flag)),
                     s if s.starts_with("d2Zi+") => Ok(Arg::flag(Scope::Shared, flag)),
                     s if s.starts_with("MP") => Ok(Arg::flag(Scope::Compiler, flag)),
                     s if s.starts_with("MD") => Ok(Arg::flag(Scope::Shared, flag)),
@@ -360,7 +358,7 @@ fn is_spaceable_param(flag: &str) -> Option<(&str, Scope)> {
 }
 
 fn has_param_prefix(arg: &str) -> bool {
-    arg.starts_with("/") || arg.starts_with("-")
+    arg.starts_with('/') || arg.starts_with('-')
 }
 
 #[test]
@@ -368,7 +366,7 @@ fn test_parse_argument() {
     let args = Vec::from_iter(
         "/TP /c /Yusample.h /Fpsample.h.pch /Fosample.cpp.o /DTEST /D TEST2 /arch:AVX \
          sample.cpp"
-            .split(" ")
+            .split(' ')
             .map(|x| x.to_string()),
     );
     assert_eq!(

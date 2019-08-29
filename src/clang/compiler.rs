@@ -21,15 +21,14 @@ lazy_static! {
         regex::bytes::Regex::new(r"(?i)^(clang(:?\+\+)?)(-\d+\.\d+)?(?:.exe)?$").unwrap();
 }
 
+#[derive(Default)]
 pub struct ClangCompiler {
     toolchains: ToolchainHolder,
 }
 
 impl ClangCompiler {
     pub fn new() -> Self {
-        ClangCompiler {
-            toolchains: ToolchainHolder::new(),
-        }
+        Default::default()
     }
 }
 
@@ -104,28 +103,28 @@ impl Toolchain for ClangToolchain {
         // Make parameters list for preprocessing.
         for arg in task.shared.args.iter() {
             match arg {
-                &Arg::Flag {
+                Arg::Flag {
                     ref scope,
                     ref flag,
                 } => match scope {
-                    &Scope::Preprocessor | &Scope::Shared => {
+                    Scope::Preprocessor | &Scope::Shared => {
                         args.push("-".to_string() + &flag);
                     }
-                    &Scope::Ignore | &Scope::Compiler => {}
+                    Scope::Ignore | &Scope::Compiler => {}
                 },
-                &Arg::Param {
+                Arg::Param {
                     ref scope,
                     ref flag,
                     ref value,
                 } => match scope {
-                    &Scope::Preprocessor | &Scope::Shared => {
+                    Scope::Preprocessor | &Scope::Shared => {
                         args.push("-".to_string() + &flag);
                         args.push(value.clone());
                     }
-                    &Scope::Ignore | &Scope::Compiler => {}
+                    Scope::Ignore | &Scope::Compiler => {}
                 },
-                &Arg::Input { .. } => {}
-                &Arg::Output { .. } => {}
+                Arg::Input { .. } => {}
+                Arg::Output { .. } => {}
             };
         }
 
@@ -148,28 +147,28 @@ impl Toolchain for ClangToolchain {
         args.push(task.language.clone());
         for arg in task.shared.args.iter() {
             match arg {
-                &Arg::Flag {
+                Arg::Flag {
                     ref scope,
                     ref flag,
                 } => match scope {
-                    &Scope::Compiler | &Scope::Shared => {
+                    Scope::Compiler | &Scope::Shared => {
                         args.push("-".to_string() + &flag);
                     }
-                    &Scope::Ignore | &Scope::Preprocessor => {}
+                    Scope::Ignore | &Scope::Preprocessor => {}
                 },
-                &Arg::Param {
+                Arg::Param {
                     ref scope,
                     ref flag,
                     ref value,
                 } => match scope {
-                    &Scope::Compiler | &Scope::Shared => {
+                    Scope::Compiler | &Scope::Shared => {
                         args.push("-".to_string() + &flag);
                         args.push(value.clone());
                     }
-                    &Scope::Ignore | &Scope::Preprocessor => {}
+                    Scope::Ignore | &Scope::Preprocessor => {}
                 },
-                &Arg::Input { .. } => {}
-                &Arg::Output { .. } => {}
+                Arg::Input { .. } => {}
+                Arg::Output { .. } => {}
             };
         }
         Ok(CompileStep::new(task, preprocessed, args, false))
@@ -198,7 +197,7 @@ impl Toolchain for ClangToolchain {
                     let _ = task.preprocessed;
                     child.wait_with_output()
                 })
-                .map(|o| OutputInfo::new(o))
+                .map(OutputInfo::new)
         })
     }
 }
@@ -248,7 +247,7 @@ fn execute(command: &mut Command) -> Result<PreprocessResult, Error> {
                 let mut ret = MemStream::new();
                 io::copy(&mut stream, &mut ret).map(|_| ret)
             })
-            .unwrap_or(MemStream::new())
+            .unwrap_or_else(|_| MemStream::new())
     }
 
     fn read_stderr<T: Read + Send + 'static>(
@@ -269,7 +268,7 @@ fn execute(command: &mut Command) -> Result<PreprocessResult, Error> {
     }
 
     fn bytes(stream: Receiver<Result<Vec<u8>, Error>>) -> Vec<u8> {
-        stream.recv().unwrap().unwrap_or(Vec::new())
+        stream.recv().unwrap().unwrap_or_default()
     }
 
     let rx_err = read_stderr(child.stderr.take());

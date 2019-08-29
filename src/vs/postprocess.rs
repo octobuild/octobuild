@@ -22,16 +22,16 @@ const BUF_SIZE: usize = 0x10000;
 impl Display for PostprocessError {
     fn fmt(&self, f: &mut Formatter) -> Result<(), ::std::fmt::Error> {
         match self {
-            &PostprocessError::LiteralEol => write!(f, "unexpected end of line in literal"),
-            &PostprocessError::LiteralEof => write!(f, "unexpected end of stream in literal"),
-            &PostprocessError::LiteralTooLong => write!(f, "literal too long"),
-            &PostprocessError::EscapeEof => write!(f, "unexpected end of escape sequence"),
-            &PostprocessError::MarkerNotFound => write!(
+            PostprocessError::LiteralEol => write!(f, "unexpected end of line in literal"),
+            PostprocessError::LiteralEof => write!(f, "unexpected end of stream in literal"),
+            PostprocessError::LiteralTooLong => write!(f, "literal too long"),
+            PostprocessError::EscapeEof => write!(f, "unexpected end of escape sequence"),
+            PostprocessError::MarkerNotFound => write!(
                 f,
                 "can't find precompiled header marker in preprocessed file"
             ),
-            &PostprocessError::InvalidLiteral => write!(f, "can't create string from literal"),
-            &PostprocessError::TokenTooLong => write!(f, "token too long"),
+            PostprocessError::InvalidLiteral => write!(f, "can't create string from literal"),
+            PostprocessError::TokenTooLong => write!(f, "token too long"),
         }
     }
 }
@@ -39,15 +39,15 @@ impl Display for PostprocessError {
 impl ::std::error::Error for PostprocessError {
     fn description(&self) -> &str {
         match self {
-            &PostprocessError::LiteralEol => "unexpected end of line in literal",
-            &PostprocessError::LiteralEof => "unexpected end of stream in literal",
-            &PostprocessError::LiteralTooLong => "literal too long",
-            &PostprocessError::EscapeEof => "unexpected end of escape sequence",
-            &PostprocessError::MarkerNotFound => {
+            PostprocessError::LiteralEol => "unexpected end of line in literal",
+            PostprocessError::LiteralEof => "unexpected end of stream in literal",
+            PostprocessError::LiteralTooLong => "literal too long",
+            PostprocessError::EscapeEof => "unexpected end of escape sequence",
+            PostprocessError::MarkerNotFound => {
                 "can't find precompiled header marker in preprocessed file"
             }
-            &PostprocessError::InvalidLiteral => "can't create string from literal",
-            &PostprocessError::TokenTooLong => "token too long",
+            PostprocessError::InvalidLiteral => "can't create string from literal",
+            PostprocessError::TokenTooLong => "token too long",
         }
     }
 
@@ -92,17 +92,18 @@ pub fn filter_preprocessed(
 
         state.parse_bom()?;
         state.marker = match marker.as_ref() {
-            Some(ref v) => match state.utf8 {
-                true => Some(Vec::from(v.as_bytes())),
-                false => Some(Encoding::ANSI.to_bytes(&v.replace("\\", "/"))?),
-            },
+            Some(ref v) => {
+                if state.utf8 {
+                    Some(Vec::from(v.as_bytes()))
+                } else {
+                    Some(Encoding::ANSI.to_bytes(&v.replace("\\", "/"))?)
+                }
+            }
             None => None,
         };
         loop {
-            if state.ptr_read == state.ptr_end {
-                if !state.read()? {
-                    break;
-                }
+            if state.ptr_read == state.ptr_end && !state.read()? {
+                break;
             }
             state.parse_line()?;
             if state.done {
@@ -137,16 +138,14 @@ struct ScannerState<'a> {
 impl<'a> ScannerState<'a> {
     unsafe fn write(&mut self, data: &[u8]) -> Result<(), Error> {
         self.flush()?;
-        self.writer.write(data)?;
+        self.writer.write_all(data)?;
         Ok(())
     }
 
     #[inline(always)]
     unsafe fn peek(&mut self) -> Result<Option<u8>, Error> {
-        if self.ptr_read == self.ptr_end {
-            if !self.read()? {
-                return Ok(None);
-            }
+        if self.ptr_read == self.ptr_end && !self.read()? {
+            return Ok(None);
         }
         Ok(Some(*self.ptr_read))
     }
@@ -163,12 +162,12 @@ impl<'a> ScannerState<'a> {
         let base = self.buf_data.as_ptr();
         self.ptr_read = base;
         self.ptr_copy = base;
-        self.ptr_end = base.offset(self.reader.read(&mut self.buf_data)? as isize);
+        self.ptr_end = base.add(self.reader.read(&mut self.buf_data)?);
         Ok(self.ptr_read != self.ptr_end)
     }
 
     unsafe fn copy_to_end(&mut self) -> Result<(), Error> {
-        self.writer.write(slice::from_raw_parts(
+        self.writer.write_all(slice::from_raw_parts(
             self.ptr_copy,
             delta(self.ptr_copy, self.ptr_end),
         ))?;
@@ -180,7 +179,7 @@ impl<'a> ScannerState<'a> {
                     return Ok(());
                 }
                 size => {
-                    self.writer.write(&self.buf_data[0..size])?;
+                    self.writer.write_all(&self.buf_data[0..size])?;
                 }
             }
         }
@@ -189,7 +188,7 @@ impl<'a> ScannerState<'a> {
     unsafe fn flush(&mut self) -> Result<(), Error> {
         if self.ptr_copy != self.ptr_read {
             if self.keep_headers {
-                self.writer.write(slice::from_raw_parts(
+                self.writer.write_all(slice::from_raw_parts(
                     self.ptr_copy,
                     delta(self.ptr_copy, self.ptr_read),
                 ))?;
@@ -237,10 +236,10 @@ impl<'a> ScannerState<'a> {
         loop {
             let end = libc::memchr(
                 self.ptr_read as *const libc::c_void,
-                b'\n' as i32,
+                i32::from(b'\n'),
                 delta(self.ptr_read, self.ptr_end),
             ) as *const u8;
-            if end != ptr::null() {
+            if !end.is_null() {
                 self.ptr_read = end.offset(1);
                 return Ok(());
             }
@@ -256,10 +255,10 @@ impl<'a> ScannerState<'a> {
         loop {
             let end = libc::memchr(
                 self.ptr_read as *const libc::c_void,
-                b'\n' as i32,
+                i32::from(b'\n'),
                 delta(self.ptr_read, self.ptr_end),
             ) as *const u8;
-            if end != ptr::null() {
+            if !end.is_null() {
                 if end != &self.buf_data[0] {
                     last = *end.offset(-1);
                 }
@@ -309,22 +308,19 @@ impl<'a> ScannerState<'a> {
                 if self.header_found && (path == file) {
                     self.done = true;
                     let mut mark = Vec::with_capacity(0x400);
-                    mark.write(b"#pragma hdrstop")?;
-                    mark.write(&eol)?;
-                    mark.write(b"#line ")?;
-                    mark.write(&line)?;
-                    mark.write(b" ")?;
-                    mark.write(&raw)?;
-                    mark.write(&eol)?;
+                    mark.write_all(b"#pragma hdrstop")?;
+                    mark.write_all(&eol)?;
+                    mark.write_all(b"#line ")?;
+                    mark.write_all(&line)?;
+                    mark.write_all(b" ")?;
+                    mark.write_all(&raw)?;
+                    mark.write_all(&eol)?;
                     self.write(&mark)?;
                 }
-                match &self.marker {
-                    &Some(ref path) => {
-                        if is_subpath(&file, &path) {
-                            self.header_found = true;
-                        }
+                if let Some(ref path) = self.marker {
+                    if is_subpath(&file, &path) {
+                        self.header_found = true;
                     }
-                    &None => {}
                 }
                 Some(path)
             }
@@ -458,7 +454,7 @@ impl<'a> ScannerState<'a> {
                         ));
                     }
                     b'\\' => {
-                        raw[raw_offset + 0] = b'\\';
+                        raw[raw_offset] = b'\\';
                         raw[raw_offset + 1] = c;
                         raw_offset += 2;
                         token[token_offset] = match self.parse_escape()? {
@@ -523,7 +519,7 @@ mod test {
         let mut writer: Vec<u8> = Vec::new();
         let mut stream: Vec<u8> = Vec::new();
         stream
-            .write(&original.replace("\n", eol).as_bytes()[..])
+            .write_all(&original.replace("\n", eol).as_bytes()[..])
             .unwrap();
         match super::filter_preprocessed(
             &mut Cursor::new(stream),

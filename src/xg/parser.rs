@@ -36,19 +36,17 @@ pub enum XgParseError {
 impl Display for XgParseError {
     fn fmt(&self, f: &mut Formatter) -> Result<(), ::std::fmt::Error> {
         match self {
-            &XgParseError::AttributeNotFound(ref attr) => {
-                write!(f, "attribute not found: {}", attr)
-            }
-            &XgParseError::EnvironmentNotFound(ref id) => {
+            XgParseError::AttributeNotFound(ref attr) => write!(f, "attribute not found: {}", attr),
+            XgParseError::EnvironmentNotFound(ref id) => {
                 write!(f, "сan't find environment with id: {}", id)
             }
-            &XgParseError::ToolNotFound(ref id) => write!(f, "сan't find tool with id: {}", id),
-            &XgParseError::DependencyNotFound(ref id) => {
+            XgParseError::ToolNotFound(ref id) => write!(f, "сan't find tool with id: {}", id),
+            XgParseError::DependencyNotFound(ref id) => {
                 write!(f, "сan't find task for dependency with id: {}", id)
             }
-            &XgParseError::InvalidStreamFormat => write!(f, "unexpected XML-stream root element"),
-            &XgParseError::EndOfStream => write!(f, "unexpended end of stream"),
-            &XgParseError::XmlError(ref e) => write!(f, "xml reading error: {}", e),
+            XgParseError::InvalidStreamFormat => write!(f, "unexpected XML-stream root element"),
+            XgParseError::EndOfStream => write!(f, "unexpended end of stream"),
+            XgParseError::XmlError(ref e) => write!(f, "xml reading error: {}", e),
         }
     }
 }
@@ -56,13 +54,13 @@ impl Display for XgParseError {
 impl ::std::error::Error for XgParseError {
     fn description(&self) -> &str {
         match self {
-            &XgParseError::AttributeNotFound(_) => "attribute not found",
-            &XgParseError::EnvironmentNotFound(_) => "сan't find environment by id",
-            &XgParseError::ToolNotFound(_) => "сan't find tool by id",
-            &XgParseError::DependencyNotFound(_) => "сan't find task for dependency by id",
-            &XgParseError::InvalidStreamFormat => "unexpected XML-stream root element",
-            &XgParseError::EndOfStream => "unexpended end of stream",
-            &XgParseError::XmlError(_) => "xml reading error",
+            XgParseError::AttributeNotFound(_) => "attribute not found",
+            XgParseError::EnvironmentNotFound(_) => "сan't find environment by id",
+            XgParseError::ToolNotFound(_) => "сan't find tool by id",
+            XgParseError::DependencyNotFound(_) => "сan't find task for dependency by id",
+            XgParseError::InvalidStreamFormat => "unexpected XML-stream root element",
+            XgParseError::EndOfStream => "unexpended end of stream",
+            XgParseError::XmlError(_) => "xml reading error",
         }
     }
 
@@ -101,17 +99,14 @@ struct XgTool {
 pub fn parse<R: Read>(graph: &mut XgGraph, reader: R) -> Result<(), Error> {
     let mut parser = EventReader::new(reader);
     loop {
-        match next_xml_event(&mut parser)? {
-            XmlEvent::StartElement { name, .. } => {
-                return match &name.local_name[..] {
-                    "BuildSet" => parse_build_set(graph, &mut parser),
-                    _ => Err(Error::new(
-                        ErrorKind::InvalidInput,
-                        XgParseError::InvalidStreamFormat,
-                    )),
-                };
-            }
-            _ => {}
+        if let XmlEvent::StartElement { name, .. } = next_xml_event(&mut parser)? {
+            return match &name.local_name[..] {
+                "BuildSet" => parse_build_set(graph, &mut parser),
+                _ => Err(Error::new(
+                    ErrorKind::InvalidInput,
+                    XgParseError::InvalidStreamFormat,
+                )),
+            };
         }
     }
 }
@@ -209,14 +204,11 @@ fn parse_variables<R: Read>(
             XmlEvent::StartElement {
                 name, attributes, ..
             } => {
-                match &name.local_name[..] {
-                    "Variable" => {
-                        let mut attrs = map_attributes(attributes);
-                        let name = take_attr(&mut attrs, "Name")?;
-                        let value = take_attr(&mut attrs, "Value")?;
-                        variables.insert(name, value);
-                    }
-                    _ => {}
+                if name.local_name == "Variable" {
+                    let mut attrs = map_attributes(attributes);
+                    let name = take_attr(&mut attrs, "Name")?;
+                    let value = take_attr(&mut attrs, "Value")?;
+                    variables.insert(name, value);
                 }
                 parse_skip(events, ())?;
             }
@@ -237,21 +229,18 @@ fn parse_tools<R: Read>(
             XmlEvent::StartElement {
                 name, attributes, ..
             } => {
-                match &name.local_name[..] {
-                    "Tool" => {
-                        let mut attrs = map_attributes(attributes);
-                        let name = take_attr(&mut attrs, "Name")?;
-                        let exec = take_attr(&mut attrs, "Path")?;
-                        tools.insert(
-                            name,
-                            XgTool {
-                                exec: Path::new(&exec).to_path_buf(),
-                                output: attrs.remove("OutputPrefix"),
-                                args: attrs.remove("Params").unwrap_or_else(|| String::new()),
-                            },
-                        );
-                    }
-                    _ => {}
+                if name.local_name == "Tool" {
+                    let mut attrs = map_attributes(attributes);
+                    let name = take_attr(&mut attrs, "Name")?;
+                    let exec = take_attr(&mut attrs, "Path")?;
+                    tools.insert(
+                        name,
+                        XgTool {
+                            exec: Path::new(&exec).to_path_buf(),
+                            output: attrs.remove("OutputPrefix"),
+                            args: attrs.remove("Params").unwrap_or_else(String::new),
+                        },
+                    );
                 }
                 parse_skip(events, ())?;
             }
@@ -270,29 +259,26 @@ fn parse_tasks<R: Read>(events: &mut EventReader<R>) -> Result<HashMap<String, X
             XmlEvent::StartElement {
                 name, attributes, ..
             } => {
-                match &name.local_name[..] {
-                    "Task" => {
-                        let mut attrs = map_attributes(attributes);
-                        let name = take_attr(&mut attrs, "Name")?;
-                        let tool = take_attr(&mut attrs, "Tool")?;
-                        let working_dir = take_attr(&mut attrs, "WorkingDir")?;
-                        // DependsOn
-                        let depends_on: HashSet<String> = match attrs.remove("DependsOn") {
-                            Some(v) => HashSet::from_iter(v.split(";").map(|v| v.to_string())),
-                            _ => HashSet::new(),
-                        };
+                if name.local_name == "Task" {
+                    let mut attrs = map_attributes(attributes);
+                    let name = take_attr(&mut attrs, "Name")?;
+                    let tool = take_attr(&mut attrs, "Tool")?;
+                    let working_dir = take_attr(&mut attrs, "WorkingDir")?;
+                    // DependsOn
+                    let depends_on: HashSet<String> = match attrs.remove("DependsOn") {
+                        Some(v) => HashSet::from_iter(v.split(';').map(|v| v.to_string())),
+                        _ => HashSet::new(),
+                    };
 
-                        tasks.insert(
-                            name.clone(),
-                            XgTask {
-                                title: attrs.remove("Caption"),
-                                tool,
-                                working_dir: Path::new(&working_dir).to_path_buf(),
-                                depends_on: depends_on.into_iter().collect::<Vec<String>>(),
-                            },
-                        );
-                    }
-                    _ => {}
+                    tasks.insert(
+                        name.clone(),
+                        XgTask {
+                            title: attrs.remove("Caption"),
+                            tool,
+                            working_dir: Path::new(&working_dir).to_path_buf(),
+                            depends_on: depends_on.into_iter().collect::<Vec<String>>(),
+                        },
+                    );
                 }
                 parse_skip(events, ())?;
             }
@@ -362,11 +348,7 @@ fn graph_project(
         })?;
         let node = graph.add_node(XgNode {
             title: task.title.as_ref().map_or_else(
-                || {
-                    tool.output
-                        .as_ref()
-                        .map_or_else(|| String::new(), |v| v.clone())
-                },
+                || tool.output.as_ref().map_or_else(String::new, |v| v.clone()),
                 |v| v.clone(),
             ),
             command: CommandInfo {

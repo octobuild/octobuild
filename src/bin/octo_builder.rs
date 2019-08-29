@@ -71,9 +71,7 @@ impl BuilderService {
         let config = Config::new().unwrap();
         info!("Helper bind to address: {}", config.helper_bind);
 
-        let temp_dir = create_temp_dir()
-            .ok()
-            .expect("Can't create temporary directory");
+        let temp_dir = create_temp_dir().expect("Can't create temporary directory");
         let state = Arc::new(BuilderState {
             name: get_name(),
             shared: SharedState::new(&config).unwrap(),
@@ -310,7 +308,7 @@ impl<D> Middleware<D> for RpcBuilderUploadHandler {
                     ));
                 }
             };
-            if size <= 0 {
+            if size == 0 {
                 break;
             }
             total_size += size;
@@ -361,7 +359,7 @@ fn is_valid_md5(hash: &str) -> bool {
 
 impl BuilderState {
     fn toolchain_names(&self) -> Vec<String> {
-        let mut names: Vec<String> = self.toolchains.keys().map(|s| s.clone()).collect();
+        let mut names: Vec<String> = self.toolchains.keys().cloned().collect();
         names.sort();
         names
     }
@@ -384,17 +382,11 @@ impl Drop for BuilderService {
     fn drop(&mut self) {
         println!("drop begin");
         self.done.store(true, Ordering::Relaxed);
-        match self.anoncer.take() {
-            Some(t) => {
-                t.join().unwrap();
-            }
-            None => {}
+        if let Some(t) = self.anoncer.take() {
+            t.join().unwrap();
         }
-        match self.listener.take() {
-            Some(t) => {
-                t.detach();
-            }
-            None => {}
+        if let Some(t) = self.listener.take() {
+            t.detach();
         }
         println!("drop end");
     }

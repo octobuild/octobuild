@@ -5,7 +5,7 @@ use std::mem;
 fn read_byte(stream: &mut dyn Read) -> Result<u8> {
     let mut buf = [0];
     let size = stream.read(&mut buf)?;
-    if size <= 0 {
+    if size == 0 {
         return Err(Error::new(
             ErrorKind::InvalidInput,
             "Unexpected end of data",
@@ -37,7 +37,7 @@ fn read_array(stream: &mut dyn Read, buf: &mut [u8]) -> Result<()> {
     let mut pos = 0;
     while pos < buf.len() {
         let size = stream.read(&mut buf[pos..])?;
-        if size <= 0 {
+        if size == 0 {
             return Err(Error::new(
                 ErrorKind::InvalidInput,
                 "Unexpected end of data",
