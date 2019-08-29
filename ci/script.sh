@@ -10,4 +10,5 @@ if [ "${RUSTFMT}" == "true" ]; then
   exit
 fi
 
+cargo build --verbose
 cargo test --verbose
