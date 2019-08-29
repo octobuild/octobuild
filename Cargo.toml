@@ -33,6 +33,13 @@ name = "filter_cl"
 capnpc = "0.10"
 rustc_version = "0.2"
 
+[dev-dependencies]
+criterion = "0.3"
+
+[[bench]]
+name = "vs_postprocess"
+harness = false
+
 [dependencies]
 dirs= "2.0"
 hostname = "0.1"
