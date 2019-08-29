@@ -272,8 +272,7 @@ fn test_parse_vars() {
                     "inner" => Some("$(bar)".to_string()),
                     "none" => None,
                     _ => {
-                        assert!(false, format!("Unexpected value: {}", name));
-                        None
+                        unreachable!(format!("Unexpected value: {}", name));
                     }
                 }
             },
