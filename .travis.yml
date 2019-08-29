@@ -12,15 +12,22 @@ matrix:
     - name: "Clippy Linux"
       os: linux
       env: CLIPPY=true
+      if: tag IS NOT present
+
     - name: "Clippy OSX"
       os: osx
       env: CLIPPY=true
+      if: tag IS NOT present
+
     - name: "Clippy Windows"
       os: windows
       env: CLIPPY=true
+      if: tag IS NOT present
+
     - name: "Rustfmt"
       os: linux
       env: RUSTFMT=true
+      if: tag IS NOT present
 
 addons:
   apt:
