@@ -1,6 +1,6 @@
 language: rust
 dist: bionic
-cache: rust
+cache: cargo
 
 os:
   - windows
