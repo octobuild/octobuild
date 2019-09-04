@@ -1,0 +1,35 @@
+{
+  "package": {
+    "name": "octobuild",
+    "repo": "octobuild",
+    "licenses": [
+      "MIT"
+    ],
+    "desc": "Simple distributed compile system for C++",
+    "github_repo": "__REPO_SLUG__",
+    "website_url": "https://github.com/__REPO_SLUG__",
+    "issue_tracker_url": "https://github.com/__REPO_SLUG__/issues",
+    "vcs_url": "https://github.com/__REPO_SLUG__.git",
+    "github_use_tag_release_notes": true,
+    "github_release_notes_file": "CHANGELOG.md",
+    "subject": "__SUBJECT__"
+  },
+  "version": {
+    "name": "__VERSION__",
+    "vs_tag": "__VERSION__",
+    "desc": "octobuild __VERSION__ by __SUBJECT__",
+    "gpgSign": true
+  },
+  "files": [
+    {
+      "includePattern": "target/deploy/(.[^/]*(\\.deb)$)",
+      "uploadPattern": "$1",
+      "matrixParams": {
+        "deb_distribution": "debian",
+        "deb_component": "main",
+        "deb_architecture": "amd64"
+      }
+    }
+  ],
+  "publish": true
+}
