@@ -12,7 +12,7 @@
         <Package InstallerVersion="405" Compressed="yes" InstallScope="perMachine" />
         <MajorUpgrade AllowSameVersionUpgrades="yes" DowngradeErrorMessage="A later version of [ProductName] is already installed" />
         <Media Id="1" Cabinet="media1.cab" EmbedCab="yes"/>
-		<WixVariable Id="WixUILicenseRtf" Value="wix\MIT.rtf" />
+		<WixVariable Id="WixUILicenseRtf" Value="wix\License.rtf" />
 		<UIRef Id="WixUI_Minimal"/>
 
         <Feature Id="ProductFeature" Level="1">
