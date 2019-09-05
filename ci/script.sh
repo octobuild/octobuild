@@ -10,11 +10,10 @@ if [ "${RUSTFMT}" == "true" ]; then
   exit
 fi
 
-cargo test
+cargo test --all-targets
 
 if [ "${TRAVIS_OS_NAME}" = "windows" ]; then
-  cargo build --release
-  ./wix/build-msi.sh
+  cargo wix --output target/deploy/ --nocapture --bin-path WiX.3.11.1/tools
 elif [ "${TRAVIS_OS_NAME}" = "linux" ]; then
   cargo deb --output target/deploy/
 fi

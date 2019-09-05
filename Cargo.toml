@@ -28,6 +28,9 @@ debug = true
 debug = true
 
 [[bin]]
+name = "xgConsole"
+
+[[bin]]
 name = "octo_builder"
 
 [[bin]]
@@ -38,9 +41,6 @@ name = "octo_clang"
 
 [[bin]]
 name = "octo_coordinator"
-
-[[bin]]
-name = "xgConsole"
 
 [[bin]]
 name = "filter_cl"
