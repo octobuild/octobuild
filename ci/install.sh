@@ -1,4 +1,6 @@
-#!/bin/bash -ex
+#!/bin/bash
+
+set -e
 
 if [ "${CLIPPY}" == "true" ]; then
   rustup component add clippy
@@ -6,14 +8,14 @@ elif [ "${RUSTFMT}" == "true" ]; then
   rustup component add rustfmt
 else
   if [ "${TRAVIS_OS_NAME}" = "windows" ]; then
-    choco install nuget.commandline
+    cinst -y nuget.commandline
     nuget install WiX
+    cargo install cargo-wix
   elif [ "${TRAVIS_OS_NAME}" = "linux" ]; then
-    # Fix this when https://doc.rust-lang.org/nightly/cargo/reference/unstable.html#install-upgrade is stabilized
-    cargo install cargo-deb || true
+    cargo install cargo-deb
   fi
 fi
 
 if [ "${TRAVIS_OS_NAME}" = "windows" ]; then
-  choco install capnproto
+  cinst -y capnproto
 fi
