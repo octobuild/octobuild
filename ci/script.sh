@@ -1,7 +1,7 @@
 #!/bin/bash -ex
 
 if [ "${CLIPPY}" == "true" ]; then
-  cargo clippy --all-targets
+  cargo clippy --all-targets -- -D warnings
   exit
 fi
 

@@ -276,6 +276,7 @@ fn parse_arguments<S: AsRef<str>, I: Iterator<Item = S>>(mut iter: I) -> Result<
     Ok(result)
 }
 
+#[allow(clippy::cognitive_complexity)]
 fn parse_argument<S: AsRef<str>, I: Iterator<Item = S>>(
     iter: &mut I,
 ) -> Option<Result<Arg, String>> {

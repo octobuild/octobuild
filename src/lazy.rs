@@ -5,13 +5,15 @@ pub struct Lazy<T: Clone> {
     holder: RwLock<Option<T>>,
 }
 
-impl<T: Clone> Lazy<T> {
-    pub fn new() -> Self {
+impl<T: Clone> Default for Lazy<T> {
+    fn default() -> Self {
         Lazy {
             holder: RwLock::new(None),
         }
     }
+}
 
+impl<T: Clone> Lazy<T> {
     pub fn get<F: FnOnce() -> T>(&self, factory: F) -> T {
         {
             let read_lock = self.holder.read().unwrap();

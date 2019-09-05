@@ -11,17 +11,23 @@ where
     map: Mutex<HashMap<K, Arc<Mutex<Option<V>>>>>,
 }
 
+impl<K, V> Default for MemCache<K, V>
+where
+    K: Eq + Hash + Clone,
+    V: Clone + Send,
+{
+    fn default() -> Self {
+        MemCache {
+            map: Mutex::new(HashMap::new()),
+        }
+    }
+}
+
 impl<K, V> MemCache<K, V>
 where
     K: Eq + Hash + Clone,
     V: Clone + Send,
 {
-    pub fn new() -> Self {
-        MemCache {
-            map: Mutex::new(HashMap::new()),
-        }
-    }
-
     pub fn run_cached<F>(&self, key: K, worker: F) -> V
     where
         F: Fn(Option<V>) -> V,
