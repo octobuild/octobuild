@@ -7,9 +7,9 @@ use std::io::{BufReader, Read, Write};
 use std::iter::FromIterator;
 use std::net::SocketAddr;
 use std::path::PathBuf;
-use std::sync::{Arc, Mutex};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::Receiver;
+use std::sync::{Arc, Mutex};
 use std::thread;
 use std::thread::JoinHandle;
 use std::time::Duration;
@@ -21,12 +21,12 @@ use daemon::Daemon;
 use daemon::DaemonRunner;
 use daemon::State;
 use log::info;
+use nickel::hyper::method::Method;
+use nickel::status::StatusCode;
 use nickel::{
     HttpRouter, ListeningServer, MediaType, Middleware, MiddlewareResult, Nickel, NickelError,
     Request, Response,
 };
-use nickel::hyper::method::Method;
-use nickel::status::StatusCode;
 use tempdir::TempDir;
 
 use octobuild::cluster::builder::{CompileRequest, CompileResponse};
