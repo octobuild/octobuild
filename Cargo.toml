@@ -47,7 +47,6 @@ name = "filter_cl"
 
 [build-dependencies]
 capnpc = "0.10"
-rustc_version = "0.2"
 
 [dev-dependencies]
 criterion = "0.3"

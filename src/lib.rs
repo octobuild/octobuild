@@ -1,7 +1,3 @@
-include!(concat!(env!("OUT_DIR"), "/version.rs"));
-
-pub const VERSION: &str = env!("CARGO_PKG_VERSION");
-
 #[allow(dead_code)]
 pub mod builder_capnp {
     include!(concat!(env!("OUT_DIR"), "/builder_capnp.rs"));
