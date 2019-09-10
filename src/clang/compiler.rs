@@ -41,7 +41,7 @@ impl ClangToolchain {
     pub fn new(path: PathBuf) -> Self {
         ClangToolchain {
             path,
-            identifier: Lazy::new(),
+            identifier: Default::default(),
         }
     }
 }

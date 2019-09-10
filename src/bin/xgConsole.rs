@@ -1,3 +1,5 @@
+#![allow(non_snake_case)]
+
 use std::env;
 use std::fs::File;
 use std::io;
@@ -199,8 +201,8 @@ fn prepare_graph<C: Compiler>(compiler: &C, graph: XgGraph) -> Result<BuildGraph
         }
     }
 
-    assert!(remap.len() == graph.node_count());
-    assert!(depends.len() == result.node_count());
+    assert_eq!(remap.len(), graph.node_count());
+    assert_eq!(depends.len(), result.node_count());
     for i in 0..depends.len() {
         let node_a = NodeIndex::new(i);
         for neighbor in

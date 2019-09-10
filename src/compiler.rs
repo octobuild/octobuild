@@ -195,7 +195,7 @@ impl CommandEnv {
 
     #[cfg(unix)]
     fn normalize_key(key: String) -> String {
-        key.into()
+        key
     }
 
     #[cfg(windows)]
@@ -518,6 +518,7 @@ impl CompilerGroup {
         Default::default()
     }
 
+    #[allow(clippy::should_implement_trait)]
     pub fn add<C: 'static + Compiler>(mut self: Self, compiler: C) -> Self {
         self.0.push(Box::new(compiler));
         self
@@ -545,8 +546,8 @@ trait Hasher: Digest {
     fn hash_u64(&mut self, number: u64) {
         let mut n = number;
         let mut buf: [u8; 8] = [0; 8];
-        for i in 0..buf.len() {
-            buf[i] = (n & 0xFF) as u8;
+        for e in &mut buf {
+            *e = (n & 0xFF) as u8;
             n >>= 8;
         }
         self.input(&buf);
@@ -570,6 +571,7 @@ pub trait Compiler: Send + Sync {
     // Discovery local toolchains.
     fn discovery_toolchains(&self) -> Vec<Arc<dyn Toolchain>>;
 
+    #[allow(clippy::type_complexity)]
     fn create_tasks(
         &self,
         command: CommandInfo,

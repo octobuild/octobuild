@@ -45,7 +45,7 @@ impl VsToolchain {
         VsToolchain {
             temp_dir: temp_dir.clone(),
             path,
-            identifier: Lazy::new(),
+            identifier: Default::default(),
         }
     }
 }
