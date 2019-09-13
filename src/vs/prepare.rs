@@ -316,6 +316,8 @@ fn parse_argument<S: AsRef<str>, I: Iterator<Item = S>>(
                     s if s.starts_with("fp:") => Ok(Arg::flag(Scope::Shared, flag)),
                     s if s.starts_with("arch:") => Ok(Arg::flag(Scope::Shared, flag)),
                     s if s.starts_with("errorReport:") => Ok(Arg::flag(Scope::Shared, flag)),
+                    s if s.starts_with("source-charset:") => Ok(Arg::flag(Scope::Shared, flag)),
+                    s if s.starts_with("execution-charset:") => Ok(Arg::flag(Scope::Shared, flag)),
                     s if s.starts_with("Fo") => Ok(Arg::output(OutputKind::Object, "Fo", &s[2..])),
                     s if s.starts_with("Fp") => {
                         Ok(Arg::input(InputKind::Precompiled, "Fp", &s[2..]))
