@@ -1,8 +1,7 @@
 use std::borrow::Cow;
 use std::cmp::{max, min};
 use std::io::{Error, ErrorKind};
-use std::sync::mpsc::{channel, Receiver, Sender};
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 use crossbeam;
 use petgraph::graph::NodeIndex;
@@ -131,8 +130,8 @@ pub fn validate_graph<N, E>(graph: Graph<N, E>) -> Result<Graph<N, E>, Error> {
 
 fn execute_until_failed<F>(
     graph: &BuildGraph,
-    tx_task: Sender<TaskMessage>,
-    rx_result: &Receiver<ResultMessage>,
+    tx_task: crossbeam::Sender<TaskMessage>,
+    rx_result: &crossbeam::Receiver<ResultMessage>,
     count: &mut usize,
     update_progress: F,
 ) -> Result<Option<i32>, Error>
@@ -217,16 +216,15 @@ where
         return result.map(|output| output.status);
     }
 
-    let (tx_result, rx_result): (Sender<ResultMessage>, Receiver<ResultMessage>) = channel();
-    let (tx_task, rx_task): (Sender<TaskMessage>, Receiver<TaskMessage>) = channel();
-    let mutex_rx_task = Arc::new(Mutex::new(rx_task));
+    let (tx_result, rx_result) = crossbeam::unbounded::<ResultMessage>();
+    let (tx_task, rx_task) = crossbeam::unbounded::<TaskMessage>();
     let num_cpus = max(1, min(process_limit, graph.node_count()));
     crossbeam::scope(|scope| {
         for worker_id in 0..num_cpus {
-            let local_rx_task = mutex_rx_task.clone();
+            let local_rx_task = rx_task.clone();
             let local_tx_result = tx_result.clone();
             scope.spawn(move |_| {
-                while let Ok(message) = local_rx_task.lock().unwrap().recv() {
+                while let Ok(message) = local_rx_task.recv() {
                     match local_tx_result.send(ResultMessage {
                         index: message.index,
                         worker: worker_id,
@@ -247,7 +245,7 @@ where
         let result =
             execute_until_failed(&graph, tx_task, &rx_result, &mut count, &update_progress);
         // Cleanup task queue.
-        for _ in mutex_rx_task.lock().unwrap().iter() {}
+        for _ in rx_task.try_iter() {}
         // Wait for in progress task completion.
         for message in rx_result.iter() {
             update_progress(BuildResult::new(&message, &mut count, graph.node_count()))?;
