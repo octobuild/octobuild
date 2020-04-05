@@ -5,7 +5,6 @@
 
 language: rust
 dist: xenial
-rust: 1.42.0
 os:
   - windows
   - linux
