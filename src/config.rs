@@ -1,11 +1,9 @@
-use std::env;
-use std::error::Error;
-use std::fs::File;
 use std::io;
-use std::io::{ErrorKind, Read, Result};
+use std::io::{ErrorKind, Result};
 use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4, ToSocketAddrs};
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
+use std::{env, fs};
 
 use yaml_rust::yaml::Hash;
 use yaml_rust::{Yaml, YamlEmitter, YamlLoader};
@@ -168,7 +166,7 @@ impl Config {
                 c.show();
             }
             Err(e) => {
-                println!("  ERROR: {}", e.description());
+                println!("  ERROR: {}", e);
             }
         }
         println!();
@@ -178,7 +176,7 @@ impl Config {
                 c.show();
             }
             Err(e) => {
-                println!("  ERROR: {}", e.description());
+                println!("  ERROR: {}", e);
             }
         }
         println!();
@@ -194,9 +192,7 @@ where
 }
 
 fn load_config<P: AsRef<Path>>(path: P) -> Result<Yaml> {
-    let mut file = File::open(path)?;
-    let mut content = String::new();
-    file.read_to_string(&mut content)?;
+    let content = fs::read_to_string(path)?;
     match YamlLoader::load_from_str(&content) {
         Ok(ref mut docs) => Ok(docs.pop().unwrap()),
         Err(e) => Err(io::Error::new(ErrorKind::InvalidInput, e)),

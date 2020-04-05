@@ -1,5 +1,4 @@
-use std::fs::File;
-use std::io::{Error, ErrorKind, Read};
+use std::io::{Error, ErrorKind};
 use std::iter::FromIterator;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -10,6 +9,7 @@ use crate::cmd;
 use crate::compiler::{
     Arg, CommandInfo, CompilationArgs, CompilationTask, InputKind, OutputKind, Scope,
 };
+use std::fs;
 
 enum ParamValue<T> {
     None,
@@ -74,7 +74,7 @@ pub fn create_tasks(command: CommandInfo, args: &[String]) -> Result<Vec<Compila
                 ParamValue::Single((input, path)) => {
                     let precompiled_path = match precompiled_file {
                         Some(v) => v,
-                        None => Path::new(&path).with_extension(".pch").to_path_buf(),
+                        None => Path::new(&path).with_extension(".pch"),
                     };
                     marker_precompiled = if path.is_empty() { None } else { Some(path) };
                     if input {
@@ -122,7 +122,7 @@ pub fn create_tasks(command: CommandInfo, args: &[String]) -> Result<Vec<Compila
                     }
                 }) {
                     ParamValue::None => None,
-                    ParamValue::Single(v) => Some(v.clone()),
+                    ParamValue::Single(v) => Some(v),
                     ParamValue::Many(v) => {
                         return Err(format!("Found too many output object files: {:?}", v));
                     }
@@ -213,9 +213,7 @@ fn load_arguments<S: AsRef<str>, I: Iterator<Item = S>>(
                 Some(ref p) => p.join(&item.as_ref()[1..]),
                 None => Path::new(&item.as_ref()[1..]).to_path_buf(),
             };
-            let mut file = File::open(path)?;
-            let mut data = Vec::new();
-            file.read_to_end(&mut data)?;
+            let data = fs::read(path)?;
             let text = decode_string(&data)?;
             let mut args = cmd::native::parse(&text)?;
             result.append(&mut args);

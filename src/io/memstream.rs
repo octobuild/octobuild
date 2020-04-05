@@ -69,7 +69,8 @@ impl MemStream {
         while src_offset < buf.len() {
             let dst_offset = self.size % BLOCK_SIZE;
             if dst_offset == 0 {
-                self.blocks.push_back(unsafe { mem::uninitialized() });
+                self.blocks
+                    .push_back(unsafe { mem::MaybeUninit::uninit().assume_init() });
             };
             let block = self.blocks.back_mut().unwrap();
             let copy_size = min(buf.len() - src_offset, BLOCK_SIZE - dst_offset);
@@ -85,7 +86,7 @@ impl MemStream {
 }
 
 fn memcpy(src: &[u8], dst: &mut [u8]) {
-    assert!(src.len() == dst.len());
+    assert_eq!(src.len(), dst.len());
     unsafe {
         ptr::copy_nonoverlapping(&src[0], &mut dst[0], src.len());
     }

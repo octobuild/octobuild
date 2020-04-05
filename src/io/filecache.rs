@@ -187,12 +187,9 @@ fn write_cache(
     }
     write_output(&mut stream, output)?;
     stream.write_all(FOOTER)?;
-    match stream.finish() {
-        (writer, result) => {
-            statistic.add_miss(writer.len());
-            result
-        }
-    }
+    let (writer, result) = stream.finish();
+    statistic.add_miss(writer.len());
+    result
 }
 
 fn read_cached_file<R: Read>(stream: &mut R, path: &PathBuf) -> Result<(), Error> {

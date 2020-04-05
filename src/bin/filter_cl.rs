@@ -1,13 +1,13 @@
+use std::fs;
+use std::io::Cursor;
+
 use clap::{App, AppSettings, Arg};
-use std::fs::File;
-use std::io::{Cursor, Read};
 
 use octobuild::version::{AUTHORS, VERSION};
 use octobuild::vs::postprocess;
 
 fn bench_filter(path: &str, marker: &Option<String>, keep_headers: bool, num: usize) -> Vec<u8> {
-    let mut source = Vec::new();
-    File::open(path).unwrap().read_to_end(&mut source).unwrap();
+    let source = fs::read(path).unwrap();
 
     let mut total: usize = 0;
     let mut result = Vec::with_capacity(source.len());

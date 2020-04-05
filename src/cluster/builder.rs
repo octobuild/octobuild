@@ -1,7 +1,6 @@
 use std::io;
 use std::io::{BufRead, Write};
 
-use capnp;
 use capnp::message::{Allocator, Builder, ReaderOptions};
 use capnp::serialize_packed;
 

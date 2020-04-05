@@ -7,7 +7,6 @@ use std::sync::mpsc::{channel, Receiver};
 use std::sync::Arc;
 use std::thread;
 
-use regex;
 use regex::Regex;
 
 use lazy_static::lazy_static;

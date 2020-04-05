@@ -89,7 +89,7 @@ impl FileHasher for Cache {
             },
         );
         match result {
-            Ok(value) => Ok(value.clone()),
+            Ok(value) => Ok(value),
             Err(_) => Err(Error::new(ErrorKind::Other, "I/O Error")),
         }
     }

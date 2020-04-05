@@ -1,9 +1,9 @@
-use std::env;
 use std::fs::File;
 use std::io::{Cursor, Error, Read, Write};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::Arc;
+use std::{env, fs};
 
 use regex::bytes::{NoExpand, Regex};
 use tempdir::TempDir;
@@ -304,12 +304,8 @@ impl Toolchain for VsToolchain {
     ) -> Result<(OutputInfo, Vec<u8>), Error> {
         let output_temp = TempFile::new_in(self.temp_dir.path(), ".o");
         task.output_object = Some(output_temp.path().to_path_buf());
-        self.compile_step(state, task).and_then(|output| {
-            File::open(&output_temp.path()).and_then(|mut f| {
-                let mut buffer = Vec::new();
-                f.read_to_end(&mut buffer).map(|_| (output, buffer))
-            })
-        })
+        self.compile_step(state, task)
+            .and_then(|output| fs::read(&output_temp.path()).map(|content| (output, content)))
     }
 }
 

@@ -8,10 +8,7 @@ use std::sync::{Arc, RwLock};
 
 use capnp::message;
 use log::{trace, warn};
-use rand;
 use reqwest::{Client, StatusCode};
-use serde_json;
-use time;
 use time::{Duration, Timespec};
 
 use crate::cache::FileHasher;
@@ -127,7 +124,7 @@ impl RemoteToolchain {
         let base_url = get_base_url(&addr);
         // Send compilation request.
         let request = CompileRequest {
-            toolchain: name.clone(),
+            toolchain: name,
             args: task.args.clone(),
             preprocessed_data: (&task.preprocessed).into(),
             precompiled_hash: self.upload_precompiled(state, &task.input_precompiled, &base_url)?,

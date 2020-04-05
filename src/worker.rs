@@ -3,7 +3,6 @@ use std::cmp::{max, min};
 use std::io::{Error, ErrorKind};
 use std::sync::Arc;
 
-use crossbeam;
 use petgraph::graph::NodeIndex;
 use petgraph::{EdgeDirection, Graph};
 

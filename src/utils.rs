@@ -1,12 +1,9 @@
 use crypto::digest::Digest;
 use crypto::md5::Md5;
-use fern;
-use log;
 use std::env;
 use std::io;
 use std::io::{Error, Read};
 use std::iter::FromIterator;
-use time;
 
 pub const DEFAULT_BUF_SIZE: usize = 1024 * 64;
 

@@ -9,7 +9,6 @@ use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 use std::sync::{Arc, RwLock};
 
-use capnp;
 use crypto::digest::Digest;
 use crypto::md5::Md5;
 use ipc::Semaphore;
@@ -650,7 +649,7 @@ fn fn_find_exec_native(mut path: PathBuf) -> Option<PathBuf> {
         return None;
     }
     if path.is_file() {
-        return Some(path.to_path_buf());
+        return Some(path);
     }
     if path
         .extension()

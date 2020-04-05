@@ -1,5 +1,4 @@
 use std::collections::HashMap;
-use std::error::Error;
 use std::fs;
 use std::fs::File;
 use std::io;
@@ -103,7 +102,7 @@ impl BuilderService {
         let done = Arc::new(AtomicBool::new(false));
         BuilderService {
             anoncer: Some(BuilderService::thread_anoncer(
-                state.clone(),
+                state,
                 config.coordinator.unwrap(),
                 done.clone(),
                 listener.socket(),
@@ -136,10 +135,7 @@ impl BuilderService {
                 {
                     Ok(_) => {}
                     Err(e) => {
-                        info!(
-                            "Builder: can't send info to coordinator: {}",
-                            e.description()
-                        );
+                        info!("Builder: can't send info to coordinator: {}", e);
                     }
                 }
                 thread::sleep(Duration::from_secs(1));

@@ -1,6 +1,5 @@
 use local_encoding::{Encoder, Encoding};
 
-use libc;
 use std::fmt::{Display, Formatter};
 use std::io::{Error, ErrorKind, Read, Write};
 use std::ptr;
