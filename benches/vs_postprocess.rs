@@ -1,16 +1,13 @@
+use std::fs;
+use std::io::Cursor;
+
 use criterion::{criterion_group, criterion_main, Criterion};
-use std::fs::File;
-use std::io::{Cursor, Read};
 
 use octobuild::vs::postprocess;
 
 fn filter_preprocessed_benchmark(c: &mut Criterion) {
     c.bench_function("filter_preprocessed", |b| {
-        let mut source = Vec::new();
-        File::open("tests/filter_preprocessed.i")
-            .unwrap()
-            .read_to_end(&mut source)
-            .unwrap();
+        let source = fs::read("tests/filter_preprocessed.i").unwrap();
         let marker = Some("c:\\bozaro\\github\\octobuild\\test_cl\\sample.h".to_string());
 
         b.iter(|| {
