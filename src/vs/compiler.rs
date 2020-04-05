@@ -1,5 +1,5 @@
 use std::fs::File;
-use std::io::{Cursor, Error, Read, Write};
+use std::io::{Cursor, Error, Write};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::Arc;
@@ -411,7 +411,7 @@ fn vs_identifier(path: &Path) -> Option<String> {
 #[cfg(windows)]
 fn read_executable_id(path: &Path) -> Result<String, Error> {
     use byteorder::{LittleEndian, ReadBytesExt};
-    use std::io::{ErrorKind, Seek, SeekFrom};
+    use std::io::{ErrorKind, Read, Seek, SeekFrom};
 
     let mut header: Vec<u8> = Vec::with_capacity(0x54);
 
