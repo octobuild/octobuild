@@ -1,17 +1,17 @@
 use std::net::{IpAddr, SocketAddr};
 use std::str::FromStr;
-use std::sync::{Arc, RwLock};
 use std::sync::mpsc::Receiver;
+use std::sync::{Arc, RwLock};
 use std::time::{Duration, Instant};
 
 use daemon::Daemon;
 use daemon::DaemonRunner;
 use daemon::State;
 use log::info;
+use nickel::status::StatusCode;
 use nickel::{
     HttpRouter, MediaType, Middleware, MiddlewareResult, Nickel, NickelError, Request, Response,
 };
-use nickel::status::StatusCode;
 
 use octobuild::cluster::common::{
     BuilderInfo, BuilderInfoUpdate, RPC_BUILDER_LIST, RPC_BUILDER_UPDATE,

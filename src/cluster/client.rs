@@ -16,7 +16,7 @@ use crate::cache::FileHasher;
 use crate::cluster::builder::{CompileRequest, CompileResponse};
 use crate::cluster::common::{BuilderInfo, RPC_BUILDER_LIST, RPC_BUILDER_TASK, RPC_BUILDER_UPLOAD};
 use crate::compiler::{
-    CommandInfo, CompilationTask, Compiler, CompileStep, OutputInfo, PreprocessResult, SharedState,
+    CommandInfo, CompilationTask, CompileStep, Compiler, OutputInfo, PreprocessResult, SharedState,
     Toolchain,
 };
 use crate::io::memstream::MemStream;
@@ -143,14 +143,14 @@ impl RemoteToolchain {
                     &mut BufReader::new(ReadWrapper(&mut response)),
                     options,
                 )
-                    .map_err(|e| Error::new(ErrorKind::InvalidData, e))
-                    .and_then(|result| {
-                        if let CompileResponse::Success(ref output, ref content) = result {
-                            write_output(&task.output_object, output.success(), content)?;
-                        }
-                        state.statistic.inc_remote();
-                        Ok(result)
-                    })
+                .map_err(|e| Error::new(ErrorKind::InvalidData, e))
+                .and_then(|result| {
+                    if let CompileResponse::Success(ref output, ref content) = result {
+                        write_output(&task.output_object, output.success(), content)?;
+                    }
+                    state.statistic.inc_remote();
+                    Ok(result)
+                })
             })
     }
 
