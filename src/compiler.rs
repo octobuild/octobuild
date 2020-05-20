@@ -1,3 +1,6 @@
+use ipc::Semaphore;
+use sha2::{Digest, Sha256};
+
 use std::cmp::max;
 use std::collections::hash_map;
 use std::collections::HashMap;
@@ -8,10 +11,6 @@ use std::iter::FromIterator;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 use std::sync::{Arc, RwLock};
-
-use crypto::digest::Digest;
-use crypto::md5::Md5;
-use ipc::Semaphore;
 
 use crate::builder_capnp::output_info;
 use crate::cache::{Cache, FileHasher};
@@ -467,10 +466,10 @@ pub trait Toolchain: Send + Sync {
         state: &SharedState,
         task: CompileStep,
     ) -> Result<OutputInfo, Error> {
-        let mut hasher = Md5::new();
+        let mut hasher = Sha256::new();
         // Get hash from preprocessed data
         hasher.hash_u64(task.preprocessed.len() as u64);
-        task.preprocessed.copy(&mut hasher.as_write())?;
+        task.preprocessed.copy(&mut hasher)?;
         // Hash arguments
         hasher.hash_u64(task.args.len() as u64);
         for arg in task.args.iter() {
@@ -504,7 +503,7 @@ pub trait Toolchain: Send + Sync {
         // Try to get files from cache or run
         state.cache.run_file_cached(
             &state.statistic,
-            &hasher.result_str(),
+            &hex::encode(hasher.result()),
             &outputs,
             || -> Result<OutputInfo, Error> { self.compile_step(state, task) },
             || true,

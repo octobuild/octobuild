@@ -1,5 +1,5 @@
-use crypto::digest::Digest;
-use crypto::md5::Md5;
+use sha2::{Digest, Sha256};
+
 use std::env;
 use std::io;
 use std::io::{Error, Read};
@@ -12,9 +12,9 @@ pub fn filter<T, R, F: Fn(&T) -> Option<R>>(args: &[T], filter: F) -> Vec<R> {
 }
 
 pub fn hash_stream<R: Read>(reader: &mut R) -> Result<String, Error> {
-    let mut hash = Md5::new();
-    io::copy(reader, &mut hash.as_write())?;
-    Ok(hash.result_str())
+    let mut hasher = Sha256::new();
+    io::copy(reader, &mut hasher)?;
+    Ok(hex::encode(hasher.result()))
 }
 
 pub fn init_logger() {
@@ -44,6 +44,6 @@ fn test_hash_stream() {
     use std::io::Cursor;
     assert_eq!(
         hash_stream(&mut Cursor::new(b"foobar")).unwrap(),
-        "3858f62230ac3c915f300c664312c63f".to_string()
+        "c3ab8ff13720e8ad9047dd39466b3c8974e592c2fa383d4a3960714caef0c4f2".to_string()
     );
 }

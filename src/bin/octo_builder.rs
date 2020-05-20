@@ -1,21 +1,4 @@
-use std::collections::HashMap;
-use std::fs;
-use std::fs::File;
-use std::io;
-use std::io::{BufReader, Read, Write};
-use std::iter::FromIterator;
-use std::net::SocketAddr;
-use std::path::PathBuf;
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::mpsc::Receiver;
-use std::sync::{Arc, Mutex};
-use std::thread;
-use std::thread::JoinHandle;
-use std::time::Duration;
-
 use capnp::message;
-use crypto::digest::Digest;
-use crypto::md5::Md5;
 use daemon::Daemon;
 use daemon::DaemonRunner;
 use daemon::State;
@@ -26,6 +9,8 @@ use nickel::{
     HttpRouter, ListeningServer, MediaType, Middleware, MiddlewareResult, Nickel, NickelError,
     Request, Response,
 };
+use sha2::digest::DynDigest;
+use sha2::{Digest, Sha256};
 use tempdir::TempDir;
 
 use octobuild::cluster::builder::{CompileRequest, CompileResponse};
@@ -40,6 +25,20 @@ use octobuild::simple::create_temp_dir;
 use octobuild::simple::supported_compilers;
 use octobuild::utils::DEFAULT_BUF_SIZE;
 use octobuild::version;
+use std::collections::HashMap;
+use std::fs;
+use std::fs::File;
+use std::io;
+use std::io::{BufReader, Read, Write};
+use std::iter::FromIterator;
+use std::net::SocketAddr;
+use std::path::PathBuf;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::mpsc::Receiver;
+use std::sync::{Arc, Mutex};
+use std::thread;
+use std::thread::JoinHandle;
+use std::time::Duration;
 
 struct BuilderService {
     done: Arc<AtomicBool>,
@@ -178,7 +177,7 @@ impl<D> Middleware<D> for RpcBuilderTaskHandler {
             let request = CompileRequest::stream_read(&mut buf, options).unwrap();
             let precompiled: Option<PathBuf> = match request.precompiled_hash {
                 Some(ref hash) => {
-                    if !is_valid_md5(hash) {
+                    if !is_valid_sha256(hash) {
                         return Err(NickelError::new(
                             res,
                             format!("Invalid hash value: {}", hash),
@@ -242,7 +241,7 @@ impl<D> Middleware<D> for RpcBuilderUploadHandler {
                 ));
             }
         };
-        if !is_valid_md5(&hash) {
+        if !is_valid_sha256(&hash) {
             return Err(NickelError::new(
                 response,
                 format!("Invalid hash value: {}", hash),
@@ -280,7 +279,7 @@ impl<D> Middleware<D> for RpcBuilderUploadHandler {
 
         // Receive uploading file.
         let tempory = TempFile::wrap(&path.with_extension("tmp"));
-        let mut hasher = Md5::new();
+        let mut hasher = Sha256::new();
         let mut temp = match File::create(tempory.path()) {
             Ok(f) => f,
             Err(e) => {
@@ -318,9 +317,9 @@ impl<D> Middleware<D> for RpcBuilderUploadHandler {
                     ));
                 }
             }
-            hasher.input(&buf[0..size]);
+            Digest::input(&mut hasher, &buf[0..size]);
         }
-        if hasher.result_str() != hash {
+        if hex::encode(hasher.result()) != hash {
             return Err(NickelError::new(
                 response,
                 format!("Content hash mismatch: {}, {}", hash, total_size),
@@ -347,10 +346,10 @@ impl<D> Middleware<D> for RpcBuilderUploadHandler {
     }
 }
 
-fn is_valid_md5(hash: &str) -> bool {
+fn is_valid_sha256(hash: &str) -> bool {
     hex::decode(hash)
         .ok()
-        .map_or(false, |v| v.len() == Md5::new().output_bytes())
+        .map_or(false, |v| v.len() == Sha256::new().output_size() * 2)
 }
 
 impl BuilderState {
