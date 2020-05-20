@@ -1,17 +1,17 @@
 use std::net::{IpAddr, SocketAddr};
 use std::str::FromStr;
-use std::sync::mpsc::Receiver;
 use std::sync::{Arc, RwLock};
+use std::sync::mpsc::Receiver;
+use std::time::{Duration, Instant};
 
 use daemon::Daemon;
 use daemon::DaemonRunner;
 use daemon::State;
 use log::info;
-use nickel::status::StatusCode;
 use nickel::{
     HttpRouter, MediaType, Middleware, MiddlewareResult, Nickel, NickelError, Request, Response,
 };
-use time::{Duration, Timespec};
+use nickel::status::StatusCode;
 
 use octobuild::cluster::common::{
     BuilderInfo, BuilderInfoUpdate, RPC_BUILDER_LIST, RPC_BUILDER_UPDATE,
@@ -21,7 +21,7 @@ use octobuild::config::Config;
 struct BuilderState {
     pub guid: String,
     pub info: BuilderInfo,
-    pub timeout: Timespec,
+    pub timeout: Instant,
 }
 
 struct CoordinatorState {
@@ -67,13 +67,13 @@ impl<D> Middleware<D> for RpcAgentUpdateHandler {
         // Update information.
         {
             let mut holder = self.0.builders.write().unwrap();
-            let now = time::get_time();
+            let now = Instant::now();
             holder.retain(|e| (e.guid != update.guid) && (e.timeout >= now));
             payload = serde_json::to_string(&update.info).unwrap();
             holder.push(BuilderState {
                 guid: update.guid,
                 info: update.info,
-                timeout: now + Duration::seconds(5),
+                timeout: now + Duration::from_secs(5),
             });
         }
 
@@ -90,7 +90,7 @@ impl<D> Middleware<D> for RpcAgentListHandler {
         mut response: Response<'a, D>,
     ) -> MiddlewareResult<'a, D> {
         let holder = self.0.builders.read().unwrap();
-        let now = time::get_time();
+        let now = Instant::now();
         let builders: Vec<&BuilderInfo> = holder
             .iter()
             .filter_map(|e| {

@@ -1,6 +1,6 @@
 use std::io;
 use std::io::{ErrorKind, Result};
-use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4, ToSocketAddrs};
+use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4};
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use std::{env, fs};
@@ -41,13 +41,10 @@ impl Config {
 
     pub fn get_coordinator_addrs(&self) -> Result<Vec<SocketAddr>> {
         match self.coordinator {
-            Some(ref url) => url
-                .with_default_port(|url| match url.scheme() {
-                    "http" => Ok(80),
-                    _ => Err(()),
-                })
-                .and_then(|host| host.to_socket_addrs())
-                .map(|iter| iter.collect()),
+            Some(ref url) => url.socket_addrs(|| match url.scheme() {
+                "http" => Some(80),
+                _ => None,
+            }),
             None => Ok(Vec::new()),
         }
     }

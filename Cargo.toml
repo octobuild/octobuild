@@ -46,7 +46,7 @@ name = "octo_coordinator"
 name = "filter_cl"
 
 [build-dependencies]
-capnpc = "0.10"
+capnpc = "0.12"
 
 [dev-dependencies]
 criterion = "0.3"
@@ -57,31 +57,30 @@ harness = false
 
 [dependencies]
 dirs= "2"
-hostname = "0.1"
+hostname = "0.3"
 yaml-rust = "0.4"
 filetime = "0.2"
 lz4 = "1"
 libc = "0.2"
-petgraph = "0.4"
+petgraph = "0.5"
 xml-rs = "0.8"
 rand = "0.7"
-uuid = { version = "0.7", features = ["v4"] }
+uuid = { version = "0.8", features = ["v4"] }
 tempdir = "0.3"
 num_cpus = "1"
 regex = "1"
 lazy_static = "1"
 clap = "2"
 crossbeam = "0.7"
-reqwest = "0.9"
+reqwest = { version = "0.10", features = ["blocking"] }
 
 byteorder = "1"
 log = "0.4"
-fern = "0.5"
+fern = "0.6"
 # daemon-rs doesn't compile on osx, see https://github.com/bozaro/daemon-rs/pull/9
 daemon = { git = "https://github.com/slonopotamus/daemon-rs", branch = "travis-madness" }
 nickel = "0.11"
 hex = "0.4"
-time = "0.1"
 local-encoding = "0.2"
 # ipc-rs doesn't compile on osx, see https://github.com/alexcrichton/ipc-rs/pull/4
 ipc = { git = "https://github.com/slonopotamus/ipc-rs", branch = "mac-win-travis" }
@@ -91,7 +90,7 @@ serde_derive = "1.0"
 serde_json = "1.0"
 
 sha2 = "0.8"
-capnp = "0.10"
+capnp = "0.12"
 
 [target.'cfg(windows)'.dependencies]
 winreg = "0.6"

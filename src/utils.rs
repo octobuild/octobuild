@@ -1,9 +1,10 @@
-use sha2::{Digest, Sha256};
-
 use std::env;
 use std::io;
 use std::io::{Error, Read};
 use std::iter::FromIterator;
+use std::time::Instant;
+
+use sha2::{Digest, Sha256};
 
 pub const DEFAULT_BUF_SIZE: usize = 1024 * 64;
 
@@ -24,8 +25,8 @@ pub fn init_logger() {
     fern::Dispatch::new()
         .format(|out, message, record| {
             out.finish(format_args!(
-                "{} [{}] {}",
-                time::now().rfc3339(),
+                "{:?} [{}] {}",
+                Instant::now(),
                 record.level(),
                 message
             ))

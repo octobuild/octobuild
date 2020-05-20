@@ -5,17 +5,18 @@ use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::str::FromStr;
 use std::sync::{Arc, RwLock};
+use std::time::{Duration, Instant};
 
 use capnp::message;
 use log::{trace, warn};
-use reqwest::{Client, StatusCode};
-use time::{Duration, Timespec};
+use reqwest::blocking::Client;
+use reqwest::StatusCode;
 
 use crate::cache::FileHasher;
 use crate::cluster::builder::{CompileRequest, CompileResponse};
 use crate::cluster::common::{BuilderInfo, RPC_BUILDER_LIST, RPC_BUILDER_TASK, RPC_BUILDER_UPLOAD};
 use crate::compiler::{
-    CommandInfo, CompilationTask, CompileStep, Compiler, OutputInfo, PreprocessResult, SharedState,
+    CommandInfo, CompilationTask, Compiler, CompileStep, OutputInfo, PreprocessResult, SharedState,
     Toolchain,
 };
 use crate::io::memstream::MemStream;
@@ -26,7 +27,7 @@ pub struct RemoteCompiler<C: Compiler> {
 }
 
 struct RemoteSharedMut {
-    cooldown: Timespec,
+    cooldown: Instant,
     builders: Arc<Vec<BuilderInfo>>,
 }
 
@@ -46,7 +47,7 @@ impl<C: Compiler> RemoteCompiler<C> {
         RemoteCompiler {
             shared: Arc::new(RemoteShared {
                 mutable: RwLock::new(RemoteSharedMut {
-                    cooldown: Timespec { sec: 0, nsec: 0 },
+                    cooldown: Instant::now(),
                     builders: Arc::new(Vec::new()),
                 }),
                 base_url: base_url.as_ref().cloned(),
@@ -61,12 +62,9 @@ impl RemoteSharedMut {
     fn receive_builders(&self, base_url: &Option<reqwest::Url>) -> Result<Vec<BuilderInfo>, Error> {
         match base_url {
             Some(ref base_url) => {
-                let client = reqwest::Client::new();
                 let url = base_url.join(RPC_BUILDER_LIST).unwrap();
-                let response = client
-                    .get(url)
-                    .send()
-                    .map_err(|e| Error::new(ErrorKind::Other, e))?;
+                let response =
+                    reqwest::blocking::get(url).map_err(|e| Error::new(ErrorKind::Other, e))?;
 
                 serde_json::from_reader(response).map_err(|e| Error::new(ErrorKind::InvalidData, e))
             }
@@ -145,14 +143,14 @@ impl RemoteToolchain {
                     &mut BufReader::new(ReadWrapper(&mut response)),
                     options,
                 )
-                .map_err(|e| Error::new(ErrorKind::InvalidData, e))
-                .and_then(|result| {
-                    if let CompileResponse::Success(ref output, ref content) = result {
-                        write_output(&task.output_object, output.success(), content)?;
-                    }
-                    state.statistic.inc_remote();
-                    Ok(result)
-                })
+                    .map_err(|e| Error::new(ErrorKind::InvalidData, e))
+                    .and_then(|result| {
+                        if let CompileResponse::Success(ref output, ref content) = result {
+                            write_output(&task.output_object, output.success(), content)?;
+                        }
+                        state.statistic.inc_remote();
+                        Ok(result)
+                    })
             })
     }
 
@@ -195,7 +193,7 @@ impl RemoteToolchain {
                     )
                     // todo: this is workaround for https://github.com/hyperium/hyper/issues/838
                     //.header(Expect::Continue)
-                    .body(reqwest::Body::sized(file, meta.size))
+                    .body(reqwest::blocking::Body::sized(file, meta.size))
                     .send()
                     .map(|response| response.status())
                     .map_err(|e| Error::new(ErrorKind::BrokenPipe, e))?
@@ -212,7 +210,7 @@ impl RemoteToolchain {
     }
 
     fn builders(&self) -> Arc<Vec<BuilderInfo>> {
-        let now = time::get_time();
+        let now = Instant::now();
         {
             let holder = self.shared.mutable.read().unwrap();
             if holder.cooldown >= now {
@@ -227,10 +225,10 @@ impl RemoteToolchain {
             match holder.receive_builders(&self.shared.base_url) {
                 Ok(builders) => {
                     holder.builders = Arc::new(builders);
-                    holder.cooldown = now + Duration::seconds(5);
+                    holder.cooldown = now + Duration::from_secs(5);
                 }
                 Err(e) => {
-                    holder.cooldown = now + Duration::seconds(1);
+                    holder.cooldown = now + Duration::from_secs(1);
                     warn!("Can't receive toolchains from coordinator: {}", e);
                 }
             }

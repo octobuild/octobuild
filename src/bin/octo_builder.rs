@@ -125,7 +125,7 @@ impl BuilderService {
                 toolchains: state.toolchain_names(),
             });
 
-            let client = reqwest::Client::new();
+            let client = reqwest::blocking::Client::new();
             while !done.load(Ordering::Relaxed) {
                 match client
                     .post(coordinator.join(RPC_BUILDER_UPDATE).unwrap())
@@ -388,7 +388,7 @@ impl Drop for BuilderService {
 }
 
 fn get_name() -> String {
-    hostname::get_hostname().unwrap()
+    hostname::get().unwrap().into_string().unwrap()
 }
 
 fn main() {
