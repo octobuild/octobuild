@@ -33,19 +33,17 @@ impl<W: Write> Counter<W> {
 
 impl<R: Read> Read for Counter<R> {
     fn read(&mut self, buf: &mut [u8]) -> Result<usize> {
-        self.stream.read(buf).and_then(|s| {
-            self.size += s;
-            Ok(s)
-        })
+        let size = self.stream.read(buf)?;
+        self.size += size;
+        Ok(size)
     }
 }
 
 impl<W: Write> Write for Counter<W> {
     fn write(&mut self, buf: &[u8]) -> Result<usize> {
-        self.stream.write(buf).and_then(|s| {
-            self.size += s;
-            Ok(s)
-        })
+        let size = self.stream.write(buf)?;
+        self.size += size;
+        Ok(size)
     }
 
     fn flush(&mut self) -> Result<()> {

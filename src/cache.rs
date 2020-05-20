@@ -93,5 +93,6 @@ impl FileHasher for Cache {
 }
 
 fn generate_file_hash(path: &Path) -> Result<String, Error> {
-    File::open(path).and_then(|mut file| hash_stream(&mut file))
+    let mut file = File::open(path)?;
+    hash_stream(&mut file)
 }

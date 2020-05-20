@@ -135,17 +135,13 @@ impl RemoteToolchain {
             .send()
             .map_err(|e| Error::new(ErrorKind::Other, e))?;
         // Receive compilation result.
-        let compile_response: bincode::Result<CompileResponse> =
-            bincode::deserialize_from(&mut resp);
-        compile_response
-            .map_err(|e| Error::new(ErrorKind::InvalidData, e))
-            .and_then(|result| {
-                if let CompileResponse::Success(ref output, ref content) = result {
-                    write_output(&task.output_object, output.success(), content)?;
-                }
-                state.statistic.inc_remote();
-                Ok(result)
-            })
+        let result: CompileResponse = bincode::deserialize_from(&mut resp)
+            .map_err(|e| Error::new(ErrorKind::InvalidData, e))?;
+        if let CompileResponse::Success(ref output, ref content) = result {
+            write_output(&task.output_object, output.success(), content)?;
+        }
+        state.statistic.inc_remote();
+        Ok(result)
     }
 
     fn upload_precompiled(
@@ -233,8 +229,8 @@ impl RemoteToolchain {
     fn remote_endpoint(&self, toolchain_name: &str) -> Option<SocketAddr> {
         let name = toolchain_name.to_string();
         let all_builders = self.builders();
-        get_random_builder(&all_builders, |b| b.toolchains.contains(&name))
-            .and_then(|builder| SocketAddr::from_str(&builder.endpoint).ok())
+        let builder = get_random_builder(&all_builders, |b| b.toolchains.contains(&name))?;
+        SocketAddr::from_str(&builder.endpoint).ok()
     }
 }
 
@@ -295,13 +291,12 @@ fn write_output(path: &Option<PathBuf>, success: bool, output: &[u8]) -> Result<
     match path {
         Some(ref path) => {
             if success {
-                File::create(path)
-                    .and_then(|mut f| f.write(&output))
-                    .or_else(|e| {
-                        drop(fs::remove_file(path));
-                        Err(e)
-                    })
-                    .map(|_| ())
+                let mut f = File::create(path)?;
+                f.write(&output).or_else(|e| {
+                    drop(fs::remove_file(path));
+                    Err(e)
+                })?;
+                Ok(())
             } else {
                 fs::remove_file(path)
             }

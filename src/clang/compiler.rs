@@ -47,18 +47,15 @@ impl ClangToolchain {
 
 impl Compiler for ClangCompiler {
     fn resolve_toolchain(&self, command: &CommandInfo) -> Option<Arc<dyn Toolchain>> {
-        if command
-            .program
-            .file_name()
-            .map_or(false, |n| RE_CLANG.is_match(n.to_string_lossy().as_bytes()))
-        {
-            command.find_executable().and_then(|path| {
-                self.toolchains
-                    .resolve(&path, |path| Arc::new(ClangToolchain::new(path)))
-            })
-        } else {
-            None
+        let file_name = command.program.file_name()?;
+
+        if !RE_CLANG.is_match(file_name.to_string_lossy().as_bytes()) {
+            return None;
         }
+
+        let executable = command.find_executable()?;
+        self.toolchains
+            .resolve(&executable, |path| Arc::new(ClangToolchain::new(path)))
     }
 
     fn discovery_toolchains(&self) -> Vec<Arc<dyn Toolchain>> {
@@ -176,7 +173,7 @@ impl Toolchain for ClangToolchain {
     fn compile_step(&self, state: &SharedState, task: CompileStep) -> Result<OutputInfo, Error> {
         // Run compiler.
         state.wrap_slow(|| {
-            Command::new(&self.path)
+            let mut child = Command::new(&self.path)
                 .env_clear()
                 .arg("-c")
                 .args(&task.args)
@@ -190,13 +187,11 @@ impl Toolchain for ClangToolchain {
                 .stdin(Stdio::piped())
                 .stdout(Stdio::piped())
                 .stderr(Stdio::piped())
-                .spawn()
-                .and_then(|mut child| {
-                    task.preprocessed.copy(child.stdin.as_mut().unwrap())?;
-                    let _ = task.preprocessed;
-                    child.wait_with_output()
-                })
-                .map(OutputInfo::new)
+                .spawn()?;
+            task.preprocessed.copy(child.stdin.as_mut().unwrap())?;
+            let _ = task.preprocessed;
+            let output = child.wait_with_output()?;
+            Ok(OutputInfo::new(output))
         })
     }
 }
