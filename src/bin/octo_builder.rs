@@ -1,4 +1,18 @@
-use capnp::message;
+use std::collections::HashMap;
+use std::fs;
+use std::fs::File;
+use std::io;
+use std::io::{Read, Write};
+use std::iter::FromIterator;
+use std::net::SocketAddr;
+use std::path::PathBuf;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::mpsc::Receiver;
+use std::sync::{Arc, Mutex};
+use std::thread;
+use std::thread::JoinHandle;
+use std::time::Duration;
+
 use daemon::Daemon;
 use daemon::DaemonRunner;
 use daemon::State;
@@ -25,20 +39,6 @@ use octobuild::simple::create_temp_dir;
 use octobuild::simple::supported_compilers;
 use octobuild::utils::DEFAULT_BUF_SIZE;
 use octobuild::version;
-use std::collections::HashMap;
-use std::fs;
-use std::fs::File;
-use std::io;
-use std::io::{BufReader, Read, Write};
-use std::iter::FromIterator;
-use std::net::SocketAddr;
-use std::path::PathBuf;
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::mpsc::Receiver;
-use std::sync::{Arc, Mutex};
-use std::thread;
-use std::thread::JoinHandle;
-use std::time::Duration;
 
 struct BuilderService {
     done: Arc<AtomicBool>,
@@ -171,10 +171,7 @@ impl<D> Middleware<D> for RpcBuilderTaskHandler {
         // Receive compilation request.
         {
             info!("Received task from: {}", req.origin.remote_addr);
-            let mut buf = BufReader::new(ReadWrapper(&mut req.origin));
-            let mut options = ::capnp::message::ReaderOptions::new();
-            options.traversal_limit_in_words(1024 * 1024 * 1024);
-            let request = CompileRequest::stream_read(&mut buf, options).unwrap();
+            let request: CompileRequest = bincode::deserialize_from(&mut req.origin).unwrap();
             let precompiled: Option<PathBuf> = match request.precompiled_hash {
                 Some(ref hash) => {
                     if !is_valid_sha256(hash) {
@@ -210,12 +207,7 @@ impl<D> Middleware<D> for RpcBuilderTaskHandler {
                 state.toolchains.get(&request.toolchain).unwrap().clone();
             let response =
                 CompileResponse::from(toolchain.compile_memory(&state.shared, compile_step));
-
-            let mut payload = Vec::new();
-            response
-                .stream_write(&mut payload, &mut message::Builder::new_default())
-                .unwrap();
-
+            let payload = bincode::serialize(&response).unwrap();
             res.set(StatusCode::Ok);
             res.set(MediaType::Bin);
             res.send(payload)

@@ -33,15 +33,6 @@ matrix:
       env: CLIPPY=true
       if: tag IS NOT present
 
-addons:
-  apt:
-    packages:
-      - capnproto
-  homebrew:
-    packages:
-      - capnp
-    update: true
-
 before_install:
   # Hack. gcc crashes on Travis when tries to compile lz4-sys
   - if [[ "${TRAVIS_OS_NAME}" == "windows" ]]; then rustup default stable-x86_64-pc-windows-msvc ; fi

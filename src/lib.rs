@@ -1,8 +1,3 @@
-#[allow(dead_code)]
-pub mod builder_capnp {
-    include!(concat!(env!("OUT_DIR"), "/builder_capnp.rs"));
-}
-
 pub mod cache;
 
 pub mod cluster {

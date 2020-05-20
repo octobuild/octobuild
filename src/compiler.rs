@@ -1,6 +1,3 @@
-use ipc::Semaphore;
-use sha2::{Digest, Sha256};
-
 use std::cmp::max;
 use std::collections::hash_map;
 use std::collections::HashMap;
@@ -12,7 +9,10 @@ use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 use std::sync::{Arc, RwLock};
 
-use crate::builder_capnp::output_info;
+use ipc::Semaphore;
+use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
+
 use crate::cache::{Cache, FileHasher};
 use crate::config::Config;
 use crate::io::memstream::MemStream;
@@ -284,7 +284,7 @@ impl CommandInfo {
     }
 }
 
-#[derive(Debug)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct OutputInfo {
     pub status: Option<i32>,
     pub stdout: Vec<u8>,
@@ -305,35 +305,6 @@ impl OutputInfo {
             Some(e) if e == 0 => true,
             _ => false,
         }
-    }
-
-    pub fn read(reader: output_info::Reader) -> Result<(Self, Vec<u8>), capnp::Error> {
-        let content = reader.get_content()?.to_vec();
-        let output = OutputInfo {
-            status: if reader.get_undefined() {
-                Some(reader.get_status())
-            } else {
-                None
-            },
-            stdout: reader.get_stdout()?.to_vec(),
-            stderr: reader.get_stderr()?.to_vec(),
-        };
-        Ok((output, content))
-    }
-
-    pub fn write(&self, mut builder: output_info::Builder, content: &[u8]) {
-        match self.status {
-            Some(v) => {
-                builder.set_undefined(false);
-                builder.set_status(v);
-            }
-            None => {
-                builder.set_undefined(true);
-            }
-        }
-        builder.set_stdout(&self.stdout);
-        builder.set_stderr(&self.stderr);
-        builder.set_content(content);
     }
 }
 

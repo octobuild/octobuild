@@ -1,13 +1,12 @@
 use std::fs;
 use std::fs::File;
-use std::io::{BufReader, Error, ErrorKind, Read, Write};
+use std::io::{Error, ErrorKind, Read, Write};
 use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::str::FromStr;
 use std::sync::{Arc, RwLock};
 use std::time::{Duration, Instant};
 
-use capnp::message;
 use log::{trace, warn};
 use reqwest::blocking::Client;
 use reqwest::StatusCode;
@@ -127,30 +126,25 @@ impl RemoteToolchain {
             preprocessed_data: (&task.preprocessed).into(),
             precompiled_hash: self.upload_precompiled(state, &task.input_precompiled, &base_url)?,
         };
-        let mut request_payload = Vec::new();
-        request.stream_write(&mut request_payload, &mut message::Builder::new_default())?;
-        self.shared
+        let request_payload = bincode::serialize(&request).unwrap();
+        let mut resp: reqwest::blocking::Response = self
+            .shared
             .client
             .post(base_url.join(RPC_BUILDER_TASK).unwrap())
             .body(request_payload)
             .send()
-            .map_err(|e| Error::new(ErrorKind::Other, e))
-            .and_then(|mut response| {
-                // Receive compilation result.
-                let mut options = ::capnp::message::ReaderOptions::new();
-                options.traversal_limit_in_words(1024 * 1024 * 1024);
-                CompileResponse::stream_read(
-                    &mut BufReader::new(ReadWrapper(&mut response)),
-                    options,
-                )
-                .map_err(|e| Error::new(ErrorKind::InvalidData, e))
-                .and_then(|result| {
-                    if let CompileResponse::Success(ref output, ref content) = result {
-                        write_output(&task.output_object, output.success(), content)?;
-                    }
-                    state.statistic.inc_remote();
-                    Ok(result)
-                })
+            .map_err(|e| Error::new(ErrorKind::Other, e))?;
+        // Receive compilation result.
+        let compile_response: bincode::Result<CompileResponse> =
+            bincode::deserialize_from(&mut resp);
+        compile_response
+            .map_err(|e| Error::new(ErrorKind::InvalidData, e))
+            .and_then(|result| {
+                if let CompileResponse::Success(ref output, ref content) = result {
+                    write_output(&task.output_object, output.success(), content)?;
+                }
+                state.statistic.inc_remote();
+                Ok(result)
             })
     }
 
@@ -280,7 +274,7 @@ impl Toolchain for RemoteToolchain {
         match self.compile_remote(state, &task) {
             Ok(response) => match response {
                 CompileResponse::Success(output, _) => Ok(output),
-                CompileResponse::Err(err) => Err(err),
+                CompileResponse::Err(err) => Err(Error::new(ErrorKind::Other, err)),
             },
             Err(e) => {
                 trace!("Fallback to local build: {}", e);

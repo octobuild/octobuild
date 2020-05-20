@@ -15,7 +15,3 @@ else
     cargo install cargo-deb
   fi
 fi
-
-if [ "${TRAVIS_OS_NAME}" = "windows" ]; then
-  cinst -y capnproto
-fi

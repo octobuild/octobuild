@@ -1,4 +1,4 @@
-use serde_derive::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 pub const RPC_BUILDER_UPDATE: &str = "/rpc/v1/builder/update";
