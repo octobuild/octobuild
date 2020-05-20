@@ -209,11 +209,7 @@ fn get_global_config_path() -> Option<PathBuf> {
 
 #[cfg(unix)]
 fn get_global_config_path() -> Option<PathBuf> {
-    Some(
-        Path::new("/etc/octobuild")
-            .join(CONFIG_FILE_NAME)
-            .to_path_buf(),
-    )
+    Some(Path::new("/etc/octobuild").join(CONFIG_FILE_NAME))
 }
 
 fn replace_home(path: &str) -> Result<PathBuf> {
