@@ -93,5 +93,5 @@ sha2 = "0.8"
 capnp = "0.12"
 
 [target.'cfg(windows)'.dependencies]
-winreg = "0.6"
+winreg = "0.7"
 winapi = { version = "0.3", features = ["winver"] }
