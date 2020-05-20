@@ -9,8 +9,7 @@ use super::io::filecache::FileCache;
 use super::io::memcache::MemCache;
 use super::io::statistic::Statistic;
 use super::utils::hash_stream;
-
-use filetime::FileTime;
+use std::time::SystemTime;
 
 pub struct Cache {
     file_cache: FileCache,
@@ -21,7 +20,7 @@ pub struct Cache {
 pub struct FileHash {
     pub hash: String,
     pub size: u64,
-    pub modified: FileTime,
+    pub modified: SystemTime,
 }
 
 pub trait FileHasher {
@@ -67,9 +66,7 @@ impl FileHasher for Cache {
                 // Validate cached value.
                 if let Some(result) = cached {
                     if let Ok(value) = result {
-                        if value.size == stat.len()
-                            && value.modified == FileTime::from_last_modification_time(&stat)
-                        {
+                        if value.size == stat.len() && value.modified == stat.modified().unwrap() {
                             return Ok(value);
                         }
                     }
@@ -84,7 +81,7 @@ impl FileHasher for Cache {
                 Ok(FileHash {
                     hash,
                     size: stat.len(),
-                    modified: FileTime::from_last_modification_time(&stat),
+                    modified: stat.modified().unwrap(),
                 })
             },
         );

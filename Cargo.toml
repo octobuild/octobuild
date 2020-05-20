@@ -59,7 +59,6 @@ harness = false
 dirs= "2"
 hostname = "0.3"
 yaml-rust = "0.4"
-filetime = "0.2"
 lz4 = "1"
 libc = "0.2"
 petgraph = "0.5"

@@ -6,14 +6,13 @@ use std::fs::{File, OpenOptions};
 use std::io::{Error, ErrorKind, Read, Seek, SeekFrom, Write};
 use std::path::{Path, PathBuf};
 
-use filetime::FileTime;
-
 use super::super::compiler::OutputInfo;
 use super::super::config::Config;
 use super::super::utils::DEFAULT_BUF_SIZE;
 use super::binary::*;
 use super::counter::Counter;
 use super::statistic::Statistic;
+use std::time::SystemTime;
 
 const HEADER: &[u8] = b"OBCF\x00\x03";
 const FOOTER: &[u8] = b"END\x00";
@@ -69,7 +68,7 @@ pub struct FileCache {
 struct CacheFile {
     path: PathBuf,
     size: u64,
-    accessed: FileTime,
+    accessed: SystemTime,
 }
 
 impl FileCache {
@@ -131,7 +130,7 @@ fn find_cache_files(dir: &Path, mut files: Vec<CacheFile>) -> Result<Vec<CacheFi
             files.push(CacheFile {
                 path,
                 size: stat.len(),
-                accessed: FileTime::from_last_modification_time(&stat),
+                accessed: stat.modified()?,
             });
         }
     }
