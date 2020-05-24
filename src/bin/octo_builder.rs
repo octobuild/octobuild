@@ -129,7 +129,7 @@ impl BuilderService {
             while !done.load(Ordering::Relaxed) {
                 match client
                     .post(coordinator.join(RPC_BUILDER_UPDATE).unwrap())
-                    .body(serde_json::to_string(&info).unwrap())
+                    .body(bincode::serialize(&info).unwrap())
                     .send()
                 {
                     Ok(_) => {}

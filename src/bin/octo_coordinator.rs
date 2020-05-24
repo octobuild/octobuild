@@ -46,7 +46,7 @@ impl<D> Middleware<D> for RpcAgentUpdateHandler {
         request: &mut Request<'a, 'server, D>,
         mut response: Response<'a, D>,
     ) -> MiddlewareResult<'a, D> {
-        let mut update: BuilderInfoUpdate = serde_json::from_reader(&mut request.origin).unwrap();
+        let mut update: BuilderInfoUpdate = bincode::deserialize_from(&mut request.origin).unwrap();
         // Fix inspecified endpoint IP address.
         let endpoint = match SocketAddr::from_str(&update.info.endpoint) {
             Ok(v) => v,
@@ -63,13 +63,13 @@ impl<D> Middleware<D> for RpcAgentUpdateHandler {
                 SocketAddr::new(request.origin.remote_addr.ip(), endpoint.port()).to_string();
         }
 
-        let payload: String;
+        let payload: Vec<u8>;
         // Update information.
         {
             let mut holder = self.0.builders.write().unwrap();
             let now = Instant::now();
             holder.retain(|e| (e.guid != update.guid) && (e.timeout >= now));
-            payload = serde_json::to_string(&update.info).unwrap();
+            payload = bincode::serialize(&update.info).unwrap();
             holder.push(BuilderState {
                 guid: update.guid,
                 info: update.info,
@@ -78,7 +78,7 @@ impl<D> Middleware<D> for RpcAgentUpdateHandler {
         }
 
         response.set(StatusCode::Ok);
-        response.set(MediaType::Json);
+        response.set(MediaType::Bin);
         response.send(payload)
     }
 }
@@ -103,8 +103,8 @@ impl<D> Middleware<D> for RpcAgentListHandler {
             .collect();
 
         response.set(StatusCode::Ok);
-        response.set(MediaType::Json);
-        response.send(serde_json::to_string(&builders).unwrap())
+        response.set(MediaType::Bin);
+        response.send(bincode::serialize(&builders).unwrap())
     }
 }
 

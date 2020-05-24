@@ -62,10 +62,11 @@ impl RemoteSharedMut {
         match base_url {
             Some(ref base_url) => {
                 let url = base_url.join(RPC_BUILDER_LIST).unwrap();
-                let response =
+                let mut response =
                     reqwest::blocking::get(url).map_err(|e| Error::new(ErrorKind::Other, e))?;
 
-                serde_json::from_reader(response).map_err(|e| Error::new(ErrorKind::InvalidData, e))
+                bincode::deserialize_from(&mut response)
+                    .map_err(|e| Error::new(ErrorKind::InvalidData, e))
             }
             None => Ok(Vec::new()),
         }
