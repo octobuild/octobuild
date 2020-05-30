@@ -1,8 +1,8 @@
 = octobuild
 Artem Navrotskiy; Marat Radchenko
-:slug: boozaro/octobuild
+:slug: bozaro/octobuild
 :uri-project: https://github.com/{slug}
-:uri-ci: {uri-repo}/actions?query=branch%3Amaster
+:uri-ci: {uri-project}/actions?query=branch%3Amaster
 :uri-discuss: https://gitter.im/{slug}
 :uri-unreal: https://github.com/EpicGames/UnrealEngine
 
