@@ -3,7 +3,7 @@ name = "octobuild"
 version = "0.1.15"
 authors = [ "Artem V. Navrotskiy <bozaro@users.noreply.github.com>" ]
 edition = "2018"
-readme = "README.md"
+readme = "README.adoc"
 description = "Simple distributed compile system for C++"
 homepage = "https://github.com/bozaro/octobuild"
 repository = "https://github.com/bozaro/octobuild.git"
@@ -17,7 +17,7 @@ extended-description = ""
 assets = [
     ["target/release/xgConsole", "usr/bin/", "755"],
     ["target/release/octo_clang", "usr/bin/", "755"],
-    ["*.md", "usr/share/doc/octobuild/", "644"],
+    ["*.adoc", "usr/share/doc/octobuild/", "644"],
 ]
 
 [profile.bench]
