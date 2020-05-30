@@ -1,24 +1,35 @@
-# Overview
+= octobuild
+Artem Navrotskiy; Marat Radchenko
+:slug: boozaro/octobuild
+:uri-project: https://github.com/{slug}
+:uri-ci: {uri-repo}/actions?query=branch%3Amaster
+:uri-discuss: https://gitter.im/{slug}
+:uri-unreal: https://github.com/EpicGames/UnrealEngine
 
-[![Join the chat at https://gitter.im/bozaro/octobuild](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/bozaro/octobuild?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
-[![Build Status](https://github.com/bozaro/octobuild/workflows/CI/badge.svg?branch=master)](https://github.com/bozaro/octobuild/actions?query=branch%3Amaster)
+image:https://badges.gitter.im/Join%20Chat.svg[Gitter,link={uri-discuss}]
+image:{uri-project}/workflows/CI/badge.svg?branch=master[Build Status,link={uri-ci}]
+
+== Overview
 
 This project allows you to cache the compilation on Unreal Engine building (like ccache).
 
 It's supported out of box (you need simply install it):
 
- * Visual Studio UBT build on Windows;
- * clang UBT build on Linux.
+* Visual Studio UBT build on Windows;
+* clang UBT build on Linux.
 
 This program uses UBT extension point for IncrediBuild.
 
 It speeds up recompilation by caching previous compilations and detecting when the same compilation is being done again.
 
-## Installation
+== Installation
 
-### Windows 10
+=== Windows 10
+
 You can install octobuild by PowerShell commands:
-```ps1
+
+[source,powershell]
+----
 # First, you have to set the execution policy to allow scripts, otherwise it'll silently fail
 # while reporting success (https://github.com/OneGet/oneget/issues/97#issuecomment-139331418):
 Set-ExecutionPolicy RemoteSigned
@@ -26,44 +37,49 @@ Set-ExecutionPolicy RemoteSigned
 Register-PackageSource -Name bozaro -Provider Chocolatey -Location https://www.myget.org/F/bozaro/
 # Install package
 Install-Package octobuild
-```
+----
 
-### Chocolatey
+=== Chocolatey
+
 Chocolatey installation:
-```bat
+
+[source,bat]
+----
 rem Add chocolatey source
 choco sources add -name bozaro -source https://www.myget.org/F/bozaro/
 
 rem Install package
 choco install octobuild
-```
+----
 
-### Ubuntu/Debian
+=== Ubuntu/Debian
 
 You can install octobuild by commands:
-```bash
+
+[source,bash]
+----
 # Add package source
 echo "deb https://dist.bozaro.ru/ debian/" | sudo tee /etc/apt/sources.list.d/dist.bozaro.ru.list
 curl -s https://dist.bozaro.ru/signature.gpg | sudo apt-key add -
 # Install package
 sudo apt-get update
 sudo apt-get install octobuild
-```
+----
 
-## Configuration files
+== Configuration files
 
 You can get configuration files and show default and actual configuration by running ```xgConsole``` without parameters.
 
-## Known issues
+== Known issues
 
 On Windows you can't mix compilation with and without octobuild.
 
-## Unreal Engine patches
+== Unreal Engine patches
 
 This project require some patches for Unreal Engine:
 
- * [#1789](https://github.com/EpicGames/UnrealEngine/pull/1789) Allow use xgConsole on Linux (merged to 4.11)
- * [#1825](https://github.com/EpicGames/UnrealEngine/pull/1825) Don't disable XGE for building UnrealHeaderTool (merged to 4.12)
- * [#1959](https://github.com/EpicGames/UnrealEngine/pull/1959) Fix redistributable build on Windows for UE 4.11 (merged to 4.12)
- * [#2144](https://github.com/EpicGames/UnrealEngine/pull/2144) Enable xgConsole octobuild implementation in AutomationTool (merged to 4.14)
- * [#3014](https://github.com/EpicGames/UnrealEngine/pull/3014) Increase cache hit by removing timestamp from generated filed
+* {uri-unreal}/pull/1789[#1789] Allow use xgConsole on Linux (merged to 4.11)
+* {uri-unreal}/pull/1825[#1825] Don't disable XGE for building UnrealHeaderTool (merged to 4.12)
+* {uri-unreal}/pull/1959[#1959] Fix redistributable build on Windows for UE 4.11 (merged to 4.12)
+* {uri-unreal}/pull/2144[#2144] Enable xgConsole octobuild implementation in AutomationTool (merged to 4.14)
+* {uri-unreal}/pull/3014[#3014] Increase cache hit by removing timestamp from generated filed
