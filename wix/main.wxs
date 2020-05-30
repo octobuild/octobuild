@@ -87,12 +87,12 @@
                                 Action='set'
                                 System='yes'/>
                         </Component>
-                        <Component Id='xgConsoleBinary' Guid='*' Win64='$(var.Win64)'>
+                        <Component Id='binary0' Guid='*' Win64='$(var.Win64)'>
                             <File
-                                Id='xgConsoleEXE'
+                                Id='exe0'
                                 Name='xgConsole.exe'
                                 DiskId='1'
-                                Source='target\release\xgConsole.exe'
+                                Source='target\$(var.Profile)\xgConsole.exe'
                                 KeyPath='yes'/>
                         </Component>
                     </Directory>
@@ -101,9 +101,9 @@
         </Directory>
 
         <Feature
-            Id='MainProgram'
+            Id='Binaries'
             Title='Application'
-            Description='Installs the executable and license.'
+            Description='Installs all binaries and the license.'
             Level='1'
             ConfigurableDirectory='APPLICATIONFOLDER'
             AllowAdvertise='no'
@@ -115,7 +115,8 @@
             -->
             <ComponentRef Id='License'/>
             
-            <ComponentRef Id='xgConsoleBinary'/>
+            <ComponentRef Id='binary0'/>
+
             <Feature
                 Id='Environment'
                 Title='PATH Environment Variable'
