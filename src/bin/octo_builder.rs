@@ -309,9 +309,9 @@ impl<D> Middleware<D> for RpcBuilderUploadHandler {
                     ));
                 }
             }
-            Digest::input(&mut hasher, &buf[0..size]);
+            Digest::update(&mut hasher, &buf[0..size]);
         }
-        if hex::encode(hasher.result()) != hash {
+        if hex::encode(hasher.finalize()) != hash {
             return Err(NickelError::new(
                 response,
                 format!("Content hash mismatch: {}, {}", hash, total_size),

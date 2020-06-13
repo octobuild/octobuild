@@ -474,7 +474,7 @@ pub trait Toolchain: Send + Sync {
         // Try to get files from cache or run
         state.cache.run_file_cached(
             &state.statistic,
-            &hex::encode(hasher.result()),
+            &hex::encode(hasher.finalize()),
             &outputs,
             || -> Result<OutputInfo, Error> { self.compile_step(state, task) },
             || true,
@@ -519,16 +519,16 @@ trait Hasher: Digest {
             *e = (n & 0xFF) as u8;
             n >>= 8;
         }
-        self.input(&buf);
+        self.update(&buf);
     }
 
     fn hash_u8(&mut self, number: u8) {
-        self.input(&[number]);
+        self.update(&[number]);
     }
 
     fn hash_bytes(&mut self, bytes: &[u8]) {
         self.hash_u64(bytes.len() as u64);
-        self.input(bytes);
+        self.update(bytes);
     }
 }
 

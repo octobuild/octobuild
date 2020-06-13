@@ -15,7 +15,7 @@ pub fn filter<T, R, F: Fn(&T) -> Option<R>>(args: &[T], filter: F) -> Vec<R> {
 pub fn hash_stream<R: Read>(reader: &mut R) -> Result<String, Error> {
     let mut hasher = Sha256::new();
     io::copy(reader, &mut hasher)?;
-    Ok(hex::encode(hasher.result()))
+    Ok(hex::encode(hasher.finalize()))
 }
 
 pub fn init_logger() {
