@@ -16,12 +16,14 @@ This project allows you to cache the compilation on Unreal Engine building (like
 
 It's supported out of box (you need simply install it):
 
-* Visual Studio UBT build on Windows;
-* clang UBT build on Linux.
-
-This program uses UBT extension point for IncrediBuild.
+* Visual Studio UBT build on Windows
+* clang UBT build on Linux
 
 It speeds up recompilation by caching previous compilations and detecting when the same compilation is being done again.
+
+////
+
+TODO: #47 document installation process
 
 == Installation
 
@@ -67,6 +69,8 @@ sudo apt-get update
 sudo apt-get install octobuild
 ----
 
+////
+
 == Configuration files
 
 You can get configuration files and show default and actual configuration by running ```xgConsole``` without parameters.
@@ -74,13 +78,3 @@ You can get configuration files and show default and actual configuration by run
 == Known issues
 
 On Windows you can't mix compilation with and without octobuild.
-
-== Unreal Engine patches
-
-This project require some patches for Unreal Engine:
-
-* {uri-unreal}/pull/1789[#1789] Allow use xgConsole on Linux (merged to 4.11)
-* {uri-unreal}/pull/1825[#1825] Don't disable XGE for building UnrealHeaderTool (merged to 4.12)
-* {uri-unreal}/pull/1959[#1959] Fix redistributable build on Windows for UE 4.11 (merged to 4.12)
-* {uri-unreal}/pull/2144[#2144] Enable xgConsole octobuild implementation in AutomationTool (merged to 4.14)
-* {uri-unreal}/pull/3014[#3014] Increase cache hit by removing timestamp from generated filed
