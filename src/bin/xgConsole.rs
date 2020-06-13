@@ -205,11 +205,10 @@ fn prepare_graph<C: Compiler>(compiler: &C, graph: XgGraph) -> Result<BuildGraph
     assert_eq!(depends.len(), result.node_count());
     for i in 0..depends.len() {
         let node_a = NodeIndex::new(i);
-        for neighbor in
-            graph.neighbors_directed(depends.get(i).unwrap().clone(), EdgeDirection::Outgoing)
+        for neighbor in graph.neighbors_directed(*depends.get(i).unwrap(), EdgeDirection::Outgoing)
         {
             let node_b = remap.get(neighbor.index()).unwrap();
-            result.add_edge(node_a, node_b.clone(), ());
+            result.add_edge(node_a, *node_b, ());
         }
     }
     validate_graph(result)
