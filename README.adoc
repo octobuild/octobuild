@@ -6,7 +6,7 @@ Artem Navrotskiy; Marat Radchenko
 :uri-discuss: https://gitter.im/{slug}
 :uri-unreal: https://github.com/EpicGames/UnrealEngine
 
-image:https://img.shields.io/github/release/{slug}.svg[Download,link={url-project}/releases/latest]
+image:https://img.shields.io/github/release/{slug}.svg[Download,link={uri-project}/releases/latest]
 image:{uri-project}/workflows/CI/badge.svg?branch=master[Build Status,link={uri-ci}]
 image:https://badges.gitter.im/{slug}.svg[Gitter chat,link={uri-discuss}]
 
