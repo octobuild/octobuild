@@ -4,10 +4,15 @@ use std::io::Cursor;
 use criterion::{criterion_group, criterion_main, Criterion};
 
 use octobuild::vs::postprocess;
+use std::path::PathBuf;
 
 fn filter_preprocessed_benchmark(c: &mut Criterion) {
     c.bench_function("filter_preprocessed", |b| {
-        let source = fs::read("tests/filter_preprocessed.i").unwrap();
+        let f = PathBuf::from(file!())
+            .parent()
+            .unwrap()
+            .join(PathBuf::from("filter_preprocessed.i"));
+        let source = fs::read(f).unwrap();
         let marker = Some("c:\\bozaro\\github\\octobuild\\test_cl\\sample.h".to_string());
 
         b.iter(|| {

@@ -390,15 +390,3 @@ fn take_attr(attrs: &mut HashMap<String, String>, attr: &'static str) -> Result<
         )
     })
 }
-
-#[test]
-fn test_parse_smoke() {
-    use std::fs::File;
-    use std::io::BufReader;
-
-    parse(
-        &mut Graph::new(),
-        BufReader::new(File::open("tests/graph-parser.xml").unwrap()),
-    )
-    .unwrap();
-}
