@@ -293,9 +293,9 @@ fn write_output(path: &Option<PathBuf>, success: bool, output: &[u8]) -> Result<
         Some(ref path) => {
             if success {
                 let mut f = File::create(path)?;
-                f.write(&output).or_else(|e| {
+                f.write(&output).map_err(|e| {
                     drop(fs::remove_file(path));
-                    Err(e)
+                    e
                 })?;
                 Ok(())
             } else {
