@@ -18,14 +18,7 @@ pub fn create_tasks(command: CommandInfo, args: &[String]) -> Result<Vec<Compila
         // Support only compilation steps
         return Ok(Vec::new());
     }
-    if args
-        .iter()
-        .find(|v| match v as &str {
-            "-c" => true,
-            _ => false,
-        })
-        .is_none()
-    {
+    if args.iter().find(|v| matches!(v as &str, "-c")).is_none() {
         // Support only compilation steps
         return Ok(Vec::new());
     }

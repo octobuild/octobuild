@@ -301,10 +301,7 @@ impl OutputInfo {
     }
 
     pub fn success(&self) -> bool {
-        match self.status {
-            Some(e) if e == 0 => true,
-            _ => false,
-        }
+        matches!(self.status, Some(e) if e == 0)
     }
 }
 
@@ -488,7 +485,7 @@ impl CompilerGroup {
     }
 
     #[allow(clippy::should_implement_trait)]
-    pub fn add<C: 'static + Compiler>(mut self: Self, compiler: C) -> Self {
+    pub fn add<C: 'static + Compiler>(mut self, compiler: C) -> Self {
         self.0.push(Box::new(compiler));
         self
     }

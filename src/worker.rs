@@ -84,7 +84,7 @@ impl BuildAction {
         actions
     }
 
-    pub fn title(self: &Self) -> Cow<str> {
+    pub fn title(&self) -> Cow<str> {
         match self {
             BuildAction::Empty => Cow::Borrowed(""),
             BuildAction::Exec(_, ref args) => Cow::Owned(format!("{:?}", args)),
@@ -137,10 +137,7 @@ fn execute_until_failed<F>(
 where
     F: Fn(BuildResult) -> Result<(), Error>,
 {
-    let mut completed: Vec<bool> = Vec::new();
-    for _ in 0..graph.node_count() {
-        completed.push(false);
-    }
+    let mut completed: Vec<bool> = vec![false; graph.node_count()];
     for index in graph.externals(EdgeDirection::Outgoing) {
         tx_task
             .send(TaskMessage {

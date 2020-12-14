@@ -469,10 +469,7 @@ fn prepare_output(line: &[u8], mut buffer: Vec<u8>, success: bool) -> Vec<u8> {
 }
 
 fn is_eol(c: u8) -> bool {
-    match c {
-        b'\r' | b'\n' => true,
-        _ => false,
-    }
+    matches!(c, b'\r' | b'\n')
 }
 
 fn join_flag(flag: &str, path: &Path) -> String {
