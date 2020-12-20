@@ -27,7 +27,7 @@ pub struct RemoteCompiler<C: Compiler> {
 
 struct RemoteSharedMut {
     cooldown: Instant,
-    builders: Arc<Vec<BuilderInfo>>,
+    builders: Arc<[BuilderInfo]>,
 }
 
 struct RemoteShared {
@@ -47,7 +47,7 @@ impl<C: Compiler> RemoteCompiler<C> {
             shared: Arc::new(RemoteShared {
                 mutable: RwLock::new(RemoteSharedMut {
                     cooldown: Instant::now(),
-                    builders: Arc::new(Vec::new()),
+                    builders: Arc::new([] as [BuilderInfo; 0]),
                 }),
                 base_url: base_url.as_ref().cloned(),
                 client: Client::new(),
@@ -200,7 +200,7 @@ impl RemoteToolchain {
         }
     }
 
-    fn builders(&self) -> Arc<Vec<BuilderInfo>> {
+    fn builders(&self) -> Arc<[BuilderInfo]> {
         let now = Instant::now();
         {
             let holder = self.shared.mutable.read().unwrap();
@@ -215,7 +215,7 @@ impl RemoteToolchain {
             }
             match holder.receive_builders(&self.shared.base_url) {
                 Ok(builders) => {
-                    holder.builders = Arc::new(builders);
+                    holder.builders = Arc::new(builders.into());
                     holder.cooldown = now + Duration::from_secs(5);
                 }
                 Err(e) => {
