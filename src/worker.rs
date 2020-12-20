@@ -129,8 +129,8 @@ pub fn validate_graph<N, E>(graph: Graph<N, E>) -> Result<Graph<N, E>, Error> {
 
 fn execute_until_failed<F>(
     graph: &BuildGraph,
-    tx_task: crossbeam::Sender<TaskMessage>,
-    rx_result: &crossbeam::Receiver<ResultMessage>,
+    tx_task: crossbeam::channel::Sender<TaskMessage>,
+    rx_result: &crossbeam::channel::Receiver<ResultMessage>,
     count: &mut usize,
     update_progress: F,
 ) -> Result<Option<i32>, Error>
@@ -212,8 +212,8 @@ where
         return result.map(|output| output.status);
     }
 
-    let (tx_result, rx_result) = crossbeam::unbounded::<ResultMessage>();
-    let (tx_task, rx_task) = crossbeam::unbounded::<TaskMessage>();
+    let (tx_result, rx_result) = crossbeam::channel::unbounded::<ResultMessage>();
+    let (tx_task, rx_task) = crossbeam::channel::unbounded::<TaskMessage>();
     let num_cpus = max(1, min(process_limit, graph.node_count()));
     crossbeam::scope(|scope| {
         for worker_id in 0..num_cpus {
