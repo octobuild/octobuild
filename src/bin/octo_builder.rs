@@ -3,7 +3,6 @@ use std::fs;
 use std::fs::File;
 use std::io;
 use std::io::{Read, Write};
-use std::iter::FromIterator;
 use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -144,12 +143,11 @@ impl BuilderService {
 
     fn discovery_toolchains(temp_dir: &Arc<TempDir>) -> HashMap<String, Arc<dyn Toolchain>> {
         let compiler = supported_compilers(temp_dir);
-        HashMap::from_iter(
-            compiler
-                .discovery_toolchains()
-                .into_iter()
-                .filter_map(|toolchain| toolchain.identifier().map(|name| (name, toolchain))),
-        )
+        compiler
+            .discovery_toolchains()
+            .into_iter()
+            .filter_map(|toolchain| toolchain.identifier().map(|name| (name, toolchain)))
+            .collect()
     }
 }
 

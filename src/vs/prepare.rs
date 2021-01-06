@@ -1,5 +1,4 @@
 use std::io::{Error, ErrorKind};
-use std::iter::FromIterator;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
@@ -194,7 +193,7 @@ fn get_output_object(
 }
 
 fn find_param<T, R, F: Fn(&T) -> Option<R>>(args: &[T], filter: F) -> ParamValue<R> {
-    let mut found = Vec::from_iter(args.iter().filter_map(filter));
+    let mut found: Vec<R> = args.iter().filter_map(filter).collect();
     match found.len() {
         0 => ParamValue::None,
         1 => ParamValue::Single(found.pop().unwrap()),
@@ -364,12 +363,12 @@ fn has_param_prefix(arg: &str) -> bool {
 
 #[test]
 fn test_parse_argument() {
-    let args = Vec::from_iter(
+    let args: Vec<String> =
         "/TP /c /Yusample.h /Fpsample.h.pch /Fosample.cpp.o /DTEST /D TEST2 /arch:AVX \
          sample.cpp"
             .split(' ')
-            .map(|x| x.to_string()),
-    );
+            .map(|x| x.to_string())
+            .collect();
     assert_eq!(
         parse_arguments(args.iter()).unwrap(),
         [

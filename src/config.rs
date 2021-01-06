@@ -63,7 +63,7 @@ impl Config {
         } else {
             env::var("OCTOBUILD_CACHE")
                 .ok()
-                .and_then(|v| if v == "" { None } else { Some(v) })
+                .and_then(|v| if v.is_empty() { None } else { Some(v) })
         }
         .or_else(|| {
             get_config(local, global, PARAM_CACHE_PATH, |v| {
