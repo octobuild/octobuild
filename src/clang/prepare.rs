@@ -1,4 +1,3 @@
-use std::iter::FromIterator;
 use std::path::{Path, PathBuf};
 use std::slice::Iter;
 use std::sync::Arc;
@@ -156,7 +155,7 @@ pub fn create_tasks(command: CommandInfo, args: &[String]) -> Result<Vec<Compila
 }
 
 fn find_param<T, R, F: Fn(&T) -> Option<R>>(args: &[T], filter: F) -> ParamValue<R> {
-    let mut found = Vec::from_iter(args.iter().filter_map(filter));
+    let mut found: Vec<R> = args.iter().filter_map(filter).collect();
     match found.len() {
         0 => ParamValue::None,
         1 => ParamValue::Single(found.pop().unwrap()),
@@ -277,14 +276,14 @@ fn has_param_prefix(arg: &str) -> bool {
 
 #[test]
 fn test_parse_argument_precompile() {
-    let args = Vec::from_iter(
+    let args: Vec<String> =
         "-x c++-header -pipe -Wall -Werror -funwind-tables -Wsequence-point -mmmx -msse -msse2 \
          -fno-math-errno -fno-rtti -g3 -gdwarf-3 -O2 -D_LINUX64 -IEngine/Source \
          -IDeveloper/Public -I Runtime/Core/Private -D IS_PROGRAM=1 -D UNICODE \
          -DIS_MONOLITHIC=1 -std=c++11 -o CorePrivatePCH.h.pch CorePrivatePCH.h"
             .split(' ')
-            .map(|x| x.to_string()),
-    );
+            .map(|x| x.to_string())
+            .collect();
     assert_eq!(
         parse_arguments(&args).unwrap(),
         [
@@ -318,14 +317,14 @@ fn test_parse_argument_precompile() {
 
 #[test]
 fn test_parse_argument_compile() {
-    let args = Vec::from_iter(
+    let args: Vec<String> =
         "-c -include-pch CorePrivatePCH.h.pch -pipe -Wall -Werror -funwind-tables \
          -Wsequence-point -mmmx -msse -msse2 -fno-math-errno -fno-rtti -g3 -gdwarf-3 -O2 -D \
          IS_PROGRAM=1 -D UNICODE -DIS_MONOLITHIC=1 -x c++ -std=c++11 -include CorePrivatePCH.h \
          -o Module.Core.cpp.o Module.Core.cpp"
             .split(' ')
-            .map(|x| x.to_string()),
-    );
+            .map(|x| x.to_string())
+            .collect();
     assert_eq!(
         parse_arguments(&args).unwrap(),
         [

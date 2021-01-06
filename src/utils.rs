@@ -1,7 +1,6 @@
 use std::env;
 use std::io;
 use std::io::{Error, Read};
-use std::iter::FromIterator;
 use std::time::Instant;
 
 use sha2::{Digest, Sha256};
@@ -9,7 +8,7 @@ use sha2::{Digest, Sha256};
 pub const DEFAULT_BUF_SIZE: usize = 1024 * 64;
 
 pub fn filter<T, R, F: Fn(&T) -> Option<R>>(args: &[T], filter: F) -> Vec<R> {
-    Vec::from_iter(args.iter().filter_map(filter))
+    args.iter().filter_map(filter).collect()
 }
 
 pub fn hash_stream<R: Read>(reader: &mut R) -> Result<String, Error> {

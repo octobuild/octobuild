@@ -155,7 +155,7 @@ pub struct CompilerGroup(Vec<Box<dyn Compiler>>);
 
 impl SharedState {
     pub fn new(config: &Config) -> Result<Self, Error> {
-        let semaphore = Semaphore::new("octobuild-worker", max(config.process_limit, 1 as usize))?;
+        let semaphore = Semaphore::new("octobuild-worker", max(config.process_limit, 1_usize))?;
         Ok(SharedState {
             semaphore,
             statistic: Statistic::new(),

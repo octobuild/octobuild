@@ -2,7 +2,6 @@ use std::collections::{HashMap, HashSet};
 use std::env;
 use std::fmt::{Display, Formatter};
 use std::io::{Error, ErrorKind, Read};
-use std::iter::FromIterator;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
@@ -266,7 +265,7 @@ fn parse_tasks<R: Read>(events: &mut EventReader<R>) -> Result<HashMap<String, X
                     let working_dir = take_attr(&mut attrs, "WorkingDir")?;
                     // DependsOn
                     let depends_on: HashSet<String> = match attrs.remove("DependsOn") {
-                        Some(v) => HashSet::from_iter(v.split(';').map(|v| v.to_string())),
+                        Some(v) => v.split(';').map(|v| v.to_string()).collect(),
                         _ => HashSet::new(),
                     };
 
@@ -379,7 +378,10 @@ fn graph_project(
 }
 
 fn map_attributes(attributes: Vec<xml::attribute::OwnedAttribute>) -> HashMap<String, String> {
-    HashMap::from_iter(attributes.into_iter().map(|v| (v.name.local_name, v.value)))
+    attributes
+        .into_iter()
+        .map(|v| (v.name.local_name, v.value))
+        .collect()
 }
 
 fn take_attr(attrs: &mut HashMap<String, String>, attr: &'static str) -> Result<String, Error> {

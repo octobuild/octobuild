@@ -4,7 +4,6 @@ use std::env;
 use std::fs::File;
 use std::io;
 use std::io::{BufReader, Error, ErrorKind, Write};
-use std::iter::FromIterator;
 use std::path::{Path, PathBuf};
 use std::process;
 use std::sync::Arc;
@@ -28,7 +27,7 @@ use octobuild::xg::parser::{XgGraph, XgNode};
 
 fn main() {
     println!("xgConsole ({}):", version::full_version());
-    let args = Vec::from_iter(env::args());
+    let args: Vec<String> = env::args().collect();
     for arg in args.iter() {
         println!("  {}", arg);
     }
@@ -39,10 +38,7 @@ fn main() {
     }
 
     process::exit(match execute(&args[1..]) {
-        Ok(result) => match result {
-            Some(r) => r,
-            None => 501,
-        },
+        Ok(result) => result.unwrap_or(501),
         Err(e) => {
             println!("FATAL ERROR: {}", e);
             500

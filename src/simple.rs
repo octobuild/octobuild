@@ -1,7 +1,6 @@
 use std::env;
 use std::io;
 use std::io::{Error, Write};
-use std::iter::FromIterator;
 use std::path::Path;
 use std::sync::Arc;
 
@@ -71,7 +70,7 @@ pub fn compile<C>(
 where
     C: Compiler,
 {
-    let args = Vec::from_iter(env::args());
+    let args: Vec<String> = env::args().collect();
     let command_info = CommandInfo::simple(Path::new(exec));
     let remote = RemoteCompiler::new(&config.coordinator, compiler);
     let actions = BuildAction::create_tasks(&remote, command_info, &args[1..], exec);
