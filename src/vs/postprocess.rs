@@ -518,7 +518,7 @@ mod test {
         let mut writer: Vec<u8> = Vec::new();
         let mut stream: Vec<u8> = Vec::new();
         stream
-            .write_all(&original.replace("\n", eol).as_bytes()[..])
+            .write_all(original.replace("\n", eol).as_bytes())
             .unwrap();
         match super::filter_preprocessed(
             &mut Cursor::new(stream),
@@ -531,7 +531,7 @@ mod test {
                 expected.replace("\n", eol)
             ),
             Err(e) => {
-                panic!(e);
+                panic!("{}", e);
             }
         }
     }

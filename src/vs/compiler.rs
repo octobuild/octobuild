@@ -482,7 +482,7 @@ mod test {
 
     fn check_prepare_output(original: &str, expected: &str, line: &str, success: bool) {
         let mut stream: Vec<u8> = Vec::new();
-        stream.write_all(&original.as_bytes()[..]).unwrap();
+        stream.write_all(original.as_bytes()).unwrap();
 
         let result = super::prepare_output(line.as_bytes(), stream, success);
         assert_eq!(String::from_utf8_lossy(&result), expected);
