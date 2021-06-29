@@ -92,18 +92,10 @@ fn memcpy(src: &[u8], dst: &mut [u8]) {
     }
 }
 
-impl<'a> Into<Vec<u8>> for &'a MemStream {
-    fn into(self) -> Vec<u8> {
-        let mut buffer = Vec::with_capacity(self.size);
-        self.copy(&mut buffer).unwrap();
-        buffer
-    }
-}
-
-impl Into<Vec<u8>> for MemStream {
-    fn into(self) -> Vec<u8> {
-        let mut buffer = Vec::with_capacity(self.size);
-        self.copy(&mut buffer).unwrap();
+impl<'a> From<&'a MemStream> for Vec<u8> {
+    fn from(stream: &'a MemStream) -> Self {
+        let mut buffer = Vec::with_capacity(stream.size);
+        stream.copy(&mut buffer).unwrap();
         buffer
     }
 }

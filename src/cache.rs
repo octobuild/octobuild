@@ -64,11 +64,9 @@ impl FileHasher for Cache {
                     }
                 };
                 // Validate cached value.
-                if let Some(result) = cached {
-                    if let Ok(value) = result {
-                        if value.size == stat.len() && value.modified == stat.modified().unwrap() {
-                            return Ok(value);
-                        }
+                if let Some(Ok(value)) = cached {
+                    if value.size == stat.len() && value.modified == stat.modified().unwrap() {
+                        return Ok(value);
                     }
                 }
                 // Calculate hash value.

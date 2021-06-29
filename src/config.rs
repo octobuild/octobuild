@@ -207,6 +207,7 @@ fn get_global_config_path() -> Option<PathBuf> {
         .map(|v| Path::new(&v).join("octobuild").join(CONFIG_FILE_NAME))
 }
 
+#[allow(clippy::unnecessary_wraps)]
 #[cfg(unix)]
 fn get_global_config_path() -> Option<PathBuf> {
     Some(Path::new("/etc/octobuild").join(CONFIG_FILE_NAME))

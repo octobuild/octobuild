@@ -137,7 +137,7 @@ fn find_cache_files(dir: &Path, mut files: Vec<CacheFile>) -> Result<Vec<CacheFi
     Ok(files)
 }
 
-fn write_cached_file<W: Write>(stream: &mut W, path: &PathBuf) -> Result<(), Error> {
+fn write_cached_file<W: Write>(stream: &mut W, path: &Path) -> Result<(), Error> {
     let mut buf: [u8; DEFAULT_BUF_SIZE] = [0; DEFAULT_BUF_SIZE];
     let mut file = File::open(path)?;
     let total_size = file.seek(SeekFrom::End(0))?;
@@ -191,7 +191,7 @@ fn write_cache(
     result
 }
 
-fn read_cached_file<R: Read>(stream: &mut R, path: &PathBuf) -> Result<(), Error> {
+fn read_cached_file<R: Read>(stream: &mut R, path: &Path) -> Result<(), Error> {
     let mut buf: [u8; DEFAULT_BUF_SIZE] = [0; DEFAULT_BUF_SIZE];
     let total_size = read_u64(stream)?;
     let mut need_size = total_size;

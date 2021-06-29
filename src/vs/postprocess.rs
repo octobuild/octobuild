@@ -283,7 +283,7 @@ impl<'a> ScannerState<'a> {
     unsafe fn parse_directive(&mut self) -> Result<(), Error> {
         self.parse_spaces()?;
         let mut token = [0; 0x10];
-        match &self.parse_token(&mut token)?[..] {
+        match self.parse_token(&mut token)? {
             b"line" => self.parse_directive_line(),
             b"pragma" => self.parse_directive_pragma(),
             _ => {
@@ -331,7 +331,7 @@ impl<'a> ScannerState<'a> {
     unsafe fn parse_directive_pragma(&mut self) -> Result<(), Error> {
         self.parse_spaces()?;
         let mut token = [0; 0x20];
-        match &self.parse_token(&mut token)?[..] {
+        match self.parse_token(&mut token)? {
             b"hdrstop" => {
                 if !self.keep_headers {
                     self.write(b"#pragma hdrstop")?;

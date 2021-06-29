@@ -90,11 +90,12 @@ impl Toolchain for ClangToolchain {
         state: &SharedState,
         task: &CompilationTask,
     ) -> Result<PreprocessResult, Error> {
-        let mut args = Vec::new();
-        args.push("-E".to_string());
-        args.push("-x".to_string());
-        args.push(task.language.clone());
-        args.push("-frewrite-includes".to_string());
+        let mut args = vec![
+            "-E".to_string(),
+            "-x".to_string(),
+            task.language.clone(),
+            "-frewrite-includes".to_string(),
+        ];
 
         // Make parameters list for preprocessing.
         for arg in task.shared.args.iter() {
@@ -138,9 +139,7 @@ impl Toolchain for ClangToolchain {
         task: CompilationTask,
         preprocessed: MemStream,
     ) -> Result<CompileStep, Error> {
-        let mut args = Vec::new();
-        args.push("-x".to_string());
-        args.push(task.language.clone());
+        let mut args = vec!["-x".to_string(), task.language.clone()];
         for arg in task.shared.args.iter() {
             match arg {
                 Arg::Flag {
