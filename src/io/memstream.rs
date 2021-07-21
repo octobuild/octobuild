@@ -3,8 +3,7 @@ use std::collections::vec_deque;
 use std::collections::VecDeque;
 use std::io::Result;
 pub use std::io::{Read, Write};
-use std::mem;
-use std::ptr;
+use std::mem::MaybeUninit;
 
 const BLOCK_SIZE: usize = 0x10000 - 0x100;
 
@@ -64,31 +63,23 @@ impl MemStream {
         Ok(self.size)
     }
 
+    #[allow(clippy::uninit_assumed_init)]
     fn write_data(&mut self, buf: &[u8]) -> usize {
         let mut src_offset = 0;
         while src_offset < buf.len() {
             let dst_offset = self.size % BLOCK_SIZE;
             if dst_offset == 0 {
                 self.blocks
-                    .push_back(unsafe { mem::MaybeUninit::uninit().assume_init() });
+                    .push_back(unsafe { MaybeUninit::uninit().assume_init() });
             };
             let block = self.blocks.back_mut().unwrap();
             let copy_size = min(buf.len() - src_offset, BLOCK_SIZE - dst_offset);
-            memcpy(
-                &buf[src_offset..src_offset + copy_size],
-                &mut block[dst_offset..dst_offset + copy_size],
-            );
+            block[dst_offset..dst_offset + copy_size]
+                .copy_from_slice(&buf[src_offset..src_offset + copy_size]);
             self.size += copy_size;
             src_offset += copy_size;
         }
         src_offset
-    }
-}
-
-fn memcpy(src: &[u8], dst: &mut [u8]) {
-    assert_eq!(src.len(), dst.len());
-    unsafe {
-        ptr::copy_nonoverlapping(&src[0], &mut dst[0], src.len());
     }
 }
 
@@ -153,10 +144,8 @@ impl<'a> Read for MemReader<'a> {
                         continue;
                     }
                     let copy_size = min(buf.len() - dst_offset, block.len() - self.offset);
-                    memcpy(
-                        &block[self.offset..self.offset + copy_size],
-                        &mut buf[dst_offset..dst_offset + copy_size],
-                    );
+                    buf[dst_offset..dst_offset + copy_size]
+                        .copy_from_slice(&block[self.offset..self.offset + copy_size]);
                     // add code here
                     self.offset += copy_size;
                     dst_offset += copy_size;

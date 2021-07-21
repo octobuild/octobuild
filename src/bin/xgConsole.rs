@@ -280,13 +280,13 @@ fn test_parse_vars() {
 
 #[test]
 fn test_is_flag() {
-    assert_eq!(is_flag("/Wait"), true);
-    assert_eq!(is_flag("/out=/foo/bar"), true);
-    assert_eq!(is_flag("/out/foo/bar"), false);
-    assert_eq!(is_flag("foo/bar"), false);
-    assert_eq!(is_flag("/Wait.xml"), false);
-    assert_eq!(is_flag("/Wait/foo=bar"), false);
-    assert_eq!(is_flag("/WaitFoo=bar"), true);
-    assert_eq!(is_flag("/Wait.Foo=bar"), false);
-    assert_eq!(is_flag("/Wait=/foo/bar"), true);
+    assert!(is_flag("/Wait"));
+    assert!(is_flag("/out=/foo/bar"));
+    assert!(!is_flag("/out/foo/bar"));
+    assert!(!is_flag("foo/bar"));
+    assert!(!is_flag("/Wait.xml"));
+    assert!(!is_flag("/Wait/foo=bar"));
+    assert!(is_flag("/WaitFoo=bar"));
+    assert!(!is_flag("/Wait.Foo=bar"));
+    assert!(is_flag("/Wait=/foo/bar"));
 }

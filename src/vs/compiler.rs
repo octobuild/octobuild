@@ -328,10 +328,11 @@ fn vs_identifier(path: &Path) -> Option<String> {
     use std::slice;
 
     #[repr(C)]
+    #[allow(clippy::upper_case_acronyms)]
     struct LANGANDCODEPAGE {
         language: WORD,
         codepage: WORD,
-    };
+    }
 
     fn utf16<'a, T: Into<&'a OsStr>>(value: T) -> Vec<u16> {
         value
@@ -339,7 +340,7 @@ fn vs_identifier(path: &Path) -> Option<String> {
             .encode_wide()
             .chain(Some(0).into_iter())
             .collect()
-    };
+    }
 
     let path_raw = utf16(path.as_os_str());
     // Get version info size
