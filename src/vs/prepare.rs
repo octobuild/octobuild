@@ -277,8 +277,8 @@ fn parse_arguments<S: AsRef<str>, I: Iterator<Item = S>>(mut iter: I) -> Result<
 fn parse_argument<S: AsRef<str>, I: Iterator<Item = S>>(
     iter: &mut I,
 ) -> Option<Result<Arg, String>> {
-    match iter.next() {
-        Some(arg) => Some(if has_param_prefix(arg.as_ref()) {
+    iter.next().map(|arg| {
+        if has_param_prefix(arg.as_ref()) {
             let flag = &arg.as_ref()[1..];
             match is_spaceable_param(flag) {
                 Some((prefix, scope)) => {
@@ -333,9 +333,8 @@ fn parse_argument<S: AsRef<str>, I: Iterator<Item = S>>(
                 flag: String::new(),
                 file: arg.as_ref().to_string(),
             })
-        }),
-        None => None,
-    }
+        }
+    })
 }
 
 fn is_spaceable_param(flag: &str) -> Option<(&str, Scope)> {

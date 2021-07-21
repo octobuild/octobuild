@@ -64,7 +64,7 @@ impl Compiler for ClangCompiler {
             .iter()
             .filter(|path| path.is_absolute())
             .filter_map(|path| path.read_dir().ok())
-            .flat_map(|read_dir| read_dir)
+            .flatten()
             .filter_map(|entry| entry.ok())
             .filter(|entry| RE_CLANG.is_match(entry.file_name().to_string_lossy().as_bytes()))
             .map(|entry| -> Arc<dyn Toolchain> { Arc::new(ClangToolchain::new(entry.path())) })
