@@ -84,5 +84,5 @@ bincode = "1.2"
 sha2 = "0.9"
 
 [target.'cfg(windows)'.dependencies]
-winreg = "0.8"
+winreg = "0.9"
 winapi = { version = "0.3", features = ["winver"] }
