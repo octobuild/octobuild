@@ -57,7 +57,7 @@ hostname = "0.3"
 yaml-rust = "0.4"
 lz4 = "1"
 libc = "0.2"
-petgraph = "0.5"
+petgraph = "0.6"
 xml-rs = "0.8"
 rand = "0.8"
 uuid = { version = "0.8", features = ["v4"] }
