@@ -100,7 +100,7 @@ fn expand_files(mut files: Vec<PathBuf>, arg: &str) -> Vec<PathBuf> {
     let path = Path::new(arg).to_path_buf();
     let mask = path.file_name().and_then(|name| name.to_str());
     match mask {
-        Some(ref mask) if mask.contains(|c| c == '?' || c == '*') => {
+        Some(mask) if mask.contains(|c| c == '?' || c == '*') => {
             match find_files(path.parent().unwrap_or_else(|| Path::new(".")), mask) {
                 Ok(ref mut found) if !found.is_empty() => {
                     files.append(found);
