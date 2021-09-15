@@ -16,7 +16,7 @@ fn bench_filter(path: &str, marker: &Option<String>, keep_headers: bool, num: us
         postprocess::filter_preprocessed(
             &mut Cursor::new(source.clone()),
             &mut result,
-            &marker,
+            marker,
             keep_headers,
         )
         .unwrap();
