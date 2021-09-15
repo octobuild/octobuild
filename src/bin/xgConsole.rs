@@ -127,7 +127,7 @@ fn execute(args: &[String]) -> Result<Option<i32>, Error> {
     let files = args
         .iter()
         .filter(|a| !is_flag(a))
-        .fold(Vec::new(), |state, a| expand_files(state, &a));
+        .fold(Vec::new(), |state, a| expand_files(state, a));
     if files.is_empty() {
         return Err(Error::new(
             ErrorKind::InvalidInput,
@@ -162,7 +162,7 @@ fn prepare_graph<C: Compiler>(compiler: &C, graph: XgGraph) -> Result<BuildGraph
         let args: Vec<String> = node
             .args
             .iter()
-            .map(|ref arg| expand_arg(&arg, &env_resolver))
+            .map(|ref arg| expand_arg(arg, &env_resolver))
             .collect();
         let command = node.command.clone();
 
@@ -236,7 +236,7 @@ fn expand_arg<F: Fn(&str) -> Option<String>>(arg: &str, resolver: &F) -> String 
                     match resolver(name) {
                         Some(ref value) => {
                             result += &suffix[..begin];
-                            result += &value;
+                            result += value;
                         }
                         None => {
                             result += &suffix[..=begin + end];
