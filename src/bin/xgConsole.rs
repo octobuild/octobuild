@@ -162,7 +162,7 @@ fn prepare_graph<C: Compiler>(compiler: &C, graph: XgGraph) -> Result<BuildGraph
         let args: Vec<String> = node
             .args
             .iter()
-            .map(|ref arg| expand_arg(arg, &env_resolver))
+            .map(|arg| expand_arg(arg, &env_resolver))
             .collect();
         let command = node.command.clone();
 
