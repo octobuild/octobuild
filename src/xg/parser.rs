@@ -359,7 +359,7 @@ fn graph_project(
             },
             args: cmd::native::parse(&tool.args)?,
         });
-        task_refs.insert(&id, node);
+        task_refs.insert(id, node);
         nodes.push(node);
     }
     for (src_id, task) in project.tasks.iter() {

@@ -155,7 +155,7 @@ impl RemoteToolchain {
         match precompiled {
             Some(ref path) => {
                 // Get precompiled header file hash
-                let meta = state.cache.file_hash(&path)?;
+                let meta = state.cache.file_hash(path)?;
                 // Check is precompiled header uploaded
                 // todo: this is workaround for https://github.com/hyperium/hyper/issues/838
                 match self
@@ -295,7 +295,7 @@ fn write_output(path: &Option<PathBuf>, success: bool, output: &[u8]) -> Result<
         Some(ref path) => {
             if success {
                 let mut f = File::create(path)?;
-                f.write(&output).map_err(|e| {
+                f.write(output).map_err(|e| {
                     drop(fs::remove_file(path));
                     e
                 })?;

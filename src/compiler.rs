@@ -159,7 +159,7 @@ impl SharedState {
         Ok(SharedState {
             semaphore,
             statistic: Statistic::new(),
-            cache: Cache::new(&config),
+            cache: Cache::new(config),
         })
     }
 
@@ -441,12 +441,12 @@ pub trait Toolchain: Send + Sync {
         // Hash arguments
         hasher.hash_u64(task.args.len() as u64);
         for arg in task.args.iter() {
-            hasher.hash_bytes(&arg.as_bytes());
+            hasher.hash_bytes(arg.as_bytes());
         }
         // Hash input files
         match task.input_precompiled {
             Some(ref path) => {
-                hasher.hash_bytes(state.cache.file_hash(&path)?.hash.as_bytes());
+                hasher.hash_bytes(state.cache.file_hash(path)?.hash.as_bytes());
             }
             None => {
                 hasher.hash_u64(0);

@@ -146,7 +146,7 @@ impl Toolchain for VsToolchain {
                     ref scope,
                     ref flag,
                 } => match scope {
-                    Scope::Preprocessor | &Scope::Shared => Some("/".to_string() + &flag),
+                    Scope::Preprocessor | &Scope::Shared => Some("/".to_string() + flag),
                     Scope::Ignore | &Scope::Compiler => None,
                 },
                 Arg::Param {
@@ -154,7 +154,7 @@ impl Toolchain for VsToolchain {
                     ref flag,
                     ref value,
                 } => match scope {
-                    Scope::Preprocessor | &Scope::Shared => Some("/".to_string() + &flag + &value),
+                    Scope::Preprocessor | &Scope::Shared => Some("/".to_string() + flag + value),
                     Scope::Ignore | &Scope::Compiler => None,
                 },
                 Arg::Input { .. } => None,
@@ -208,9 +208,9 @@ impl Toolchain for VsToolchain {
                     ref scope,
                     ref flag,
                 } => match scope {
-                    Scope::Compiler | &Scope::Shared => Some("/".to_string() + &flag),
+                    Scope::Compiler | &Scope::Shared => Some("/".to_string() + flag),
                     Scope::Preprocessor if task.shared.output_precompiled.is_some() => {
-                        Some("/".to_string() + &flag)
+                        Some("/".to_string() + flag)
                     }
                     Scope::Ignore | &Scope::Preprocessor => None,
                 },
@@ -219,9 +219,9 @@ impl Toolchain for VsToolchain {
                     ref flag,
                     ref value,
                 } => match scope {
-                    Scope::Compiler | &Scope::Shared => Some("/".to_string() + &flag + &value),
+                    Scope::Compiler | &Scope::Shared => Some("/".to_string() + flag + value),
                     Scope::Preprocessor if task.shared.output_precompiled.is_some() => {
-                        Some("/".to_string() + &flag + &value)
+                        Some("/".to_string() + flag + value)
                     }
                     Scope::Ignore | &Scope::Preprocessor => None,
                 },

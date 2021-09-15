@@ -18,7 +18,7 @@ use crate::worker::{BuildAction, BuildGraph, BuildResult, BuildTask};
 
 pub fn supported_compilers(temp_dir: &Arc<TempDir>) -> CompilerGroup {
     CompilerGroup::new()
-        .add(VsCompiler::new(&temp_dir))
+        .add(VsCompiler::new(temp_dir))
         .add(ClangCompiler::new())
 }
 

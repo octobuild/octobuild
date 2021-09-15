@@ -91,7 +91,7 @@ pub fn filter_preprocessed(
 
         state.parse_bom()?;
         state.marker = match marker.as_ref() {
-            Some(ref v) => {
+            Some(v) => {
                 if state.utf8 {
                     Some(Vec::from(v.as_bytes()))
                 } else {
@@ -308,16 +308,16 @@ impl<'a> ScannerState<'a> {
                     self.done = true;
                     let mut mark = Vec::with_capacity(0x400);
                     mark.write_all(b"#pragma hdrstop")?;
-                    mark.write_all(&eol)?;
+                    mark.write_all(eol)?;
                     mark.write_all(b"#line ")?;
-                    mark.write_all(&line)?;
+                    mark.write_all(line)?;
                     mark.write_all(b" ")?;
-                    mark.write_all(&raw)?;
-                    mark.write_all(&eol)?;
+                    mark.write_all(raw)?;
+                    mark.write_all(eol)?;
                     self.write(&mark)?;
                 }
                 if let Some(ref path) = self.marker {
-                    if is_subpath(&file, &path) {
+                    if is_subpath(file, path) {
                         self.header_found = true;
                     }
                 }

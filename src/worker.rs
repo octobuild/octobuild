@@ -67,7 +67,7 @@ impl BuildAction {
         title: &str,
     ) -> Vec<BuildAction> {
         let actions: Vec<BuildAction> = compiler
-            .create_tasks(command.clone(), &args)
+            .create_tasks(command.clone(), args)
             .map(|tasks| {
                 tasks
                     .into_iter()
@@ -201,7 +201,7 @@ where
 
     if graph.node_count() == 1 {
         let task = &graph.raw_nodes()[0].weight;
-        let result = execute_compiler(&state, task);
+        let result = execute_compiler(state, task);
         update_progress(BuildResult {
             worker: 0,
             completed: 1,

@@ -105,7 +105,7 @@ impl Toolchain for ClangToolchain {
                     ref flag,
                 } => match scope {
                     Scope::Preprocessor | &Scope::Shared => {
-                        args.push("-".to_string() + &flag);
+                        args.push("-".to_string() + flag);
                     }
                     Scope::Ignore | &Scope::Compiler => {}
                 },
@@ -115,7 +115,7 @@ impl Toolchain for ClangToolchain {
                     ref value,
                 } => match scope {
                     Scope::Preprocessor | &Scope::Shared => {
-                        args.push("-".to_string() + &flag);
+                        args.push("-".to_string() + flag);
                         args.push(value.clone());
                     }
                     Scope::Ignore | &Scope::Compiler => {}
@@ -147,7 +147,7 @@ impl Toolchain for ClangToolchain {
                     ref flag,
                 } => match scope {
                     Scope::Compiler | &Scope::Shared => {
-                        args.push("-".to_string() + &flag);
+                        args.push("-".to_string() + flag);
                     }
                     Scope::Ignore | &Scope::Preprocessor => {}
                 },
@@ -157,7 +157,7 @@ impl Toolchain for ClangToolchain {
                     ref value,
                 } => match scope {
                     Scope::Compiler | &Scope::Shared => {
-                        args.push("-".to_string() + &flag);
+                        args.push("-".to_string() + flag);
                         args.push(value.clone());
                     }
                     Scope::Ignore | &Scope::Preprocessor => {}
@@ -200,7 +200,7 @@ fn clang_parse_version(base_name: &str, stdout: &str) -> Option<String> {
         static ref RE: Regex = Regex::new(r"^.*clang.*?\((\S+)\).*\nTarget:\s*(\S+)").unwrap();
     }
 
-    let cap: regex::Captures = RE.captures_iter(&stdout).next()?;
+    let cap: regex::Captures = RE.captures_iter(stdout).next()?;
     let version = cap.get(1)?.as_str();
     let target = cap.get(2)?.as_str();
 
