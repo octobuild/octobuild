@@ -107,7 +107,7 @@ impl Compiler for VsCompiler {
                 key.enum_values()
                     .filter_map(|x| x.ok())
                     .map(|(name, _)| name)
-                    .filter(|name| RE.is_match(&name))
+                    .filter(|name| RE.is_match(name))
                     .filter_map(|name: String| -> Option<String> { key.get_value(name).ok() })
                     .collect()
             })
