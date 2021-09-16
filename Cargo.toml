@@ -52,7 +52,7 @@ name = "vs_postprocess"
 harness = false
 
 [dependencies]
-dirs= "3"
+dirs= "4"
 hostname = "0.3"
 yaml-rust = "0.4"
 lz4 = "1"
