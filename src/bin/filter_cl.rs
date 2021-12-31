@@ -38,28 +38,28 @@ fn main() {
         .author(AUTHORS)
         .about("Preprocessor filter for CL.exe compiler test tool")
         .arg(
-            Arg::with_name(MARKER)
-                .short("m")
+            Arg::new(MARKER)
+                .short('m')
                 .long("marker")
                 .value_name("header")
                 .takes_value(true)
                 .help("Precompiled header marker (like StdAfx.h)"),
         )
         .arg(
-            Arg::with_name(KEEP)
-                .short("k")
+            Arg::new(KEEP)
+                .short('k')
                 .long("keep")
                 .help("Keep header before precompiled header marker"),
         )
         .arg(
-            Arg::with_name(COUNT)
-                .short("c")
+            Arg::new(COUNT)
+                .short('c')
                 .long("count")
                 .default_value("1")
                 .help("Iteration count"),
         )
         .arg(
-            Arg::with_name(INPUT)
+            Arg::new(INPUT)
                 .required(true)
                 .index(1)
                 .help("Preprocessed input file"),
