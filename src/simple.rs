@@ -83,7 +83,7 @@ where
         }));
     }
     let result = execute_graph(state, build_graph, config.process_limit, print_task_result);
-    println!("{}", state.statistic.to_string());
+    println!("{}", state.statistic);
     result
 }
 

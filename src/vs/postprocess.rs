@@ -95,7 +95,7 @@ pub fn filter_preprocessed(
                 if state.utf8 {
                     Some(Vec::from(v.as_bytes()))
                 } else {
-                    Some(Encoding::ANSI.to_bytes(&v.replace("\\", "/"))?)
+                    Some(Encoding::ANSI.to_bytes(&v.replace('\\', "/"))?)
                 }
             }
             None => None,
@@ -518,7 +518,7 @@ mod test {
         let mut writer: Vec<u8> = Vec::new();
         let mut stream: Vec<u8> = Vec::new();
         stream
-            .write_all(original.replace("\n", eol).as_bytes())
+            .write_all(original.replace('\n', eol).as_bytes())
             .unwrap();
         match super::filter_preprocessed(
             &mut Cursor::new(stream),
@@ -528,7 +528,7 @@ mod test {
         ) {
             Ok(_) => assert_eq!(
                 String::from_utf8_lossy(&writer),
-                expected.replace("\n", eol)
+                expected.replace('\n', eol)
             ),
             Err(e) => {
                 panic!("{}", e);

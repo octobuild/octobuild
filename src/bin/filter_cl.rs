@@ -1,7 +1,7 @@
 use std::fs;
 use std::io::Cursor;
 
-use clap::{App, AppSettings, Arg};
+use clap::{Arg, Command};
 
 use octobuild::version::{AUTHORS, VERSION};
 use octobuild::vs::postprocess;
@@ -32,8 +32,8 @@ fn main() {
     const COUNT: &str = "count";
     const KEEP: &str = "keep";
 
-    let matches = App::new("filter_cl")
-        .setting(AppSettings::ArgRequiredElseHelp)
+    let matches = Command::new("filter_cl")
+        .arg_required_else_help(true)
         .version(VERSION)
         .author(AUTHORS)
         .about("Preprocessor filter for CL.exe compiler test tool")

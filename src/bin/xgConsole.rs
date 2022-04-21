@@ -144,7 +144,7 @@ fn execute(args: &[String]) -> Result<Option<i32>, Error> {
 
     let result = execute_graph(&state, build_graph, config.process_limit, print_task_result);
     let _ = state.cache.cleanup();
-    println!("{}", state.statistic.to_string());
+    println!("{}", state.statistic);
     result
 }
 
@@ -269,7 +269,7 @@ fn test_parse_vars() {
                     "inner" => Some("$(bar)".to_string()),
                     "none" => None,
                     _ => {
-                        unreachable!(format!("Unexpected value: {}", name));
+                        unreachable!("Unexpected value: {}", name);
                     }
                 }
             },

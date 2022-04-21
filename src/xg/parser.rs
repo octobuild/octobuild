@@ -237,7 +237,7 @@ fn parse_tools<R: Read>(
                         XgTool {
                             exec: Path::new(&exec).to_path_buf(),
                             output: attrs.remove("OutputPrefix"),
-                            args: attrs.remove("Params").unwrap_or_else(String::new),
+                            args: attrs.remove("Params").unwrap_or_default(),
                         },
                     );
                 }

@@ -315,6 +315,7 @@ fn vs_identifier(_: &Path) -> Option<String> {
 }
 
 #[cfg(windows)]
+#[allow(clippy::uninit_vec)]
 fn vs_identifier(path: &Path) -> Option<String> {
     use winapi::ctypes::c_void;
     use winapi::shared::minwindef::{DWORD, LPCVOID, LPVOID, WORD};
