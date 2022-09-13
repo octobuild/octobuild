@@ -45,7 +45,7 @@ name = "octo_coordinator"
 name = "filter_cl"
 
 [dev-dependencies]
-criterion = "0.3"
+criterion = "0.4"
 
 [[bench]]
 name = "vs_postprocess"
