@@ -76,7 +76,7 @@ pub enum OutputKind {
     Marker,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Eq, PartialEq)]
 pub enum Arg {
     Flag {
         scope: Scope,
