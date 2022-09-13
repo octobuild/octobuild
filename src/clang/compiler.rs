@@ -222,7 +222,7 @@ fn clang_identifier(clang: &Path) -> Option<String> {
 
     clang_parse_version(
         &base_name,
-        &String::from_utf8_lossy(&output.stdout).to_string(),
+        &String::from_utf8_lossy(&output.stdout),
     )
 }
 

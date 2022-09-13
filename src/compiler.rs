@@ -51,7 +51,7 @@ impl ::std::error::Error for CompilerError {
 }
 
 // Scope of command line argument.
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub enum Scope {
     // Preprocessing argument
     Preprocessor,
@@ -63,14 +63,14 @@ pub enum Scope {
     Ignore,
 }
 
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub enum InputKind {
     Source,
     Marker,
     Precompiled,
 }
 
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub enum OutputKind {
     Object,
     Marker,
