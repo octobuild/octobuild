@@ -220,10 +220,7 @@ fn clang_identifier(clang: &Path) -> Option<String> {
         return None;
     }
 
-    clang_parse_version(
-        &base_name,
-        &String::from_utf8_lossy(&output.stdout),
-    )
+    clang_parse_version(&base_name, &String::from_utf8_lossy(&output.stdout))
 }
 
 fn execute(command: &mut Command) -> Result<PreprocessResult, Error> {
