@@ -16,17 +16,45 @@
 -->
 
 <!--
+  The "cargo wix" subcommand provides a variety of predefined variables available
+  for customization of this template. The values for each variable are set at
+  installer creation time. The following variables are available:
+
+  TargetTriple      = The rustc target triple name.
+  TargetEnv         = The rustc target environment. This is typically either
+                      "msvc" or "gnu" depending on the toolchain downloaded and
+                      installed.
+  TargetVendor      = The rustc target vendor. This is typically "pc", but Rust
+                      does support other vendors, like "uwp".
+  CargoTargetBinDir = The complete path to the binary (exe). The default would
+                      be "target\release\<BINARY_NAME>.exe" where
+                      "<BINARY_NAME>" is replaced with the name of each binary
+                      target defined in the package's manifest (Cargo.toml). If
+                      a different rustc target triple is used than the host,
+                      i.e. cross-compiling, then the default path would be
+                      "target\<CARGO_TARGET>\<CARGO_PROFILE>\<BINARY_NAME>.exe",
+                      where "<CARGO_TARGET>" is replaced with the "CargoTarget"
+                      variable value and "<CARGO_PROFILE>" is replaced with the
+                      value from the `CargoProfile` variable.
+  CargoTargetDir    = The path to the directory for the build artifacts, i.e.
+                      "target".
+  CargoProfile      = Either "debug" or `release` depending on the build
+                      profile. The default is "release".
+  Version           = The version for the installer. The default is the
+                      "Major.Minor.Fix" semantic versioning number of the Rust
+                      package.
+-->
+
+<!--
   Please do not remove these pre-processor If-Else blocks. These are used with
   the `cargo wix` subcommand to automatically determine the installation
   destination for 32-bit versus 64-bit installers. Removal of these lines will
   cause installation errors.
 -->
-<?if $(var.Platform) = x64 ?>
-    <?define Win64 = "yes" ?>
+<?if $(sys.BUILDARCH) = x64 or $(sys.BUILDARCH) = arm64 ?>
     <?define PlatformProgramFilesFolder = "ProgramFiles64Folder" ?>
 <?else ?>
-  <?define Win64 = "no" ?>
-  <?define PlatformProgramFilesFolder = "ProgramFilesFolder" ?>
+    <?define PlatformProgramFilesFolder = "ProgramFilesFolder" ?>
 <?endif ?>
 
 <Wix xmlns='http://schemas.microsoft.com/wix/2006/wi'>
@@ -49,7 +77,7 @@
             Compressed='yes'
             InstallScope='perMachine'
             SummaryCodepage='1252'
-            Platform='$(var.Platform)'/>
+            />
 
         <MajorUpgrade
             Schedule='afterInstallInitialize'
@@ -61,7 +89,7 @@
 
         <Directory Id='TARGETDIR' Name='SourceDir'>
             <Directory Id='$(var.PlatformProgramFilesFolder)' Name='PFiles'>
-                <Directory Id='APPLICATIONFOLDER' Name='octobuild'>
+                <Directory Id='INSTALLDIR' Name='octobuild'>
                     <!--
                       Disabling the license sidecar file in the installer is a two step process:
 
@@ -69,16 +97,16 @@
                       2. Comment out or remove the `ComponentRef` tag with the "License" Id
                          attribute value further down in this file.
                     -->
-                    <Component Id='License' Guid='*' Win64='$(var.Win64)'>
+                    <Component Id='License' Guid='*'>
                         <File Id='LicenseFile'
                             Name='License.rtf'
                             DiskId='1'
-                            Source='wix\License.rtf'
+                            Source='wix/License.rtf'
                             KeyPath='yes'/>
                     </Component>
                     
                     <Directory Id='Bin' Name='bin'>
-                        <Component Id='Path' Guid='227D2291-7B05-4E0A-9EC6-25AB9601997B' Win64='$(var.Win64)' KeyPath='yes'>
+                        <Component Id='Path' Guid='6013CE49-D7F0-4EB5-8C5C-C750367E82B2' KeyPath='yes'>
                             <Environment
                                 Id='PATH'
                                 Name='PATH'
@@ -88,12 +116,12 @@
                                 Action='set'
                                 System='yes'/>
                         </Component>
-                        <Component Id='binary0' Guid='*' Win64='$(var.Win64)'>
+                        <Component Id='binary0' Guid='8dca8328-4e8e-467b-ab51-1d0780c2afb2'>
                             <File
                                 Id='exe0'
                                 Name='xgConsole.exe'
                                 DiskId='1'
-                                Source='target\$(var.Profile)\xgConsole.exe'
+                                Source='$(var.CargoTargetBinDir)/xgConsole.exe'
                                 KeyPath='yes'/>
                         </Component>
                     </Directory>
@@ -106,7 +134,7 @@
             Title='Application'
             Description='Installs all binaries and the license.'
             Level='1'
-            ConfigurableDirectory='APPLICATIONFOLDER'
+            ConfigurableDirectory='INSTALLDIR'
             AllowAdvertise='no'
             Display='expand'
             Absent='disallow'>
@@ -128,7 +156,7 @@
             </Feature>
         </Feature>
 
-        <SetProperty Id='ARPINSTALLLOCATION' Value='[APPLICATIONFOLDER]' After='CostFinalize'/>
+        <SetProperty Id='ARPINSTALLLOCATION' Value='[INSTALLDIR]' After='CostFinalize'/>
 
         
         <!--
@@ -160,7 +188,7 @@
           Disabling the EULA dialog in the installer requires commenting out
           or removing the following `WixVariable` tag
         -->
-        <WixVariable Id='WixUILicenseRtf' Value='wix\License.rtf'/>
+        <WixVariable Id='WixUILicenseRtf' Value='wix/License.rtf'/>
         
         
         <!--
