@@ -1,7 +1,20 @@
-$packageName = "Octobuild"
-$fileType = "msi"
-$silentArgs = "/quiet ADDLOCAL=ALL"
-$url   = "http://dist.bozaro.ru/windows/octobuild-$version$-i686.msi"
-$url64 = "http://dist.bozaro.ru/windows/octobuild-$version$-x86_64.msi"
+$ErrorActionPreference = 'Stop';
+$toolsDir   = "$(Split-Path -parent $MyInvocation.MyCommand.Definition)"
+$url64      = 'https://github.com/bozaro/octobuild/releases/download/{{ version }}/octobuild-{{ version }}-x86_64.msi'
 
-Install-ChocolateyPackage "$packageName" "$fileType" "$silentArgs" "$url" "$url64"
+$packageArgs = @{
+    packageName   = $env:ChocolateyPackageName
+    unzipLocation = $toolsDir
+    fileType      = 'MSI'
+    url64bit      = $url64
+
+    softwareName  = 'Octobuild'
+
+    checksum64    = '{{ sha256 }}'
+    checksumType64= 'sha256'
+
+    silentArgs    = "/qn /norestart /l*v `"$($env:TEMP)\$($packageName).$($env:chocolateyPackageVersion).MsiInstall.log`""
+    validExitCodes= @(0, 3010, 1641)
+}
+
+Install-ChocolateyPackage @packageArgs
