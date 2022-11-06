@@ -2,7 +2,7 @@ use std::io::{Error, ErrorKind};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-use local_encoding::{Encoder, Encoding};
+use local_encoding_ng::{Encoder, Encoding};
 
 use crate::cmd;
 use crate::compiler::{
