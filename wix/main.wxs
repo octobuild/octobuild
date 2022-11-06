@@ -88,6 +88,11 @@
         <Property Id='DiskPrompt' Value='octobuild Installation'/>
 
         <Directory Id='TARGETDIR' Name='SourceDir'>
+            <Merge Id='VCRedist'
+                   SourceFile='target/$(var.Profile)/vcredist.msm'
+                   DiskId='1'
+                   Language='0'/>
+
             <Directory Id='$(var.PlatformProgramFilesFolder)' Name='PFiles'>
                 <Directory Id='APPLICATIONFOLDER' Name='octobuild'>
                     <!--
@@ -138,6 +143,9 @@
             AllowAdvertise='no'
             Display='expand'
             Absent='disallow'>
+
+            <MergeRef Id="VCRedist"/>
+
             <!--
               Comment out or remove the following `ComponentRef` tag to remove
               the license sidecar file from the installer.
@@ -151,6 +159,7 @@
                 Title='PATH Environment Variable'
                 Description='Add the install location of the [ProductName] executable to the PATH system environment variable. This allows the [ProductName] executable to be called from any location.'
                 Level='1'
+                AllowAdvertise='no'
                 Absent='allow'>
                 <ComponentRef Id='Path'/>
             </Feature>
