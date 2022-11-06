@@ -1,9 +1,8 @@
 use std::fs;
 use std::io::Cursor;
 
-use clap::{Arg, Command};
+use clap::Parser;
 
-use octobuild::version::{AUTHORS, VERSION};
 use octobuild::vs::postprocess;
 
 fn bench_filter(path: &str, marker: &Option<String>, keep_headers: bool, num: usize) -> Vec<u8> {
@@ -26,56 +25,29 @@ fn bench_filter(path: &str, marker: &Option<String>, keep_headers: bool, num: us
     result
 }
 
+/// Preprocessor filter for CL.exe compiler test tool
+#[derive(Parser, Debug)]
+#[command(author, version, about, long_about = None)]
+struct Args {
+    /// Precompiled header marker (like StdAfx.h)
+    #[arg(long, short)]
+    marker: Option<String>,
+
+    /// Keep header before precompiled header marker
+    #[arg(long, short)]
+    keep: bool,
+
+    /// Number of iterations
+    #[arg(short, long, default_value_t = 1)]
+    count: usize,
+
+    /// Preprocessed input file
+    #[arg()]
+    input: String,
+}
+
 fn main() {
-    const MARKER: &str = "marker";
-    const INPUT: &str = "input";
-    const COUNT: &str = "count";
-    const KEEP: &str = "keep";
+    let args = Args::parse();
 
-    let matches = Command::new("filter_cl")
-        .arg_required_else_help(true)
-        .version(VERSION)
-        .author(AUTHORS)
-        .about("Preprocessor filter for CL.exe compiler test tool")
-        .arg(
-            Arg::new(MARKER)
-                .short('m')
-                .long("marker")
-                .value_name("header")
-                .takes_value(true)
-                .help("Precompiled header marker (like StdAfx.h)"),
-        )
-        .arg(
-            Arg::new(KEEP)
-                .short('k')
-                .long("keep")
-                .help("Keep header before precompiled header marker"),
-        )
-        .arg(
-            Arg::new(COUNT)
-                .short('c')
-                .long("count")
-                .default_value("1")
-                .help("Iteration count"),
-        )
-        .arg(
-            Arg::new(INPUT)
-                .required(true)
-                .index(1)
-                .help("Preprocessed input file"),
-        )
-        .get_matches();
-
-    let inputs = matches.values_of_lossy(INPUT).unwrap();
-    let marker = matches.value_of(MARKER).map(|s| s.to_string());
-    let keep = matches.is_present(KEEP);
-    let count = matches
-        .value_of(COUNT)
-        .unwrap_or("1")
-        .parse::<usize>()
-        .unwrap();
-
-    for input in inputs.iter() {
-        bench_filter(input, &marker, keep, count);
-    }
+    bench_filter(&args.input, &args.marker, args.keep, args.count);
 }
