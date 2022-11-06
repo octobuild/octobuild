@@ -89,7 +89,7 @@
 
         <Directory Id='TARGETDIR' Name='SourceDir'>
             <Directory Id='$(var.PlatformProgramFilesFolder)' Name='PFiles'>
-                <Directory Id='INSTALLDIR' Name='octobuild'>
+                <Directory Id='APPLICATIONFOLDER' Name='octobuild'>
                     <!--
                       Disabling the license sidecar file in the installer is a two step process:
 
@@ -101,7 +101,7 @@
                         <File Id='LicenseFile'
                             Name='License.rtf'
                             DiskId='1'
-                            Source='wix/License.rtf'
+                            Source='wix\License.rtf'
                             KeyPath='yes'/>
                     </Component>
                     
@@ -121,7 +121,7 @@
                                 Id='exe0'
                                 Name='xgConsole.exe'
                                 DiskId='1'
-                                Source='$(var.CargoTargetBinDir)/xgConsole.exe'
+                                Source='$(var.CargoTargetBinDir)\xgConsole.exe'
                                 KeyPath='yes'/>
                         </Component>
                     </Directory>
@@ -134,7 +134,7 @@
             Title='Application'
             Description='Installs all binaries and the license.'
             Level='1'
-            ConfigurableDirectory='INSTALLDIR'
+            ConfigurableDirectory='APPLICATIONFOLDER'
             AllowAdvertise='no'
             Display='expand'
             Absent='disallow'>
@@ -156,7 +156,7 @@
             </Feature>
         </Feature>
 
-        <SetProperty Id='ARPINSTALLLOCATION' Value='[INSTALLDIR]' After='CostFinalize'/>
+        <SetProperty Id='ARPINSTALLLOCATION' Value='[APPLICATIONFOLDER]' After='CostFinalize'/>
 
         
         <!--
@@ -188,7 +188,7 @@
           Disabling the EULA dialog in the installer requires commenting out
           or removing the following `WixVariable` tag
         -->
-        <WixVariable Id='WixUILicenseRtf' Value='wix/License.rtf'/>
+        <WixVariable Id='WixUILicenseRtf' Value='wix\License.rtf'/>
         
         
         <!--
