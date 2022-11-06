@@ -2,7 +2,7 @@
 name = "octobuild"
 version = "0.1.15"
 authors = [ "Artem V. Navrotskiy <bozaro@users.noreply.github.com>" ]
-edition = "2018"
+edition = "2021"
 readme = "README.adoc"
 description = "Simple distributed compile system for C++"
 homepage = "https://github.com/bozaro/octobuild"

@@ -137,7 +137,7 @@ fn execute(args: &[String]) -> Result<Option<i32>, Error> {
 
     let mut graph = Graph::new();
     for arg in files.iter() {
-        let file = File::open(&Path::new(arg))?;
+        let file = File::open(Path::new(arg))?;
         xg::parser::parse(&mut graph, BufReader::new(file))?;
     }
     let build_graph = validate_graph(graph).and_then(|graph| prepare_graph(&compiler, graph))?;

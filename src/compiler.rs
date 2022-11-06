@@ -25,7 +25,7 @@ pub enum CompilerError {
 }
 
 impl Display for CompilerError {
-    fn fmt(&self, f: &mut Formatter) -> Result<(), ::std::fmt::Error> {
+    fn fmt(&self, f: &mut Formatter) -> Result<(), std::fmt::Error> {
         match self {
             CompilerError::InvalidArguments(ref arg) => {
                 write!(f, "can't parse command line arguments: {}", arg)
@@ -37,7 +37,7 @@ impl Display for CompilerError {
     }
 }
 
-impl ::std::error::Error for CompilerError {
+impl std::error::Error for CompilerError {
     fn description(&self) -> &str {
         match self {
             CompilerError::InvalidArguments(_) => "can't parse command line arguments",
@@ -45,7 +45,7 @@ impl ::std::error::Error for CompilerError {
         }
     }
 
-    fn cause(&self) -> Option<&dyn (::std::error::Error)> {
+    fn cause(&self) -> Option<&dyn (std::error::Error)> {
         None
     }
 }
@@ -234,7 +234,7 @@ impl CommandInfo {
             command.env(key.clone(), value.clone());
         }
         if let Some(ref v) = self.current_dir {
-            command.current_dir(&v);
+            command.current_dir(v);
         }
         command
     }
@@ -453,11 +453,7 @@ pub trait Toolchain: Send + Sync {
             }
         }
         // Store output precompiled flag
-        hasher.hash_u8(if task.output_precompiled.is_some() {
-            1
-        } else {
-            0
-        });
+        hasher.hash_u8(u8::from(task.output_precompiled.is_some()));
 
         // Output files list
         let mut outputs: Vec<PathBuf> = Vec::new();
@@ -516,11 +512,11 @@ trait Hasher: Digest {
             *e = (n & 0xFF) as u8;
             n >>= 8;
         }
-        self.update(&buf);
+        self.update(buf);
     }
 
     fn hash_u8(&mut self, number: u8) {
-        self.update(&[number]);
+        self.update([number]);
     }
 
     fn hash_bytes(&mut self, bytes: &[u8]) {

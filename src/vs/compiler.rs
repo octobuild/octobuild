@@ -305,7 +305,7 @@ impl Toolchain for VsToolchain {
         let output_temp = TempFile::new_in(self.temp_dir.path(), ".o");
         task.output_object = Some(output_temp.path().to_path_buf());
         self.compile_step(state, task)
-            .and_then(|output| fs::read(&output_temp.path()).map(|content| (output, content)))
+            .and_then(|output| fs::read(output_temp.path()).map(|content| (output, content)))
     }
 }
 

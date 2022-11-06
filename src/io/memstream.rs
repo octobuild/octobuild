@@ -64,6 +64,7 @@ impl MemStream {
     }
 
     #[allow(clippy::uninit_assumed_init)]
+    #[allow(invalid_value)]
     fn write_data(&mut self, buf: &[u8]) -> usize {
         let mut src_offset = 0;
         while src_offset < buf.len() {

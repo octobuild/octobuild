@@ -174,7 +174,7 @@ fn write_cache(
         return Ok(());
     }
     if let Some(parent) = path.parent() {
-        fs::create_dir_all(&parent)?
+        fs::create_dir_all(parent)?
     }
     let mut stream = lz4::EncoderBuilder::new()
         .level(1)
@@ -234,8 +234,8 @@ fn read_cache(statistic: &Statistic, path: &Path, paths: &[PathBuf]) -> Result<O
         let mut temp_name = OsString::from("~tmp~");
         temp_name.push(path.file_name().unwrap());
         let temp = path.with_file_name(temp_name);
-        drop(fs::remove_file(&path));
-        match read_cached_file(&mut stream, &temp).and_then(|_| fs::rename(&temp, &path)) {
+        drop(fs::remove_file(path));
+        match read_cached_file(&mut stream, &temp).and_then(|_| fs::rename(&temp, path)) {
             Ok(_) => {}
             Err(e) => {
                 drop(fs::remove_file(&temp));
