@@ -27,6 +27,9 @@ debug = true
 debug = true
 
 [[bin]]
+name = "ib_console"
+
+[[bin]]
 name = "xgConsole"
 
 [[bin]]
