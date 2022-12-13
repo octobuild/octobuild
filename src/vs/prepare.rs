@@ -8,6 +8,7 @@ use crate::cmd;
 use crate::compiler::{
     Arg, CommandInfo, CompilationArgs, CompilationTask, InputKind, OutputKind, Scope,
 };
+use crate::utils::expands_response_files;
 use std::fs;
 
 enum ParamValue<T> {
@@ -17,7 +18,8 @@ enum ParamValue<T> {
 }
 
 pub fn create_tasks(command: CommandInfo, args: &[String]) -> Result<Vec<CompilationTask>, String> {
-    load_arguments(&command.current_dir, args.iter())
+    let expanded_args = expands_response_files(args).map_err(|e| e.to_string())?;
+    load_arguments(&command.current_dir, expanded_args.iter())
         .map_err(|e: Error| format!("IO error: {}", e))
         .and_then(|a| parse_arguments(a.iter()))
         .and_then(|parsed_args| {

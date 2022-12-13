@@ -1,8 +1,9 @@
-use std::env;
 use std::io;
 use std::io::{Error, Read};
 use std::time::Instant;
+use std::{env, fs};
 
+use crate::cmd;
 use sha2::{Digest, Sha256};
 
 pub const DEFAULT_BUF_SIZE: usize = 1024 * 64;
@@ -15,6 +16,21 @@ pub fn hash_stream<R: Read>(reader: &mut R) -> Result<String, Error> {
     let mut hasher = Sha256::new();
     io::copy(reader, &mut hasher)?;
     Ok(hex::encode(hasher.finalize()))
+}
+
+pub fn expands_response_files(args: &[String]) -> Result<Vec<String>, Error> {
+    let mut args_expanded = Vec::<String>::with_capacity(args.len());
+    for arg in args {
+        if !(arg.starts_with('@')) {
+            args_expanded.push(arg.clone());
+            continue;
+        }
+
+        let response_file = fs::read_to_string(&arg[1..])?;
+        let mut response_args = cmd::native::parse(&response_file)?;
+        args_expanded.append(&mut response_args);
+    }
+    Ok(args_expanded)
 }
 
 pub fn init_logger() {

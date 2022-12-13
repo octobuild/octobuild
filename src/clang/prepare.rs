@@ -5,6 +5,7 @@ use std::sync::Arc;
 use crate::compiler::{
     Arg, CommandInfo, CompilationArgs, CompilationTask, InputKind, OutputKind, Scope,
 };
+use crate::utils::expands_response_files;
 
 enum ParamValue<T> {
     None,
@@ -13,15 +14,19 @@ enum ParamValue<T> {
 }
 
 pub fn create_tasks(command: CommandInfo, args: &[String]) -> Result<Vec<CompilationTask>, String> {
-    if args.iter().any(|v| v == "--analyze") {
+    let expanded_args = expands_response_files(args).map_err(|e| e.to_string())?;
+
+    if expanded_args.iter().any(|v| v == "--analyze") {
         // Support only compilation steps
         return Ok(Vec::new());
     }
-    if !args.iter().any(|v| matches!(v as &str, "-c")) {
+
+    if !expanded_args.iter().any(|v| matches!(v as &str, "-c")) {
         // Support only compilation steps
         return Ok(Vec::new());
     }
-    let parsed_args = parse_arguments(args)?;
+
+    let parsed_args = parse_arguments(&expanded_args)?;
     // Source file name.
     let input_sources: Vec<PathBuf> = parsed_args
         .iter()
