@@ -1,5 +1,6 @@
 use std::io;
 use std::io::{Error, Read};
+use std::path::{Path, PathBuf};
 use std::time::Instant;
 use std::{env, fs};
 
@@ -18,19 +19,29 @@ pub fn hash_stream<R: Read>(reader: &mut R) -> Result<String, Error> {
     Ok(hex::encode(hasher.finalize()))
 }
 
-pub fn expands_response_files(args: &[String]) -> Result<Vec<String>, Error> {
-    let mut args_expanded = Vec::<String>::with_capacity(args.len());
-    for arg in args {
-        if !(arg.starts_with('@')) {
-            args_expanded.push(arg.clone());
+pub fn expands_response_files(
+    base: &Option<PathBuf>,
+    args: &[String],
+) -> Result<Vec<String>, Error> {
+    let mut result = Vec::<String>::new();
+
+    for item in args {
+        if !(item.as_ref().starts_with('@')) {
+            result.push(item.as_ref().to_string());
             continue;
         }
 
-        let response_file = fs::read_to_string(&arg[1..])?;
-        let mut response_args = cmd::native::parse(&response_file)?;
-        args_expanded.append(&mut response_args);
+        let path = match base {
+            Some(ref p) => p.join(&item.as_ref()[1..]),
+            None => Path::new(&item.as_ref()[1..]).to_path_buf(),
+        };
+        let data = fs::read(path)?;
+        let text = decode_string(&data)?;
+        let mut args = cmd::native::parse(&text)?;
+        result.append(&mut args);
     }
-    Ok(args_expanded)
+
+    Ok(result)
 }
 
 pub fn init_logger() {

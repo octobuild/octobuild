@@ -18,8 +18,7 @@ enum ParamValue<T> {
 }
 
 pub fn create_tasks(command: CommandInfo, args: &[String]) -> Result<Vec<CompilationTask>, String> {
-    let expanded_args = expands_response_files(args).map_err(|e| e.to_string())?;
-    load_arguments(&command.current_dir, expanded_args.iter())
+    expands_response_files(&command.current_dir, args)
         .map_err(|e: Error| format!("IO error: {}", e))
         .and_then(|a| parse_arguments(a.iter()))
         .and_then(|parsed_args| {
@@ -201,28 +200,6 @@ fn find_param<T, R, F: Fn(&T) -> Option<R>>(args: &[T], filter: F) -> ParamValue
         1 => ParamValue::Single(found.pop().unwrap()),
         _ => ParamValue::Many(found),
     }
-}
-
-fn load_arguments<S: AsRef<str>, I: Iterator<Item = S>>(
-    base: &Option<PathBuf>,
-    iter: I,
-) -> Result<Vec<String>, Error> {
-    let mut result: Vec<String> = Vec::new();
-    for item in iter {
-        if item.as_ref().starts_with('@') {
-            let path = match base {
-                Some(ref p) => p.join(&item.as_ref()[1..]),
-                None => Path::new(&item.as_ref()[1..]).to_path_buf(),
-            };
-            let data = fs::read(path)?;
-            let text = decode_string(&data)?;
-            let mut args = cmd::native::parse(&text)?;
-            result.append(&mut args);
-        } else {
-            result.push(item.as_ref().to_string());
-        }
-    }
-    Ok(result)
 }
 
 fn decode_string(data: &[u8]) -> Result<String, Error> {

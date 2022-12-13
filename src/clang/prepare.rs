@@ -14,7 +14,8 @@ enum ParamValue<T> {
 }
 
 pub fn create_tasks(command: CommandInfo, args: &[String]) -> Result<Vec<CompilationTask>, String> {
-    let expanded_args = expands_response_files(args).map_err(|e| e.to_string())?;
+    let expanded_args =
+        expands_response_files(&command.current_dir, args).map_err(|e| e.to_string())?;
 
     if expanded_args.iter().any(|v| v == "--analyze") {
         // Support only compilation steps
