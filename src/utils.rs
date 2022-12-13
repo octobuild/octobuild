@@ -20,7 +20,7 @@ pub fn hash_stream<R: Read>(reader: &mut R) -> Result<String, Error> {
     Ok(hex::encode(hasher.finalize()))
 }
 
-pub fn expands_response_files(
+pub fn expand_response_files(
     base: &Option<PathBuf>,
     args: &[String],
 ) -> Result<Vec<String>, Error> {

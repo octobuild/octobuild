@@ -5,7 +5,7 @@ use std::sync::Arc;
 use crate::compiler::{
     Arg, CommandInfo, CompilationArgs, CompilationTask, InputKind, OutputKind, Scope,
 };
-use crate::utils::expands_response_files;
+use crate::utils::expand_response_files;
 
 enum ParamValue<T> {
     None,
@@ -14,7 +14,7 @@ enum ParamValue<T> {
 }
 
 pub fn create_tasks(command: CommandInfo, args: &[String]) -> Result<Vec<CompilationTask>, String> {
-    expands_response_files(&command.current_dir, args)
+    expand_response_files(&command.current_dir, args)
         .map_err(|e: Error| format!("IO error: {}", e))
         .and_then(|a| parse_arguments(a.iter()))
         .and_then(|parsed_args| {
