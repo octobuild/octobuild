@@ -527,38 +527,40 @@ trait Hasher: Digest {
 
 impl<D: Digest + ?Sized> Hasher for D {}
 
+pub struct ToolchainCompilationTask {
+    pub toolchain: Arc<dyn Toolchain>,
+    pub task: CompilationTask,
+}
+
 pub trait Compiler: Send + Sync {
     // Resolve toolchain for command execution.
     fn resolve_toolchain(&self, command: &CommandInfo) -> Option<Arc<dyn Toolchain>>;
     // Discovery local toolchains.
     fn discovery_toolchains(&self) -> Vec<Arc<dyn Toolchain>>;
 
-    #[allow(clippy::type_complexity)]
     fn create_tasks(
         &self,
         command: CommandInfo,
         args: &[String],
-    ) -> Result<Vec<(Arc<dyn Toolchain>, CompilationTask)>, Error> {
-        self.resolve_toolchain(&command)
-            .ok_or_else(|| {
-                Error::new(
-                    ErrorKind::InvalidInput,
-                    CompilerError::ToolchainNotFound(command.program.clone()),
-                )
+    ) -> Result<Vec<ToolchainCompilationTask>, Error> {
+        let toolchain = self.resolve_toolchain(&command).ok_or_else(|| {
+            Error::new(
+                ErrorKind::InvalidInput,
+                CompilerError::ToolchainNotFound(command.program.clone()),
+            )
+        })?;
+
+        let tasks = toolchain
+            .create_tasks(command, args)
+            .map_err(|e| Error::new(ErrorKind::InvalidInput, CompilerError::InvalidArguments(e)))?;
+
+        Ok(tasks
+            .into_iter()
+            .map(|task| ToolchainCompilationTask {
+                toolchain: toolchain.clone(),
+                task,
             })
-            .and_then(|toolchain| {
-                toolchain
-                    .create_tasks(command, args)
-                    .map_err(|e| {
-                        Error::new(ErrorKind::InvalidInput, CompilerError::InvalidArguments(e))
-                    })
-                    .map(|tasks| {
-                        tasks
-                            .into_iter()
-                            .map(|task| (toolchain.clone(), task))
-                            .collect()
-                    })
-            })
+            .collect())
     }
 }
 

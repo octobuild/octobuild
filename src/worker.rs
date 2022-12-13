@@ -71,7 +71,7 @@ impl BuildAction {
             .map(|tasks| {
                 tasks
                     .into_iter()
-                    .map(|(toolchain, task)| BuildAction::Compilation(toolchain, task))
+                    .map(|task| BuildAction::Compilation(task.toolchain, task.task))
                     .collect()
             })
             .unwrap_or_else(|e| {
