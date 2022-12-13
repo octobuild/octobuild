@@ -1,15 +1,11 @@
-use std::io::{Error, ErrorKind};
+use std::io::Error;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-use local_encoding_ng::{Encoder, Encoding};
-
-use crate::cmd;
 use crate::compiler::{
     Arg, CommandInfo, CompilationArgs, CompilationTask, InputKind, OutputKind, Scope,
 };
 use crate::utils::expands_response_files;
-use std::fs;
 
 enum ParamValue<T> {
     None,
@@ -202,34 +198,6 @@ fn find_param<T, R, F: Fn(&T) -> Option<R>>(args: &[T], filter: F) -> ParamValue
     }
 }
 
-fn decode_string(data: &[u8]) -> Result<String, Error> {
-    if data.starts_with(&[0xEF, 0xBB, 0xBF]) {
-        String::from_utf8(data[3..].to_vec()).map_err(|e| Error::new(ErrorKind::InvalidInput, e))
-    } else if data.starts_with(&[0xFE, 0xFF]) {
-        decode_utf16(&data[2..], |a, b| (a << 8) + b)
-    } else if data.starts_with(&[0xFF, 0xFE]) {
-        decode_utf16(&data[2..], |a, b| (b << 8) + a)
-    } else {
-        Encoding::ANSI.to_string(data)
-    }
-}
-
-fn decode_utf16<F: Fn(u16, u16) -> u16>(data: &[u8], endian: F) -> Result<String, Error> {
-    let mut utf16 = Vec::new();
-    if data.len() % 2 != 0 {
-        return Err(Error::new(
-            ErrorKind::InvalidInput,
-            "Invalid UTF-16 line: odd bytes length",
-        ));
-    }
-    let mut i = 0;
-    while i < data.len() {
-        utf16.push(endian(u16::from(data[i]), u16::from(data[i + 1])));
-        i += 2;
-    }
-    String::from_utf16(&utf16).map_err(|e| Error::new(ErrorKind::InvalidInput, e))
-}
-
 fn parse_arguments<S: AsRef<str>, I: Iterator<Item = S>>(mut iter: I) -> Result<Vec<Arg>, String> {
     let mut result: Vec<Arg> = Vec::new();
     let mut errors: Vec<String> = Vec::new();
@@ -361,25 +329,4 @@ fn test_parse_argument() {
             Arg::input(InputKind::Source, "", "sample.cpp")
         ]
     )
-}
-
-#[test]
-fn test_decode_string() {
-    // ANSI
-    assert_eq!(&decode_string(b"test").unwrap(), "test");
-    // UTF-8
-    assert_eq!(
-        &decode_string(b"\xEF\xBB\xBFtest \xD1\x80\xD1\x83\xD1\x81").unwrap(),
-        "test рус"
-    );
-    // UTF-16LE
-    assert_eq!(
-        &decode_string(b"\xFF\xFEt\x00e\x00s\x00t\x00 \x00\x40\x04\x43\x04\x41\x04").unwrap(),
-        "test рус"
-    );
-    // UTF-16BE
-    assert_eq!(
-        &decode_string(b"\xFE\xFF\x00t\x00e\x00s\x00t\x00 \x04\x40\x04\x43\x04\x41").unwrap(),
-        "test рус"
-    );
 }
