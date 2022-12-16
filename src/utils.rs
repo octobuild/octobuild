@@ -95,6 +95,21 @@ pub fn init_logger() {
         .expect("Failed to initialize logging");
 }
 
+pub enum ParamValue<T> {
+    None,
+    Single(T),
+    Many(Vec<T>),
+}
+
+pub fn find_param<T, R, F: Fn(&T) -> Option<R>>(args: &[T], filter: F) -> ParamValue<R> {
+    let mut found: Vec<R> = args.iter().filter_map(filter).collect();
+    match found.len() {
+        0 => ParamValue::None,
+        1 => ParamValue::Single(found.pop().unwrap()),
+        _ => ParamValue::Many(found),
+    }
+}
+
 #[test]
 fn test_hash_stream() {
     use std::io::Cursor;

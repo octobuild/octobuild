@@ -5,13 +5,7 @@ use std::sync::Arc;
 use crate::compiler::{
     Arg, CommandInfo, CompilationArgs, CompilationTask, InputKind, OutputKind, Scope,
 };
-use crate::utils::expand_response_files;
-
-enum ParamValue<T> {
-    None,
-    Single(T),
-    Many(Vec<T>),
-}
+use crate::utils::{expand_response_files, find_param, ParamValue};
 
 pub fn create_tasks(command: CommandInfo, args: &[String]) -> Result<Vec<CompilationTask>, String> {
     expand_response_files(&command.current_dir, args)
@@ -187,15 +181,6 @@ fn get_output_object(
             }
         },
     )
-}
-
-fn find_param<T, R, F: Fn(&T) -> Option<R>>(args: &[T], filter: F) -> ParamValue<R> {
-    let mut found: Vec<R> = args.iter().filter_map(filter).collect();
-    match found.len() {
-        0 => ParamValue::None,
-        1 => ParamValue::Single(found.pop().unwrap()),
-        _ => ParamValue::Many(found),
-    }
 }
 
 fn parse_arguments<S: AsRef<str>, I: Iterator<Item = S>>(mut iter: I) -> Result<Vec<Arg>, String> {
