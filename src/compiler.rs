@@ -14,6 +14,7 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
 use crate::cache::{Cache, FileHasher};
+use crate::compiler::Scope::{Preprocessor, Shared};
 use crate::config::Config;
 use crate::io::memstream::MemStream;
 use crate::io::statistic::Statistic;
@@ -61,6 +62,17 @@ pub enum Scope {
     Shared,
     // Unknown argument - local build only
     Ignore,
+}
+
+impl Scope {
+    pub fn matches(self, scope: Scope) -> bool {
+        match scope {
+            Preprocessor => self == Preprocessor || self == Shared,
+            Scope::Compiler => self == Scope::Compiler || self == Shared,
+            Shared => self == Shared,
+            Scope::Ignore => false,
+        }
+    }
 }
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
@@ -317,6 +329,7 @@ pub struct CompilationArgs {
     pub output_precompiled: Option<PathBuf>,
     // Marker for precompiled header.
     pub marker_precompiled: Option<String>,
+    pub deps_file: Option<PathBuf>,
 }
 
 #[derive(Clone, Debug)]

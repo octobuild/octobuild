@@ -1,11 +1,12 @@
-use std::env;
+use std::fs::File;
 use std::io;
-use std::io::{Error, Read};
+use std::io::{Error, Read, Write};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::sync::mpsc::{channel, Receiver};
 use std::sync::Arc;
 use std::thread;
+use std::{env, fs};
 
 use regex::Regex;
 
@@ -103,23 +104,21 @@ impl Toolchain for ClangToolchain {
                 Arg::Flag {
                     ref scope,
                     ref flag,
-                } => match scope {
-                    Scope::Preprocessor | &Scope::Shared => {
+                } => {
+                    if scope.matches(Scope::Preprocessor) {
                         args.push("-".to_string() + flag);
                     }
-                    Scope::Ignore | &Scope::Compiler => {}
-                },
+                }
                 Arg::Param {
                     ref scope,
                     ref flag,
                     ref value,
-                } => match scope {
-                    Scope::Preprocessor | &Scope::Shared => {
+                } => {
+                    if scope.matches(Scope::Preprocessor) {
                         args.push("-".to_string() + flag);
                         args.push(value.clone());
                     }
-                    Scope::Ignore | &Scope::Compiler => {}
-                },
+                }
                 Arg::Input { .. } => {}
                 Arg::Output { .. } => {}
             };
@@ -130,7 +129,18 @@ impl Toolchain for ClangToolchain {
         args.push("-o".to_string());
         args.push("-".to_string());
 
-        state.wrap_slow(|| execute(task.shared.command.to_command().args(&args)))
+        state.wrap_slow(|| {
+            let result = execute(task.shared.command.to_command().args(&args))?;
+            if let Some(ref deps_file) = task.shared.deps_file {
+                let data = fs::read_to_string(deps_file)?;
+                if let Some(end) = data.strip_prefix('-') {
+                    let mut f = File::create(deps_file)?;
+                    f.write_all(task.output_object.to_string_lossy().as_bytes())?;
+                    f.write_all(end.as_bytes())?;
+                }
+            }
+            Ok(result)
+        })
     }
 
     // Compile preprocessed file.
@@ -145,23 +155,21 @@ impl Toolchain for ClangToolchain {
                 Arg::Flag {
                     ref scope,
                     ref flag,
-                } => match scope {
-                    Scope::Compiler | &Scope::Shared => {
+                } => {
+                    if scope.matches(Scope::Compiler) {
                         args.push("-".to_string() + flag);
                     }
-                    Scope::Ignore | &Scope::Preprocessor => {}
-                },
+                }
                 Arg::Param {
                     ref scope,
                     ref flag,
                     ref value,
-                } => match scope {
-                    Scope::Compiler | &Scope::Shared => {
+                } => {
+                    if scope.matches(Scope::Compiler) {
                         args.push("-".to_string() + flag);
                         args.push(value.clone());
                     }
-                    Scope::Ignore | &Scope::Preprocessor => {}
-                },
+                }
                 Arg::Input { .. } => {}
                 Arg::Output { .. } => {}
             };

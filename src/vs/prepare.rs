@@ -123,6 +123,7 @@ pub fn create_tasks(command: CommandInfo, args: &[String]) -> Result<Vec<Compila
                 output_precompiled: output_precompiled.map(|path| command.current_dir_join(&path)),
                 marker_precompiled,
                 command,
+                deps_file: None,
             });
             input_sources
                 .into_iter()

@@ -82,6 +82,19 @@ pub fn create_tasks(command: CommandInfo, args: &[String]) -> Result<Vec<Compila
             return Err(format!("Found too many output object files: {:?}", v));
         }
     };
+
+    let deps_file = parsed_args
+        .iter()
+        .filter_map(|arg| match arg {
+            Arg::Param {
+                ref flag,
+                ref value,
+                ..
+            } if *flag == "MF" => Some(Path::new(value).to_path_buf()),
+            _ => None,
+        })
+        .next();
+
     // Language
     let language: Option<String> = match find_param(&parsed_args, |arg: &Arg| -> Option<String> {
         match arg {
@@ -116,6 +129,7 @@ pub fn create_tasks(command: CommandInfo, args: &[String]) -> Result<Vec<Compila
         output_precompiled: None,
         marker_precompiled,
         input_precompiled,
+        deps_file,
     });
     input_sources
         .into_iter()
@@ -215,11 +229,12 @@ fn parse_argument(iter: &mut Iter<String>) -> Option<Result<Arg, String>> {
                 None => match flag {
                     "c" => Ok(Arg::flag(Scope::Ignore, flag)),
                     "pipe" => Ok(Arg::flag(Scope::Shared, flag)),
+                    "MD" => Ok(Arg::flag(Scope::Preprocessor, flag)),
                     "nostdinc++" => Ok(Arg::flag(Scope::Shared, flag)),
                     s if s.starts_with('f') => Ok(Arg::flag(Scope::Shared, flag)),
                     s if s.starts_with('g') => Ok(Arg::flag(Scope::Shared, flag)),
                     s if s.starts_with('O') => Ok(Arg::flag(Scope::Shared, flag)),
-                    s if s.starts_with('W') => Ok(Arg::flag(Scope::Shared, flag)),
+                    s if s.starts_with('W') => Ok(Arg::flag(Scope::Compiler, flag)),
                     s if s.starts_with('m') => Ok(Arg::flag(Scope::Shared, flag)),
                     s if s.starts_with("std=") => Ok(Arg::flag(Scope::Shared, flag)),
                     _ => Err(arg.to_string()),
@@ -251,7 +266,7 @@ fn is_spaceable_param(flag: &str) -> Option<(&str, Scope, bool)> {
                     return Some((*prefix, Scope::Ignore, false));
                 }
             }
-            for prefix in ["I"].iter() {
+            for prefix in ["I", "MF"].iter() {
                 if flag.starts_with(*prefix) {
                     return Some((*prefix, Scope::Preprocessor, false));
                 }
