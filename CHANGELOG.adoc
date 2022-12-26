@@ -1,7 +1,7 @@
 = Changelog
 :icons: font
 
-== Unreleased
+== 0.2.3
 
 * Include `ib_console` executable in deb package
 
