@@ -12,14 +12,7 @@ image:https://badges.gitter.im/{slug}.svg[Gitter chat,link={uri-discuss}]
 
 == Overview
 
-This project allows you to cache the compilation on Unreal Engine building (like ccache).
-
-It's supported out of box (you need simply install it):
-
-* Visual Studio UBT build on Windows
-* clang UBT build on Linux
-
-It speeds up recompilation by caching previous compilations and detecting when the same compilation is being done again.
+This project allows you to speedup re-compilation of Unreal Engine (and UE-based games) by caching intermediate compilation files.
 
 ////
 
@@ -73,8 +66,11 @@ sudo apt-get install octobuild
 
 == Configuration files
 
-You can get configuration files and show default and actual configuration by running ```xgConsole``` without parameters.
+You can get configuration files and show default and actual configuration by running `ib_console`/`xgConsole` without parameters.
 
-== Known issues
+== Unreal Engine patches
 
-On Windows you can't mix compilation with and without octobuild.
+This project requires some patches to Unreal Engine:
+
+* https://github.com/EpicGames/UnrealEngine/pull/9932[#9932]: Fix action graph copy action on non-Windows platforms
+* https://github.com/EpicGames/UnrealEngine/pull/9933[#9933]: Reenable XGE on Linux

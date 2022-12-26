@@ -1,10 +1,11 @@
 = Changelog
+:icons: font
 
-== 0.1.15
+== 0.2.0
 
-* Clang: Feature "remove comments from clang preprocessed output" is removed from Octobuild as unsafe (fix #23).
-+
-To increase cache hit on Unreal Engine build please patch UE4 like https://github.com/EpicGames/UnrealEngine/pull/3014
+* Fix compatibility with modern Unreal Engine on Linux
+
+WARNING: Windows support is still broken in this release
 
 == 0.1.14
 
