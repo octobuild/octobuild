@@ -75,7 +75,7 @@ impl BuildAction {
                     .collect()
             })
             .unwrap_or_else(|e| {
-                println!("Can't use octobuild for task {}: {}", title, e);
+                //println!("Can't use octobuild for task {}: {}", title, e);
                 Vec::new()
             });
         if actions.is_empty() {
