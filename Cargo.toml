@@ -1,6 +1,6 @@
 [package]
 name = "octobuild"
-version = "0.2.0"
+version = "0.2.1"
 authors = [ "Artem V. Navrotskiy <bozaro@users.noreply.github.com>" ]
 edition = "2021"
 readme = "README.adoc"

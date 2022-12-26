@@ -1,11 +1,15 @@
 = Changelog
 :icons: font
 
+== 0.2.1
+
+* Add deb package to release artifacts
+
 == 0.2.0
 
 * Fix compatibility with modern Unreal Engine on Linux
 
-WARNING: Windows support is still broken in this release
+WARNING: Windows support is still broken
 
 == 0.1.14
 
