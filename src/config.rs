@@ -197,7 +197,7 @@ fn load_config<P: AsRef<Path>>(path: P) -> Result<Yaml> {
 }
 
 fn get_local_config_path() -> Option<PathBuf> {
-    dirs::home_dir().map(|v| v.join(&(".".to_string() + CONFIG_FILE_NAME)))
+    dirs::home_dir().map(|v| v.join(".".to_string() + CONFIG_FILE_NAME))
 }
 
 #[cfg(windows)]

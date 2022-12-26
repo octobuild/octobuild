@@ -88,7 +88,7 @@ pub fn init_logger() {
         })
         // Output to stdout and the log file in the temporary directory we made above to test
         .chain(io::stdout())
-        .chain(fern::log_file(&log_file).unwrap())
+        .chain(fern::log_file(log_file).unwrap())
         // Only log messages Info and above
         .level(log::LevelFilter::Info)
         .apply()

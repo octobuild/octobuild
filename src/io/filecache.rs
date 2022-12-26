@@ -90,7 +90,7 @@ impl FileCache {
         let path = self
             .cache_dir
             .join(&hash[0..2])
-            .join(&(hash[2..].to_string() + SUFFIX));
+            .join(hash[2..].to_string() + SUFFIX);
         // Try to read data from cache.
         if let Ok(output) = read_cache(statistic, &path, outputs) {
             return Ok(output);
@@ -197,7 +197,7 @@ fn read_cached_file<R: Read>(stream: &mut R, path: &Path) -> Result<(), Error> {
     let mut need_size = total_size;
 
     let mut file = File::create(path)?;
-    file.set_len(total_size as u64)?;
+    file.set_len(total_size)?;
     while need_size > 0 {
         let need = min(buf.len() as u64, need_size) as usize;
         let size = stream.read(&mut buf[0..need])?;

@@ -13,7 +13,7 @@ impl TempFile {
     /// Create random file name in specified directory.
     pub fn new_in(path: &Path, suffix: &str) -> Self {
         let random_name = Uuid::new_v4().to_string() + suffix;
-        TempFile::wrap(&path.join(&random_name))
+        TempFile::wrap(&path.join(random_name))
     }
 
     /// Wrap path to a temporary file. The file will be automatically

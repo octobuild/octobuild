@@ -23,9 +23,6 @@ pub struct VsCompiler {
 }
 
 impl VsCompiler {
-    pub fn default() -> Result<Self, Error> {
-        Ok(VsCompiler::new(&Arc::new(TempDir::new("octobuild")?)))
-    }
     pub fn new(temp_dir: &Arc<TempDir>) -> Self {
         VsCompiler {
             temp_dir: temp_dir.clone(),
