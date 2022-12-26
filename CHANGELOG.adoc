@@ -1,6 +1,10 @@
 = Changelog
 :icons: font
 
+== 0.2.2
+
+* Fix installation on Ubuntu 20.04
+
 == 0.2.1
 
 * Add deb package to release artifacts
