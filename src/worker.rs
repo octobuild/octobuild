@@ -74,7 +74,7 @@ impl BuildAction {
                     .map(|task| BuildAction::Compilation(task.toolchain, task.task))
                     .collect()
             })
-            .unwrap_or_else(|e| {
+            .unwrap_or_else(|_| {
                 //println!("Can't use octobuild for task {}: {}", title, e);
                 Vec::new()
             });
