@@ -64,7 +64,7 @@ impl BuildAction {
         compiler: &C,
         command: CommandInfo,
         args: &[String],
-        title: &str,
+        _title: &str,
     ) -> Vec<BuildAction> {
         let actions: Vec<BuildAction> = compiler
             .create_tasks(command.clone(), args)
