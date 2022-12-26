@@ -15,6 +15,7 @@ section = "devel"
 priority = "optional"
 extended-description = ""
 assets = [
+    ["target/release/ib_console", "usr/bin/", "755"],
     ["target/release/xgConsole", "usr/bin/", "755"],
     ["target/release/octo_clang", "usr/bin/", "755"],
     ["*.adoc", "usr/share/doc/octobuild/", "644"],

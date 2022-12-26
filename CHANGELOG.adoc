@@ -1,6 +1,10 @@
 = Changelog
 :icons: font
 
+== Unreleased
+
+* Include `ib_console` executable in deb package
+
 == 0.2.2
 
 * Fix installation on Ubuntu 20.04
