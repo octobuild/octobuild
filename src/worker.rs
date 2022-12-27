@@ -64,7 +64,7 @@ impl BuildAction {
         compiler: &C,
         command: CommandInfo,
         args: &[String],
-        _title: &str,
+        title: &str,
     ) -> Vec<BuildAction> {
         let actions: Vec<BuildAction> = compiler
             .create_tasks(command.clone(), args)
@@ -74,8 +74,8 @@ impl BuildAction {
                     .map(|task| BuildAction::Compilation(task.toolchain, task.task))
                     .collect()
             })
-            .unwrap_or_else(|_| {
-                //println!("Can't use octobuild for task {}: {}", title, e);
+            .unwrap_or_else(|e| {
+                println!("Can't use octobuild for task {}: {}", title, e);
                 Vec::new()
             });
         if actions.is_empty() {
@@ -258,16 +258,13 @@ fn execute_compiler(state: &SharedState, task: &BuildTask) -> Result<OutputInfo,
             stderr: Vec::new(),
             stdout: Vec::new(),
         }),
-        BuildAction::Exec(ref command, ref args) => state.wrap_slow(|| {
-            command
-                .to_command()
-                .args(args)
-                .output()
-                .map(OutputInfo::new)
+        BuildAction::Exec(ref command_info, ref args) => state.wrap_slow(|| {
+            let mut command = command_info.to_command();
+            command.args(args);
+            //println!("{:?}", command);
+            command.output().map(OutputInfo::new)
         }),
-        BuildAction::Compilation(ref toolchain, ref task) => {
-            toolchain.compile_task(state, task.clone())
-        }
+        BuildAction::Compilation(ref toolchain, ref task) => toolchain.compile_task(state, task),
     }
 }
 

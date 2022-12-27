@@ -49,21 +49,14 @@ impl VsToolchain {
 
 impl Compiler for VsCompiler {
     fn resolve_toolchain(&self, command: &CommandInfo) -> Option<Arc<dyn Toolchain>> {
-        if command
-            .program
-            .file_name()
-            .and_then(|n| n.to_str())
-            .map(|n| n.to_lowercase())
-            .map_or(false, |n| (n == "cl.exe") || (n == "cl"))
-        {
-            command.find_executable().and_then(|path| {
-                self.toolchains.resolve(&path, |path| {
-                    Arc::new(VsToolchain::new(path, &self.temp_dir))
-                })
-            })
-        } else {
-            None
+        let filename_lowercase = command.program.file_name()?.to_str()?.to_lowercase();
+        if filename_lowercase != "cl.exe" && filename_lowercase != "cl" {
+            return None;
         }
+        let executable = command.find_executable()?;
+        self.toolchains.resolve(&executable, |path| {
+            Arc::new(VsToolchain::new(path, &self.temp_dir))
+        })
     }
 
     #[cfg(unix)]
@@ -196,7 +189,7 @@ impl Toolchain for VsToolchain {
     // Compile preprocessed file.
     fn compile_prepare_step(
         &self,
-        task: CompilationTask,
+        task: &CompilationTask,
         preprocessed: MemStream,
     ) -> Result<CompileStep, Error> {
         let mut args = filter(&task.shared.args, |arg: &Arg| -> Option<String> {

@@ -359,14 +359,14 @@ pub struct CompileStep {
 
 impl CompileStep {
     pub fn new(
-        task: CompilationTask,
+        task: &CompilationTask,
         preprocessed: MemStream,
         args: Vec<String>,
         use_precompiled: bool,
     ) -> Self {
         assert!(use_precompiled || task.shared.input_precompiled.is_none());
         CompileStep {
-            output_object: Some(task.output_object),
+            output_object: Some(task.output_object.clone()),
             output_precompiled: task.shared.output_precompiled.clone(),
             input_precompiled: if use_precompiled {
                 task.shared.input_precompiled.clone()
@@ -403,7 +403,7 @@ pub trait Toolchain: Send + Sync {
     // Compile preprocessed file.
     fn compile_prepare_step(
         &self,
-        task: CompilationTask,
+        task: &CompilationTask,
         preprocessed: MemStream,
     ) -> Result<CompileStep, Error>;
 
@@ -431,9 +431,9 @@ pub trait Toolchain: Send + Sync {
     fn compile_task(
         &self,
         state: &SharedState,
-        task: CompilationTask,
+        task: &CompilationTask,
     ) -> Result<OutputInfo, Error> {
-        self.preprocess_step(state, &task)
+        self.preprocess_step(state, task)
             .and_then(|preprocessed| match preprocessed {
                 PreprocessResult::Success(preprocessed) => self
                     .compile_prepare_step(task, preprocessed)

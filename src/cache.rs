@@ -11,9 +11,14 @@ use super::io::statistic::Statistic;
 use super::utils::hash_stream;
 use std::time::SystemTime;
 
+#[derive(Clone)]
+pub struct CacheError {
+    error_msg: String,
+}
+
 pub struct Cache {
     file_cache: FileCache,
-    file_hash_cache: MemCache<PathBuf, Result<FileHash, ()>>,
+    file_hash_cache: MemCache<PathBuf, Result<FileHash, CacheError>>,
 }
 
 #[derive(Clone)]
@@ -52,41 +57,39 @@ impl Cache {
     }
 }
 
+fn file_hash_helper(
+    path: &Path,
+    cached: Option<Result<FileHash, CacheError>>,
+) -> Result<FileHash, Error> {
+    let stat = fs::metadata(path)?;
+    let modified = stat.modified()?;
+    // Validate cached value.
+    if let Some(Ok(value)) = cached {
+        if value.size == stat.len() && value.modified == modified {
+            return Ok(value);
+        }
+    }
+    // Calculate hash value.
+    let hash = generate_file_hash(path)?;
+    Ok(FileHash {
+        hash,
+        size: stat.len(),
+        modified,
+    })
+}
+
 impl FileHasher for Cache {
     fn file_hash(&self, path: &Path) -> Result<FileHash, Error> {
-        let result = self.file_hash_cache.run_cached(
-            path.to_path_buf(),
-            |cached: Option<Result<FileHash, ()>>| -> Result<FileHash, ()> {
-                let stat = match fs::metadata(path) {
-                    Ok(value) => value,
-                    Err(_) => {
-                        return Err(());
-                    }
-                };
-                // Validate cached value.
-                if let Some(Ok(value)) = cached {
-                    if value.size == stat.len() && value.modified == stat.modified().unwrap() {
-                        return Ok(value);
-                    }
-                }
-                // Calculate hash value.
-                let hash = match generate_file_hash(path) {
-                    Ok(value) => value,
-                    Err(_) => {
-                        return Err(());
-                    }
-                };
-                Ok(FileHash {
-                    hash,
-                    size: stat.len(),
-                    modified: stat.modified().unwrap(),
-                })
-            },
-        );
-        match result {
-            Ok(value) => Ok(value),
-            Err(_) => Err(Error::new(ErrorKind::Other, "I/O Error")),
-        }
+        self.file_hash_cache
+            .run_cached(
+                path.to_path_buf(),
+                |cached: Option<Result<FileHash, CacheError>>| -> Result<FileHash, CacheError> {
+                    file_hash_helper(path, cached).map_err(|e| CacheError {
+                        error_msg: e.to_string(),
+                    })
+                },
+            )
+            .map_err(|e| Error::new(ErrorKind::Other, e.error_msg))
     }
 }
 

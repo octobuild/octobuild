@@ -263,7 +263,7 @@ impl Toolchain for RemoteToolchain {
     // Compile preprocessed file.
     fn compile_prepare_step(
         &self,
-        task: CompilationTask,
+        task: &CompilationTask,
         preprocessed: MemStream,
     ) -> Result<CompileStep, Error> {
         self.local.compile_prepare_step(task, preprocessed)
