@@ -72,5 +72,6 @@ You can get configuration files and show default and actual configuration by run
 
 This project requires some patches to Unreal Engine:
 
+* https://github.com/EpicGames/UnrealEngine/pull/9903[#9903]: Restore ability to use XGE executor on non-Windows platforms
 * https://github.com/EpicGames/UnrealEngine/pull/9932[#9932]: Fix action graph copy action on non-Windows platforms
 * https://github.com/EpicGames/UnrealEngine/pull/9933[#9933]: Reenable XGE on Linux
