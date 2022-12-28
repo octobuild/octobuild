@@ -1,6 +1,10 @@
 = Changelog
 :icons: font
 
+== 0.2.4
+
+* Fix Windows support
+
 == 0.2.3
 
 * Include `ib_console` executable in deb package
