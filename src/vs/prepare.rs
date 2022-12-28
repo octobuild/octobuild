@@ -128,34 +128,35 @@ pub fn create_tasks(command: CommandInfo, args: &[String]) -> Result<Vec<Compila
         .into_iter()
         .map(|source| {
             let input_source = cwd.as_ref().map(|cwd| cwd.join(&source)).unwrap_or(source);
+            let language = language
+                .as_ref()
+                .map_or_else(|| detect_language(&input_source), |lang| Some(lang.clone()))
+                .ok_or_else(|| {
+                    format!(
+                        "Can't detect file language by extension: {}",
+                        input_source.to_string_lossy()
+                    )
+                })?;
             Ok(CompilationTask {
                 shared: shared.clone(),
-                language: language
-                    .as_ref()
-                    .map_or_else(
-                        || {
-                            input_source
-                                .extension()
-                                .and_then(|ext| match ext.to_str() {
-                                    Some(e) if e.eq_ignore_ascii_case("cpp") => Some("P"),
-                                    Some(e) if e.eq_ignore_ascii_case("c") => Some("C"),
-                                    _ => None,
-                                })
-                                .map(|ext| ext.to_string())
-                        },
-                        |lang| Some(lang.clone()),
-                    )
-                    .ok_or_else(|| {
-                        format!(
-                            "Can't detect file language by extension: {}",
-                            input_source.to_string_lossy()
-                        )
-                    })?,
+                language,
                 output_object: get_output_object(&input_source, &output_object)?,
                 input_source,
             })
         })
         .collect()
+}
+
+fn detect_language(path: &Path) -> Option<String> {
+    println!("{}", path.to_string_lossy());
+    let ext = path.extension()?.to_str()?;
+    if ext.eq_ignore_ascii_case("cpp") || ext.eq_ignore_ascii_case("cc") {
+        Some("P".to_string())
+    } else if ext.eq_ignore_ascii_case("c") {
+        Some("C".to_string())
+    } else {
+        None
+    }
 }
 
 fn get_output_object(

@@ -261,7 +261,6 @@ fn execute_compiler(state: &SharedState, task: &BuildTask) -> Result<OutputInfo,
         BuildAction::Exec(ref command_info, ref args) => state.wrap_slow(|| {
             let mut command = command_info.to_command();
             command.args(args);
-            //println!("{:?}", command);
             command.output().map(OutputInfo::new)
         }),
         BuildAction::Compilation(ref toolchain, ref task) => toolchain.compile_task(state, task),
