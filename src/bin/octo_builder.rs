@@ -72,7 +72,7 @@ impl BuilderService {
         let state = Arc::new(BuilderState {
             name: get_name(),
             shared: SharedState::new(&config).unwrap(),
-            toolchains: BuilderService::discovery_toolchains(&temp_dir),
+            toolchains: BuilderService::discover_toolchains(&temp_dir),
             precompiled_dir: config.cache_dir,
             precompiled: Mutex::new(HashMap::new()),
         });
@@ -141,10 +141,10 @@ impl BuilderService {
         })
     }
 
-    fn discovery_toolchains(temp_dir: &Arc<TempDir>) -> HashMap<String, Arc<dyn Toolchain>> {
+    fn discover_toolchains(temp_dir: &Arc<TempDir>) -> HashMap<String, Arc<dyn Toolchain>> {
         let compiler = supported_compilers(temp_dir);
         compiler
-            .discovery_toolchains()
+            .discover_toolchains()
             .into_iter()
             .filter_map(|toolchain| toolchain.identifier().map(|name| (name, toolchain)))
             .collect()

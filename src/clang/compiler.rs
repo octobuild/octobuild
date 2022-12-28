@@ -59,7 +59,7 @@ impl Compiler for ClangCompiler {
             .resolve(&executable, |path| Arc::new(ClangToolchain::new(path)))
     }
 
-    fn discovery_toolchains(&self) -> Vec<Arc<dyn Toolchain>> {
+    fn discover_toolchains(&self) -> Vec<Arc<dyn Toolchain>> {
         env::var_os("PATH")
             .map_or(Vec::new(), |paths| env::split_paths(&paths).collect())
             .iter()

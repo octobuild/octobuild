@@ -87,9 +87,9 @@ impl<C: Compiler> Compiler for RemoteCompiler<C> {
             })
     }
 
-    // Discovery local toolchains.
-    fn discovery_toolchains(&self) -> Vec<Arc<dyn Toolchain>> {
-        self.local.discovery_toolchains()
+    // Discover local toolchains.
+    fn discover_toolchains(&self) -> Vec<Arc<dyn Toolchain>> {
+        self.local.discover_toolchains()
     }
 }
 
