@@ -10,6 +10,7 @@ use std::{env, fs};
 
 use regex::Regex;
 
+use crate::compiler::CompileInput::{Preprocessed, Source};
 use lazy_static::lazy_static;
 
 pub use super::super::compiler::*;
@@ -91,12 +92,10 @@ impl Toolchain for ClangToolchain {
         state: &SharedState,
         task: &CompilationTask,
     ) -> Result<PreprocessResult, Error> {
-        let mut args = vec![
-            "-E".to_string(),
-            "-x".to_string(),
-            task.language.clone(),
-            "-frewrite-includes".to_string(),
-        ];
+        let mut args: Vec<String> = vec!["-E", "-x", task.language.as_str(), "-frewrite-includes"]
+            .iter()
+            .map(|arg| arg.to_string())
+            .collect();
 
         // Make parameters list for preprocessing.
         for arg in task.shared.args.iter() {
@@ -105,7 +104,7 @@ impl Toolchain for ClangToolchain {
                     ref scope,
                     ref flag,
                 } => {
-                    if scope.matches(Scope::Preprocessor) {
+                    if scope.matches(Scope::Preprocessor, state.run_second_cpp) {
                         args.push("-".to_string() + flag);
                     }
                 }
@@ -114,7 +113,7 @@ impl Toolchain for ClangToolchain {
                     ref flag,
                     ref value,
                 } => {
-                    if scope.matches(Scope::Preprocessor) {
+                    if scope.matches(Scope::Preprocessor, state.run_second_cpp) {
                         args.push("-".to_string() + flag);
                         args.push(value.clone());
                     }
@@ -124,7 +123,7 @@ impl Toolchain for ClangToolchain {
             };
         }
 
-        // Add preprocessor paramters.
+        // Add preprocessor parameters.
         args.push(task.input_source.display().to_string());
         args.push("-o".to_string());
         args.push("-".to_string());
@@ -146,6 +145,7 @@ impl Toolchain for ClangToolchain {
     // Compile preprocessed file.
     fn compile_prepare_step(
         &self,
+        state: &SharedState,
         task: &CompilationTask,
         preprocessed: MemStream,
     ) -> Result<CompileStep, Error> {
@@ -156,7 +156,7 @@ impl Toolchain for ClangToolchain {
                     ref scope,
                     ref flag,
                 } => {
-                    if scope.matches(Scope::Compiler) {
+                    if scope.matches(Scope::Compiler, state.run_second_cpp) {
                         args.push("-".to_string() + flag);
                     }
                 }
@@ -165,7 +165,7 @@ impl Toolchain for ClangToolchain {
                     ref flag,
                     ref value,
                 } => {
-                    if scope.matches(Scope::Compiler) {
+                    if scope.matches(Scope::Compiler, state.run_second_cpp) {
                         args.push("-".to_string() + flag);
                         args.push(value.clone());
                     }
@@ -174,29 +174,60 @@ impl Toolchain for ClangToolchain {
                 Arg::Output { .. } => {}
             };
         }
-        Ok(CompileStep::new(task, preprocessed, args, false))
+        let input = if state.run_second_cpp {
+            Source(SourceInput {
+                path: task.input_source.clone(),
+                current_dir: task.shared.command.current_dir.clone(),
+            })
+        } else {
+            Preprocessed(preprocessed)
+        };
+        Ok(CompileStep::new(task, input, args, false))
     }
 
     fn compile_step(&self, state: &SharedState, task: CompileStep) -> Result<OutputInfo, Error> {
         // Run compiler.
         state.wrap_slow(|| {
-            let mut child = Command::new(&self.path)
-                .env_clear()
-                .arg("-c")
-                .args(&task.args)
-                .arg("-")
+            let mut command = Command::new(&self.path);
+
+            match &task.input {
+                Preprocessed(_) => {
+                    command.env_clear();
+                }
+                Source(source) => {
+                    if let Some(dir) = &source.current_dir {
+                        command.current_dir(dir);
+                    }
+                }
+            }
+
+            command.arg("-c").args(&task.args);
+
+            match &task.input {
+                Preprocessed(_) => command.arg("-"),
+                Source(source) => command.arg(&source.path),
+            };
+
+            command
                 .arg("-o")
                 .arg(
-                    task.output_object
-                        .as_ref()
+                    &task
+                        .output_object
                         .map_or("-".to_string(), |path| path.display().to_string()),
                 )
-                .stdin(Stdio::piped())
+                .stdin(match &task.input {
+                    Preprocessed(_) => Stdio::piped(),
+                    Source(_) => Stdio::null(),
+                })
                 .stdout(Stdio::piped())
-                .stderr(Stdio::piped())
-                .spawn()?;
-            task.preprocessed.copy(child.stdin.as_mut().unwrap())?;
-            let _ = task.preprocessed;
+                .stderr(Stdio::piped());
+
+            let mut child = command.spawn()?;
+
+            if let Preprocessed(preprocessed) = task.input {
+                preprocessed.copy(child.stdin.as_mut().unwrap())?;
+            }
+
             let output = child.wait_with_output()?;
             Ok(OutputInfo::new(output))
         })

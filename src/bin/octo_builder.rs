@@ -30,6 +30,7 @@ use octobuild::cluster::builder::{CompileRequest, CompileResponse};
 use octobuild::cluster::common::{
     BuilderInfo, BuilderInfoUpdate, RPC_BUILDER_TASK, RPC_BUILDER_UPDATE, RPC_BUILDER_UPLOAD,
 };
+use octobuild::compiler::CompileInput::Preprocessed;
 use octobuild::compiler::*;
 use octobuild::config::Config;
 use octobuild::io::memstream::MemStream;
@@ -198,7 +199,7 @@ impl<D> Middleware<D> for RpcBuilderTaskHandler {
                 output_precompiled: None,
                 input_precompiled: precompiled,
                 args: request.args,
-                preprocessed: MemStream::from(request.preprocessed_data),
+                input: Preprocessed(MemStream::from(request.preprocessed_data)),
             };
 
             let toolchain: Arc<dyn Toolchain> =

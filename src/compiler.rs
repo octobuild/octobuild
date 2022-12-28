@@ -65,10 +65,10 @@ pub enum Scope {
 }
 
 impl Scope {
-    pub fn matches(self, scope: Scope) -> bool {
+    pub fn matches(self, scope: Scope, run_second_cpp: bool) -> bool {
         match scope {
             Preprocessor => self == Preprocessor || self == Shared,
-            Scope::Compiler => self == Scope::Compiler || self == Shared,
+            Scope::Compiler => run_second_cpp || self == Scope::Compiler || self == Shared,
             Shared => self == Shared,
             Scope::Ignore => false,
         }
@@ -160,6 +160,7 @@ pub struct SharedState {
     pub semaphore: Semaphore,
     pub cache: Cache,
     pub statistic: Statistic,
+    pub run_second_cpp: bool,
 }
 
 #[derive(Default)]
@@ -172,6 +173,7 @@ impl SharedState {
             semaphore,
             statistic: Statistic::new(),
             cache: Cache::new(config),
+            run_second_cpp: config.run_second_cpp,
         })
     }
 
@@ -344,6 +346,16 @@ pub struct CompilationTask {
     pub output_object: PathBuf,
 }
 
+pub struct SourceInput {
+    pub path: PathBuf,
+    pub current_dir: Option<PathBuf>,
+}
+
+pub enum CompileInput {
+    Preprocessed(MemStream),
+    Source(SourceInput),
+}
+
 pub struct CompileStep {
     // Compiler arguments.
     pub args: Vec<String>,
@@ -353,14 +365,13 @@ pub struct CompileStep {
     pub output_object: Option<PathBuf>,
     // Output precompiled header file name.
     pub output_precompiled: Option<PathBuf>,
-    // Preprocessed source file.
-    pub preprocessed: MemStream,
+    pub input: CompileInput,
 }
 
 impl CompileStep {
     pub fn new(
         task: &CompilationTask,
-        preprocessed: MemStream,
+        input: CompileInput,
         args: Vec<String>,
         use_precompiled: bool,
     ) -> Self {
@@ -374,7 +385,7 @@ impl CompileStep {
                 None
             },
             args,
-            preprocessed,
+            input,
         }
     }
 }
@@ -403,6 +414,7 @@ pub trait Toolchain: Send + Sync {
     // Compile preprocessed file.
     fn compile_prepare_step(
         &self,
+        state: &SharedState,
         task: &CompilationTask,
         preprocessed: MemStream,
     ) -> Result<CompileStep, Error>;
@@ -435,9 +447,9 @@ pub trait Toolchain: Send + Sync {
     ) -> Result<OutputInfo, Error> {
         self.preprocess_step(state, task)
             .and_then(|preprocessed| match preprocessed {
-                PreprocessResult::Success(preprocessed) => self
-                    .compile_prepare_step(task, preprocessed)
-                    .and_then(|task| self.compile_step_cached(state, task)),
+                PreprocessResult::Success(preprocessed) => {
+                    self.compile_step_cached(state, task, preprocessed)
+                }
                 PreprocessResult::Failed(output) => Ok(output),
             })
     }
@@ -445,19 +457,23 @@ pub trait Toolchain: Send + Sync {
     fn compile_step_cached(
         &self,
         state: &SharedState,
-        task: CompileStep,
+        task: &CompilationTask,
+        preprocessed: MemStream,
     ) -> Result<OutputInfo, Error> {
         let mut hasher = Sha256::new();
         // Get hash from preprocessed data
-        hasher.hash_u64(task.preprocessed.len() as u64);
-        task.preprocessed.copy(&mut hasher)?;
+        hasher.hash_u64(preprocessed.len() as u64);
+        preprocessed.copy(&mut hasher)?;
+
+        let step = self.compile_prepare_step(state, task, preprocessed)?;
+
         // Hash arguments
-        hasher.hash_u64(task.args.len() as u64);
-        for arg in task.args.iter() {
+        hasher.hash_u64(step.args.len() as u64);
+        for arg in step.args.iter() {
             hasher.hash_bytes(arg.as_bytes());
         }
         // Hash input files
-        match task.input_precompiled {
+        match step.input_precompiled {
             Some(ref path) => {
                 hasher.hash_bytes(state.cache.file_hash(path)?.hash.as_bytes());
             }
@@ -466,14 +482,14 @@ pub trait Toolchain: Send + Sync {
             }
         }
         // Store output precompiled flag
-        hasher.hash_u8(u8::from(task.output_precompiled.is_some()));
+        hasher.hash_u8(u8::from(step.output_precompiled.is_some()));
 
         // Output files list
         let mut outputs: Vec<PathBuf> = Vec::new();
-        if let Some(ref path) = task.output_object {
+        if let Some(ref path) = step.output_object {
             outputs.push(path.clone());
         }
-        if let Some(ref path) = task.output_precompiled {
+        if let Some(ref path) = step.output_precompiled {
             outputs.push(path.clone());
         }
 
@@ -482,7 +498,7 @@ pub trait Toolchain: Send + Sync {
             &state.statistic,
             &hex::encode(hasher.finalize()),
             &outputs,
-            || -> Result<OutputInfo, Error> { self.compile_step(state, task) },
+            || -> Result<OutputInfo, Error> { self.compile_step(state, step) },
             || true,
         )
     }

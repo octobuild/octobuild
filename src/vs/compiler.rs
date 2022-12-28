@@ -8,6 +8,7 @@ use std::{env, fs};
 use regex::bytes::{NoExpand, Regex};
 use tempdir::TempDir;
 
+use crate::compiler::CompileInput::Preprocessed;
 use lazy_static::lazy_static;
 
 pub use super::super::compiler::*;
@@ -189,6 +190,7 @@ impl Toolchain for VsToolchain {
     // Compile preprocessed file.
     fn compile_prepare_step(
         &self,
+        state: &SharedState,
         task: &CompilationTask,
         preprocessed: MemStream,
     ) -> Result<CompileStep, Error> {
@@ -224,13 +226,27 @@ impl Toolchain for VsToolchain {
         if task.shared.output_precompiled.is_some() {
             args.push("/Yc".to_string());
         }
-        Ok(CompileStep::new(task, preprocessed, args, true))
+        let compile_input = if state.run_second_cpp {
+            CompileInput::Source(SourceInput {
+                path: task.input_source.clone(),
+                current_dir: task.shared.command.current_dir.clone(),
+            })
+        } else {
+            Preprocessed(preprocessed)
+        };
+        Ok(CompileStep::new(task, compile_input, args, true))
     }
 
     fn compile_step(&self, state: &SharedState, task: CompileStep) -> Result<OutputInfo, Error> {
+        let preprocessed = if let Preprocessed(preprocessed) = &task.input {
+            preprocessed
+        } else {
+            todo!()
+        };
+
         // Input file path.
         let input_temp = TempFile::new_in(self.temp_dir.path(), ".i");
-        File::create(input_temp.path()).and_then(|mut s| task.preprocessed.copy(&mut s))?;
+        File::create(input_temp.path()).and_then(|mut s| preprocessed.copy(&mut s))?;
         // Output file path
         let output_object = task
             .output_object

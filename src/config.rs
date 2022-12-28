@@ -16,6 +16,8 @@ pub struct Config {
     pub process_limit: usize,
     pub cache_dir: PathBuf,
     pub cache_limit_mb: u32,
+
+    pub run_second_cpp: bool,
 }
 
 const CONFIG_FILE_NAME: &str = "octobuild.conf";
@@ -31,6 +33,7 @@ const PARAM_COORDINATOR: &str = "coordinator";
 const PARAM_CACHE_LIMIT: &str = "cache_limit_mb";
 const PARAM_CACHE_PATH: &str = "cache_path";
 const PARAM_PROCESS_LIMIT: &str = "process_limit";
+const PARAM_RUN_SECOND_CPP: &str = "run_second_cpp";
 
 impl Config {
     pub fn new() -> Result<Self> {
@@ -98,6 +101,11 @@ impl Config {
         })
         .unwrap_or_else(|| SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::new(0, 0, 0, 0), 3000)));
 
+        let run_second_cpp = get_config(local, global, PARAM_RUN_SECOND_CPP, |v| {
+            bool::from_str(v.as_str()?).ok()
+        })
+        .unwrap_or(false);
+
         Ok(Config {
             process_limit,
             cache_dir: replace_home(&cache_path)?,
@@ -105,6 +113,7 @@ impl Config {
             coordinator,
             helper_bind,
             coordinator_bind,
+            run_second_cpp,
         })
     }
 
@@ -137,6 +146,10 @@ impl Config {
         y.insert(
             Yaml::String(PARAM_COORDINATOR_BIND.to_string()),
             Yaml::String(self.coordinator_bind.to_string()),
+        );
+        y.insert(
+            Yaml::String(PARAM_RUN_SECOND_CPP.to_string()),
+            Yaml::String(self.run_second_cpp.to_string()),
         );
         YamlEmitter::new(&mut content).dump(&Yaml::Hash(y)).unwrap();
         println!("{}", content);

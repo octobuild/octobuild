@@ -14,6 +14,7 @@ use reqwest::StatusCode;
 use crate::cache::FileHasher;
 use crate::cluster::builder::{CompileRequest, CompileResponse};
 use crate::cluster::common::{BuilderInfo, RPC_BUILDER_LIST, RPC_BUILDER_TASK, RPC_BUILDER_UPLOAD};
+use crate::compiler::CompileInput::Preprocessed;
 use crate::compiler::{
     CommandInfo, CompilationTask, CompileStep, Compiler, OutputInfo, PreprocessResult, SharedState,
     Toolchain,
@@ -110,6 +111,11 @@ impl RemoteToolchain {
         let name = self
             .identifier()
             .ok_or_else(|| Error::new(ErrorKind::Other, "Can't get toolchain name"))?;
+        let preprocessed = if let Preprocessed(preprocessed) = &task.input {
+            preprocessed
+        } else {
+            unimplemented!()
+        };
         let addr = self
             .remote_endpoint(&name)
             .ok_or_else(|| Error::new(ErrorKind::Other, "Can't find helper for toolchain"))?;
@@ -125,7 +131,7 @@ impl RemoteToolchain {
         let request = CompileRequest {
             toolchain: name,
             args: task.args.clone(),
-            preprocessed_data: (&task.preprocessed).into(),
+            preprocessed_data: preprocessed.into(),
             precompiled_hash: self.upload_precompiled(state, &task.input_precompiled, &base_url)?,
         };
         let request_payload = bincode::serialize(&request).unwrap();
@@ -263,10 +269,11 @@ impl Toolchain for RemoteToolchain {
     // Compile preprocessed file.
     fn compile_prepare_step(
         &self,
+        state: &SharedState,
         task: &CompilationTask,
         preprocessed: MemStream,
     ) -> Result<CompileStep, Error> {
-        self.local.compile_prepare_step(task, preprocessed)
+        self.local.compile_prepare_step(state, task, preprocessed)
     }
 
     fn compile_step(&self, state: &SharedState, task: CompileStep) -> Result<OutputInfo, Error> {
