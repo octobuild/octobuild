@@ -34,6 +34,9 @@ name = "ib_console"
 name = "xgConsole"
 
 [[bin]]
+name = "agent"
+
+[[bin]]
 name = "octo_builder"
 
 [[bin]]

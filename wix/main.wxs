@@ -51,13 +51,15 @@
   destination for 32-bit versus 64-bit installers. Removal of these lines will
   cause installation errors.
 -->
-<?if $(sys.BUILDARCH) = x64 or $(sys.BUILDARCH) = arm64 ?>
-    <?define PlatformProgramFilesFolder = "ProgramFiles64Folder" ?>
+<?if $(var.Platform) = x64 ?>
+<?define Win64 = 'yes' ?>
+<?define PlatformProgramFilesFolder = 'ProgramFiles64Folder' ?>
 <?else ?>
-    <?define PlatformProgramFilesFolder = "ProgramFilesFolder" ?>
+<?define Win64 = 'no' ?>
+<?define PlatformProgramFilesFolder = 'ProgramFilesFolder' ?>
 <?endif ?>
 
-<Wix xmlns='http://schemas.microsoft.com/wix/2006/wi'>
+<Wix xmlns:util="http://schemas.microsoft.com/wix/UtilExtension" xmlns='http://schemas.microsoft.com/wix/2006/wi'>
 
     <Product
         Id='*'
@@ -94,15 +96,8 @@
                    Language='0'/>
 
             <Directory Id='$(var.PlatformProgramFilesFolder)' Name='PFiles'>
-                <Directory Id='APPLICATIONFOLDER' Name='octobuild'>
-                    <!--
-                      Disabling the license sidecar file in the installer is a two step process:
-
-                      1. Comment out or remove the `Component` tag along with its contents.
-                      2. Comment out or remove the `ComponentRef` tag with the "License" Id
-                         attribute value further down in this file.
-                    -->
-                    <Component Id='License' Guid='*'>
+                <Directory Id='INSTALLDIR' Name='octobuild'>
+                    <Component Id='License' Guid='bd448224-5d8b-4b46-b317-c8264bf985dc'>
                         <File Id='LicenseFile'
                             Name='License.rtf'
                             DiskId='1'
@@ -111,7 +106,31 @@
                     </Component>
                     
                     <Directory Id='Bin' Name='bin'>
-                        <Component Id='Path' Guid='6013CE49-D7F0-4EB5-8C5C-C750367E82B2' KeyPath='yes'>
+                        <Component Id='agent_Comp' Guid='c4e9db58-087f-4ef2-98e4-0d880f6efd79'>
+                            <File Source='$(var.CargoTargetBinDir)\agent.exe'/>
+                            <ServiceInstall
+                                    DisplayName='Octobuild Agent'
+                                    ErrorControl='normal'
+                                    Id='agent_install'
+                                    Name='Incredibuild Agent'
+                                    Start='auto'
+                                    Type='ownProcess'>
+                                <util:ServiceConfig
+                                        FirstFailureActionType="restart"
+                                        SecondFailureActionType="restart"
+                                        ThirdFailureActionType="none"
+                                        ResetPeriodInDays="1"
+                                        RestartServiceDelayInSeconds="60"/>
+                            </ServiceInstall>
+                            <ServiceControl
+                                    Id='agent_start'
+                                    Name='Incredibuild Agent'
+                                    Remove='uninstall'
+                                    Start='install'
+                                    Stop='both'
+                                    Wait='yes'/>
+                        </Component>
+                        <Component Id='path_Comp' Guid='6013CE49-D7F0-4EB5-8C5C-C750367E82B2' KeyPath='yes'>
                             <Environment
                                 Id='PATH'
                                 Name='PATH'
@@ -121,7 +140,7 @@
                                 Action='set'
                                 System='yes'/>
                         </Component>
-                        <Component Id='binary0' Guid='8dca8328-4e8e-467b-ab51-1d0780c2afb2'>
+                        <Component Id='xgConsole_Comp' Guid='8dca8328-4e8e-467b-ab51-1d0780c2afb2'>
                             <File
                                 Id='exe0'
                                 Name='xgConsole.exe'
@@ -139,88 +158,28 @@
             Title='Application'
             Description='Installs all binaries and the license.'
             Level='1'
-            ConfigurableDirectory='APPLICATIONFOLDER'
+            ConfigurableDirectory='INSTALLDIR'
             AllowAdvertise='no'
             Display='expand'
             Absent='disallow'>
 
             <MergeRef Id="VCRedist"/>
 
-            <!--
-              Comment out or remove the following `ComponentRef` tag to remove
-              the license sidecar file from the installer.
-            -->
             <ComponentRef Id='License'/>
-            
-            <ComponentRef Id='binary0'/>
-
-            <Feature
-                Id='Environment'
-                Title='PATH Environment Variable'
-                Description='Add the install location of the [ProductName] executable to the PATH system environment variable. This allows the [ProductName] executable to be called from any location.'
-                Level='1'
-                AllowAdvertise='no'
-                Absent='allow'>
-                <ComponentRef Id='Path'/>
-            </Feature>
+            <ComponentRef Id='agent_Comp'/>
+            <ComponentRef Id='path_Comp'/>
+            <ComponentRef Id='xgConsole_Comp'/>
         </Feature>
 
-        <SetProperty Id='ARPINSTALLLOCATION' Value='[APPLICATIONFOLDER]' After='CostFinalize'/>
-
-        
-        <!--
-          Uncomment the following `Icon` and `Property` tags to change the product icon.
-
-          The product icon is the graphic that appears in the Add/Remove
-          Programs control panel for the application.
-        -->
-        <!--<Icon Id='ProductICO' SourceFile='wix\Product.ico'/>-->
-        <!--<Property Id='ARPPRODUCTICON' Value='ProductICO' />-->
+        <SetProperty Id='ARPINSTALLLOCATION' Value='[INSTALLDIR]' After='CostFinalize'/>
 
         <Property Id='ARPHELPLINK' Value='https://github.com/bozaro/octobuild'/>
         
         <UI>
             <UIRef Id='WixUI_FeatureTree'/>
-            <!--
-              Disabling the EULA dialog in the installer is a two step process:
-
-                 1. Uncomment the following two `Publish` tags
-                 2. Comment out or remove the `<WiXVariable Id='WixUILicenseRtf'...` tag further down
-
-            -->
-            <!--<Publish Dialog='WelcomeDlg' Control='Next' Event='NewDialog' Value='CustomizeDlg' Order='99'>1</Publish>-->
-            <!--<Publish Dialog='CustomizeDlg' Control='Back' Event='NewDialog' Value='WelcomeDlg' Order='99'>1</Publish>-->
-            
         </UI>
 
-        <!--
-          Disabling the EULA dialog in the installer requires commenting out
-          or removing the following `WixVariable` tag
-        -->
         <WixVariable Id='WixUILicenseRtf' Value='wix\License.rtf'/>
-        
-        
-        <!--
-          Uncomment the next `WixVaraible` tag to customize the installer's
-          Graphical User Interface (GUI) and add a custom banner image across
-          the top of each screen. See the WiX Toolset documentation for details
-          about customization.
-
-          The banner BMP dimensions are 493 x 58 pixels.
-        -->
-        <!--<WixVariable Id='WixUIBannerBmp' Value='wix\Banner.bmp'/>-->
-
-        
-        <!--
-          Uncomment the next `WixVariable` tag to customize the installer's
-          Graphical User Interface (GUI) and add a custom image to the first
-          dialog, or screen. See the WiX Toolset documentation for details about
-          customization.
-
-          The dialog BMP dimensions are 493 x 312 pixels.
-        -->
-        <!--<WixVariable Id='WixUIDialogBmp' Value='wix\Dialog.bmp'/>-->
-
     </Product>
 
 </Wix>
