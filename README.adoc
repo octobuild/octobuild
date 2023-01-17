@@ -72,7 +72,7 @@ You can get configuration files and show default and actual configuration by run
 
 Linux build tested on AMD Ryzen 7 3700X, 32GB DDR4 @ 3200MHz, SSD and Unreal Engine 5.0.3 by running `<engine>/Engine/Build/BatchFiles/RunUAT.sh <game>.uproject <game>Editor DebugGame Linux`.
 
-Windows build tested on Inter Core i7-9700F, 32GB DDR4 @ 2400MHz, SSD and Unreal Engine 5.0.3 by running `<engine>/Engine/Build/BatchFiles/RunUBT.bat <game>.uproject <game>Editor DebugGame Win64`.
+Windows build tested on Intel Core i7-9700F, 32GB DDR4 @ 2400MHz, SSD and Unreal Engine 5.0.3 by running `<engine>/Engine/Build/BatchFiles/RunUBT.bat <game>.uproject <game>Editor DebugGame Win64`.
 
 [%autowidth]
 |===
