@@ -8,6 +8,7 @@ use std::iter::FromIterator;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 use std::sync::{Arc, RwLock};
+use std::time::Duration;
 
 use ipc::Semaphore;
 use serde::{Deserialize, Serialize};
@@ -305,6 +306,11 @@ pub struct OutputInfo {
     pub stderr: Vec<u8>,
 }
 
+pub struct BuildTaskResult {
+    pub output: Result<OutputInfo, Error>,
+    pub duration: Duration,
+}
+
 impl OutputInfo {
     pub fn new(output: Output) -> Self {
         OutputInfo {
@@ -445,13 +451,13 @@ pub trait Toolchain: Send + Sync {
         state: &SharedState,
         task: &CompilationTask,
     ) -> Result<OutputInfo, Error> {
-        self.preprocess_step(state, task)
-            .and_then(|preprocessed| match preprocessed {
-                PreprocessResult::Success(preprocessed) => {
-                    self.compile_step_cached(state, task, preprocessed)
-                }
-                PreprocessResult::Failed(output) => Ok(output),
-            })
+        let preprocessed = self.preprocess_step(state, task)?;
+        match preprocessed {
+            PreprocessResult::Success(preprocessed) => {
+                self.compile_step_cached(state, task, preprocessed)
+            }
+            PreprocessResult::Failed(output) => Ok(output),
+        }
     }
 
     fn compile_step_cached(

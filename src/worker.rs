@@ -2,17 +2,47 @@ use std::borrow::Cow;
 use std::cmp::{max, min};
 use std::io::{Error, ErrorKind};
 use std::sync::Arc;
+use std::time::Instant;
 
 use petgraph::graph::NodeIndex;
 use petgraph::{EdgeDirection, Graph};
 
-use crate::compiler::{CommandInfo, CompilationTask, Compiler, OutputInfo, SharedState, Toolchain};
+use crate::compiler::{
+    BuildTaskResult, CommandInfo, CompilationTask, Compiler, OutputInfo, SharedState, Toolchain,
+};
 
 pub type BuildGraph = Graph<Arc<BuildTask>, ()>;
 
 pub struct BuildTask {
     pub title: String,
     pub action: BuildAction,
+}
+
+impl BuildTask {
+    fn execute(&self, state: &SharedState) -> BuildTaskResult {
+        let start_time = Instant::now();
+        let output = match self.action {
+            BuildAction::Empty => Ok(OutputInfo {
+                status: Some(0),
+                stderr: Vec::new(),
+                stdout: Vec::new(),
+            }),
+            BuildAction::Exec(ref command_info, ref args) => state.wrap_slow(|| {
+                command_info
+                    .to_command()
+                    .args(args)
+                    .output()
+                    .map(OutputInfo::new)
+            }),
+            BuildAction::Compilation(ref toolchain, ref task) => {
+                toolchain.compile_task(state, task)
+            }
+        };
+        BuildTaskResult {
+            output,
+            duration: Instant::now().duration_since(start_time),
+        }
+    }
 }
 
 pub enum BuildAction {
@@ -27,7 +57,7 @@ pub struct BuildResult<'a> {
     // Worker number
     pub worker: usize,
     // Build result
-    pub result: &'a Result<OutputInfo, Error>,
+    pub result: &'a BuildTaskResult,
     // Completed task count
     pub completed: usize,
     // Total task count
@@ -38,7 +68,7 @@ struct ResultMessage {
     index: NodeIndex,
     task: Arc<BuildTask>,
     worker: usize,
-    result: Result<OutputInfo, Error>,
+    result: BuildTaskResult,
 }
 
 struct TaskMessage {
@@ -151,9 +181,9 @@ where
         assert!(!completed[message.index.index()]);
 
         update_progress(BuildResult::new(&message, count, graph.node_count()))?;
-        let result = message.result?;
-        if !result.success() {
-            let status = result.status;
+        let output = message.result.output?;
+        if !output.success() {
+            let status = output.status;
             return Ok(status);
         }
         completed[message.index.index()] = true;
@@ -201,7 +231,7 @@ where
 
     if graph.node_count() == 1 {
         let task = &graph.raw_nodes()[0].weight;
-        let result = execute_compiler(state, task);
+        let result = task.execute(state);
         update_progress(BuildResult {
             worker: 0,
             completed: 1,
@@ -209,7 +239,7 @@ where
             result: &result,
             task,
         })?;
-        return result.map(|output| output.status);
+        return result.output.map(|o| o.status);
     }
 
     let (tx_result, rx_result) = crossbeam::channel::unbounded::<ResultMessage>();
@@ -224,7 +254,7 @@ where
                     match local_tx_result.send(ResultMessage {
                         index: message.index,
                         worker: worker_id,
-                        result: execute_compiler(state, &message.task),
+                        result: message.task.execute(state),
                         task: message.task,
                     }) {
                         Ok(_) => {}
@@ -249,22 +279,6 @@ where
         result
     })
     .unwrap()
-}
-
-fn execute_compiler(state: &SharedState, task: &BuildTask) -> Result<OutputInfo, Error> {
-    match &task.action {
-        BuildAction::Empty => Ok(OutputInfo {
-            status: Some(0),
-            stderr: Vec::new(),
-            stdout: Vec::new(),
-        }),
-        BuildAction::Exec(ref command_info, ref args) => state.wrap_slow(|| {
-            let mut command = command_info.to_command();
-            command.args(args);
-            command.output().map(OutputInfo::new)
-        }),
-        BuildAction::Compilation(ref toolchain, ref task) => toolchain.compile_task(state, task),
-    }
 }
 
 #[cfg(test)]

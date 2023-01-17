@@ -212,10 +212,14 @@ fn prepare_graph<C: Compiler>(compiler: &C, graph: XgGraph) -> Result<BuildGraph
 
 fn print_task_result(result: BuildResult) -> Result<(), Error> {
     println!(
-        "#{} {}/{}: {}",
-        result.worker, result.completed, result.total, result.task.title
+        "#{} {}/{}: {} @ {}s",
+        result.worker,
+        result.completed,
+        result.total,
+        result.task.title,
+        result.result.duration.as_secs(),
     );
-    match result.result {
+    match result.result.output {
         Ok(ref output) => {
             io::stdout().write_all(&output.stdout)?;
             io::stderr().write_all(&output.stderr)?;
