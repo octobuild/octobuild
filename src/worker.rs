@@ -1,6 +1,6 @@
 use std::borrow::Cow;
 use std::cmp::{max, min};
-use std::io::{Error, ErrorKind};
+use std::io::{Error, ErrorKind, Write};
 use std::sync::Arc;
 use std::time::Instant;
 
@@ -86,6 +86,14 @@ impl<'a> BuildResult<'a> {
             completed: *completed,
             total,
         }
+    }
+
+    pub fn print(self) -> Result<(), Error> {
+        if let Ok(ref output) = self.result.output {
+            std::io::stdout().write_all(&output.stdout)?;
+            std::io::stderr().write_all(&output.stderr)?;
+        }
+        Ok(())
     }
 }
 

@@ -3,7 +3,7 @@ use std::collections::hash_map;
 use std::collections::HashMap;
 use std::env;
 use std::fmt::{Display, Formatter};
-use std::io::{Error, ErrorKind};
+use std::io::{Error, ErrorKind, Write};
 use std::iter::FromIterator;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
@@ -309,6 +309,16 @@ pub struct OutputInfo {
 pub struct BuildTaskResult {
     pub output: Result<OutputInfo, Error>,
     pub duration: Duration,
+}
+
+impl BuildTaskResult {
+    pub fn print_output(&self) -> std::io::Result<()> {
+        if let Ok(ref output) = self.output {
+            std::io::stdout().write_all(&output.stdout)?;
+            std::io::stderr().write_all(&output.stderr)?;
+        }
+        Ok(())
+    }
 }
 
 impl OutputInfo {

@@ -1,6 +1,5 @@
 use std::env;
-use std::io;
-use std::io::{Error, Write};
+use std::io::Error;
 use std::path::Path;
 use std::sync::Arc;
 
@@ -88,12 +87,6 @@ where
 }
 
 fn print_task_result(result: BuildResult) -> Result<(), Error> {
-    match result.result.output {
-        Ok(ref output) => {
-            io::stdout().write_all(&output.stdout)?;
-            io::stderr().write_all(&output.stderr)?;
-        }
-        Err(_) => {}
-    }
+    result.result.print_output()?;
     Ok(())
 }

@@ -2,8 +2,7 @@
 
 use std::env;
 use std::fs::File;
-use std::io;
-use std::io::{BufReader, Error, ErrorKind, Write};
+use std::io::{BufReader, Error, ErrorKind};
 use std::path::{Path, PathBuf};
 use std::process;
 use std::sync::Arc;
@@ -219,13 +218,7 @@ fn print_task_result(result: BuildResult) -> Result<(), Error> {
         result.task.title,
         result.result.duration.as_secs(),
     );
-    match result.result.output {
-        Ok(ref output) => {
-            io::stdout().write_all(&output.stdout)?;
-            io::stderr().write_all(&output.stderr)?;
-        }
-        Err(_) => {}
-    }
+    result.result.print_output()?;
     Ok(())
 }
 
