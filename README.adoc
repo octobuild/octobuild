@@ -68,6 +68,20 @@ sudo apt-get install octobuild
 
 You can get configuration files and show default and actual configuration by running `ib_console`/`xgConsole` without parameters.
 
+== Benchmark
+
+Tested on Ryzen 7 3700X, 32GB DDR4 @ 3200MHz, SSD, Unreal Engine 5.0.3, Linux by running `<engine>/Engine/Build/BatchFiles/RunUAT.sh <game>.uproject <game>Editor DebugGame Linux`.
+
+[%autowidth]
+|===
+| Without octobuild | octobuild (0% cache) | octobuild (100% cache)
+
+| 3m54s
+| 3m53s
+| 36s
+
+|===
+
 == Unreal Engine patches
 
 This project requires some patches to Unreal Engine:
