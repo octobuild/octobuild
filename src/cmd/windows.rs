@@ -33,7 +33,7 @@ pub fn parse(cmd_line: &str) -> Result<Vec<String>, Error> {
 
     let mut ret_val = Vec::<String>::new();
 
-    let mut code_units = cmd_line.chars().peekable();
+    let mut code_units = cmd_line.trim().chars().peekable();
 
     // Parse the arguments according to these rules:
     // * All code units are taken literally except space, tab, quote and backslash.
@@ -108,7 +108,7 @@ fn test_parse_1() {
 
 #[test]
 fn test_parse_2() {
-    assert_eq!(parse(" \"abc\" d e ").unwrap(), ["", "abc", "d", "e"]);
+    assert_eq!(parse(" \"abc\" d e ").unwrap(), ["abc", "d", "e"]);
 }
 
 #[test]

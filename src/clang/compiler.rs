@@ -19,7 +19,7 @@ use super::super::lazy::Lazy;
 
 lazy_static! {
     static ref RE_CLANG: regex::bytes::Regex =
-        regex::bytes::Regex::new(r"(?i)^(clang(:?\+\+)?)(-\d+\.\d+)?(?:.exe)?$").unwrap();
+        regex::bytes::Regex::new(r"(?i)^(.*clang(:?\+\+)?)(-\d+\.\d+)?(?:.exe)?$").unwrap();
 }
 
 #[derive(Default)]
@@ -174,15 +174,13 @@ impl Toolchain for ClangToolchain {
                 Arg::Output { .. } => {}
             };
         }
-        let input = if state.run_second_cpp {
-            Source(SourceInput {
-                path: task.input_source.clone(),
-                current_dir: task.shared.command.current_dir.clone(),
-            })
-        } else {
-            Preprocessed(preprocessed)
-        };
-        Ok(CompileStep::new(task, input, args, false))
+        Ok(CompileStep::new(
+            task,
+            preprocessed,
+            args,
+            false,
+            state.run_second_cpp,
+        ))
     }
 
     fn compile_step(&self, state: &SharedState, task: CompileStep) -> Result<OutputInfo, Error> {

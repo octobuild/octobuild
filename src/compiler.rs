@@ -19,6 +19,7 @@ use crate::config::Config;
 use crate::io::memstream::MemStream;
 use crate::io::statistic::Statistic;
 
+use crate::compiler::CompileInput::{Preprocessed, Source};
 use thiserror::Error;
 
 #[derive(Error, Debug)]
@@ -364,9 +365,10 @@ pub struct CompileStep {
 impl CompileStep {
     pub fn new(
         task: &CompilationTask,
-        input: CompileInput,
+        preprocessed: MemStream,
         args: Vec<String>,
         use_precompiled: bool,
+        run_second_cpp: bool,
     ) -> Self {
         assert!(use_precompiled || task.shared.input_precompiled.is_none());
         CompileStep {
@@ -378,7 +380,14 @@ impl CompileStep {
                 None
             },
             args,
-            input,
+            input: if run_second_cpp {
+                Source(SourceInput {
+                    path: task.input_source.clone(),
+                    current_dir: task.shared.command.current_dir.clone(),
+                })
+            } else {
+                Preprocessed(preprocessed)
+            },
         }
     }
 }

@@ -1,17 +1,18 @@
+use crate::compiler::CompileInput::{Preprocessed, Source};
+use crate::compiler::{
+    Arg, CommandInfo, CompilationTask, CompileStep, Compiler, OutputInfo, PreprocessResult, Scope,
+    SharedState, Toolchain, ToolchainHolder,
+};
+use lazy_static::lazy_static;
+use regex::bytes::{NoExpand, Regex};
 use std::fs::File;
 use std::io::{Cursor, Error, Write};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::Arc;
 use std::{env, fs};
-
-use regex::bytes::{NoExpand, Regex};
 use tempdir::TempDir;
 
-use crate::compiler::CompileInput::Preprocessed;
-use lazy_static::lazy_static;
-
-pub use super::super::compiler::*;
 use super::super::io::memstream::MemStream;
 use super::super::io::tempfile::TempFile;
 use super::super::lazy::Lazy;
@@ -226,27 +227,16 @@ impl Toolchain for VsToolchain {
         if task.shared.output_precompiled.is_some() {
             args.push("/Yc".to_string());
         }
-        let compile_input = if state.run_second_cpp {
-            CompileInput::Source(SourceInput {
-                path: task.input_source.clone(),
-                current_dir: task.shared.command.current_dir.clone(),
-            })
-        } else {
-            Preprocessed(preprocessed)
-        };
-        Ok(CompileStep::new(task, compile_input, args, true))
+        Ok(CompileStep::new(
+            task,
+            preprocessed,
+            args,
+            true,
+            state.run_second_cpp,
+        ))
     }
 
     fn compile_step(&self, state: &SharedState, task: CompileStep) -> Result<OutputInfo, Error> {
-        let preprocessed = if let Preprocessed(preprocessed) = &task.input {
-            preprocessed
-        } else {
-            todo!()
-        };
-
-        // Input file path.
-        let input_temp = TempFile::new_in(self.temp_dir.path(), ".i");
-        File::create(input_temp.path()).and_then(|mut s| preprocessed.copy(&mut s))?;
         // Output file path
         let output_object = task
             .output_object
@@ -258,8 +248,30 @@ impl Toolchain for VsToolchain {
             .current_dir(self.temp_dir.path())
             .arg("/c")
             .args(&task.args)
-            .arg(input_temp.path().to_str().unwrap())
             .arg(&join_flag("/Fo", &output_object));
+
+        let (input_file, temp_file) = match &task.input {
+            Preprocessed(preprocessed) => {
+                let input_temp = TempFile::new_in(self.temp_dir.path(), ".i");
+                File::create(input_temp.path()).and_then(|mut s| preprocessed.copy(&mut s))?;
+                command.arg(input_temp.path().to_str().unwrap());
+                (input_temp.path().to_path_buf(), Some(input_temp))
+            }
+            Source(source) => {
+                if let Some(dir) = &source.current_dir {
+                    command.current_dir(dir);
+                }
+                command.arg(&source.path);
+                (source.path.clone(), None)
+            }
+        };
+        let input_marker = input_file
+            // Save input file name for output filter.
+            .file_name()
+            .and_then(|o| o.to_str())
+            .map(|o| o.as_bytes())
+            .unwrap_or(b"");
+
         // Copy required environment variables.
         // todo: #15 Need to make correct PATH variable for cl.exe manually
         for (name, value) in vec!["SystemDrive", "SystemRoot", "TEMP", "TMP", "PATH"]
@@ -276,13 +288,6 @@ impl Toolchain for VsToolchain {
             }
             None => {}
         }
-        // Save input file name for output filter.
-        let temp_file = input_temp
-            .path()
-            .file_name()
-            .and_then(|o| o.to_str())
-            .map(|o| o.as_bytes())
-            .unwrap_or(b"");
         // Use precompiled header
         match &task.input_precompiled {
             Some(ref path) => {
@@ -293,13 +298,17 @@ impl Toolchain for VsToolchain {
             None => {}
         }
         // Execute.
-        state.wrap_slow(|| {
+        let result = state.wrap_slow(|| {
             command.output().map(|o| OutputInfo {
                 status: o.status.code(),
-                stdout: prepare_output(temp_file, o.stdout.clone(), o.status.code() == Some(0)),
+                stdout: prepare_output(input_marker, o.stdout.clone(), o.status.code() == Some(0)),
                 stderr: o.stderr,
             })
-        })
+        });
+
+        drop(temp_file);
+
+        result
     }
 
     // Compile preprocessed file.
