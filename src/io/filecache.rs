@@ -1,6 +1,5 @@
 use std::cmp::min;
 use std::ffi::OsString;
-use std::fmt::{Display, Formatter};
 use std::fs;
 use std::fs::{File, OpenOptions};
 use std::io::{Error, ErrorKind, Read, Seek, SeekFrom, Write};
@@ -14,50 +13,22 @@ use super::counter::Counter;
 use super::statistic::Statistic;
 use std::time::SystemTime;
 
+use thiserror::Error;
+
 const HEADER: &[u8] = b"OBCF\x00\x03";
 const FOOTER: &[u8] = b"END\x00";
 const SUFFIX: &str = ".lz4";
 
-#[derive(Debug)]
+#[derive(Error, Debug)]
 pub enum CacheError {
+    #[error("invalid cache file header: {0}")]
     InvalidHeader(PathBuf),
+    #[error("invalid cache file footer: {0}")]
     InvalidFooter(PathBuf),
+    #[error("unexpected count of packed cached files: {0}")]
     PackedFilesMismatch(PathBuf),
+    #[error("mutex error: {0}")]
     MutexError(String),
-}
-
-impl Display for CacheError {
-    fn fmt(&self, f: &mut Formatter) -> Result<(), ::std::fmt::Error> {
-        match self {
-            CacheError::InvalidHeader(ref path) => {
-                write!(f, "invalid cache file header: {}", path.display())
-            }
-            CacheError::InvalidFooter(ref path) => {
-                write!(f, "invalid cache file footer: {}", path.display())
-            }
-            CacheError::PackedFilesMismatch(ref path) => write!(
-                f,
-                "unexpected count of packed cached files: {}",
-                path.display()
-            ),
-            CacheError::MutexError(ref message) => write!(f, "mutex error: {}", message),
-        }
-    }
-}
-
-impl ::std::error::Error for CacheError {
-    fn description(&self) -> &str {
-        match self {
-            CacheError::InvalidHeader(_) => "invalid cache file header",
-            CacheError::InvalidFooter(_) => "invalid cache file footer",
-            CacheError::PackedFilesMismatch(_) => "unexpected count of packed cached files",
-            CacheError::MutexError(_) => "mutex error",
-        }
-    }
-
-    fn cause(&self) -> Option<&dyn (::std::error::Error)> {
-        None
-    }
 }
 
 pub struct FileCache {

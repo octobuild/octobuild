@@ -1,59 +1,28 @@
 use local_encoding_ng::{Encoder, Encoding};
-
-use std::fmt::{Display, Formatter};
 use std::io::{Error, ErrorKind, Read, Write};
 use std::ptr;
 use std::slice;
+use thiserror::Error;
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Error, Clone, Copy, Debug)]
 pub enum PostprocessError {
+    #[error("unexpected end of line in literal")]
     LiteralEol,
+    #[error("unexpected end of stream in literal")]
     LiteralEof,
+    #[error("literal too long")]
     LiteralTooLong,
+    #[error("unexpected end of escape sequence")]
     EscapeEof,
+    #[error("can't find precompiled header marker in preprocessed file")]
     MarkerNotFound,
+    #[error("can't create string from literal")]
     InvalidLiteral,
+    #[error("token too long")]
     TokenTooLong,
 }
 
 const BUF_SIZE: usize = 0x10000;
-
-impl Display for PostprocessError {
-    fn fmt(&self, f: &mut Formatter) -> Result<(), ::std::fmt::Error> {
-        match self {
-            PostprocessError::LiteralEol => write!(f, "unexpected end of line in literal"),
-            PostprocessError::LiteralEof => write!(f, "unexpected end of stream in literal"),
-            PostprocessError::LiteralTooLong => write!(f, "literal too long"),
-            PostprocessError::EscapeEof => write!(f, "unexpected end of escape sequence"),
-            PostprocessError::MarkerNotFound => write!(
-                f,
-                "can't find precompiled header marker in preprocessed file"
-            ),
-            PostprocessError::InvalidLiteral => write!(f, "can't create string from literal"),
-            PostprocessError::TokenTooLong => write!(f, "token too long"),
-        }
-    }
-}
-
-impl ::std::error::Error for PostprocessError {
-    fn description(&self) -> &str {
-        match self {
-            PostprocessError::LiteralEol => "unexpected end of line in literal",
-            PostprocessError::LiteralEof => "unexpected end of stream in literal",
-            PostprocessError::LiteralTooLong => "literal too long",
-            PostprocessError::EscapeEof => "unexpected end of escape sequence",
-            PostprocessError::MarkerNotFound => {
-                "can't find precompiled header marker in preprocessed file"
-            }
-            PostprocessError::InvalidLiteral => "can't create string from literal",
-            PostprocessError::TokenTooLong => "token too long",
-        }
-    }
-
-    fn cause(&self) -> Option<&dyn (::std::error::Error)> {
-        None
-    }
-}
 
 #[derive(PartialEq, Hash, Eq, Clone, Debug)]
 pub enum Include<T> {

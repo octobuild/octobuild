@@ -1,9 +1,10 @@
 use std::collections::{HashMap, HashSet};
 use std::env;
-use std::fmt::{Display, Formatter};
 use std::io::{Error, ErrorKind, Read};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
+
+use thiserror::Error;
 
 use crate::cmd;
 use crate::compiler::{CommandEnv, CommandInfo};
@@ -21,51 +22,22 @@ pub struct XgNode {
 
 pub type XgGraph = Graph<XgNode, ()>;
 
-#[derive(Debug)]
+#[derive(Error, Debug)]
 pub enum XgParseError {
+    #[error("attribute not found: {0}")]
     AttributeNotFound(&'static str),
+    #[error("сan't find environment with id: {0}")]
     EnvironmentNotFound(String),
+    #[error("сan't find tool with id: {0}")]
     ToolNotFound(String),
+    #[error("сan't find task for dependency with id: {0}")]
     DependencyNotFound(String),
+    #[error("unexpected XML-stream root element")]
     InvalidStreamFormat,
+    #[error("unexpended end of stream")]
     EndOfStream,
+    #[error("xml reading error: {0}")]
     XmlError(xml::reader::Error),
-}
-
-impl Display for XgParseError {
-    fn fmt(&self, f: &mut Formatter) -> Result<(), ::std::fmt::Error> {
-        match self {
-            XgParseError::AttributeNotFound(ref attr) => write!(f, "attribute not found: {}", attr),
-            XgParseError::EnvironmentNotFound(ref id) => {
-                write!(f, "сan't find environment with id: {}", id)
-            }
-            XgParseError::ToolNotFound(ref id) => write!(f, "сan't find tool with id: {}", id),
-            XgParseError::DependencyNotFound(ref id) => {
-                write!(f, "сan't find task for dependency with id: {}", id)
-            }
-            XgParseError::InvalidStreamFormat => write!(f, "unexpected XML-stream root element"),
-            XgParseError::EndOfStream => write!(f, "unexpended end of stream"),
-            XgParseError::XmlError(ref e) => write!(f, "xml reading error: {}", e),
-        }
-    }
-}
-
-impl ::std::error::Error for XgParseError {
-    fn description(&self) -> &str {
-        match self {
-            XgParseError::AttributeNotFound(_) => "attribute not found",
-            XgParseError::EnvironmentNotFound(_) => "сan't find environment by id",
-            XgParseError::ToolNotFound(_) => "сan't find tool by id",
-            XgParseError::DependencyNotFound(_) => "сan't find task for dependency by id",
-            XgParseError::InvalidStreamFormat => "unexpected XML-stream root element",
-            XgParseError::EndOfStream => "unexpended end of stream",
-            XgParseError::XmlError(_) => "xml reading error",
-        }
-    }
-
-    fn cause(&self) -> Option<&dyn (::std::error::Error)> {
-        None
-    }
 }
 
 #[derive(Debug)]

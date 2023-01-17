@@ -2,7 +2,6 @@ use std::cmp::max;
 use std::collections::hash_map;
 use std::collections::HashMap;
 use std::env;
-use std::fmt::{Display, Formatter};
 use std::io::{Error, ErrorKind, Write};
 use std::iter::FromIterator;
 use std::path::{Path, PathBuf};
@@ -20,36 +19,14 @@ use crate::config::Config;
 use crate::io::memstream::MemStream;
 use crate::io::statistic::Statistic;
 
-#[derive(Debug)]
+use thiserror::Error;
+
+#[derive(Error, Debug)]
 pub enum CompilerError {
+    #[error("can't parse command line arguments: {0}")]
     InvalidArguments(String),
+    #[error("can't find toolchain for: {0}")]
     ToolchainNotFound(PathBuf),
-}
-
-impl Display for CompilerError {
-    fn fmt(&self, f: &mut Formatter) -> Result<(), std::fmt::Error> {
-        match self {
-            CompilerError::InvalidArguments(ref arg) => {
-                write!(f, "can't parse command line arguments: {}", arg)
-            }
-            CompilerError::ToolchainNotFound(ref arg) => {
-                write!(f, "can't find toolchain for: {}", arg.display())
-            }
-        }
-    }
-}
-
-impl std::error::Error for CompilerError {
-    fn description(&self) -> &str {
-        match self {
-            CompilerError::InvalidArguments(_) => "can't parse command line arguments",
-            CompilerError::ToolchainNotFound(_) => "can't find toolchain",
-        }
-    }
-
-    fn cause(&self) -> Option<&dyn (std::error::Error)> {
-        None
-    }
 }
 
 // Scope of command line argument.
