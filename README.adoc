@@ -70,15 +70,23 @@ You can get configuration files and show default and actual configuration by run
 
 == Benchmark
 
-Tested on Ryzen 7 3700X, 32GB DDR4 @ 3200MHz, SSD, Unreal Engine 5.0.3, Linux by running `<engine>/Engine/Build/BatchFiles/RunUAT.sh <game>.uproject <game>Editor DebugGame Linux`.
+Linux build tested on AMD Ryzen 7 3700X, 32GB DDR4 @ 3200MHz, SSD and Unreal Engine 5.0.3 by running `<engine>/Engine/Build/BatchFiles/RunUAT.sh <game>.uproject <game>Editor DebugGame Linux`.
+
+Windows build tested on Inter Core i7-9700F, 32GB DDR @ 2400MHz, SSD and Unreal Engine 5.0.3 by running `<engine>/Engine/Build/BatchFiles/RunUBT.bat <game>.uproject <game>Editor DebugGame Win64`.
 
 [%autowidth]
 |===
-| Without octobuild | octobuild (0% cache) | octobuild (100% cache)
+| OS + compiler | Without octobuild | octobuild (0% cache) | octobuild (100% cache)
 
+| *Linux + clang*
 | 3m54s
 | 3m53s
 | 36s
+
+| *Windows + MSVC 2019*
+| 8m4s
+| 10m6s
+| 2m15s
 
 |===
 
