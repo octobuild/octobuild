@@ -80,10 +80,7 @@ pub fn parse<R: Read>(graph: &mut XgGraph, reader: R) -> Result<(), Error> {
     }
 }
 
-fn parse_build_set<R: Read>(
-    graph: &mut XgGraph,
-    events: &mut EventReader<R>,
-) -> Result<(), Error> {
+fn parse_build_set<R: Read>(graph: &mut XgGraph, events: &mut EventReader<R>) -> Result<(), Error> {
     let mut envs: HashMap<String, XgEnvironment> = HashMap::new();
     let mut projects: Vec<XgProject> = Vec::new();
     loop {
