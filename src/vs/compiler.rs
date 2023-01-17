@@ -3,6 +3,11 @@ use crate::compiler::{
     Arg, CommandInfo, CompilationTask, CompileStep, Compiler, OutputInfo, PreprocessResult, Scope,
     SharedState, Toolchain, ToolchainHolder,
 };
+use crate::io::memstream::MemStream;
+use crate::io::tempfile::TempFile;
+use crate::lazy::Lazy;
+use crate::utils::filter;
+use crate::vs::postprocess;
 use lazy_static::lazy_static;
 use regex::bytes::{NoExpand, Regex};
 use std::fs::File;
@@ -12,12 +17,6 @@ use std::process::Command;
 use std::sync::Arc;
 use std::{env, fs};
 use tempdir::TempDir;
-
-use super::super::io::memstream::MemStream;
-use super::super::io::tempfile::TempFile;
-use super::super::lazy::Lazy;
-use super::super::utils::filter;
-use super::postprocess;
 
 pub struct VsCompiler {
     temp_dir: Arc<TempDir>,
@@ -154,7 +153,7 @@ impl Toolchain for VsToolchain {
             }
         });
 
-        // Add preprocessor paramters.
+        // Add preprocessor parameters.
         args.push("/nologo".to_string());
         args.push("/T".to_string() + &task.language);
         args.push("/E".to_string());

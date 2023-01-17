@@ -162,7 +162,7 @@ impl<'a> Read for MemReader<'a> {
 
 #[cfg(test)]
 mod test {
-    use super::{MemStream, BLOCK_SIZE};
+    use crate::io::memstream::{MemStream, BLOCK_SIZE};
     use std::io::{Read, Write};
 
     fn check_stream(write_size: usize, read_size: usize) {

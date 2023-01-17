@@ -5,14 +5,14 @@ use std::fs::{File, OpenOptions};
 use std::io::{Error, ErrorKind, Read, Seek, SeekFrom, Write};
 use std::path::{Path, PathBuf};
 
-use super::super::compiler::OutputInfo;
-use super::super::config::Config;
-use super::super::utils::DEFAULT_BUF_SIZE;
-use super::binary::*;
-use super::counter::Counter;
-use super::statistic::Statistic;
 use std::time::SystemTime;
 
+use crate::compiler::OutputInfo;
+use crate::config::Config;
+use crate::io::binary::{read_exact, read_u64, read_usize, write_u64, write_usize};
+use crate::io::counter::Counter;
+use crate::io::statistic::Statistic;
+use crate::utils::DEFAULT_BUF_SIZE;
 use thiserror::Error;
 
 const HEADER: &[u8] = b"OBCF\x00\x03";

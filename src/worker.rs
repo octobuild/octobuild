@@ -295,8 +295,7 @@ mod test {
 
     use crate::compiler::SharedState;
     use crate::config::Config;
-
-    use super::*;
+    use crate::worker::{execute_graph, BuildAction, BuildGraph, BuildTask};
 
     #[test]
     fn test_execute_graph_empty() {
