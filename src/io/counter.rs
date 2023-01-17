@@ -13,10 +13,6 @@ impl<S> Counter<S> {
     pub fn is_empty(&self) -> bool {
         self.size == 0
     }
-
-    pub fn unwrap(self) -> S {
-        self.stream
-    }
 }
 
 impl<R: Read> Counter<R> {

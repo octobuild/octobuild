@@ -5,7 +5,7 @@ use std::slice;
 use thiserror::Error;
 
 #[derive(Error, Clone, Copy, Debug)]
-pub enum PostprocessError {
+enum PostprocessError {
     #[error("unexpected end of line in literal")]
     LiteralEol,
     #[error("unexpected end of stream in literal")]
@@ -16,19 +16,11 @@ pub enum PostprocessError {
     EscapeEof,
     #[error("can't find precompiled header marker in preprocessed file")]
     MarkerNotFound,
-    #[error("can't create string from literal")]
-    InvalidLiteral,
     #[error("token too long")]
     TokenTooLong,
 }
 
 const BUF_SIZE: usize = 0x10000;
-
-#[derive(PartialEq, Hash, Eq, Clone, Debug)]
-pub enum Include<T> {
-    Quoted(T),
-    Angle(T),
-}
 
 pub fn filter_preprocessed(
     reader: &mut dyn Read,

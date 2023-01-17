@@ -22,11 +22,6 @@ pub fn read_exact(stream: &mut dyn Read, len: usize) -> Result<Vec<u8>> {
 }
 
 #[inline]
-pub fn write_u8(stream: &mut dyn Write, n: u8) -> Result<()> {
-    stream.write_u8(n)
-}
-
-#[inline]
 pub fn write_u64(stream: &mut dyn Write, i: u64) -> Result<()> {
     stream.write_u64::<LittleEndian>(i)
 }
@@ -34,11 +29,6 @@ pub fn write_u64(stream: &mut dyn Write, i: u64) -> Result<()> {
 #[inline]
 pub fn write_usize(stream: &mut dyn Write, i: usize) -> Result<()> {
     write_u64(stream, i as u64)
-}
-
-#[inline]
-pub fn read_u8(stream: &mut dyn Read) -> Result<u8> {
-    stream.read_u8()
 }
 
 #[inline]

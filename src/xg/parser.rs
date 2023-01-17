@@ -23,7 +23,7 @@ pub struct XgNode {
 pub type XgGraph = Graph<XgNode, ()>;
 
 #[derive(Error, Debug)]
-pub enum XgParseError {
+enum XgParseError {
     #[error("attribute not found: {0}")]
     AttributeNotFound(&'static str),
     #[error("сan't find environment with id: {0}")]
@@ -34,8 +34,6 @@ pub enum XgParseError {
     DependencyNotFound(String),
     #[error("unexpected XML-stream root element")]
     InvalidStreamFormat,
-    #[error("unexpended end of stream")]
-    EndOfStream,
     #[error("xml reading error: {0}")]
     XmlError(xml::reader::Error),
 }
@@ -82,7 +80,7 @@ pub fn parse<R: Read>(graph: &mut XgGraph, reader: R) -> Result<(), Error> {
     }
 }
 
-pub fn parse_build_set<R: Read>(
+fn parse_build_set<R: Read>(
     graph: &mut XgGraph,
     events: &mut EventReader<R>,
 ) -> Result<(), Error> {

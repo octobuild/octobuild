@@ -12,7 +12,7 @@ use super::utils::hash_stream;
 use std::time::SystemTime;
 
 #[derive(Clone)]
-pub struct CacheError {
+struct CacheError {
     error_msg: String,
 }
 
@@ -69,8 +69,8 @@ fn file_hash_helper(
             return Ok(value);
         }
     }
-    // Calculate hash value.
-    let hash = generate_file_hash(path)?;
+    let mut file = File::open(path)?;
+    let hash = hash_stream(&mut file)?;
     Ok(FileHash {
         hash,
         size: stat.len(),
@@ -91,9 +91,4 @@ impl FileHasher for Cache {
             )
             .map_err(|e| Error::new(ErrorKind::Other, e.error_msg))
     }
-}
-
-fn generate_file_hash(path: &Path) -> Result<String, Error> {
-    let mut file = File::open(path)?;
-    hash_stream(&mut file)
 }
