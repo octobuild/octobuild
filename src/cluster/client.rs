@@ -111,11 +111,7 @@ impl RemoteToolchain {
         let name = self
             .identifier()
             .ok_or_else(|| Error::new(ErrorKind::Other, "Can't get toolchain name"))?;
-        let preprocessed = if let Preprocessed(preprocessed) = &task.input {
-            preprocessed
-        } else {
-            unimplemented!()
-        };
+
         let addr = self
             .remote_endpoint(&name)
             .ok_or_else(|| Error::new(ErrorKind::Other, "Can't find helper for toolchain"))?;
@@ -127,6 +123,13 @@ impl RemoteToolchain {
         }
 
         let base_url = get_base_url(&addr);
+
+        let preprocessed = if let Preprocessed(preprocessed) = &task.input {
+            preprocessed
+        } else {
+            unimplemented!()
+        };
+
         // Send compilation request.
         let request = CompileRequest {
             toolchain: name,
