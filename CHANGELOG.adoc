@@ -1,6 +1,10 @@
 = Changelog
 :icons: font
 
+== Unreleased
+
+* fix XB1/XSX support
+
 == 0.3.0
 
 * add `run_second_cpp` support for `cl.exe`

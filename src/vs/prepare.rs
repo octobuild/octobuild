@@ -232,7 +232,7 @@ fn parse_argument<S: AsRef<str>, I: Iterator<Item = S>>(
                 None => match flag {
                     "c" | "nologo" => Ok(Arg::flag(Scope::Ignore, flag)),
                     "bigobj" => Ok(Arg::flag(Scope::Compiler, flag)),
-                    "FC" => Ok(Arg::flag(Scope::Shared, flag)),
+                    "FC" | "d2vzeroupper" => Ok(Arg::flag(Scope::Shared, flag)),
                     "X" => Ok(Arg::flag(Scope::Preprocessor, flag)),
                     s if s.starts_with('T') => Ok(Arg::param(Scope::Ignore, "T", &s[1..])),
                     s if s.starts_with('O') => Ok(Arg::flag(Scope::Shared, flag)),
@@ -250,6 +250,7 @@ fn parse_argument<S: AsRef<str>, I: Iterator<Item = S>>(
                     s if s.starts_with("errorReport:") => Ok(Arg::flag(Scope::Shared, flag)),
                     s if s.starts_with("source-charset:") => Ok(Arg::flag(Scope::Shared, flag)),
                     s if s.starts_with("execution-charset:") => Ok(Arg::flag(Scope::Shared, flag)),
+                    s if s.starts_with("favor:") => Ok(Arg::flag(Scope::Shared, flag)),
                     s if s.starts_with("Fo") => Ok(Arg::output(OutputKind::Object, "Fo", &s[2..])),
                     s if s.starts_with("Fp") => {
                         Ok(Arg::input(InputKind::Precompiled, "Fp", &s[2..]))
