@@ -233,6 +233,7 @@ fn parse_argument<S: AsRef<str>, I: Iterator<Item = S>>(
                     "c" | "nologo" => Ok(Arg::flag(Scope::Ignore, flag)),
                     "bigobj" => Ok(Arg::flag(Scope::Compiler, flag)),
                     "FC" => Ok(Arg::flag(Scope::Shared, flag)),
+                    "X" => Ok(Arg::flag(Scope::Preprocessor, flag)),
                     s if s.starts_with('T') => Ok(Arg::param(Scope::Ignore, "T", &s[1..])),
                     s if s.starts_with('O') => Ok(Arg::flag(Scope::Shared, flag)),
                     s if s.starts_with('G') => Ok(Arg::flag(Scope::Shared, flag)),

@@ -4,6 +4,7 @@
 == Unreleased
 
 * add `run_second_cpp` support for `cl.exe`
+* add support for `cl.exe /X`
 
 == 0.2.7
 
