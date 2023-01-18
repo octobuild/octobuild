@@ -10,64 +10,35 @@ image:https://img.shields.io/github/release/{slug}.svg[Download,link={uri-projec
 image:{uri-project}/workflows/CI/badge.svg?branch=master[Build Status,link={uri-ci}]
 image:https://badges.gitter.im/{slug}.svg[Gitter chat,link={uri-discuss}]
 
+[[overview]]
 == Overview
 
 This project allows you to speedup re-compilation of Unreal Engine (and UE-based games) by caching intermediate compilation files.
 
-////
-
-TODO: #47 document installation process
-
+[[installation]]
 == Installation
 
-=== Windows 10
+[[windows-installation]]
+=== Windows
 
-You can install octobuild by PowerShell commands:
+. Download https://github.com/bozaro/octobuild/releases/latest[MSI installer]
+. Install it
+. Normally build Unreal Engine projects, UBT will automatically use octobuild
 
-[source,powershell]
-----
-# First, you have to set the execution policy to allow scripts, otherwise it'll silently fail
-# while reporting success (https://github.com/OneGet/oneget/issues/97#issuecomment-139331418):
-Set-ExecutionPolicy RemoteSigned
-# Add package source
-Register-PackageSource -Name bozaro -Provider Chocolatey -Location https://www.myget.org/F/bozaro/
-# Install package
-Install-Package octobuild
-----
-
-=== Chocolatey
-
-Chocolatey installation:
-
-[source,bat]
-----
-rem Add chocolatey source
-choco sources add -name bozaro -source https://www.myget.org/F/bozaro/
-
-rem Install package
-choco install octobuild
-----
-
+[[ubuntu-installation]]
 === Ubuntu/Debian
 
-You can install octobuild by commands:
+. Download https://github.com/bozaro/octobuild/releases/latest[deb package]
+. Install it via `dpkg -i <octobuild>.deb`
+. Apply <<linux-notes,Linux patches>>
+. Normally build Unreal Engine projects, UBT will automatically use octobuild
 
-[source,bash]
-----
-# Add package source
-echo "deb https://dist.bozaro.ru/ debian/" | sudo tee /etc/apt/sources.list.d/dist.bozaro.ru.list
-curl -s https://dist.bozaro.ru/signature.gpg | sudo apt-key add -
-# Install package
-sudo apt-get update
-sudo apt-get install octobuild
-----
-
-////
-
+[[configuration]]
 == Configuration files
 
 You can get configuration files and show default and actual configuration by running `ib_console`/`xgConsole` without parameters.
 
+[[benchmark]]
 == Benchmark
 
 Linux build tested on AMD Ryzen 7 3700X, 32GB DDR4 @ 3200MHz, SSD and Unreal Engine 5.0.3 by running `<engine>/Engine/Build/BatchFiles/RunUAT.sh <game>.uproject <game>Editor DebugGame Linux`.
@@ -112,22 +83,11 @@ Console builds tested on Intel Core i7-9700F, 32GB DDR4 @ 2400MHz, SSD and Unrea
 
 |===
 
-== Unreal Engine patches
+[[linux-notes]]
+== Linux notes
 
-This project requires some patches to Unreal Engine:
+This project requires several patches to Unreal Engine:
 
 * https://github.com/EpicGames/UnrealEngine/pull/9903[#9903]: Restore ability to use XGE executor on non-Windows platforms
 * https://github.com/EpicGames/UnrealEngine/pull/9932[#9932]: Fix action graph copy action on non-Windows platforms
 * https://github.com/EpicGames/UnrealEngine/pull/9933[#9933]: Reenable XGE on Linux
-
-== Linux notes
-
-There's a https://github.com/llvm/llvm-project/issues/59736[bug in clang] that prevents octobuild from using some of its optimizations.
-Due to the bug, some of `GENERATED_BODY` macros will fail to compile.
-
-As a workaround, you need to create `~/.octobuild.conf` file with following contents:
-
-[source,yaml]
-----
-run_second_cpp: "true"
-----
