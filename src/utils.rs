@@ -10,10 +10,6 @@ use sha2::{Digest, Sha256};
 
 pub const DEFAULT_BUF_SIZE: usize = 1024 * 64;
 
-pub fn filter<T, R, F: Fn(&T) -> Option<R>>(args: &[T], filter: F) -> Vec<R> {
-    args.iter().filter_map(filter).collect()
-}
-
 pub fn hash_stream<R: Read>(reader: &mut R) -> Result<String, Error> {
     let mut hasher = Sha256::new();
     io::copy(reader, &mut hasher)?;

@@ -6,7 +6,6 @@ use crate::compiler::{
 use crate::io::memstream::MemStream;
 use crate::io::tempfile::TempFile;
 use crate::lazy::Lazy;
-use crate::utils::filter;
 use crate::vs::postprocess;
 use lazy_static::lazy_static;
 use regex::bytes::{NoExpand, Regex};
@@ -130,40 +129,47 @@ impl Toolchain for VsToolchain {
         state: &SharedState,
         task: &CompilationTask,
     ) -> Result<PreprocessResult, Error> {
-        // Make parameters list for preprocessing.
-        let mut args = filter(&task.shared.args, |arg: &Arg| -> Option<String> {
-            match arg {
-                Arg::Flag {
-                    ref scope,
-                    ref flag,
-                } => match scope {
-                    Scope::Preprocessor | &Scope::Shared => Some("/".to_string() + flag),
-                    Scope::Ignore | &Scope::Compiler => None,
-                },
-                Arg::Param {
-                    ref scope,
-                    ref flag,
-                    ref value,
-                } => match scope {
-                    Scope::Preprocessor | &Scope::Shared => Some("/".to_string() + flag + value),
-                    Scope::Ignore | &Scope::Compiler => None,
-                },
-                Arg::Input { .. } => None,
-                Arg::Output { .. } => None,
-            }
-        });
-
-        // Add preprocessor parameters.
-        args.push("/nologo".to_string());
-        args.push("/T".to_string() + &task.language);
-        args.push("/E".to_string());
-        args.push("/we4002".to_string()); // C4002: too many actual parameters for macro 'identifier'
-        args.push(task.input_source.display().to_string());
-
         let mut command = task.shared.command.to_command();
         command
-            .args(&args)
-            .arg(&join_flag("/Fo", &task.output_object)); // /Fo option also set output path for #import directive
+            .args(
+                task.shared
+                    .args
+                    .iter()
+                    .filter_map(|arg: &Arg| -> Option<String> {
+                        match arg {
+                            Arg::Flag {
+                                ref scope,
+                                ref flag,
+                            } => {
+                                if scope.matches(Scope::Preprocessor, state.run_second_cpp, false) {
+                                    Some("/".to_string() + flag)
+                                } else {
+                                    None
+                                }
+                            }
+                            Arg::Param {
+                                ref scope,
+                                ref flag,
+                                ref value,
+                            } => {
+                                if scope.matches(Scope::Preprocessor, state.run_second_cpp, false) {
+                                    Some("/".to_string() + flag + value)
+                                } else {
+                                    None
+                                }
+                            }
+                            Arg::Input { .. } => None,
+                            Arg::Output { .. } => None,
+                        }
+                    }),
+            )
+            .arg("/nologo")
+            .arg("/T".to_string() + &task.language)
+            .arg("/E")
+            .arg("/we4002") // C4002: too many actual parameters for macro 'identifier'
+            .arg(join_flag("/Fo", &task.output_object)) // /Fo option also set output path for #import directive
+            .arg(&task.input_source);
+
         let output = state.wrap_slow(|| command.output())?;
         if output.status.success() {
             let mut content = MemStream::new();
@@ -194,33 +200,46 @@ impl Toolchain for VsToolchain {
         task: &CompilationTask,
         preprocessed: MemStream,
     ) -> Result<CompileStep, Error> {
-        let mut args = filter(&task.shared.args, |arg: &Arg| -> Option<String> {
-            match arg {
-                Arg::Flag {
-                    ref scope,
-                    ref flag,
-                } => match scope {
-                    Scope::Compiler | &Scope::Shared => Some("/".to_string() + flag),
-                    Scope::Preprocessor if task.shared.output_precompiled.is_some() => {
-                        Some("/".to_string() + flag)
+        let mut args: Vec<String> = task
+            .shared
+            .args
+            .iter()
+            .filter_map(|arg: &Arg| -> Option<String> {
+                match arg {
+                    Arg::Flag {
+                        ref scope,
+                        ref flag,
+                    } => {
+                        if scope.matches(
+                            Scope::Compiler,
+                            state.run_second_cpp,
+                            task.shared.output_precompiled.is_some(),
+                        ) {
+                            Some("/".to_string() + flag)
+                        } else {
+                            None
+                        }
                     }
-                    Scope::Ignore | &Scope::Preprocessor => None,
-                },
-                Arg::Param {
-                    ref scope,
-                    ref flag,
-                    ref value,
-                } => match scope {
-                    Scope::Compiler | &Scope::Shared => Some("/".to_string() + flag + value),
-                    Scope::Preprocessor if task.shared.output_precompiled.is_some() => {
-                        Some("/".to_string() + flag + value)
+                    Arg::Param {
+                        ref scope,
+                        ref flag,
+                        ref value,
+                    } => {
+                        if scope.matches(
+                            Scope::Compiler,
+                            state.run_second_cpp,
+                            task.shared.output_precompiled.is_some(),
+                        ) {
+                            Some("/".to_string() + flag + value)
+                        } else {
+                            None
+                        }
                     }
-                    Scope::Ignore | &Scope::Preprocessor => None,
-                },
-                Arg::Input { .. } => None,
-                Arg::Output { .. } => None,
-            }
-        });
+                    Arg::Input { .. } => None,
+                    Arg::Output { .. } => None,
+                }
+            })
+            .collect();
         args.push("/nologo".to_string());
         args.push("/T".to_string() + &task.language);
         if task.shared.output_precompiled.is_some() {
@@ -252,7 +271,7 @@ impl Toolchain for VsToolchain {
         let (input_file, temp_file) = match &task.input {
             Preprocessed(preprocessed) => {
                 let input_temp = TempFile::new_in(self.temp_dir.path(), ".i");
-                File::create(input_temp.path()).and_then(|mut s| preprocessed.copy(&mut s))?;
+                preprocessed.copy(&mut File::create(input_temp.path())?)?;
                 command.arg(input_temp.path().to_str().unwrap());
                 (input_temp.path().to_path_buf(), Some(input_temp))
             }
@@ -291,7 +310,12 @@ impl Toolchain for VsToolchain {
         match &task.input_precompiled {
             Some(ref path) => {
                 assert!(path.is_absolute());
-                command.arg("/Yu");
+                if let Some(marker) = &task.marker_precompiled {
+                    command.arg("/Yu".to_string() + marker);
+                } else {
+                    command.arg("/Yu");
+                }
+
                 command.arg(join_flag("/Fp", path));
             }
             None => {}

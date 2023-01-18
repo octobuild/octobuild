@@ -106,7 +106,7 @@ impl Toolchain for ClangToolchain {
                     ref scope,
                     ref flag,
                 } => {
-                    if scope.matches(Scope::Preprocessor, state.run_second_cpp) {
+                    if scope.matches(Scope::Preprocessor, state.run_second_cpp, false) {
                         args.push("-".to_string() + flag);
                     }
                 }
@@ -115,7 +115,7 @@ impl Toolchain for ClangToolchain {
                     ref flag,
                     ref value,
                 } => {
-                    if scope.matches(Scope::Preprocessor, state.run_second_cpp) {
+                    if scope.matches(Scope::Preprocessor, state.run_second_cpp, false) {
                         args.push("-".to_string() + flag);
                         args.push(value.clone());
                     }
@@ -158,7 +158,11 @@ impl Toolchain for ClangToolchain {
                     ref scope,
                     ref flag,
                 } => {
-                    if scope.matches(Scope::Compiler, state.run_second_cpp) {
+                    if scope.matches(
+                        Scope::Compiler,
+                        state.run_second_cpp,
+                        task.shared.output_precompiled.is_some(),
+                    ) {
                         args.push("-".to_string() + flag);
                     }
                 }
@@ -167,7 +171,11 @@ impl Toolchain for ClangToolchain {
                     ref flag,
                     ref value,
                 } => {
-                    if scope.matches(Scope::Compiler, state.run_second_cpp) {
+                    if scope.matches(
+                        Scope::Compiler,
+                        state.run_second_cpp,
+                        task.shared.output_precompiled.is_some(),
+                    ) {
                         args.push("-".to_string() + flag);
                         args.push(value.clone());
                     }

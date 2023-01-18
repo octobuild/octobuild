@@ -44,10 +44,15 @@ pub enum Scope {
 }
 
 impl Scope {
-    pub fn matches(self, scope: Scope, run_second_cpp: bool) -> bool {
+    pub fn matches(self, scope: Scope, run_second_cpp: bool, output_precompiled: bool) -> bool {
         match scope {
             Preprocessor => self == Preprocessor || self == Shared,
-            Scope::Compiler => run_second_cpp || self == Scope::Compiler || self == Shared,
+            Scope::Compiler => {
+                run_second_cpp
+                    || self == Scope::Compiler
+                    || self == Shared
+                    || output_precompiled && self == Preprocessor
+            }
             Shared => self == Shared,
             Scope::Ignore => false,
         }
@@ -215,9 +220,10 @@ impl CommandInfo {
     }
 
     pub fn current_dir_join(&self, path: &Path) -> PathBuf {
-        self.current_dir
-            .as_ref()
-            .map_or_else(|| path.to_path_buf(), |cwd| cwd.join(path))
+        match self.current_dir.as_ref() {
+            None => path.to_path_buf(),
+            Some(cwd) => cwd.join(path),
+        }
     }
 
     pub fn to_command(&self) -> Command {
@@ -360,6 +366,7 @@ pub struct CompileStep {
     // Output precompiled header file name.
     pub output_precompiled: Option<PathBuf>,
     pub input: CompileInput,
+    pub marker_precompiled: Option<String>,
 }
 
 impl CompileStep {
@@ -387,6 +394,11 @@ impl CompileStep {
                 })
             } else {
                 Preprocessed(preprocessed)
+            },
+            marker_precompiled: if run_second_cpp {
+                task.shared.marker_precompiled.clone()
+            } else {
+                None
             },
         }
     }

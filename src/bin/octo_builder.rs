@@ -200,6 +200,7 @@ impl<D> Middleware<D> for RpcBuilderTaskHandler {
                 input_precompiled: precompiled,
                 args: request.args,
                 input: Preprocessed(MemStream::from(request.preprocessed_data)),
+                marker_precompiled: None,
             };
 
             let toolchain: Arc<dyn Toolchain> =
