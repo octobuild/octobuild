@@ -14,7 +14,6 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
 use crate::cache::{Cache, FileHasher};
-use crate::compiler::Scope::{Preprocessor, Shared};
 use crate::config::Config;
 use crate::io::memstream::MemStream;
 use crate::io::statistic::Statistic;
@@ -46,14 +45,17 @@ pub enum Scope {
 impl Scope {
     pub fn matches(self, scope: Scope, run_second_cpp: bool, output_precompiled: bool) -> bool {
         match scope {
-            Preprocessor => self == Preprocessor || self == Shared,
+            Scope::Preprocessor => self == Scope::Preprocessor || self == Scope::Shared,
             Scope::Compiler => {
-                run_second_cpp
-                    || self == Scope::Compiler
-                    || self == Shared
-                    || output_precompiled && self == Preprocessor
+                if run_second_cpp {
+                    self != Scope::Ignore
+                } else {
+                    self == Scope::Compiler
+                        || self == Scope::Shared
+                        || self == Scope::Preprocessor && output_precompiled
+                }
             }
-            Shared => self == Shared,
+            Scope::Shared => self == Scope::Shared,
             Scope::Ignore => false,
         }
     }

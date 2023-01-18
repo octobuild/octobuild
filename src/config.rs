@@ -104,7 +104,7 @@ impl Config {
         let run_second_cpp = get_config(local, global, PARAM_RUN_SECOND_CPP, |v| {
             bool::from_str(v.as_str()?).ok()
         })
-        .unwrap_or(false);
+        .unwrap_or(true);
 
         Ok(Config {
             process_limit,

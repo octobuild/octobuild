@@ -5,6 +5,8 @@
 
 * add `run_second_cpp` support for `cl.exe`
 * add support for `cl.exe /X`
+* enable `run_second_cpp` mode by default
+* fix PS4/PS5 support
 
 == 0.2.7
 

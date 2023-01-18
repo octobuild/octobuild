@@ -222,6 +222,16 @@ fn parse_argument(iter: &mut Iter<String>) -> Option<Result<Arg, String>> {
                         flag[prefix.len()..].to_string()
                     };
                     match flag {
+                        "D" => Ok(Arg::param(
+                            // Workaround for PS4/PS5
+                            if value.starts_with("DUMMY_DEFINE") {
+                                Scope::Ignore
+                            } else {
+                                scope
+                            },
+                            prefix,
+                            value,
+                        )),
                         "o" => Ok(Arg::output(OutputKind::Object, prefix, value)),
                         _ => Ok(Arg::param(scope, prefix, value)),
                     }
