@@ -74,19 +74,26 @@ Linux build tested on AMD Ryzen 7 3700X, 32GB DDR4 @ 3200MHz, SSD and Unreal Eng
 
 Windows build tested on Intel Core i7-9700F, 32GB DDR4 @ 2400MHz, SSD and Unreal Engine 5.0.3 by running `<engine>/Engine/Build/BatchFiles/RunUBT.bat <game>.uproject <game>Editor DebugGame Win64`.
 
+Console builds tested on Intel Core i7-9700F, 32GB DDR4 @ 2400MHz, SSD and Unreal Engine 5.0.3 by running `<engine>/Engine/Build/BatchFiles/RunUBT.bat <game>.uproject <game> DebugGame <platform>`.
+
 [%autowidth]
 |===
-| OS + compiler | Without octobuild | octobuild (0% cache) | octobuild (100% cache)
+| Platform | Without octobuild | octobuild (0% cache) | octobuild (100% cache)
 
-| *Linux + clang*
+| *Linux*
 | 3m54s
 | 3m53s
 | 36s
 
-| *Windows + MSVC 2019*
+| *Win64 (MSVC 2019)*
 | 8m4s
 | 10m6s
 | 2m15s
+
+| *PS4*
+| 6m12s
+| 7m10s
+| 2m34s
 
 |===
 
