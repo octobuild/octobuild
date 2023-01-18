@@ -95,6 +95,11 @@ Console builds tested on Intel Core i7-9700F, 32GB DDR4 @ 2400MHz, SSD and Unrea
 | 7m10s
 | 2m34s
 
+| *PS5*
+| 5m48s
+| 6m56s
+| 2m11s
+
 |===
 
 == Unreal Engine patches
