@@ -1,7 +1,7 @@
 = Changelog
 :icons: font
 
-== Unreleased
+== 0.3.0
 
 * add `run_second_cpp` support for `cl.exe`
 * add support for `cl.exe /X`
