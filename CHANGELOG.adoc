@@ -1,7 +1,7 @@
 = Changelog
 :icons: font
 
-== Unreleased
+== 0.3.1
 
 * fix XB1/XSX support
 
