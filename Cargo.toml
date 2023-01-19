@@ -5,8 +5,8 @@ authors = [ "Artem V. Navrotskiy <bozaro@users.noreply.github.com>" ]
 edition = "2021"
 readme = "README.adoc"
 description = "Simple distributed compile system for C++"
-homepage = "https://github.com/bozaro/octobuild"
-repository = "https://github.com/bozaro/octobuild.git"
+homepage = "https://github.com/octobuild/octobuild"
+repository = "https://github.com/octobuild/octobuild.git"
 license = "MIT"
 
 [package.metadata.deb]

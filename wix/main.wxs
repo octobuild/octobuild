@@ -173,7 +173,7 @@
 
         <SetProperty Id='ARPINSTALLLOCATION' Value='[INSTALLDIR]' After='CostFinalize'/>
 
-        <Property Id='ARPHELPLINK' Value='https://github.com/bozaro/octobuild'/>
+        <Property Id='ARPHELPLINK' Value='https://github.com/octobuild/octobuild'/>
         
         <UI>
             <UIRef Id='WixUI_FeatureTree'/>

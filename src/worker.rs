@@ -329,7 +329,7 @@ mod test {
         assert_eq!(actual, vec!["task 1".to_string()]);
     }
 
-    // Test for #19 issue (https://github.com/bozaro/octobuild/issues/19)
+    // Test for #19 issue (https://github.com/octobuild/octobuild/issues/19)
     #[test]
     fn test_execute_graph_no_hang() {
         let state = SharedState::new(&Config::defaults().unwrap()).unwrap();

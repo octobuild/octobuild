@@ -1,6 +1,6 @@
 $ErrorActionPreference = 'Stop';
 $toolsDir   = "$(Split-Path -parent $MyInvocation.MyCommand.Definition)"
-$url64      = 'https://github.com/bozaro/octobuild/releases/download/{{ version }}/octobuild-{{ version }}-x86_64.msi'
+$url64      = 'https://github.com/octobuild/octobuild/releases/download/{{ version }}/octobuild-{{ version }}-x86_64.msi'
 
 $packageArgs = @{
     packageName   = $env:ChocolateyPackageName

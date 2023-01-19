@@ -1,6 +1,6 @@
 = octobuild
 Artem Navrotskiy; Marat Radchenko
-:slug: bozaro/octobuild
+:slug: octobuild/octobuild
 :uri-project: https://github.com/{slug}
 :uri-ci: {uri-project}/actions?query=branch%3Amaster
 :uri-discuss: https://gitter.im/{slug}
@@ -21,14 +21,14 @@ This project allows you to speedup re-compilation of Unreal Engine (and UE-based
 [[windows-installation]]
 === Windows
 
-. Download https://github.com/bozaro/octobuild/releases/latest[MSI installer]
+. Download https://github.com/octobuild/octobuild/releases/latest[MSI installer]
 . Install it
 . Normally build Unreal Engine projects, UBT will automatically use octobuild
 
 [[ubuntu-installation]]
 === Ubuntu/Debian
 
-. Download https://github.com/bozaro/octobuild/releases/latest[deb package]
+. Download https://github.com/octobuild/octobuild/releases/latest[deb package]
 . Install it via `dpkg -i <octobuild>.deb`
 . Apply <<linux-notes,Linux patches>>
 . Normally build Unreal Engine projects, UBT will automatically use octobuild

@@ -2,17 +2,17 @@
 <package xmlns="http://schemas.microsoft.com/packaging/2015/06/nuspec.xsd">
   <metadata>
     <id>octobuild</id>
-    <title>Octobuild</title>
+    <title>octobuild</title>
     <version>{{ version }}</version>
     <authors>Artem V. Navrotskiy</authors>
     <summary>Сache Unreal Engine compilation</summary>
-    <description>This project allows you to cache the compilation on Unreal Engine building</description>
-    <projectUrl>https://github.com/bozaro/octobuild</projectUrl>
-    <licenseUrl>https://github.com/bozaro/octobuild/master/LICENSE</licenseUrl>
-    <releaseNotes>https://github.com/bozaro/octobuild/releases/tag/{{ version }}</releaseNotes>
-    <packageSourceUrl>https://github.com/bozaro/octobuild/tree/main/choco</packageSourceUrl>
-    <bugTrackerUrl>https://github.com/bozaro/octobuild/issues</bugTrackerUrl>
-    <docsUrl>https://github.com/bozaro/octobuild/blob/main/README.adoc</docsUrl>
+    <description>This project allows you to speedup re-compilation of Unreal Engine (and UE-based games) by caching intermediate compilation files.</description>
+    <projectUrl>https://github.com/octobuild/octobuild</projectUrl>
+    <licenseUrl>https://github.com/octobuild/octobuild/master/LICENSE</licenseUrl>
+    <releaseNotes>https://github.com/octobuild/octobuild/releases/tag/{{ version }}</releaseNotes>
+    <packageSourceUrl>https://github.com/octobuild/octobuild/tree/main/choco</packageSourceUrl>
+    <bugTrackerUrl>https://github.com/octobuild/octobuild/issues</bugTrackerUrl>
+    <docsUrl>https://github.com/octobuild/octobuild/blob/main/README.adoc</docsUrl>
   </metadata>
   <files>
     <file src="tools/**" target="tools" />

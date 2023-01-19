@@ -22,7 +22,7 @@
 
 == 0.2.5
 
-* Introduce `run_second_cpp` mode (https://github.com/bozaro/octobuild/issues/76[#76])
+* Introduce `run_second_cpp` mode (https://github.com/octobuild/octobuild/issues/76[#76])
 
 == 0.2.4
 
