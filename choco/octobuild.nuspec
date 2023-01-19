@@ -8,11 +8,12 @@
     <summary>Сache Unreal Engine compilation</summary>
     <description>This project allows you to speedup re-compilation of Unreal Engine (and UE-based games) by caching intermediate compilation files.</description>
     <projectUrl>https://github.com/octobuild/octobuild</projectUrl>
-    <licenseUrl>https://github.com/octobuild/octobuild/master/LICENSE</licenseUrl>
+    <tags>unreal c++ cache</tags>
+    <licenseUrl>https://github.com/octobuild/octobuild/blob/master/LICENSE</licenseUrl>
     <releaseNotes>https://github.com/octobuild/octobuild/releases/tag/{{ version }}</releaseNotes>
-    <packageSourceUrl>https://github.com/octobuild/octobuild/tree/main/choco</packageSourceUrl>
+    <packageSourceUrl>https://github.com/octobuild/octobuild/tree/master/choco</packageSourceUrl>
     <bugTrackerUrl>https://github.com/octobuild/octobuild/issues</bugTrackerUrl>
-    <docsUrl>https://github.com/octobuild/octobuild/blob/main/README.adoc</docsUrl>
+    <docsUrl>https://github.com/octobuild/octobuild/blob/master/README.adoc</docsUrl>
   </metadata>
   <files>
     <file src="tools/**" target="tools" />
