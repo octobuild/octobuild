@@ -1,6 +1,10 @@
 = Changelog
 :icons: font
 
+== 0.3.2
+
+* publish MSI packages to Chocolatey (https://github.com/octobuild/octobuild/issues/75[#75])
+
 == 0.3.1
 
 * fix XB1/XSX support
