@@ -39,15 +39,23 @@ If you already have Chocolatey installed, you can just run the following command
 choco install octobuild
 ----
 
+[[installation-windows-winget]]
+=== WinGet (Windows)
+
+[source,powershell]
+----
+winget install octobuild
+----
+
 [[installation-windows-manual]]
-=== Windows Manual
+=== Manual (Windows)
 
 . Download https://github.com/octobuild/octobuild/releases/latest[MSI installer]
-. Install it
-. Normally build Unreal Engine projects, UBT will automatically use octobuild
+. Double-click on it
+. Next-next-next
 
 [[installation-ubuntu-manual]]
-=== Ubuntu/Debian Manual
+=== Manual (Ubuntu/Debian)
 
 . Download https://github.com/octobuild/octobuild/releases/latest[deb package]
 . Install it via `dpkg -i <octobuild>.deb`
