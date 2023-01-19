@@ -4,29 +4,50 @@ Artem Navrotskiy; Marat Radchenko
 :uri-project: https://github.com/{slug}
 :uri-ci: {uri-project}/actions?query=branch%3Amaster
 :uri-discuss: https://gitter.im/{slug}
-:uri-unreal: https://github.com/EpicGames/UnrealEngine
 
-image:https://img.shields.io/github/release/{slug}.svg[Download,link={uri-project}/releases/latest]
-image:{uri-project}/workflows/CI/badge.svg?branch=master[Build Status,link={uri-ci}]
 image:https://badges.gitter.im/{slug}.svg[Gitter chat,link={uri-discuss}]
+image:{uri-project}/workflows/CI/badge.svg?branch=master[Build Status,link={uri-ci}]
+image:https://img.shields.io/github/release/{slug}.svg[Download,link={uri-project}/releases/latest]
+image:https://img.shields.io/chocolatey/v/octobuild[Chocolatey package,link=https://community.chocolatey.org/packages/octobuild]
 
 [[overview]]
 == Overview
 
 This project allows you to speedup re-compilation of Unreal Engine (and UE-based games) by caching intermediate compilation files.
 
+[[supported-platforms]]
+== Supported platforms
+
+* Linux
+* PS4
+* PS5
+* Win64
+* Xbox One
+* Xbox Series
+
 [[installation]]
 == Installation
 
-[[windows-installation]]
-=== Windows
+[[installation-windows-chocolatey]]
+=== Chocolatey (Windows)
+
+octobuild is available via https://community.chocolatey.org/packages/octobuild[Chocolatey] package manager.
+If you already have Chocolatey installed, you can just run the following command from elevated console:
+
+[source,powershell]
+----
+choco install octobuild
+----
+
+[[installation-windows-manual]]
+=== Windows Manual
 
 . Download https://github.com/octobuild/octobuild/releases/latest[MSI installer]
 . Install it
 . Normally build Unreal Engine projects, UBT will automatically use octobuild
 
-[[ubuntu-installation]]
-=== Ubuntu/Debian
+[[installation-ubuntu-manual]]
+=== Ubuntu/Debian Manual
 
 . Download https://github.com/octobuild/octobuild/releases/latest[deb package]
 . Install it via `dpkg -i <octobuild>.deb`
