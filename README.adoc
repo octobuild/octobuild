@@ -79,8 +79,8 @@ sudo apt-get install octobuild
 [[Usage]]
 == Usage
 
-You do need to use octobuild directly.
-You just build Unreal Engine as usual, via Unreal Build Tool, Unreal Automation Tool or your IDE.
+You do not need to use octobuild directly.
+Just build Unreal Engine as usual, via Unreal Build Tool, Unreal Automation Tool or your IDE.
 Under the hood, they will automatically use octobuild.
 
 [[configuration]]
