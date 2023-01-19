@@ -60,7 +60,13 @@ winget install octobuild
 . Download https://github.com/octobuild/octobuild/releases/latest[deb package]
 . Install it via `dpkg -i <octobuild>.deb`
 . Apply <<linux-notes,Linux patches>>
-. Normally build Unreal Engine projects, UBT will automatically use octobuild
+
+[[Usage]]
+== Usage
+
+You do need to use octobuild directly.
+You just build Unreal Engine as usual, via Unreal Build Tool, Unreal Automation Tool or your IDE.
+Under the hood, they will automatically use octobuild.
 
 [[configuration]]
 == Configuration files
