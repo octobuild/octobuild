@@ -1,5 +1,5 @@
 name: CI
-on: [push, pull_request]
+on: [ push, pull_request ]
 jobs:
   rustfmt:
     runs-on: ubuntu-20.04
@@ -20,7 +20,7 @@ jobs:
   test:
     strategy:
       matrix:
-        platform: [ubuntu-20.04, macos-latest, windows-latest]
+        platform: [ ubuntu-20.04, macos-latest, windows-latest ]
     runs-on: ${{ matrix.platform }}
     steps:
       - name: checkout
@@ -38,7 +38,7 @@ jobs:
   clippy:
     strategy:
       matrix:
-        platform: [ubuntu-20.04, macos-latest, windows-latest]
+        platform: [ ubuntu-20.04, macos-latest, windows-latest ]
     runs-on: ${{ matrix.platform }}
     steps:
       - name: checkout
@@ -80,6 +80,14 @@ jobs:
           files: target/debian/*.deb
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Install Cloudsmith CLI
+        if: startsWith(github.ref, 'refs/tags/')
+        run: pip install --upgrade --user cloudsmith-cli
+      - name: Publish to Cloudsmith
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          CLOUDSMITH_API_KEY: ${{ secrets.CLOUDSMITH_API_KEY }}
+        run: find target/debian -name "*.deb" -print0 | xargs -0 -n1 cloudsmith push deb octobuild/octobuild/any-distro/any-version
   msi:
     runs-on: windows-latest
     steps:

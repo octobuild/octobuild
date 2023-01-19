@@ -4,6 +4,7 @@ Artem Navrotskiy; Marat Radchenko
 :uri-project: https://github.com/{slug}
 :uri-ci: {uri-project}/actions?query=branch%3Amaster
 :uri-discuss: https://gitter.im/{slug}
+:source-highlighter: rouge
 
 image:https://badges.gitter.im/{slug}.svg[Gitter chat,link={uri-discuss}]
 image:{uri-project}/workflows/CI/badge.svg?branch=master[Build Status,link={uri-ci}]
@@ -53,6 +54,20 @@ winget install octobuild
 . Download https://github.com/octobuild/octobuild/releases/latest[MSI installer]
 . Double-click on it
 . Next-next-next
+
+[[installation-ubuntu-deb]]
+=== deb package (Ubuntu/Debian)
+
+You can install octobuild on Ubuntu/Debian using the following commands:
+
+[source,bash]
+----
+# Set up repository
+curl -1sLf 'https://dl.cloudsmith.io/public/octobuild/octobuild/setup.deb.sh' | sudo -E bash
+
+# Install octobuild
+sudo apt-get install octobuild
+----
 
 [[installation-ubuntu-manual]]
 === Manual (Ubuntu/Debian)
