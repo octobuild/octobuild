@@ -88,6 +88,12 @@ Under the hood, they will automatically use octobuild.
 
 You can get configuration files and show default and actual configuration by running `ib_console`/`xgConsole` without parameters.
 
+[[environment-variables]]
+== Environment variables
+
+`OCTOBUILD_CACHE`:: specifies path to directory where octobuild cache is stored.
+Defaults to `~/.octobuild` on Windows and `~/.cache/octobuild` on Linux.
+
 [[benchmark]]
 == Benchmark
 
