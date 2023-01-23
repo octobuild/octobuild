@@ -209,19 +209,18 @@ impl Toolchain for ClangToolchain {
             }
 
             command.arg("-c").args(&task.args);
-
             match &task.input {
                 Preprocessed(_) => command.arg("-"),
                 Source(source) => command.arg(&source.path),
             };
 
+            command.arg("-o");
+            match task.output_object {
+                None => command.arg("-"),
+                Some(v) => command.arg(v),
+            };
+
             command
-                .arg("-o")
-                .arg(
-                    &task
-                        .output_object
-                        .map_or("-".to_string(), |path| path.display().to_string()),
-                )
                 .stdin(match &task.input {
                     Preprocessed(_) => Stdio::piped(),
                     Source(_) => Stdio::null(),
