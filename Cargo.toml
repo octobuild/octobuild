@@ -1,7 +1,10 @@
 [package]
 name = "octobuild"
 version = "0.3.2"
-authors = [ "Artem V. Navrotskiy <bozaro@users.noreply.github.com>" ]
+authors = [
+    "Artem V. Navrotskiy <bozaro@users.noreply.github.com>",
+    "Marat Radchenko <marat@slonopotamus.org>",
+]
 edition = "2021"
 readme = "README.adoc"
 description = "Simple distributed compile system for C++"

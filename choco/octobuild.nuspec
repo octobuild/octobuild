@@ -4,7 +4,7 @@
     <id>octobuild</id>
     <title>octobuild</title>
     <version>{{ version }}</version>
-    <authors>Artem V. Navrotskiy</authors>
+    <authors>Artem V. Navrotskiy, Marat Radchenko</authors>
     <summary>Сache Unreal Engine compilation</summary>
     <description>This project allows you to speedup re-compilation of Unreal Engine (and UE-based games) by caching intermediate compilation files.</description>
     <projectUrl>https://github.com/octobuild/octobuild</projectUrl>
