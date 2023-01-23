@@ -92,22 +92,6 @@ impl<'a> From<&'a MemStream> for Vec<u8> {
     }
 }
 
-impl From<Vec<u8>> for MemStream {
-    fn from(data: Vec<u8>) -> Self {
-        let mut result = MemStream::new();
-        result.write_data(&data);
-        result
-    }
-}
-
-impl<'a> From<&'a [u8]> for MemStream {
-    fn from(data: &[u8]) -> Self {
-        let mut result = MemStream::new();
-        result.write_data(data);
-        result
-    }
-}
-
 impl Write for MemStream {
     fn write(&mut self, buf: &[u8]) -> Result<usize> {
         Ok(self.write_data(buf))

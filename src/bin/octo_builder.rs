@@ -33,7 +33,6 @@ use octobuild::cluster::common::{
 use octobuild::compiler::CompileInput::Preprocessed;
 use octobuild::compiler::*;
 use octobuild::config::Config;
-use octobuild::io::memstream::MemStream;
 use octobuild::io::tempfile::TempFile;
 use octobuild::simple::create_temp_dir;
 use octobuild::simple::supported_compilers;
@@ -199,7 +198,7 @@ impl<D> Middleware<D> for RpcBuilderTaskHandler {
                 output_precompiled: None,
                 input_precompiled: precompiled,
                 args: request.args,
-                input: Preprocessed(MemStream::from(request.preprocessed_data)),
+                input: Preprocessed(CompilerOutput::Vec(request.preprocessed_data)),
                 marker_precompiled: None,
             };
 

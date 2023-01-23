@@ -15,10 +15,10 @@ use sha2::{Digest, Sha256};
 
 use crate::cache::{Cache, FileHasher};
 use crate::config::Config;
-use crate::io::memstream::MemStream;
 use crate::io::statistic::Statistic;
 
 use crate::compiler::CompileInput::{Preprocessed, Source};
+use crate::io::memstream::MemStream;
 use thiserror::Error;
 
 #[derive(Error, Debug)]
@@ -354,7 +354,7 @@ pub struct SourceInput {
 }
 
 pub enum CompileInput {
-    Preprocessed(MemStream),
+    Preprocessed(CompilerOutput),
     Source(SourceInput),
 }
 
@@ -374,7 +374,7 @@ pub struct CompileStep {
 impl CompileStep {
     pub fn new(
         task: &CompilationTask,
-        preprocessed: MemStream,
+        preprocessed: CompilerOutput,
         args: Vec<String>,
         use_precompiled: bool,
         run_second_cpp: bool,
@@ -406,8 +406,46 @@ impl CompileStep {
     }
 }
 
+pub enum CompilerOutput {
+    MemSteam(MemStream),
+    Vec(Vec<u8>),
+}
+
+impl CompilerOutput {
+    pub fn copy<W: Write>(&self, writer: &mut W) -> std::io::Result<usize> {
+        match &self {
+            CompilerOutput::MemSteam(v) => v.copy(writer),
+            CompilerOutput::Vec(v) => {
+                writer.write_all(v)?;
+                Ok(v.len())
+            }
+        }
+    }
+
+    pub fn is_empty(&self) -> bool {
+        match self {
+            CompilerOutput::MemSteam(v) => v.is_empty(),
+            CompilerOutput::Vec(v) => v.is_empty(),
+        }
+    }
+
+    pub fn len(&self) -> usize {
+        match self {
+            CompilerOutput::MemSteam(v) => v.len(),
+            CompilerOutput::Vec(v) => v.len(),
+        }
+    }
+
+    pub fn to_vec(&self) -> Vec<u8> {
+        match self {
+            CompilerOutput::MemSteam(v) => From::from(v),
+            CompilerOutput::Vec(v) => v.clone(),
+        }
+    }
+}
+
 pub enum PreprocessResult {
-    Success(MemStream),
+    Success(CompilerOutput),
     Failed(OutputInfo),
 }
 
@@ -432,7 +470,7 @@ pub trait Toolchain: Send + Sync {
         &self,
         state: &SharedState,
         task: &CompilationTask,
-        preprocessed: MemStream,
+        preprocessed: CompilerOutput,
     ) -> Result<CompileStep, Error>;
 
     // Compile preprocessed file.
@@ -465,7 +503,7 @@ pub trait Toolchain: Send + Sync {
         &self,
         state: &SharedState,
         task: &CompilationTask,
-        preprocessed: MemStream,
+        preprocessed: CompilerOutput,
     ) -> Result<OutputInfo, Error> {
         let mut hasher = Sha256::new();
         // Get hash from preprocessed data

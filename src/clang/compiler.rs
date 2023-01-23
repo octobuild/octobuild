@@ -1,21 +1,17 @@
 use std::fs::File;
-use std::io;
-use std::io::{Error, Read, Write};
+use std::io::{Error, Write};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
-use std::sync::mpsc::{channel, Receiver};
 use std::sync::Arc;
-use std::thread;
 use std::{env, fs};
 
 use regex::Regex;
 
 use crate::compiler::CompileInput::{Preprocessed, Source};
 use crate::compiler::{
-    Arg, CommandInfo, CompilationTask, CompileStep, Compiler, OutputInfo, PreprocessResult, Scope,
-    SharedState, Toolchain, ToolchainHolder,
+    Arg, CommandInfo, CompilationTask, CompileStep, Compiler, CompilerOutput, OutputInfo,
+    PreprocessResult, Scope, SharedState, Toolchain, ToolchainHolder,
 };
-use crate::io::memstream::MemStream;
 use crate::lazy::Lazy;
 use lazy_static::lazy_static;
 
@@ -148,7 +144,7 @@ impl Toolchain for ClangToolchain {
         &self,
         state: &SharedState,
         task: &CompilationTask,
-        preprocessed: MemStream,
+        preprocessed: CompilerOutput,
     ) -> Result<CompileStep, Error> {
         let mut args = vec!["-x".to_string(), task.language.clone()];
         for arg in task.shared.args.iter() {
@@ -269,55 +265,22 @@ fn clang_identifier(clang: &Path) -> Option<String> {
 }
 
 fn execute(command: &mut Command) -> Result<PreprocessResult, Error> {
-    let mut child = command
+    let output = command
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
-        .spawn()?;
-    drop(child.stdin.take());
+        .spawn()?
+        .wait_with_output()?;
 
-    fn read_stdout<T: Read>(stream: Option<T>) -> MemStream {
-        stream
-            .map_or(Ok(MemStream::new()), |mut stream| {
-                let mut ret = MemStream::new();
-                io::copy(&mut stream, &mut ret).map(|_| ret)
-            })
-            .unwrap_or_else(|_| MemStream::new())
-    }
-
-    fn read_stderr<T: Read + Send + 'static>(
-        stream: Option<T>,
-    ) -> Receiver<Result<Vec<u8>, Error>> {
-        let (tx, rx) = channel();
-        match stream {
-            Some(mut stream) => {
-                thread::spawn(move || {
-                    let mut ret = Vec::new();
-                    let res = stream.read_to_end(&mut ret).map(|_| ret);
-                    tx.send(res).unwrap();
-                });
-            }
-            None => tx.send(Ok(Vec::new())).unwrap(),
-        }
-        rx
-    }
-
-    fn bytes(stream: Receiver<Result<Vec<u8>, Error>>) -> Vec<u8> {
-        stream.recv().unwrap().unwrap_or_default()
-    }
-
-    let rx_err = read_stderr(child.stderr.take());
-    let stdout = read_stdout(child.stdout.take());
-    let status = child.wait()?;
-    let stderr = bytes(rx_err);
-
-    if status.success() {
-        Ok(PreprocessResult::Success(stdout))
+    if output.status.success() {
+        Ok(PreprocessResult::Success(CompilerOutput::Vec(
+            output.stdout,
+        )))
     } else {
         Ok(PreprocessResult::Failed(OutputInfo {
-            status: status.code(),
-            stdout: Vec::new(),
-            stderr,
+            status: output.status.code(),
+            stdout: output.stdout,
+            stderr: output.stderr,
         }))
     }
 }

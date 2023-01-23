@@ -16,10 +16,9 @@ use crate::cluster::builder::{CompileRequest, CompileResponse};
 use crate::cluster::common::{BuilderInfo, RPC_BUILDER_LIST, RPC_BUILDER_TASK, RPC_BUILDER_UPLOAD};
 use crate::compiler::CompileInput::Preprocessed;
 use crate::compiler::{
-    CommandInfo, CompilationTask, CompileStep, Compiler, OutputInfo, PreprocessResult, SharedState,
-    Toolchain,
+    CommandInfo, CompilationTask, CompileStep, Compiler, CompilerOutput, OutputInfo,
+    PreprocessResult, SharedState, Toolchain,
 };
-use crate::io::memstream::MemStream;
 
 pub struct RemoteCompiler<C: Compiler> {
     shared: Arc<RemoteShared>,
@@ -134,7 +133,7 @@ impl RemoteToolchain {
         let request = CompileRequest {
             toolchain: name,
             args: task.args.clone(),
-            preprocessed_data: preprocessed.into(),
+            preprocessed_data: preprocessed.to_vec(),
             precompiled_hash: self.upload_precompiled(state, &task.input_precompiled, &base_url)?,
         };
         let request_payload = bincode::serialize(&request).unwrap();
@@ -278,7 +277,7 @@ impl Toolchain for RemoteToolchain {
         &self,
         state: &SharedState,
         task: &CompilationTask,
-        preprocessed: MemStream,
+        preprocessed: CompilerOutput,
     ) -> Result<CompileStep, Error> {
         self.local.compile_prepare_step(state, task, preprocessed)
     }

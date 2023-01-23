@@ -1,7 +1,7 @@
 use crate::compiler::CompileInput::{Preprocessed, Source};
 use crate::compiler::{
-    Arg, CommandInfo, CompilationTask, CompileStep, Compiler, OutputInfo, PreprocessResult, Scope,
-    SharedState, Toolchain, ToolchainHolder,
+    Arg, CommandInfo, CompilationTask, CompileStep, Compiler, CompilerOutput, OutputInfo,
+    PreprocessResult, Scope, SharedState, Toolchain, ToolchainHolder,
 };
 use crate::io::memstream::MemStream;
 use crate::io::tempfile::TempFile;
@@ -10,7 +10,7 @@ use crate::vs::postprocess;
 use lazy_static::lazy_static;
 use regex::bytes::{NoExpand, Regex};
 use std::fs::File;
-use std::io::{Cursor, Error, Write};
+use std::io::{Cursor, Error};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::Arc;
@@ -172,14 +172,16 @@ impl Toolchain for VsToolchain {
                     &task.shared.marker_precompiled,
                     task.shared.output_precompiled.is_some(),
                 )?;
+                Ok(PreprocessResult::Success(CompilerOutput::MemSteam(content)))
             } else {
-                content.write_all(&output.stdout)?;
-            };
-            Ok(PreprocessResult::Success(content))
+                Ok(PreprocessResult::Success(CompilerOutput::Vec(
+                    output.stdout,
+                )))
+            }
         } else {
             Ok(PreprocessResult::Failed(OutputInfo {
                 status: output.status.code(),
-                stdout: Vec::new(),
+                stdout: output.stdout,
                 stderr: output.stderr,
             }))
         }
@@ -190,7 +192,7 @@ impl Toolchain for VsToolchain {
         &self,
         state: &SharedState,
         task: &CompilationTask,
-        preprocessed: MemStream,
+        preprocessed: CompilerOutput,
     ) -> Result<CompileStep, Error> {
         let mut args: Vec<String> = task
             .shared
