@@ -131,44 +131,36 @@ impl Toolchain for VsToolchain {
     ) -> Result<PreprocessResult, Error> {
         let mut command = task.shared.command.to_command();
         command
-            .args(
-                task.shared
-                    .args
-                    .iter()
-                    .filter_map(|arg: &Arg| -> Option<String> {
-                        match arg {
-                            Arg::Flag {
-                                ref scope,
-                                ref flag,
-                            } => {
-                                if scope.matches(Scope::Preprocessor, state.run_second_cpp, false) {
-                                    Some("/".to_string() + flag)
-                                } else {
-                                    None
-                                }
-                            }
-                            Arg::Param {
-                                ref scope,
-                                ref flag,
-                                ref value,
-                            } => {
-                                if scope.matches(Scope::Preprocessor, state.run_second_cpp, false) {
-                                    Some("/".to_string() + flag + value)
-                                } else {
-                                    None
-                                }
-                            }
-                            Arg::Input { .. } => None,
-                            Arg::Output { .. } => None,
-                        }
-                    }),
-            )
             .arg("/nologo")
             .arg("/T".to_string() + &task.language)
             .arg("/E")
             .arg("/we4002") // C4002: too many actual parameters for macro 'identifier'
             .arg(join_flag("/Fo", &task.output_object)) // /Fo option also set output path for #import directive
             .arg(&task.input_source);
+
+        for arg in task.shared.args.iter() {
+            match arg {
+                Arg::Flag {
+                    ref scope,
+                    ref flag,
+                } => {
+                    if scope.matches(Scope::Preprocessor, state.run_second_cpp, false) {
+                        command.arg("/".to_string() + flag);
+                    }
+                }
+                Arg::Param {
+                    ref scope,
+                    ref flag,
+                    ref value,
+                } => {
+                    if scope.matches(Scope::Preprocessor, state.run_second_cpp, false) {
+                        command.arg("/".to_string() + flag + value);
+                    }
+                }
+                Arg::Input { .. } => {}
+                Arg::Output { .. } => {}
+            };
+        }
 
         let output = state.wrap_slow(|| command.output())?;
         if output.status.success() {

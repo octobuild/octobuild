@@ -94,12 +94,16 @@ impl Toolchain for ClangToolchain {
         state: &SharedState,
         task: &CompilationTask,
     ) -> Result<PreprocessResult, Error> {
-        let mut args: Vec<String> = vec!["-E", "-x", task.language.as_str(), "-frewrite-includes"]
-            .iter()
-            .map(|arg| arg.to_string())
-            .collect();
+        let mut command = task.shared.command.to_command();
+        command
+            .arg("-E")
+            .arg("-frewrite-includes")
+            .arg("-x")
+            .arg(&task.language)
+            .arg(&task.input_source)
+            .arg("-o")
+            .arg("-");
 
-        // Make parameters list for preprocessing.
         for arg in task.shared.args.iter() {
             match arg {
                 Arg::Flag {
@@ -107,7 +111,7 @@ impl Toolchain for ClangToolchain {
                     ref flag,
                 } => {
                     if scope.matches(Scope::Preprocessor, state.run_second_cpp, false) {
-                        args.push("-".to_string() + flag);
+                        command.arg("-".to_string() + flag);
                     }
                 }
                 Arg::Param {
@@ -116,8 +120,8 @@ impl Toolchain for ClangToolchain {
                     ref value,
                 } => {
                     if scope.matches(Scope::Preprocessor, state.run_second_cpp, false) {
-                        args.push("-".to_string() + flag);
-                        args.push(value.clone());
+                        command.arg("-".to_string() + flag);
+                        command.arg(value.clone());
                     }
                 }
                 Arg::Input { .. } => {}
@@ -125,13 +129,8 @@ impl Toolchain for ClangToolchain {
             };
         }
 
-        // Add preprocessor parameters.
-        args.push(task.input_source.display().to_string());
-        args.push("-o".to_string());
-        args.push("-".to_string());
-
         state.wrap_slow(|| {
-            let result = execute(task.shared.command.to_command().args(&args))?;
+            let result = execute(&mut command)?;
             if let Some(ref deps_file) = task.shared.deps_file {
                 let data = fs::read_to_string(deps_file)?;
                 if let Some(end) = data.strip_prefix('-') {
