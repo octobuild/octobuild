@@ -442,18 +442,9 @@ pub trait Toolchain: Send + Sync {
         &self,
         state: &SharedState,
         mut task: CompileStep,
-    ) -> Result<(OutputInfo, Vec<u8>), Error> {
+    ) -> Result<OutputInfo, Error> {
         task.output_object = None;
-        self.compile_step(state, task).map(|output| {
-            (
-                OutputInfo {
-                    status: output.status,
-                    stderr: output.stderr,
-                    stdout: Vec::new(),
-                },
-                output.stdout,
-            )
-        })
+        self.compile_step(state, task)
     }
 
     fn compile_task(

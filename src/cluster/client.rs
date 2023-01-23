@@ -148,8 +148,12 @@ impl RemoteToolchain {
         // Receive compilation result.
         let result: CompileResponse = bincode::deserialize_from(&mut resp)
             .map_err(|e| Error::new(ErrorKind::InvalidData, e))?;
-        if let CompileResponse::Success(ref output, ref content) = result {
-            write_output(&task.output_object, output.success(), content)?;
+        if let CompileResponse::Success(ref output) = result {
+            write_output(
+                &task.output_object,
+                output.success(),
+                output.stdout.as_slice(),
+            )?;
         }
         state.statistic.inc_remote();
         Ok(result)
@@ -282,7 +286,7 @@ impl Toolchain for RemoteToolchain {
     fn compile_step(&self, state: &SharedState, task: CompileStep) -> Result<OutputInfo, Error> {
         match self.compile_remote(state, &task) {
             Ok(response) => match response {
-                CompileResponse::Success(output, _) => Ok(output),
+                CompileResponse::Success(output) => Ok(output),
                 CompileResponse::Err(err) => Err(Error::new(ErrorKind::Other, err)),
             },
             Err(e) => {

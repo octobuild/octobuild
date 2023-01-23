@@ -14,14 +14,14 @@ pub struct CompileRequest {
 
 #[derive(Serialize, Deserialize, Debug)]
 pub enum CompileResponse {
-    Success(OutputInfo, Vec<u8>),
+    Success(OutputInfo),
     Err(String),
 }
 
-impl From<Result<(OutputInfo, Vec<u8>), io::Error>> for CompileResponse {
-    fn from(result: Result<(OutputInfo, Vec<u8>), io::Error>) -> Self {
+impl From<Result<OutputInfo, io::Error>> for CompileResponse {
+    fn from(result: Result<OutputInfo, io::Error>) -> Self {
         match result {
-            Ok((output, content)) => CompileResponse::Success(output, content),
+            Ok(output) => CompileResponse::Success(output),
             Err(v) => CompileResponse::Err(v.to_string()),
         }
     }

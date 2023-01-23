@@ -331,11 +331,13 @@ impl Toolchain for VsToolchain {
         &self,
         state: &SharedState,
         mut task: CompileStep,
-    ) -> Result<(OutputInfo, Vec<u8>), Error> {
+    ) -> Result<OutputInfo, Error> {
         let output_temp = TempFile::new_in(self.temp_dir.path(), ".o");
         task.output_object = Some(output_temp.path().to_path_buf());
-        self.compile_step(state, task)
-            .and_then(|output| fs::read(output_temp.path()).map(|content| (output, content)))
+        let mut output = self.compile_step(state, task)?;
+        let content = fs::read(output_temp.path())?;
+        output.stdout = content;
+        Ok(output)
     }
 }
 
