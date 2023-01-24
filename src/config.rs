@@ -1,6 +1,5 @@
 use figment::providers::{Env, Format, Serialized, Yaml};
 use figment::Figment;
-use std::env;
 use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4};
 use std::path::PathBuf;
 
@@ -81,6 +80,8 @@ fn local_config_path() -> Option<PathBuf> {
 
 #[cfg(windows)]
 fn global_config_path() -> Option<PathBuf> {
+    use std::env;
+
     Some(
         PathBuf::from(env::var("ProgramData").ok()?)
             .join("octobuild")
@@ -89,6 +90,10 @@ fn global_config_path() -> Option<PathBuf> {
 }
 
 #[cfg(unix)]
-fn global_config_dir() -> Option<PathBuf> {
-    Some(PathBuf::from("/etc"))
+fn global_config_path() -> Option<PathBuf> {
+    Some(
+        PathBuf::from("/etc")
+            .join("octobuild")
+            .join("octobuild.conf"),
+    )
 }
