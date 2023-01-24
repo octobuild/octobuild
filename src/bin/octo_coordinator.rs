@@ -129,7 +129,7 @@ fn main() {
             for signal in rx.iter() {
                 match signal {
                     State::Start => {
-                        let config = Config::new().unwrap();
+                        let config = Config::load().unwrap();
                         info!("Coordinator bind to address: {}", config.coordinator_bind);
 
                         let state = Arc::new(CoordinatorState::new());

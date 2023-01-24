@@ -85,13 +85,37 @@ Under the hood, they will automatically use octobuild.
 [[configuration]]
 == Configuration files
 
-You can get configuration files and show default and actual configuration by running `ib_console`/`xgConsole` without parameters.
+You can list configuration files and check actual configuration by running `ib_console`/`xgConsole` without parameters.
+
+[%autowidth]
+|===
+| Platform | System-wide config | User-specific config (overrides system defaults)
+
+| Linux
+| `/etc/octobuild/octobuild.conf`
+| `$XDG_CONFIG_HOME/octobuild/octobuild.conf` (with fallback to `~/.config/octobuild/octobuild.conf` when `$XDG_CONFIG_HOME` is not set)
+
+| Windows
+| `%ProgramData\octobuild\octobuild.conf`
+| `%AppData%\octobuild\octobuild.conf`
+
+| macOS
+| `/etc/octobuild/octobuild.conf`
+| `~/Library/Application Support/octobuild/octobuild.conf`
+
+|===
 
 [[environment-variables]]
 == Environment variables
 
+Environment variables have higher priority than config files.
+
 `OCTOBUILD_CACHE`:: specifies path to directory where octobuild cache is stored.
-Defaults to `~/.octobuild` on Windows and `~/.cache/octobuild` on Linux.
+Defaults to `%LocalAppData%/octobuild` on Windows, `~/.cache/octobuild` on Linux and `~/Library/Caches/octobuild` on macOS.
+`OCTOBUILD_CACHE_LIMIT_MB`:: specifies octobuild disk cache size limit in megabytes.
+Defaults to 64GB.
+`OCTOBUILD_PROCESS_LIMIT`:: specifies max number of concurrent processes octobuild will spawn.
+Defaults to number of cores.
 
 [[benchmark]]
 == Benchmark

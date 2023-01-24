@@ -299,7 +299,7 @@ mod test {
 
     #[test]
     fn test_execute_graph_empty() {
-        let state = SharedState::new(&Config::defaults().unwrap()).unwrap();
+        let state = SharedState::new(&Config::default()).unwrap();
         let graph = BuildGraph::new();
         execute_graph(&state, graph, 2, |_| {
             unreachable!();
@@ -309,7 +309,7 @@ mod test {
 
     #[test]
     fn test_execute_graph_single() {
-        let state = SharedState::new(&Config::defaults().unwrap()).unwrap();
+        let state = SharedState::new(&Config::default()).unwrap();
 
         // Simple two tasks graph
         let mut graph = BuildGraph::new();
@@ -332,7 +332,7 @@ mod test {
     // Test for #19 issue (https://github.com/octobuild/octobuild/issues/19)
     #[test]
     fn test_execute_graph_no_hang() {
-        let state = SharedState::new(&Config::defaults().unwrap()).unwrap();
+        let state = SharedState::new(&Config::default()).unwrap();
 
         // Simple two tasks graph
         let mut graph = BuildGraph::new();

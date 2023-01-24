@@ -1,8 +1,9 @@
 #![allow(non_snake_case)]
 
 use std::env;
+use std::error::Error;
 use std::fs::File;
-use std::io::{BufReader, Error, ErrorKind};
+use std::io::{BufReader, ErrorKind};
 use std::path::{Path, PathBuf};
 use std::process;
 use std::sync::Arc;
@@ -24,7 +25,7 @@ use octobuild::worker::{BuildAction, BuildGraph, BuildResult, BuildTask};
 use octobuild::xg;
 use octobuild::xg::parser::{XgGraph, XgNode};
 
-pub(crate) fn main() {
+pub fn main() -> Result<(), Box<dyn Error>> {
     println!("xgConsole ({}):", version::full_version());
     let args: Vec<String> = env::args().collect();
     for arg in args.iter() {
@@ -33,7 +34,7 @@ pub(crate) fn main() {
     if args.len() == 1 {
         println!();
         Config::help();
-        return;
+        return Ok(());
     }
 
     process::exit(match execute(&args[1..]) {
@@ -80,7 +81,7 @@ fn expand_files(mut files: Vec<PathBuf>, arg: &str) -> Vec<PathBuf> {
         Regex::new(&result).unwrap()
     }
 
-    fn find_files(dir: &Path, mask: &str) -> Result<Vec<PathBuf>, Error> {
+    fn find_files(dir: &Path, mask: &str) -> std::io::Result<Vec<PathBuf>> {
         let mut result = Vec::new();
         let expr = mask_to_regex(&mask.to_lowercase());
         for entry in fs::read_dir(dir)? {
@@ -116,8 +117,8 @@ fn expand_files(mut files: Vec<PathBuf>, arg: &str) -> Vec<PathBuf> {
     files
 }
 
-fn execute(args: &[String]) -> Result<Option<i32>, Error> {
-    let config = Config::new()?;
+fn execute(args: &[String]) -> Result<Option<i32>, Box<dyn Error>> {
+    let config = Config::load()?;
     let state = SharedState::new(&config)?;
     let compiler = RemoteCompiler::new(
         &config.coordinator,
@@ -128,10 +129,9 @@ fn execute(args: &[String]) -> Result<Option<i32>, Error> {
         .filter(|a| !is_flag(a))
         .fold(Vec::new(), |state, a| expand_files(state, a));
     if files.is_empty() {
-        return Err(Error::new(
-            ErrorKind::InvalidInput,
-            "Build task files not found",
-        ));
+        return Err(
+            std::io::Error::new(ErrorKind::InvalidInput, "Build task files not found").into(),
+        );
     }
 
     let mut graph = Graph::new();
@@ -144,14 +144,14 @@ fn execute(args: &[String]) -> Result<Option<i32>, Error> {
     let result = execute_graph(&state, build_graph, config.process_limit, print_task_result);
     let _ = state.cache.cleanup();
     println!("{}", state.statistic);
-    result
+    result.map_err(Into::into)
 }
 
 fn env_resolver(name: &str) -> Option<String> {
     env::var(name).ok()
 }
 
-fn prepare_graph<C: Compiler>(compiler: &C, graph: XgGraph) -> Result<BuildGraph, Error> {
+fn prepare_graph<C: Compiler>(compiler: &C, graph: XgGraph) -> Result<BuildGraph, std::io::Error> {
     let mut remap: Vec<NodeIndex> = Vec::with_capacity(graph.node_count());
     let mut depends: Vec<NodeIndex> = Vec::with_capacity(graph.node_count());
 
@@ -209,7 +209,7 @@ fn prepare_graph<C: Compiler>(compiler: &C, graph: XgGraph) -> Result<BuildGraph
     validate_graph(result)
 }
 
-fn print_task_result(result: BuildResult) -> Result<(), Error> {
+fn print_task_result(result: BuildResult) -> Result<(), std::io::Error> {
     println!(
         "#{} {}/{}: {} @ {}s",
         result.worker,

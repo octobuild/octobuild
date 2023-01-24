@@ -1,6 +1,20 @@
 = Changelog
 :icons: font
 
+== Unreleased
+
+* Do less in-memory copying of file blobs
+* Allow to configure all octobuild settings via environment variables.
+* Change default paths.
++
+Windows: system config file is `%ProgramData%\octobuild\octobuild.conf`, user config file is `%AppData%\octobuild\octobuild.conf`, cache is `%LocalAppData%\octobuild`.
++
+Linux: system config file is `/etc/octobuild/octobuild.conf`, user config file is `$XDG_CONFIG_HOME/octobuild/octobuild.conf` (with fallback to `~/.config/octobuild/octobuild.conf` when `$XDG_CONFIG_HOME` is not set), cache is `$XDG_CACHE_HOME/octobuild` (with fallback to `~/.cache/octobuild` when `$XDG_CACHE_HOME` is not set).
++
+macOS: system config file is `/etc/octobuild/octobuild.conf`, user config file is `~/Library/Application Support/octobuild/octobuild.conf`, cache is `~/Library/Caches/octobuild`
+
+IMPORTANT: Default configuration path and cache directory locations have changed since previous versions!
+
 == 0.3.2
 
 * publish MSI packages to Chocolatey (https://github.com/octobuild/octobuild/issues/75[#75])

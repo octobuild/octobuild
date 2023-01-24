@@ -65,7 +65,7 @@ struct RpcBuilderUploadHandler(Arc<BuilderState>);
 
 impl BuilderService {
     fn new() -> Self {
-        let config = Config::new().unwrap();
+        let config = Config::load().unwrap();
         info!("Helper bind to address: {}", config.helper_bind);
 
         let temp_dir = create_temp_dir().expect("Can't create temporary directory");
@@ -73,7 +73,7 @@ impl BuilderService {
             name: get_name(),
             shared: SharedState::new(&config).unwrap(),
             toolchains: BuilderService::discover_toolchains(&temp_dir),
-            precompiled_dir: config.cache_dir,
+            precompiled_dir: config.cache,
             precompiled: Mutex::new(HashMap::new()),
         });
 

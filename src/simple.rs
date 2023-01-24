@@ -30,7 +30,7 @@ where
     C: Compiler,
     F: FnOnce(&Config) -> Result<C, Error>,
 {
-    let config = match Config::new() {
+    let config = match Config::load() {
         Ok(v) => v,
         Err(e) => {
             error!("FATAL ERROR: Can't load configuration {}", e);

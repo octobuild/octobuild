@@ -67,8 +67,9 @@ byteorder = "1"
 clap = { version = "4", features = ["derive"] }
 crossbeam = "0.8"
 daemon = { git = "https://github.com/slonopotamus/daemon-rs" }
-dirs= "4"
+dirs = "4"
 fern = "0.6"
+figment = { version = "0.10", features = ["env", "yaml"] }
 hex = "0.4"
 hostname = "0.3"
 ipc = { git = "https://github.com/slonopotamus/ipc-rs" }
@@ -84,13 +85,14 @@ rand = "0.8"
 regex = "1"
 reqwest = { version = "0.11", features = ["blocking"] }
 serde = { version = "1.0", features = ["derive"] }
+serde_yaml = "0.9"
 sha2 = "0.10"
 shlex = "1.1"
 tempdir = "0.3"
 thiserror = "1"
+url = {version = "2", features = ["serde"]}
 uuid = { version = "1", features = ["v4"] }
 xml-rs = "0.8"
-yaml-rust = "0.4"
 
 [target.'cfg(windows)'.build-dependencies]
 cc = "1.0"
