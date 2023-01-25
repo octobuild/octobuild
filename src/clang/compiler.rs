@@ -265,13 +265,7 @@ fn clang_identifier(clang: &Path) -> Option<String> {
 }
 
 fn execute(command: &mut Command) -> Result<PreprocessResult, Error> {
-    let output = command
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()?
-        .wait_with_output()?;
-
+    let output = command.output()?;
     if output.status.success() {
         Ok(PreprocessResult::Success(CompilerOutput::Vec(
             output.stdout,
