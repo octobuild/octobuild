@@ -30,7 +30,7 @@ impl BuildTask {
             }),
             BuildAction::Exec(command_info, args) => state.wrap_slow(|| {
                 let mut command = command_info.to_command();
-                args.append_to(&mut command);
+                args.append_to(&mut command)?;
                 let output = command.output()?;
                 Ok(OutputInfo::new(output))
             }),

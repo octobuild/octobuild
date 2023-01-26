@@ -628,7 +628,7 @@ pub enum CommandArgs {
 }
 
 impl CommandArgs {
-    pub fn append_to(&self, command: &mut Command) {
+    pub fn append_to(&self, command: &mut Command) -> Result<(), Error> {
         match self {
             CommandArgs::Raw(v) => {
                 #[cfg(windows)]
@@ -638,13 +638,14 @@ impl CommandArgs {
                 }
                 #[cfg(not(windows))]
                 {
-                    command.args(cmd::native::parse(v));
+                    command.args(cmd::native::parse(v)?);
                 }
             }
             CommandArgs::Array(v) => {
                 command.args(v);
             }
         }
+        Ok(())
     }
 }
 
