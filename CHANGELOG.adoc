@@ -3,6 +3,7 @@
 
 == Unreleased
 
+* Fix compatibility with Unreal Engine 5.1
 * Do less in-memory copying of file blobs
 * Allow to configure all octobuild settings via environment variables.
 * Change default paths.
