@@ -55,7 +55,7 @@ fn is_flag(arg: &str) -> bool {
 
 #[cfg(unix)]
 fn expand_files(mut files: Vec<PathBuf>, arg: &str) -> Vec<PathBuf> {
-    files.push(Path::new(arg).to_path_buf());
+    files.push(PathBuf::from(arg));
     files
 }
 
@@ -97,7 +97,7 @@ fn expand_files(mut files: Vec<PathBuf>, arg: &str) -> Vec<PathBuf> {
         Ok(result)
     }
 
-    let path = Path::new(arg).to_path_buf();
+    let path = PathBuf::from(arg);
     let mask = path.file_name().and_then(|name| name.to_str());
     match mask {
         Some(mask) if mask.contains(|c| c == '?' || c == '*') => {

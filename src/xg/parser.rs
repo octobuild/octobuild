@@ -1,7 +1,7 @@
 use std::collections::{HashMap, HashSet};
 use std::env;
 use std::io::{Error, ErrorKind, Read};
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::sync::Arc;
 
 use thiserror::Error;
@@ -201,7 +201,7 @@ fn parse_tools<R: Read>(
                     tools.insert(
                         name,
                         XgTool {
-                            exec: Path::new(&exec).to_path_buf(),
+                            exec: PathBuf::from(&exec),
                             output: attrs.remove("OutputPrefix"),
                             args: attrs.remove("Params").unwrap_or_default(),
                         },
@@ -240,7 +240,7 @@ fn parse_tasks<R: Read>(events: &mut EventReader<R>) -> Result<HashMap<String, X
                         XgTask {
                             title: attrs.remove("Caption"),
                             tool,
-                            working_dir: Path::new(&working_dir).to_path_buf(),
+                            working_dir: PathBuf::from(&working_dir),
                             depends_on: depends_on.into_iter().collect::<Vec<String>>(),
                         },
                     );

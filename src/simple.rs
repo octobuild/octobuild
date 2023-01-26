@@ -1,6 +1,6 @@
 use std::env;
 use std::io::Error;
-use std::path::Path;
+use std::path::PathBuf;
 use std::sync::Arc;
 
 use log::error;
@@ -69,7 +69,7 @@ pub fn compile<C>(
 where
     C: Compiler,
 {
-    let command_info = CommandInfo::simple(Path::new(exec));
+    let command_info = CommandInfo::simple(PathBuf::from(exec));
     let remote = RemoteCompiler::new(&config.coordinator, compiler);
     let args: Vec<String> = env::args().skip(1).collect();
     let actions = BuildAction::create_tasks(&remote, command_info, CommandArgs::Array(args), exec);

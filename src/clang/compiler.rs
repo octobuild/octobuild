@@ -102,19 +102,12 @@ impl Toolchain for ClangToolchain {
 
         for arg in task.shared.args.iter() {
             match arg {
-                Arg::Flag {
-                    ref scope,
-                    ref flag,
-                } => {
+                Arg::Flag { scope, flag } => {
                     if scope.matches(Scope::Preprocessor, state.run_second_cpp, false) {
                         command.arg("-".to_string() + flag);
                     }
                 }
-                Arg::Param {
-                    ref scope,
-                    ref flag,
-                    ref value,
-                } => {
+                Arg::Param { scope, flag, value } => {
                     if scope.matches(Scope::Preprocessor, state.run_second_cpp, false) {
                         command.arg("-".to_string() + flag);
                         command.arg(value.clone());
@@ -163,10 +156,7 @@ impl Toolchain for ClangToolchain {
         let mut args = vec!["-x".to_string(), task.language.clone()];
         for arg in task.shared.args.iter() {
             match arg {
-                Arg::Flag {
-                    ref scope,
-                    ref flag,
-                } => {
+                Arg::Flag { scope, flag } => {
                     if scope.matches(
                         Scope::Compiler,
                         state.run_second_cpp,
@@ -175,11 +165,7 @@ impl Toolchain for ClangToolchain {
                         args.push("-".to_string() + flag);
                     }
                 }
-                Arg::Param {
-                    ref scope,
-                    ref flag,
-                    ref value,
-                } => {
+                Arg::Param { scope, flag, value } => {
                     if scope.matches(
                         Scope::Compiler,
                         state.run_second_cpp,

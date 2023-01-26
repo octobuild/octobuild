@@ -214,9 +214,9 @@ impl FromIterator<(String, String)> for CommandEnv {
 }
 
 impl CommandInfo {
-    pub fn simple(path: &Path) -> Self {
+    pub fn simple(path: PathBuf) -> Self {
         CommandInfo {
-            program: path.to_path_buf(),
+            program: path,
             current_dir: env::current_dir().ok(),
             env: Arc::new(env::vars().collect()),
         }
@@ -235,7 +235,7 @@ impl CommandInfo {
         for (key, value) in self.env.iter() {
             command.env(key.clone(), value.clone());
         }
-        if let Some(ref v) = self.current_dir {
+        if let Some(v) = &self.current_dir {
             command.current_dir(v);
         }
         command
@@ -533,8 +533,8 @@ pub trait Toolchain: Send + Sync {
             hasher.hash_bytes(arg.as_bytes());
         }
         // Hash input files
-        match step.input_precompiled {
-            Some(ref path) => {
+        match &step.input_precompiled {
+            Some(path) => {
                 hasher.hash_bytes(state.cache.file_hash(path)?.hash.as_bytes());
             }
             None => {
@@ -546,10 +546,10 @@ pub trait Toolchain: Send + Sync {
 
         // Output files list
         let mut outputs: Vec<PathBuf> = Vec::new();
-        if let Some(ref path) = step.output_object {
+        if let Some(path) = &step.output_object {
             outputs.push(path.clone());
         }
-        if let Some(ref path) = step.output_precompiled {
+        if let Some(path) = &step.output_precompiled {
             outputs.push(path.clone());
         }
 

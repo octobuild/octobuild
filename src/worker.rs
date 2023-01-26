@@ -121,11 +121,11 @@ impl BuildAction {
     }
 
     pub fn title(&self) -> Cow<str> {
-        match self {
+        match &self {
             BuildAction::Empty => Cow::Borrowed(""),
-            BuildAction::Exec(_, ref args) => Cow::Owned(format!("{args:?}")),
-            BuildAction::Compilation(_, ref task) => {
-                Cow::Borrowed(task.input_source.to_str().unwrap_or(""))
+            BuildAction::Exec(_, args) => Cow::Owned(format!("{args:?}")),
+            BuildAction::Compilation(_, task) => {
+                Cow::Borrowed(task.input_source.to_str().unwrap_or("<stdin>"))
             }
         }
     }

@@ -181,11 +181,15 @@ fn read_cached_file<R: Read>(stream: &mut R, path: &Path) -> Result<(), Error> {
     Ok(())
 }
 
-fn read_cache(statistic: &Statistic, path: &Path, paths: &[PathBuf]) -> Result<OutputInfo, Error> {
+fn read_cache(
+    statistic: &Statistic,
+    path: &PathBuf,
+    paths: &[PathBuf],
+) -> Result<OutputInfo, Error> {
     let mut file = OpenOptions::new()
         .read(true)
         .write(true)
-        .open(Path::new(path))?;
+        .open(PathBuf::from(path))?;
     file.write_all(&[4])?;
     file.rewind()?;
     let mut stream = lz4::Decoder::new(Counter::reader(file))?;

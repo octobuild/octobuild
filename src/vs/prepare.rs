@@ -16,9 +16,9 @@ pub fn create_tasks(command: CommandInfo, args: &[String]) -> Result<Vec<Compila
     let input_sources: Vec<PathBuf> = parsed_args
         .iter()
         .filter_map(|arg| match arg {
-            Arg::Input {
-                ref kind, ref file, ..
-            } if *kind == InputKind::Source => Some(Path::new(file).to_path_buf()),
+            Arg::Input { kind, file, .. } if *kind == InputKind::Source => {
+                Some(PathBuf::from(file))
+            }
             _ => None,
         })
         .collect();
@@ -27,10 +27,10 @@ pub fn create_tasks(command: CommandInfo, args: &[String]) -> Result<Vec<Compila
     }
     // Precompiled header file name.
     let precompiled_file = match find_param(&parsed_args, |arg: &Arg| -> Option<PathBuf> {
-        match *arg {
-            Arg::Input {
-                ref kind, ref file, ..
-            } if *kind == InputKind::Precompiled => Some(Path::new(file).to_path_buf()),
+        match arg {
+            Arg::Input { kind, file, .. } if *kind == InputKind::Precompiled => {
+                Some(PathBuf::from(file))
+            }
             _ => None,
         }
     }) {
@@ -46,13 +46,13 @@ pub fn create_tasks(command: CommandInfo, args: &[String]) -> Result<Vec<Compila
     let input_precompiled;
     let output_precompiled;
     match find_param(&parsed_args, |arg: &Arg| -> Option<(bool, String)> {
-        match *arg {
-            Arg::Input {
-                ref kind, ref file, ..
-            } if *kind == InputKind::Marker => Some((true, file.clone())),
-            Arg::Output {
-                ref kind, ref file, ..
-            } if *kind == OutputKind::Marker => Some((false, file.clone())),
+        match arg {
+            Arg::Input { kind, file, .. } if *kind == InputKind::Marker => {
+                Some((true, file.clone()))
+            }
+            Arg::Output { kind, file, .. } if *kind == OutputKind::Marker => {
+                Some((false, file.clone()))
+            }
             _ => None,
         }
     }) {
@@ -64,7 +64,7 @@ pub fn create_tasks(command: CommandInfo, args: &[String]) -> Result<Vec<Compila
         ParamValue::Single((input, path)) => {
             let precompiled_path = match precompiled_file {
                 Some(v) => v,
-                None => Path::new(&path).with_extension(".pch"),
+                None => PathBuf::from(&path).with_extension(".pch"),
             };
             marker_precompiled = if path.is_empty() { None } else { Some(path) };
             if input {
@@ -85,10 +85,10 @@ pub fn create_tasks(command: CommandInfo, args: &[String]) -> Result<Vec<Compila
     // Output object file name.
     let output_object: Option<PathBuf> =
         match find_param(&parsed_args, |arg: &Arg| -> Option<PathBuf> {
-            match *arg {
-                Arg::Output {
-                    ref kind, ref file, ..
-                } if *kind == OutputKind::Object => Some(Path::new(file).to_path_buf()),
+            match arg {
+                Arg::Output { kind, file, .. } if *kind == OutputKind::Object => {
+                    Some(PathBuf::from(file))
+                }
                 _ => None,
             }
         }) {
@@ -102,11 +102,7 @@ pub fn create_tasks(command: CommandInfo, args: &[String]) -> Result<Vec<Compila
     // Language
     let language: Option<String> = match find_param(&parsed_args, |arg: &Arg| -> Option<String> {
         match arg {
-            Arg::Param {
-                ref flag,
-                ref value,
-                ..
-            } if *flag == "T" => Some(value.clone()),
+            Arg::Param { flag, value, .. } if *flag == "T" => Some(value.clone()),
             _ => None,
         }
     }) {

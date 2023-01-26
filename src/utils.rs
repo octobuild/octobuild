@@ -1,7 +1,7 @@
 use local_encoding_ng::{Encoder, Encoding};
 use std::io;
 use std::io::{Error, ErrorKind, Read};
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::time::Instant;
 use std::{env, fs};
 
@@ -28,9 +28,9 @@ pub fn expand_response_files(
             continue;
         }
 
-        let path = match base {
-            Some(ref p) => p.join(&item[1..]),
-            None => Path::new(&item[1..]).to_path_buf(),
+        let path = match &base {
+            Some(p) => p.join(&item[1..]),
+            None => PathBuf::from(&item[1..]),
         };
         let data = fs::read(path)?;
         let text = decode_string(&data)?;

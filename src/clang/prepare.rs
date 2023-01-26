@@ -1,4 +1,4 @@
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::slice::Iter;
 use std::sync::Arc;
 
@@ -26,9 +26,9 @@ pub fn create_tasks(command: CommandInfo, args: &[String]) -> Result<Vec<Compila
     let input_sources: Vec<PathBuf> = parsed_args
         .iter()
         .filter_map(|arg| match arg {
-            Arg::Input {
-                ref kind, ref file, ..
-            } if *kind == InputKind::Source => Some(Path::new(file).to_path_buf()),
+            Arg::Input { kind, file, .. } if *kind == InputKind::Source => {
+                Some(PathBuf::from(file))
+            }
             _ => None,
         })
         .collect();
@@ -38,9 +38,9 @@ pub fn create_tasks(command: CommandInfo, args: &[String]) -> Result<Vec<Compila
     // Precompiled header file name.
     let input_precompiled = match find_param(&parsed_args, |arg: &Arg| -> Option<PathBuf> {
         match arg {
-            Arg::Input {
-                ref kind, ref file, ..
-            } if *kind == InputKind::Precompiled => Some(Path::new(file).to_path_buf()),
+            Arg::Input { kind, file, .. } if *kind == InputKind::Precompiled => {
+                Some(PathBuf::from(file))
+            }
             _ => None,
         }
     }) {
@@ -54,20 +54,16 @@ pub fn create_tasks(command: CommandInfo, args: &[String]) -> Result<Vec<Compila
     let marker_precompiled = parsed_args
         .iter()
         .filter_map(|arg| match arg {
-            Arg::Param {
-                ref flag,
-                ref value,
-                ..
-            } if *flag == "include" => Some(value.clone()),
+            Arg::Param { flag, value, .. } if *flag == "include" => Some(value.clone()),
             _ => None,
         })
         .next();
     // Output object file name.
     let output_object = match find_param(&parsed_args, |arg: &Arg| -> Option<PathBuf> {
         match arg {
-            Arg::Output {
-                ref kind, ref file, ..
-            } if *kind == OutputKind::Object => Some(Path::new(file).to_path_buf()),
+            Arg::Output { kind, file, .. } if *kind == OutputKind::Object => {
+                Some(PathBuf::from(file))
+            }
             _ => None,
         }
     }) {
@@ -86,11 +82,7 @@ pub fn create_tasks(command: CommandInfo, args: &[String]) -> Result<Vec<Compila
     let deps_file = parsed_args
         .iter()
         .filter_map(|arg| match arg {
-            Arg::Param {
-                ref flag,
-                ref value,
-                ..
-            } if *flag == "MF" => Some(Path::new(value).to_path_buf()),
+            Arg::Param { flag, value, .. } if *flag == "MF" => Some(PathBuf::from(value)),
             _ => None,
         })
         .next();
@@ -98,11 +90,7 @@ pub fn create_tasks(command: CommandInfo, args: &[String]) -> Result<Vec<Compila
     // Language
     let language: Option<String> = match find_param(&parsed_args, |arg: &Arg| -> Option<String> {
         match arg {
-            Arg::Param {
-                ref flag,
-                ref value,
-                ..
-            } if *flag == "x" => Some(value.clone()),
+            Arg::Param { flag, value, .. } if *flag == "x" => Some(value.clone()),
             _ => None,
         }
     }) {

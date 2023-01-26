@@ -101,7 +101,7 @@ impl Compiler for VsCompiler {
                     .filter_map(|name: String| -> Option<String> { key.get_value(name).ok() })
                     .collect()
             })
-            .map(|path| Path::new(&path).to_path_buf())
+            .map(|path| PathBuf::from(&path))
             .map(|path| -> Vec<PathBuf> { CL_BIN.iter().map(|bin| path.join(bin)).collect() })
             .flat_map(|paths| paths.into_iter())
             .filter(|cl| cl.exists())
@@ -140,19 +140,12 @@ impl Toolchain for VsToolchain {
 
         for arg in task.shared.args.iter() {
             match arg {
-                Arg::Flag {
-                    ref scope,
-                    ref flag,
-                } => {
+                Arg::Flag { scope, flag } => {
                     if scope.matches(Scope::Preprocessor, state.run_second_cpp, false) {
                         command.arg("/".to_string() + flag);
                     }
                 }
-                Arg::Param {
-                    ref scope,
-                    ref flag,
-                    ref value,
-                } => {
+                Arg::Param { scope, flag, value } => {
                     if scope.matches(Scope::Preprocessor, state.run_second_cpp, false) {
                         command.arg("/".to_string() + flag + value);
                     }
@@ -200,10 +193,7 @@ impl Toolchain for VsToolchain {
             .iter()
             .filter_map(|arg: &Arg| -> Option<String> {
                 match arg {
-                    Arg::Flag {
-                        ref scope,
-                        ref flag,
-                    } => {
+                    Arg::Flag { scope, flag } => {
                         if scope.matches(
                             Scope::Compiler,
                             state.run_second_cpp,
@@ -214,11 +204,7 @@ impl Toolchain for VsToolchain {
                             None
                         }
                     }
-                    Arg::Param {
-                        ref scope,
-                        ref flag,
-                        ref value,
-                    } => {
+                    Arg::Param { scope, flag, value } => {
                         if scope.matches(
                             Scope::Compiler,
                             state.run_second_cpp,
