@@ -73,7 +73,6 @@ sudo apt-get install octobuild
 
 . Download https://github.com/octobuild/octobuild/releases/latest[deb package]
 . Install it via `dpkg -i <octobuild>.deb`
-. Apply <<linux-notes,Linux patches>>
 
 [[Usage]]
 == Usage
