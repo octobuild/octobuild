@@ -28,11 +28,8 @@ impl BuildTask {
                 stdout: Vec::new(),
             }),
             BuildAction::Exec(ref command_info, ref args) => state.wrap_slow(|| {
-                command_info
-                    .to_command()
-                    .args(args)
-                    .output()
-                    .map(OutputInfo::new)
+                let output = command_info.to_command().args(args).output()?;
+                Ok(OutputInfo::new(output))
             }),
             BuildAction::Compilation(ref toolchain, ref task) => {
                 toolchain.compile_task(state, task)
@@ -235,19 +232,6 @@ where
     let graph = validate_graph(build_graph)?;
     if graph.node_count() == 0 {
         return Ok(Some(0));
-    }
-
-    if graph.node_count() == 1 {
-        let task = &graph.raw_nodes()[0].weight;
-        let result = task.execute(state);
-        update_progress(BuildResult {
-            worker: 0,
-            completed: 1,
-            total: 1,
-            result: &result,
-            task,
-        })?;
-        return result.output.map(|o| o.status);
     }
 
     let (tx_result, rx_result) = crossbeam::channel::unbounded::<ResultMessage>();
