@@ -64,7 +64,7 @@ fn copy_redist_msm(dest_dir: &Path) {
         }
     }
 
-    panic!("Failed to find '*{}' {:?}", msm_suffix, msm_dir);
+    panic!("Failed to find '*{msm_suffix}' {msm_dir:?}");
 }
 
 fn main() {

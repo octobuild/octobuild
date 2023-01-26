@@ -160,9 +160,9 @@ impl<'a, R: 'a + Read> Read for ReadWrapper<'a, R> {
 }
 
 impl<D> Middleware<D> for RpcBuilderTaskHandler {
-    fn invoke<'a, 'server>(
+    fn invoke<'a>(
         &'a self,
-        req: &mut Request<'a, 'server, D>,
+        req: &mut Request<'a, '_, D>,
         mut res: Response<'a, D>,
     ) -> MiddlewareResult<'a, D> {
         let state = self.0.as_ref();
@@ -175,7 +175,7 @@ impl<D> Middleware<D> for RpcBuilderTaskHandler {
                     if !is_valid_sha256(hash) {
                         return Err(NickelError::new(
                             res,
-                            format!("Invalid hash value: {}", hash),
+                            format!("Invalid hash value: {hash}"),
                             StatusCode::BadRequest,
                         ));
                     }
@@ -185,7 +185,7 @@ impl<D> Middleware<D> for RpcBuilderTaskHandler {
                     if !path.exists() {
                         return Err(NickelError::new(
                             res,
-                            format!("Precompiled file not found: {}", hash),
+                            format!("Precompiled file not found: {hash}"),
                             StatusCode::FailedDependency,
                         ));
                     }
@@ -215,9 +215,9 @@ impl<D> Middleware<D> for RpcBuilderTaskHandler {
 }
 
 impl<D> Middleware<D> for RpcBuilderUploadHandler {
-    fn invoke<'a, 'server>(
+    fn invoke<'a>(
         &'a self,
-        request: &mut Request<'a, 'server, D>,
+        request: &mut Request<'a, '_, D>,
         mut response: Response<'a, D>,
     ) -> MiddlewareResult<'a, D> {
         let state = self.0.as_ref();
@@ -235,7 +235,7 @@ impl<D> Middleware<D> for RpcBuilderUploadHandler {
         if !is_valid_sha256(&hash) {
             return Err(NickelError::new(
                 response,
-                format!("Invalid hash value: {}", hash),
+                format!("Invalid hash value: {hash}"),
                 StatusCode::BadRequest,
             ));
         }
@@ -276,7 +276,7 @@ impl<D> Middleware<D> for RpcBuilderUploadHandler {
             Err(e) => {
                 return Err(NickelError::new(
                     response,
-                    format!("Can't create file: {}", e),
+                    format!("Can't create file: {e}"),
                     StatusCode::InternalServerError,
                 ));
             }
@@ -289,7 +289,7 @@ impl<D> Middleware<D> for RpcBuilderUploadHandler {
                 Err(e) => {
                     return Err(NickelError::new(
                         response,
-                        format!("Can't parse request body: {}", e),
+                        format!("Can't parse request body: {e}"),
                         StatusCode::InternalServerError,
                     ));
                 }
@@ -303,7 +303,7 @@ impl<D> Middleware<D> for RpcBuilderUploadHandler {
                 Err(e) => {
                     return Err(NickelError::new(
                         response,
-                        format!("Can't write file: {}", e),
+                        format!("Can't write file: {e}"),
                         StatusCode::InternalServerError,
                     ));
                 }
@@ -313,7 +313,7 @@ impl<D> Middleware<D> for RpcBuilderUploadHandler {
         if hex::encode(hasher.finalize()) != hash {
             return Err(NickelError::new(
                 response,
-                format!("Content hash mismatch: {}, {}", hash, total_size),
+                format!("Content hash mismatch: {hash}, {total_size}"),
                 StatusCode::BadRequest,
             ));
         }
@@ -325,7 +325,7 @@ impl<D> Middleware<D> for RpcBuilderUploadHandler {
                 if !path.exists() {
                     return Err(NickelError::new(
                         response,
-                        format!("Can't rename file: {}", e),
+                        format!("Can't rename file: {e}"),
                         StatusCode::InternalServerError,
                     ));
                 }

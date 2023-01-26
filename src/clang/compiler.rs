@@ -245,7 +245,7 @@ fn clang_parse_version(base_name: &str, stdout: &str) -> Option<String> {
     let version = cap.get(1)?.as_str();
     let target = cap.get(2)?.as_str();
 
-    Some(format!("{} {} {}", base_name, version, target))
+    Some(format!("{base_name} {version} {target}"))
 }
 
 fn clang_identifier(clang: &Path) -> Option<String> {

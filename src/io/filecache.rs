@@ -112,7 +112,7 @@ fn write_cached_file<W: Write>(stream: &mut W, path: &Path) -> Result<(), Error>
     let mut buf: [u8; DEFAULT_BUF_SIZE] = [0; DEFAULT_BUF_SIZE];
     let mut file = File::open(path)?;
     let total_size = file.seek(SeekFrom::End(0))?;
-    file.seek(SeekFrom::Start(0))?;
+    file.rewind()?;
     write_u64(stream, total_size)?;
     let mut need_size = total_size;
     loop {
@@ -187,7 +187,7 @@ fn read_cache(statistic: &Statistic, path: &Path, paths: &[PathBuf]) -> Result<O
         .write(true)
         .open(Path::new(path))?;
     file.write_all(&[4])?;
-    file.seek(SeekFrom::Start(0))?;
+    file.rewind()?;
     let mut stream = lz4::Decoder::new(Counter::reader(file))?;
     if read_exact(&mut stream, HEADER.len())? != HEADER {
         return Err(Error::new(

@@ -47,7 +47,7 @@ pub fn create_tasks(command: CommandInfo, args: &[String]) -> Result<Vec<Compila
         ParamValue::None => None,
         ParamValue::Single(v) => Some(v),
         ParamValue::Many(v) => {
-            return Err(format!("Found too many precompiled header files: {:?}", v));
+            return Err(format!("Found too many precompiled header files: {v:?}"));
         }
     };
     // Precompiled header file name.
@@ -79,7 +79,7 @@ pub fn create_tasks(command: CommandInfo, args: &[String]) -> Result<Vec<Compila
             Some(v)
         }
         ParamValue::Many(v) => {
-            return Err(format!("Found too many output object files: {:?}", v));
+            return Err(format!("Found too many output object files: {v:?}"));
         }
     };
 
@@ -115,12 +115,12 @@ pub fn create_tasks(command: CommandInfo, args: &[String]) -> Result<Vec<Compila
                     return Ok(Vec::new());
                 }
                 _ => {
-                    return Err(format!("Unknown source language type: {}", v));
+                    return Err(format!("Unknown source language type: {v}"));
                 }
             }
         }
         ParamValue::Many(v) => {
-            return Err(format!("Found too many output object files: {:?}", v));
+            return Err(format!("Found too many output object files: {v:?}"));
         }
     };
     let shared = Arc::new(CompilationArgs {
@@ -183,10 +183,7 @@ fn parse_arguments(args: &[String]) -> Result<Vec<Arg>, String> {
         }
     }
     if !errors.is_empty() {
-        return Err(format!(
-            "Found unknown command line arguments: {:?}",
-            errors
-        ));
+        return Err(format!("Found unknown command line arguments: {errors:?}"));
     }
     Ok(result)
 }

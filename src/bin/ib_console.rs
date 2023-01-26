@@ -29,7 +29,7 @@ pub fn main() -> Result<(), Box<dyn Error>> {
     println!("xgConsole ({}):", version::full_version());
     let args: Vec<String> = env::args().collect();
     for arg in args.iter() {
-        println!("  {}", arg);
+        println!("  {arg}");
     }
     if args.len() == 1 {
         println!();
@@ -40,7 +40,7 @@ pub fn main() -> Result<(), Box<dyn Error>> {
     process::exit(match execute(&args[1..]) {
         Ok(result) => result.unwrap_or(501),
         Err(e) => {
-            println!("FATAL ERROR: {}", e);
+            println!("FATAL ERROR: {e}");
             500
         }
     })
@@ -72,7 +72,7 @@ fn expand_files(mut files: Vec<PathBuf>, arg: &str) -> Vec<PathBuf> {
             result.push_str(match separator {
                 "?" => ".",
                 "*" => ".*",
-                unknown => panic!("Unexpected separator: {}", unknown),
+                unknown => panic!("Unexpected separator: {unknown}"),
             });
             begin = index + separator.len()
         }

@@ -41,9 +41,9 @@ struct RpcAgentUpdateHandler(Arc<CoordinatorState>);
 struct RpcAgentListHandler(Arc<CoordinatorState>);
 
 impl<D> Middleware<D> for RpcAgentUpdateHandler {
-    fn invoke<'a, 'server>(
+    fn invoke<'a>(
         &'a self,
-        request: &mut Request<'a, 'server, D>,
+        request: &mut Request<'a, '_, D>,
         mut response: Response<'a, D>,
     ) -> MiddlewareResult<'a, D> {
         let mut update: BuilderInfoUpdate = bincode::deserialize_from(&mut request.origin).unwrap();
@@ -53,7 +53,7 @@ impl<D> Middleware<D> for RpcAgentUpdateHandler {
             Err(e) => {
                 return Err(NickelError::new(
                     response,
-                    format!("Can't parse endpoint address: {}", e),
+                    format!("Can't parse endpoint address: {e}"),
                     StatusCode::BadRequest,
                 ));
             }
@@ -84,9 +84,9 @@ impl<D> Middleware<D> for RpcAgentUpdateHandler {
 }
 
 impl<D> Middleware<D> for RpcAgentListHandler {
-    fn invoke<'a, 'server>(
+    fn invoke<'a>(
         &'a self,
-        _: &mut Request<'a, 'server, D>,
+        _: &mut Request<'a, '_, D>,
         mut response: Response<'a, D>,
     ) -> MiddlewareResult<'a, D> {
         let holder = self.0.builders.read().unwrap();

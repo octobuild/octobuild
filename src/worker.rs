@@ -111,7 +111,7 @@ impl BuildAction {
                     .collect()
             })
             .unwrap_or_else(|e| {
-                println!("Can't use octobuild for task {}: {}", title, e);
+                println!("Can't use octobuild for task {title}: {e}");
                 Vec::new()
             });
         if actions.is_empty() {
@@ -123,7 +123,7 @@ impl BuildAction {
     pub fn title(&self) -> Cow<str> {
         match self {
             BuildAction::Empty => Cow::Borrowed(""),
-            BuildAction::Exec(_, ref args) => Cow::Owned(format!("{:?}", args)),
+            BuildAction::Exec(_, ref args) => Cow::Owned(format!("{args:?}")),
             BuildAction::Compilation(_, ref task) => {
                 Cow::Borrowed(task.input_source.to_str().unwrap_or(""))
             }

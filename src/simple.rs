@@ -54,7 +54,7 @@ where
     match compile(&config, &state, exec, compiler) {
         Ok(status) => status.unwrap_or(503),
         Err(e) => {
-            println!("FATAL ERROR: {}", e);
+            println!("FATAL ERROR: {e}");
             500
         }
     }

@@ -205,7 +205,7 @@ impl RemoteToolchain {
                     StatusCode::OK | StatusCode::ACCEPTED => Ok(Some(meta.hash)),
                     status => Err(Error::new(
                         ErrorKind::BrokenPipe,
-                        format!("Can't upload precompiled header: {}", status),
+                        format!("Can't upload precompiled header: {status}"),
                     )),
                 }
             }

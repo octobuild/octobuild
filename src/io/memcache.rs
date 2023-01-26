@@ -38,7 +38,7 @@ where
                 Entry::Occupied(entry) => entry.get().clone(),
                 Entry::Vacant(entry) => entry.insert(Arc::new(Mutex::new(None))).clone(),
             },
-            Err(e) => panic!("Mutex error: {}", e),
+            Err(e) => panic!("Mutex error: {e}"),
         };
 
         let lock = entry_lock.lock();
@@ -48,7 +48,7 @@ where
                 *entry = Some(value.clone());
                 value
             }
-            Err(e) => panic!("Mutex error: {}", e),
+            Err(e) => panic!("Mutex error: {e}"),
         }
     }
 }

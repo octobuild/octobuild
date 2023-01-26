@@ -9,7 +9,7 @@ use crate::utils::{expand_response_files, find_param, ParamValue};
 
 pub fn create_tasks(command: CommandInfo, args: &[String]) -> Result<Vec<CompilationTask>, String> {
     let expanded_args = expand_response_files(&command.current_dir, args)
-        .map_err(|e: Error| format!("IO error: {}", e))?;
+        .map_err(|e: Error| format!("IO error: {e}"))?;
 
     let parsed_args = parse_arguments(expanded_args.iter())?;
     // Source file name.
@@ -37,7 +37,7 @@ pub fn create_tasks(command: CommandInfo, args: &[String]) -> Result<Vec<Compila
         ParamValue::None => None,
         ParamValue::Single(v) => Some(v),
         ParamValue::Many(v) => {
-            return Err(format!("Found too many precompiled header files: {:?}", v));
+            return Err(format!("Found too many precompiled header files: {v:?}"));
         }
     };
     let cwd = command.current_dir.clone();
@@ -95,7 +95,7 @@ pub fn create_tasks(command: CommandInfo, args: &[String]) -> Result<Vec<Compila
             ParamValue::None => None,
             ParamValue::Single(v) => Some(v),
             ParamValue::Many(v) => {
-                return Err(format!("Found too many output object files: {:?}", v));
+                return Err(format!("Found too many output object files: {v:?}"));
             }
         }
         .map(|path| cwd.as_ref().map(|cwd| cwd.join(&path)).unwrap_or(path));
@@ -113,7 +113,7 @@ pub fn create_tasks(command: CommandInfo, args: &[String]) -> Result<Vec<Compila
         ParamValue::None => None,
         ParamValue::Single(v) => Some(v),
         ParamValue::Many(v) => {
-            return Err(format!("Found too many output object files: {:?}", v));
+            return Err(format!("Found too many output object files: {v:?}"));
         }
     };
     let shared = Arc::new(CompilationArgs {
@@ -197,10 +197,7 @@ fn parse_arguments<S: AsRef<str>, I: Iterator<Item = S>>(mut iter: I) -> Result<
         }
     }
     if !errors.is_empty() {
-        return Err(format!(
-            "Found unknown command line arguments: {:?}",
-            errors
-        ));
+        return Err(format!("Found unknown command line arguments: {errors:?}"));
     }
     Ok(result)
 }

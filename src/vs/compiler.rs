@@ -482,7 +482,7 @@ fn read_executable_id(path: &Path) -> Result<String, Error> {
     let pe_time_date_stamp = Cursor::new(&header[0x08..0x0C]).read_u32::<LittleEndian>()?;
     let pe_size_of_image = Cursor::new(&header[0x50..0x54]).read_u32::<LittleEndian>()?;
     // Read PE header information
-    Ok(format!("{:X}{:x}", pe_time_date_stamp, pe_size_of_image))
+    Ok(format!("{pe_time_date_stamp:X}{pe_size_of_image:x}"))
 }
 
 fn prepare_output(line: &[u8], mut buffer: Vec<u8>, success: bool) -> Vec<u8> {

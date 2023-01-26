@@ -315,7 +315,7 @@ impl BuildTaskResult {
                 std::io::stderr().write_all(&output.stderr)?;
             }
             Err(e) => {
-                eprintln!("ERROR: {}", e);
+                eprintln!("ERROR: {e}");
             }
         }
         Ok(())

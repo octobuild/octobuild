@@ -63,7 +63,7 @@ impl Config {
                 c.show();
             }
             Err(e) => {
-                println!("  ERROR: {}", e);
+                println!("  ERROR: {e}");
             }
         }
         println!();
