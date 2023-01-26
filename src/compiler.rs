@@ -299,18 +299,23 @@ pub struct BuildTaskResult {
 
 impl BuildTaskResult {
     pub fn print_output(&self) -> std::io::Result<()> {
-        if let Ok(ref output) = self.output {
-            if !output.success() {
-                println!(
-                    "ERROR: Task failed with exit code: {}",
-                    output
-                        .status
-                        .map(|s| s.to_string())
-                        .unwrap_or_else(|| "unknown".to_string())
-                );
+        match &self.output {
+            Ok(output) => {
+                if !output.success() {
+                    println!(
+                        "ERROR: Task failed with exit code: {}",
+                        output
+                            .status
+                            .map(|s| s.to_string())
+                            .unwrap_or_else(|| "unknown".to_string())
+                    );
+                }
+                std::io::stdout().write_all(&output.stdout)?;
+                std::io::stderr().write_all(&output.stderr)?;
             }
-            std::io::stdout().write_all(&output.stdout)?;
-            std::io::stderr().write_all(&output.stderr)?;
+            Err(e) => {
+                eprintln!("ERROR: {}", e);
+            }
         }
         Ok(())
     }
