@@ -727,7 +727,7 @@ impl ToolchainHolder {
 }
 
 fn fn_find_exec(path: PathBuf) -> Option<PathBuf> {
-    fn_find_exec_native(path).and_then(|path| path.canonicalize().ok())
+    fn_find_exec_native(path)?.canonicalize().ok()
 }
 
 #[cfg(windows)]
