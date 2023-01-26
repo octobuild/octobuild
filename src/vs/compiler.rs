@@ -315,13 +315,17 @@ impl Toolchain for VsToolchain {
             None => {}
         }
         // Execute.
-        let result = state.wrap_slow(|| {
-            command.output().map(|o| OutputInfo {
-                status: o.status.code(),
-                stdout: prepare_output(input_marker, o.stdout.clone(), o.status.code() == Some(0)),
-                stderr: o.stderr,
-            })
-        });
+        let result = state
+            .wrap_slow(|| command.output())
+            .map(|output| OutputInfo {
+                status: output.status.code(),
+                stdout: prepare_output(
+                    input_marker,
+                    output.stdout.clone(),
+                    output.status.success(),
+                ),
+                stderr: output.stderr,
+            });
 
         drop(temp_file);
 
