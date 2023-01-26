@@ -307,8 +307,7 @@ impl BuildTaskResult {
                         "ERROR: Task failed with exit code: {}",
                         output
                             .status
-                            .map(|s| s.to_string())
-                            .unwrap_or_else(|| "unknown".to_string())
+                            .map_or_else(|| "unknown".to_string(), |v| v.to_string())
                     );
                 }
                 std::io::stdout().write_all(&output.stdout)?;

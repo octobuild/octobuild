@@ -2,6 +2,7 @@ use std::collections::{HashMap, HashSet};
 use std::env;
 use std::io::{Error, ErrorKind, Read};
 use std::path::PathBuf;
+use std::rc::Rc;
 use std::sync::Arc;
 
 use thiserror::Error;
@@ -16,7 +17,7 @@ use xml::reader::XmlEvent;
 pub struct XgNode {
     pub title: String,
     pub command: CommandInfo,
-    pub raw_args: String,
+    pub raw_args: Rc<String>,
 }
 
 pub type XgGraph = Graph<XgNode, ()>;
@@ -60,7 +61,7 @@ struct XgTask {
 #[derive(Debug)]
 struct XgTool {
     exec: PathBuf,
-    args: String,
+    args: Rc<String>,
     output: Option<String>,
 }
 
@@ -203,7 +204,7 @@ fn parse_tools<R: Read>(
                         XgTool {
                             exec: PathBuf::from(&exec),
                             output: attrs.remove("OutputPrefix"),
-                            args: attrs.remove("Params").unwrap_or_default(),
+                            args: Rc::new(attrs.remove("Params").unwrap_or_default()),
                         },
                     );
                 }
