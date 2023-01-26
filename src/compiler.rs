@@ -17,6 +17,7 @@ use crate::cache::{Cache, FileHasher};
 use crate::config::Config;
 use crate::io::statistic::Statistic;
 
+use crate::cmd;
 use crate::compiler::CompileInput::{Preprocessed, Source};
 use crate::io::memstream::MemStream;
 use thiserror::Error;
@@ -620,6 +621,33 @@ pub struct ToolchainCompilationTask {
     pub task: CompilationTask,
 }
 
+#[derive(Debug, Clone)]
+pub enum CommandArgs {
+    Raw(String),
+    Array(Vec<String>),
+}
+
+impl CommandArgs {
+    pub fn append_to(&self, command: &mut Command) {
+        match self {
+            CommandArgs::Raw(v) => {
+                #[cfg(windows)]
+                {
+                    use std::os::windows::process::CommandExt;
+                    command.raw_arg(v);
+                }
+                #[cfg(not(windows))]
+                {
+                    command.args(cmd::native::parse(v));
+                }
+            }
+            CommandArgs::Array(v) => {
+                command.args(v);
+            }
+        }
+    }
+}
+
 pub trait Compiler: Send + Sync {
     // Resolve toolchain for command execution.
     fn resolve_toolchain(&self, command: &CommandInfo) -> Option<Arc<dyn Toolchain>>;
@@ -629,7 +657,7 @@ pub trait Compiler: Send + Sync {
     fn create_tasks(
         &self,
         command: CommandInfo,
-        args: &[String],
+        args: CommandArgs,
     ) -> Result<Vec<ToolchainCompilationTask>, Error> {
         let toolchain = self.resolve_toolchain(&command).ok_or_else(|| {
             Error::new(
@@ -638,8 +666,13 @@ pub trait Compiler: Send + Sync {
             )
         })?;
 
+        let argv = match args {
+            CommandArgs::Raw(v) => cmd::native::parse(&v)?,
+            CommandArgs::Array(v) => v,
+        };
+
         let tasks = toolchain
-            .create_tasks(command, args)
+            .create_tasks(command, &argv)
             .map_err(|e| Error::new(ErrorKind::InvalidInput, CompilerError::InvalidArguments(e)))?;
 
         Ok(tasks

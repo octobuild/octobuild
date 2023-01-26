@@ -158,14 +158,15 @@ fn prepare_graph<C: Compiler>(compiler: &C, graph: XgGraph) -> Result<BuildGraph
     let mut result: BuildGraph = Graph::new();
     for raw_node in graph.raw_nodes().iter() {
         let node: &XgNode = &raw_node.weight;
-        let args: Vec<String> = node
-            .args
-            .iter()
-            .map(|arg| expand_arg(arg, &env_resolver))
-            .collect();
+        let raw_args: String = expand_arg(&node.raw_args, &env_resolver);
         let command = node.command.clone();
 
-        let actions = BuildAction::create_tasks(compiler, command.clone(), &args, &node.title);
+        let actions = BuildAction::create_tasks(
+            compiler,
+            command.clone(),
+            CommandArgs::Raw(raw_args),
+            &node.title,
+        );
         let node_index = NodeIndex::new(remap.len());
         if actions.len() == 1 {
             depends.push(node_index);

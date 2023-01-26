@@ -8,7 +8,8 @@ use petgraph::graph::NodeIndex;
 use petgraph::{EdgeDirection, Graph};
 
 use crate::compiler::{
-    BuildTaskResult, CommandInfo, CompilationTask, Compiler, OutputInfo, SharedState, Toolchain,
+    BuildTaskResult, CommandArgs, CommandInfo, CompilationTask, Compiler, OutputInfo, SharedState,
+    Toolchain,
 };
 
 pub type BuildGraph = Graph<Arc<BuildTask>, ()>;
@@ -21,19 +22,19 @@ pub struct BuildTask {
 impl BuildTask {
     fn execute(&self, state: &SharedState) -> BuildTaskResult {
         let start_time = Instant::now();
-        let output = match self.action {
+        let output = match &self.action {
             BuildAction::Empty => Ok(OutputInfo {
                 status: Some(0),
                 stderr: Vec::new(),
                 stdout: Vec::new(),
             }),
-            BuildAction::Exec(ref command_info, ref args) => state.wrap_slow(|| {
-                let output = command_info.to_command().args(args).output()?;
+            BuildAction::Exec(command_info, args) => state.wrap_slow(|| {
+                let mut command = command_info.to_command();
+                args.append_to(&mut command);
+                let output = command.output()?;
                 Ok(OutputInfo::new(output))
             }),
-            BuildAction::Compilation(ref toolchain, ref task) => {
-                toolchain.compile_task(state, task)
-            }
+            BuildAction::Compilation(toolchain, task) => toolchain.compile_task(state, task),
         };
         BuildTaskResult {
             output,
@@ -44,7 +45,7 @@ impl BuildTask {
 
 pub enum BuildAction {
     Empty,
-    Exec(CommandInfo, Vec<String>),
+    Exec(CommandInfo, CommandArgs),
     Compilation(Arc<dyn Toolchain>, CompilationTask),
 }
 
@@ -98,11 +99,11 @@ impl BuildAction {
     pub fn create_tasks<C: Compiler>(
         compiler: &C,
         command: CommandInfo,
-        args: &[String],
+        args: CommandArgs,
         title: &str,
     ) -> Vec<BuildAction> {
         let actions: Vec<BuildAction> = compiler
-            .create_tasks(command.clone(), args)
+            .create_tasks(command.clone(), args.clone())
             .map(|tasks| {
                 tasks
                     .into_iter()
@@ -114,7 +115,7 @@ impl BuildAction {
                 Vec::new()
             });
         if actions.is_empty() {
-            return vec![BuildAction::Exec(command, args.to_vec())];
+            return vec![BuildAction::Exec(command, args)];
         }
         actions
     }

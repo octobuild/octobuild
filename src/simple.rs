@@ -69,10 +69,10 @@ pub fn compile<C>(
 where
     C: Compiler,
 {
-    let args: Vec<String> = env::args().collect();
     let command_info = CommandInfo::simple(Path::new(exec));
     let remote = RemoteCompiler::new(&config.coordinator, compiler);
-    let actions = BuildAction::create_tasks(&remote, command_info, &args[1..], exec);
+    let args: Vec<String> = env::args().skip(1).collect();
+    let actions = BuildAction::create_tasks(&remote, command_info, CommandArgs::Array(args), exec);
 
     let mut build_graph: BuildGraph = Graph::new();
     for action in actions.into_iter() {

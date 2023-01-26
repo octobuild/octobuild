@@ -6,7 +6,6 @@ use std::sync::Arc;
 
 use thiserror::Error;
 
-use crate::cmd;
 use crate::compiler::{CommandEnv, CommandInfo};
 
 use petgraph::graph::{Graph, NodeIndex};
@@ -17,7 +16,7 @@ use xml::reader::XmlEvent;
 pub struct XgNode {
     pub title: String,
     pub command: CommandInfo,
-    pub args: Vec<String>,
+    pub raw_args: String,
 }
 
 pub type XgGraph = Graph<XgNode, ()>;
@@ -324,7 +323,7 @@ fn graph_project(
                 // Environment variables
                 env: env.variables.clone(),
             },
-            args: cmd::native::parse(&tool.args)?,
+            raw_args: tool.args.clone(),
         });
         task_refs.insert(id, node);
         nodes.push(node);
