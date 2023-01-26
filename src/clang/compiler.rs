@@ -1,9 +1,9 @@
 use std::fs::File;
 use std::io::{Error, Write};
 use std::path::{Path, PathBuf};
-use std::process::{Command, Stdio};
+use std::process::{Command, Output, Stdio};
 use std::sync::Arc;
-use std::{env, fs};
+use std::{env, fs, io};
 
 use regex::Regex;
 
@@ -125,8 +125,9 @@ impl Toolchain for ClangToolchain {
             };
         }
 
-        state.wrap_slow(|| {
-            let result = execute(&mut command)?;
+        let output = state.wrap_slow(|| -> io::Result<Output> {
+            let output = command.output()?;
+
             if let Some(ref deps_file) = task.shared.deps_file {
                 let data = fs::read_to_string(deps_file)?;
                 if let Some(end) = data.strip_prefix('-') {
@@ -135,8 +136,21 @@ impl Toolchain for ClangToolchain {
                     f.write_all(end.as_bytes())?;
                 }
             }
-            Ok(result)
-        })
+
+            Ok(output)
+        })?;
+
+        if output.status.success() {
+            Ok(PreprocessResult::Success(CompilerOutput::Vec(
+                output.stdout,
+            )))
+        } else {
+            Ok(PreprocessResult::Failed(OutputInfo {
+                status: output.status.code(),
+                stdout: output.stdout,
+                stderr: output.stderr,
+            }))
+        }
     }
 
     // Compile preprocessed file.
@@ -262,21 +276,6 @@ fn clang_identifier(clang: &Path) -> Option<String> {
     }
 
     clang_parse_version(&base_name, &String::from_utf8_lossy(&output.stdout))
-}
-
-fn execute(command: &mut Command) -> Result<PreprocessResult, Error> {
-    let output = command.output()?;
-    if output.status.success() {
-        Ok(PreprocessResult::Success(CompilerOutput::Vec(
-            output.stdout,
-        )))
-    } else {
-        Ok(PreprocessResult::Failed(OutputInfo {
-            status: output.status.code(),
-            stdout: output.stdout,
-            stderr: output.stderr,
-        }))
-    }
 }
 
 #[cfg(test)]
