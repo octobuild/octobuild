@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::ffi::OsString;
 use std::fs;
 use std::fs::File;
 use std::io;
@@ -24,7 +25,6 @@ use nickel::{
 };
 use sha2::digest::DynDigest;
 use sha2::{Digest, Sha256};
-use tempdir::TempDir;
 
 use octobuild::cluster::builder::{CompileRequest, CompileResponse};
 use octobuild::cluster::common::{
@@ -34,7 +34,6 @@ use octobuild::compiler::CompileInput::Preprocessed;
 use octobuild::compiler::{CompileStep, Compiler, CompilerOutput, SharedState, Toolchain};
 use octobuild::config::Config;
 use octobuild::io::tempfile::TempFile;
-use octobuild::simple::create_temp_dir;
 use octobuild::simple::supported_compilers;
 use octobuild::utils::DEFAULT_BUF_SIZE;
 use octobuild::version;
@@ -68,11 +67,10 @@ impl BuilderService {
         let config = Config::load().unwrap();
         info!("Helper bind to address: {}", config.helper_bind);
 
-        let temp_dir = create_temp_dir().expect("Can't create temporary directory");
         let state = Arc::new(BuilderState {
             name: get_name(),
             shared: SharedState::new(&config).unwrap(),
-            toolchains: BuilderService::discover_toolchains(&temp_dir),
+            toolchains: BuilderService::discover_toolchains(),
             precompiled_dir: config.cache,
             precompiled: Mutex::new(HashMap::new()),
         });
@@ -141,8 +139,9 @@ impl BuilderService {
         })
     }
 
-    fn discover_toolchains(temp_dir: &Arc<TempDir>) -> HashMap<String, Arc<dyn Toolchain>> {
-        let compiler = supported_compilers(temp_dir);
+    #[must_use]
+    fn discover_toolchains() -> HashMap<String, Arc<dyn Toolchain>> {
+        let compiler = supported_compilers();
         compiler
             .discover_toolchains()
             .into_iter()
@@ -193,19 +192,19 @@ impl<D> Middleware<D> for RpcBuilderTaskHandler {
                 }
                 None => None,
             };
-            let compile_step: CompileStep = CompileStep {
+            let compile_step = CompileStep {
                 output_object: None,
-                output_precompiled: None,
-                input_precompiled: precompiled,
-                args: request.args,
+                pch_out: None,
+                pch_in: precompiled,
+                args: request.args.iter().map(OsString::from).collect(),
                 input: Preprocessed(CompilerOutput::Vec(request.preprocessed_data)),
-                marker_precompiled: None,
+                pch_marker: None,
             };
 
             let toolchain: Arc<dyn Toolchain> =
                 state.toolchains.get(&request.toolchain).unwrap().clone();
             let response =
-                CompileResponse::from(toolchain.compile_memory(&state.shared, compile_step));
+                CompileResponse::from(toolchain.run_compile(&state.shared, compile_step));
             let payload = bincode::serialize(&response).unwrap();
             res.set(StatusCode::Ok);
             res.set(MediaType::Bin);

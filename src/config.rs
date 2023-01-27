@@ -13,6 +13,7 @@ pub struct Config {
     pub helper_bind: SocketAddr,
     pub process_limit: usize,
     pub run_second_cpp: bool,
+    pub use_response_files: bool,
 }
 
 #[must_use]
@@ -34,6 +35,7 @@ impl Default for Config {
             helper_bind: SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::new(0, 0, 0, 0), 0)),
             process_limit: num_cpus::get(),
             run_second_cpp: true,
+            use_response_files: true,
         }
     }
 }

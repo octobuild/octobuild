@@ -4,45 +4,39 @@ use crate::compiler::{
     PreprocessResult, Scope, SharedState, Toolchain, ToolchainHolder,
 };
 use crate::io::memstream::MemStream;
-use crate::io::tempfile::TempFile;
 use crate::lazy::Lazy;
+use crate::utils::OsStrExt;
 use crate::vs::postprocess;
 use lazy_static::lazy_static;
 use regex::bytes::{NoExpand, Regex};
-use std::ffi::OsStr;
+use std::ffi::{OsStr, OsString};
 use std::fs::File;
 use std::io::{Cursor, Error};
 use std::path::{Path, PathBuf};
-use std::process::Command;
+use std::process::{Command, Output};
 use std::sync::Arc;
 use std::{env, fs};
-use tempdir::TempDir;
 
+#[derive(Default)]
 pub struct VsCompiler {
-    temp_dir: Arc<TempDir>,
     toolchains: ToolchainHolder,
 }
 
 impl VsCompiler {
     #[must_use]
-    pub fn new(temp_dir: &Arc<TempDir>) -> Self {
-        VsCompiler {
-            temp_dir: temp_dir.clone(),
-            toolchains: ToolchainHolder::new(),
-        }
+    pub fn new() -> Self {
+        VsCompiler::default()
     }
 }
 
 struct VsToolchain {
-    temp_dir: Arc<TempDir>,
     path: PathBuf,
     identifier: Lazy<Option<String>>,
 }
 
 impl VsToolchain {
-    pub fn new(path: PathBuf, temp_dir: &Arc<TempDir>) -> Self {
+    pub fn new(path: PathBuf) -> Self {
         VsToolchain {
-            temp_dir: temp_dir.clone(),
             path,
             identifier: Lazy::default(),
         }
@@ -56,9 +50,8 @@ impl Compiler for VsCompiler {
             return None;
         }
         let executable = command.find_executable()?;
-        self.toolchains.resolve(&executable, |path| {
-            Arc::new(VsToolchain::new(path, &self.temp_dir))
-        })
+        self.toolchains
+            .resolve(&executable, |path| Arc::new(VsToolchain::new(path)))
     }
 
     #[cfg(unix)]
@@ -107,9 +100,33 @@ impl Compiler for VsCompiler {
             .map(|path| -> Vec<PathBuf> { CL_BIN.iter().map(|bin| path.join(bin)).collect() })
             .flat_map(|paths| paths.into_iter())
             .filter(|cl| cl.exists())
-            .map(|cl| -> Arc<dyn Toolchain> { Arc::new(VsToolchain::new(cl, &self.temp_dir)) })
+            .map(|cl| -> Arc<dyn Toolchain> { Arc::new(VsToolchain::new(cl)) })
             .filter(|toolchain| toolchain.identifier().is_some())
             .collect()
+    }
+}
+
+fn collect_args(
+    args: &[Arg],
+    target_scope: Scope,
+    run_second_cpp: bool,
+    output_precompiled: bool,
+    into: &mut Vec<OsString>,
+) {
+    for arg in args {
+        match arg {
+            Arg::Flag { scope, flag } => {
+                if scope.matches(target_scope, run_second_cpp, output_precompiled) {
+                    into.push(OsString::from("/".to_string() + flag));
+                }
+            }
+            Arg::Param { scope, flag, value } => {
+                if scope.matches(target_scope, run_second_cpp, output_precompiled) {
+                    into.push(OsString::from("/".to_string() + flag + value));
+                }
+            }
+            Arg::Input { .. } | Arg::Output { .. } => {}
+        };
     }
 }
 
@@ -126,45 +143,43 @@ impl Toolchain for VsToolchain {
         super::prepare::create_tasks(command, args)
     }
 
-    fn preprocess_step(
+    fn run_preprocess(
         &self,
         state: &SharedState,
         task: &CompilationTask,
     ) -> Result<PreprocessResult, Error> {
-        let mut command = task.shared.command.to_command();
-        command
-            .arg("/nologo")
-            .arg("/T".to_string() + &task.language)
-            .arg("/E")
-            .arg("/we4002") // C4002: too many actual parameters for macro 'identifier'
-            .arg(join_flag("/Fo", &task.output_object)) // /Fo option also set output path for #import directive
-            .arg(&task.input_source);
+        let mut args = vec![
+            OsString::from("/nologo"),
+            OsString::from("/T".to_string() + &task.language),
+            OsString::from("/E"),
+            OsString::from("/we4002"), // C4002: too many actual parameters for macro 'identifier'
+            OsString::from("/Fo").concat(task.output_object.as_os_str()), // /Fo option also set output path for #import directive
+            OsString::from(&task.input_source),
+        ];
+        collect_args(
+            &task.shared.args,
+            Scope::Preprocessor,
+            state.run_second_cpp,
+            false,
+            &mut args,
+        );
 
-        for arg in &task.shared.args {
-            match arg {
-                Arg::Flag { scope, flag } => {
-                    if scope.matches(Scope::Preprocessor, state.run_second_cpp, false) {
-                        command.arg("/".to_string() + flag);
-                    }
-                }
-                Arg::Param { scope, flag, value } => {
-                    if scope.matches(Scope::Preprocessor, state.run_second_cpp, false) {
-                        command.arg("/".to_string() + flag + value);
-                    }
-                }
-                Arg::Input { .. } | Arg::Output { .. } => {}
-            };
-        }
+        let output = state.wrap_slow(|| -> std::io::Result<Output> {
+            let mut command = task.shared.command.to_command();
+            let response_file = state.do_response_file(args, &mut command)?;
+            let output = command.output()?;
+            drop(response_file);
+            Ok(output)
+        })?;
 
-        let output = state.wrap_slow(|| command.output())?;
         if output.status.success() {
             let mut content = MemStream::new();
-            if task.shared.input_precompiled.is_some() || task.shared.output_precompiled.is_some() {
+            if task.shared.pch_in.is_some() || task.shared.pch_out.is_some() {
                 postprocess::filter_preprocessed(
                     &mut Cursor::new(output.stdout),
                     &mut content,
-                    &task.shared.marker_precompiled,
-                    task.shared.output_precompiled.is_some(),
+                    &task.shared.pch_marker,
+                    task.shared.pch_out.is_some(),
                 )?;
                 Ok(PreprocessResult::Success(CompilerOutput::MemSteam(content)))
             } else {
@@ -182,154 +197,123 @@ impl Toolchain for VsToolchain {
     }
 
     // Compile preprocessed file.
-    fn compile_prepare_step(
+    fn create_compile_step(
         &self,
         state: &SharedState,
         task: &CompilationTask,
         preprocessed: CompilerOutput,
-    ) -> Result<CompileStep, Error> {
-        let mut args: Vec<String> = task
-            .shared
-            .args
-            .iter()
-            .filter_map(|arg: &Arg| -> Option<String> {
-                match arg {
-                    Arg::Flag { scope, flag } => {
-                        if scope.matches(
-                            Scope::Compiler,
-                            state.run_second_cpp,
-                            task.shared.output_precompiled.is_some(),
-                        ) {
-                            Some("/".to_string() + flag)
-                        } else {
-                            None
-                        }
-                    }
-                    Arg::Param { scope, flag, value } => {
-                        if scope.matches(
-                            Scope::Compiler,
-                            state.run_second_cpp,
-                            task.shared.output_precompiled.is_some(),
-                        ) {
-                            Some("/".to_string() + flag + value)
-                        } else {
-                            None
-                        }
-                    }
-                    Arg::Input { .. } | Arg::Output { .. } => None,
-                }
-            })
-            .collect();
-        args.push("/nologo".to_string());
-        args.push("/T".to_string() + &task.language);
-        if task.shared.output_precompiled.is_some() {
-            args.push("/Yc".to_string());
+    ) -> CompileStep {
+        let mut args = vec![
+            OsString::from("/nologo"),
+            OsString::from("/T".to_string() + &task.language),
+        ];
+        if task.shared.pch_out.is_some() {
+            args.push(OsString::from("/Yc"));
         }
-        Ok(CompileStep::new(
-            task,
-            preprocessed,
-            args,
-            true,
+        collect_args(
+            &task.shared.args,
+            Scope::Compiler,
             state.run_second_cpp,
-        ))
+            task.shared.pch_out.is_some(),
+            &mut args,
+        );
+        CompileStep::new(task, preprocessed, args, true, state.run_second_cpp)
     }
 
-    fn compile_step(&self, state: &SharedState, task: CompileStep) -> Result<OutputInfo, Error> {
-        // Output file path
-        let output_object = task
-            .output_object
-            .expect("Visual Studio don't support compilation to stdout.");
-        // Run compiler.
-        let mut command = Command::new(&self.path);
-        command
-            .env_clear()
-            .current_dir(self.temp_dir.path())
-            .arg("/c")
-            .args(&task.args)
-            .arg(&join_flag("/Fo", &output_object));
+    fn run_compile(&self, state: &SharedState, task: CompileStep) -> Result<OutputInfo, Error> {
+        let (output_path, temp_output) = match task.output_object {
+            Some(v) => (v, None),
+            None => {
+                let output_temp = tempfile::Builder::new()
+                    .suffix(".o")
+                    .tempfile_in(state.temp_dir.path())?;
+                (output_temp.path().to_path_buf(), Some(output_temp))
+            }
+        };
 
-        let (input_file, temp_file) = match &task.input {
+        let mut args = task.args.clone();
+        args.push(OsString::from("/c"));
+        args.push(OsString::from("/Fo").concat(output_path.as_os_str()));
+
+        // Output files.
+        if let Some(path) = task.pch_out {
+            assert!(path.is_absolute());
+            args.push(OsString::from("/Fp").concat(path.as_os_str()));
+        }
+
+        let (input_path, temp_input, current_dir_override) = match &task.input {
             Preprocessed(preprocessed) => {
-                let input_temp = TempFile::new_in(self.temp_dir.path(), ".i");
+                let input_temp = tempfile::Builder::new()
+                    .suffix(".i")
+                    .tempfile_in(state.temp_dir.path())?;
                 preprocessed.copy(&mut File::create(input_temp.path())?)?;
-                command.arg(input_temp.path().to_str().unwrap());
-                (input_temp.path().to_path_buf(), Some(input_temp))
+                (input_temp.path().to_path_buf(), Some(input_temp), None)
             }
             Source(source) => {
                 if let Some(dir) = &source.current_dir {
-                    command.current_dir(dir);
+                    (source.path.clone(), None, Some(dir.as_path()))
+                } else {
+                    (source.path.clone(), None, None)
                 }
-                command.arg(&source.path);
-                (source.path.clone(), None)
             }
         };
-        let input_marker = input_file
+        args.push(OsString::from(&input_path));
+
+        // Use precompiled header
+        if let Some(path) = task.pch_in {
+            assert!(path.is_absolute());
+            if let Some(pch_marker) = &task.pch_marker {
+                args.push(OsString::from("/Yu".to_string() + pch_marker));
+            } else {
+                args.push(OsString::from("/Yu"));
+            }
+
+            args.push(OsString::from("/Fp").concat(path.as_os_str()));
+        }
+
+        // Run compiler.
+
+        let input_marker = input_path
             // Save input file name for output filter.
             .file_name()
             .and_then(OsStr::to_str)
             .map(str::as_bytes)
             .unwrap_or(b"");
 
-        // Copy required environment variables.
-        // todo: #15 Need to make correct PATH variable for cl.exe manually
-        for (name, value) in vec!["SystemDrive", "SystemRoot", "TEMP", "TMP", "PATH"]
-            .iter()
-            .filter_map(|name| env::var(name).ok().map(|value| (name, value)))
-        {
-            command.env(name, value);
-        }
-        // Output files.
-        match &task.output_precompiled {
-            Some(ref path) => {
-                assert!(path.is_absolute());
-                command.arg(join_flag("/Fp", path));
-            }
-            None => {}
-        }
-        // Use precompiled header
-        match &task.input_precompiled {
-            Some(ref path) => {
-                assert!(path.is_absolute());
-                if let Some(marker) = &task.marker_precompiled {
-                    command.arg("/Yu".to_string() + marker);
-                } else {
-                    command.arg("/Yu");
-                }
-
-                command.arg(join_flag("/Fp", path));
-            }
-            None => {}
-        }
         // Execute.
-        let result = state
-            .wrap_slow(|| command.output())
-            .map(|output| OutputInfo {
-                status: output.status.code(),
-                stdout: prepare_output(
-                    input_marker,
-                    output.stdout.clone(),
-                    output.status.success(),
-                ),
-                stderr: output.stderr,
-            });
+        let output = state.wrap_slow(|| -> std::io::Result<Output> {
+            let mut command = Command::new(&self.path);
 
-        drop(temp_file);
+            command
+                .env_clear()
+                .current_dir(current_dir_override.unwrap_or_else(|| state.temp_dir.path()));
 
-        result
-    }
+            // Copy required environment variables.
+            // todo: #15 Need to make correct PATH variable for cl.exe manually
+            for (name, value) in vec!["SystemDrive", "SystemRoot", "TEMP", "TMP", "PATH"]
+                .iter()
+                .filter_map(|name| env::var(name).ok().map(|value| (name, value)))
+            {
+                command.env(name, value);
+            }
 
-    // Compile preprocessed file.
-    fn compile_memory(
-        &self,
-        state: &SharedState,
-        mut task: CompileStep,
-    ) -> Result<OutputInfo, Error> {
-        let output_temp = TempFile::new_in(self.temp_dir.path(), ".o");
-        task.output_object = Some(output_temp.path().to_path_buf());
-        let mut output = self.compile_step(state, task)?;
-        let content = fs::read(output_temp.path())?;
-        output.stdout = content;
-        Ok(output)
+            let response_file = state.do_response_file(args, &mut command)?;
+            let output = command.output()?;
+            drop(temp_input);
+            drop(response_file);
+            Ok(output)
+        })?;
+
+        let content = match temp_output {
+            Some(v) => fs::read(v.path())?,
+            None => output.stdout,
+        };
+
+        Ok(OutputInfo {
+            status: output.status.code(),
+            stdout: prepare_output(input_marker, content, output.status.success()),
+            stderr: output.stderr,
+        })
     }
 }
 
@@ -495,10 +479,6 @@ fn prepare_output(line: &[u8], mut buffer: Vec<u8>, success: bool) -> Vec<u8> {
 
 fn is_eol(c: u8) -> bool {
     matches!(c, b'\r' | b'\n')
-}
-
-fn join_flag(flag: &str, path: &Path) -> String {
-    flag.to_string() + path.to_str().unwrap()
 }
 
 #[cfg(test)]

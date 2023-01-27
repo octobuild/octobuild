@@ -42,9 +42,9 @@ pub fn create_tasks(command: CommandInfo, args: &[String]) -> Result<Vec<Compila
     };
     let cwd = command.current_dir.clone();
     // Precompiled header file name.
-    let marker_precompiled;
-    let input_precompiled;
-    let output_precompiled;
+    let pch_marker;
+    let pch_in;
+    let pch_out;
     match find_param(&parsed_args, |arg: &Arg| -> Option<(bool, String)> {
         match arg {
             Arg::Input { kind, file, .. } if *kind == InputKind::Marker => {
@@ -57,22 +57,22 @@ pub fn create_tasks(command: CommandInfo, args: &[String]) -> Result<Vec<Compila
         }
     }) {
         ParamValue::None => {
-            marker_precompiled = None;
-            input_precompiled = None;
-            output_precompiled = None;
+            pch_marker = None;
+            pch_in = None;
+            pch_out = None;
         }
         ParamValue::Single((input, path)) => {
             let precompiled_path = match precompiled_file {
                 Some(v) => v,
                 None => PathBuf::from(&path).with_extension(".pch"),
             };
-            marker_precompiled = if path.is_empty() { None } else { Some(path) };
+            pch_marker = if path.is_empty() { None } else { Some(path) };
             if input {
-                output_precompiled = None;
-                input_precompiled = Some(precompiled_path);
+                pch_out = None;
+                pch_in = Some(precompiled_path);
             } else {
-                input_precompiled = None;
-                output_precompiled = Some(precompiled_path);
+                pch_in = None;
+                pch_out = Some(precompiled_path);
             }
         }
         ParamValue::Many(v) => {
@@ -114,9 +114,9 @@ pub fn create_tasks(command: CommandInfo, args: &[String]) -> Result<Vec<Compila
     };
     let shared = Arc::new(CompilationArgs {
         args: parsed_args,
-        input_precompiled: input_precompiled.map(|path| command.current_dir_join(&path)),
-        output_precompiled: output_precompiled.map(|path| command.current_dir_join(&path)),
-        marker_precompiled,
+        pch_in: pch_in.map(|path| command.current_dir_join(&path)),
+        pch_out: pch_out.map(|path| command.current_dir_join(&path)),
+        pch_marker,
         command,
         deps_file: None,
     });

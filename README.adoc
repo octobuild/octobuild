@@ -117,6 +117,9 @@ Default is `%LocalAppData%/octobuild/cache` on Windows, `~/.cache/octobuild` on 
 Defaults is 64GB.
 `OCTOBUILD_PROCESS_LIMIT` (number):: specifies max number of concurrent processes octobuild will spawn.
 Default is number of cores.
+`OCTOBUILD_USE_RESPONSE_FILES` (bool):: specifies whether octobuild should use compiler response files to overcome commandline length limitation.
+Default is `true`.
+Enable this if you're getting `ERROR: The filename or extension is too long. (os error 206)` on Windows.
 
 [[benchmark]]
 == Benchmark
