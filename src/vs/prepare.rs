@@ -210,10 +210,10 @@ fn parse_argument<S: AsRef<str>, I: Iterator<Item = S>>(
                     if flag == prefix {
                         match iter.next() {
                             Some(value) => {
-                                if !has_param_prefix(value.as_ref()) {
-                                    Ok(Arg::param(scope, prefix, value.as_ref()))
-                                } else {
+                                if has_param_prefix(value.as_ref()) {
                                     Err(arg.as_ref().to_string())
+                                } else {
+                                    Ok(Arg::param(scope, prefix, value.as_ref()))
                                 }
                             }
                             _ => Err(arg.as_ref().to_string()),
@@ -267,19 +267,19 @@ fn parse_argument<S: AsRef<str>, I: Iterator<Item = S>>(
 }
 
 fn is_spaceable_param(flag: &str) -> Option<(&str, Scope)> {
-    for prefix in ["D"].iter() {
-        if flag.starts_with(*prefix) {
-            return Some((*prefix, Scope::Shared));
+    for prefix in ["D"] {
+        if flag.starts_with(prefix) {
+            return Some((prefix, Scope::Shared));
         }
     }
-    for prefix in ["I", "sourceDependencies"].iter() {
-        if flag.starts_with(*prefix) {
-            return Some((*prefix, Scope::Preprocessor));
+    for prefix in ["I", "sourceDependencies"] {
+        if flag.starts_with(prefix) {
+            return Some((prefix, Scope::Preprocessor));
         }
     }
-    for prefix in ["W", "wd", "we", "wo", "w"].iter() {
-        if flag.starts_with(*prefix) {
-            return Some((*prefix, Scope::Compiler));
+    for prefix in ["W", "wd", "we", "wo", "w"] {
+        if flag.starts_with(prefix) {
+            return Some((prefix, Scope::Compiler));
         }
     }
     None

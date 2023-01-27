@@ -51,13 +51,10 @@ pub fn create_tasks(command: CommandInfo, args: &[String]) -> Result<Vec<Compila
         }
     };
     // Precompiled header file name.
-    let marker_precompiled = parsed_args
-        .iter()
-        .filter_map(|arg| match arg {
-            Arg::Param { flag, value, .. } if *flag == "include" => Some(value.clone()),
-            _ => None,
-        })
-        .next();
+    let marker_precompiled = parsed_args.iter().find_map(|arg| match arg {
+        Arg::Param { flag, value, .. } if *flag == "include" => Some(value.clone()),
+        _ => None,
+    });
     // Output object file name.
     let output_object = match find_param(&parsed_args, |arg: &Arg| -> Option<PathBuf> {
         match arg {
@@ -79,13 +76,10 @@ pub fn create_tasks(command: CommandInfo, args: &[String]) -> Result<Vec<Compila
         }
     };
 
-    let deps_file = parsed_args
-        .iter()
-        .filter_map(|arg| match arg {
-            Arg::Param { flag, value, .. } if *flag == "MF" => Some(PathBuf::from(value)),
-            _ => None,
-        })
-        .next();
+    let deps_file = parsed_args.iter().find_map(|arg| match arg {
+        Arg::Param { flag, value, .. } if *flag == "MF" => Some(PathBuf::from(value)),
+        _ => None,
+    });
 
     // Language
     let language: Option<String> = match find_param(&parsed_args, |arg: &Arg| -> Option<String> {
@@ -128,16 +122,14 @@ pub fn create_tasks(command: CommandInfo, args: &[String]) -> Result<Vec<Compila
                     .as_ref()
                     .map_or_else(
                         || {
-                            source
-                                .extension()
-                                .and_then(|ext| match ext.to_str() {
-                                    Some(e) if e.eq_ignore_ascii_case("cpp") => Some("c++"),
-                                    Some(e) if e.eq_ignore_ascii_case("c") => Some("c"),
-                                    Some(e) if e.eq_ignore_ascii_case("hpp") => Some("c++-header"),
-                                    Some(e) if e.eq_ignore_ascii_case("h") => Some("c-header"),
-                                    _ => None,
-                                })
-                                .map(|ext| ext.to_string())
+                            let lang = match source.extension()?.to_str() {
+                                Some(e) if e.eq_ignore_ascii_case("cpp") => Some("c++"),
+                                Some(e) if e.eq_ignore_ascii_case("c") => Some("c"),
+                                Some(e) if e.eq_ignore_ascii_case("hpp") => Some("c++-header"),
+                                Some(e) if e.eq_ignore_ascii_case("h") => Some("c-header"),
+                                _ => None,
+                            };
+                            Some(lang?.to_string())
                         },
                         |lang| Some(lang.clone()),
                     )
@@ -223,9 +215,8 @@ fn parse_argument(iter: &mut Iter<String>) -> Option<Result<Arg, String>> {
                 }
                 None => match flag {
                     "c" => Ok(Arg::flag(Scope::Ignore, flag)),
-                    "pipe" => Ok(Arg::flag(Scope::Shared, flag)),
+                    "pipe" | "nostdinc++" => Ok(Arg::flag(Scope::Shared, flag)),
                     "MD" => Ok(Arg::flag(Scope::Preprocessor, flag)),
-                    "nostdinc++" => Ok(Arg::flag(Scope::Shared, flag)),
                     s if s.starts_with('f') => Ok(Arg::flag(Scope::Shared, flag)),
                     s if s.starts_with('g') => Ok(Arg::flag(Scope::Shared, flag)),
                     s if s.starts_with('O') => Ok(Arg::flag(Scope::Shared, flag)),
@@ -251,19 +242,19 @@ fn is_spaceable_param(flag: &str) -> Option<(&str, Scope, bool)> {
         "include" | "include-pch" => Some((flag, Scope::Preprocessor, false)),
         "target" => Some((flag, Scope::Shared, false)),
         _ => {
-            for prefix in ["D", "o"].iter() {
-                if flag.starts_with(*prefix) {
-                    return Some((*prefix, Scope::Shared, false));
+            for prefix in ["D", "o"] {
+                if flag.starts_with(prefix) {
+                    return Some((prefix, Scope::Shared, false));
                 }
             }
-            for prefix in ["x"].iter() {
-                if flag.starts_with(*prefix) {
-                    return Some((*prefix, Scope::Ignore, false));
+            for prefix in ["x"] {
+                if flag.starts_with(prefix) {
+                    return Some((prefix, Scope::Ignore, false));
                 }
             }
-            for prefix in ["I", "MF"].iter() {
-                if flag.starts_with(*prefix) {
-                    return Some((*prefix, Scope::Preprocessor, false));
+            for prefix in ["I", "MF"] {
+                if flag.starts_with(prefix) {
+                    return Some((prefix, Scope::Preprocessor, false));
                 }
             }
             None

@@ -29,7 +29,7 @@ pub struct MemReader<'a> {
 impl MemStream {
     #[must_use]
     pub fn new() -> Self {
-        Default::default()
+        MemStream::default()
     }
 
     #[must_use]
@@ -42,6 +42,7 @@ impl MemStream {
         self.size == 0
     }
 
+    #[must_use]
     pub fn reader(&self) -> MemReader {
         let mut iter = self.iter();
         let last = iter.next();
@@ -52,6 +53,7 @@ impl MemStream {
         }
     }
 
+    #[must_use]
     pub fn iter(&self) -> Iter {
         Iter {
             size: self.size,

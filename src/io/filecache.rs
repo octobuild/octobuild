@@ -153,7 +153,7 @@ fn write_cache(
         .build(Counter::writer(File::create(path)?))?;
     stream.write_all(HEADER)?;
     write_usize(&mut stream, paths.len())?;
-    for path in paths.iter() {
+    for path in paths {
         write_cached_file(&mut stream, path)?;
     }
     write_output(&mut stream, output)?;
@@ -206,7 +206,7 @@ fn read_cache(
             CacheError::PackedFilesMismatch(path.clone()),
         ));
     }
-    for path in paths.iter() {
+    for path in paths {
         let mut temp_name = OsString::from("~tmp~");
         temp_name.push(path.file_name().unwrap());
         let temp = path.with_file_name(temp_name);

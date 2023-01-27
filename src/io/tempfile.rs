@@ -11,6 +11,7 @@ pub struct TempFile {
 
 impl TempFile {
     /// Create random file name in specified directory.
+    #[must_use]
     pub fn new_in(path: &Path, suffix: &str) -> Self {
         let random_name = Uuid::new_v4().to_string() + suffix;
         TempFile::wrap(&path.join(random_name))
@@ -20,6 +21,7 @@ impl TempFile {
     /// deleted once the returned wrapper is destroyed.
     ///
     /// If no directory can be created, `Err` is returned.
+    #[must_use]
     pub fn wrap(path: &Path) -> TempFile {
         TempFile {
             path: Some(path.to_path_buf()),
@@ -28,6 +30,7 @@ impl TempFile {
     }
 
     /// Access the wrapped `std::path::Path` to the temporary file.
+    #[must_use]
     pub fn path(&self) -> &Path {
         self.path.as_ref().unwrap()
     }
@@ -45,7 +48,7 @@ impl TempFile {
 impl Drop for TempFile {
     fn drop(&mut self) {
         if !self.disarmed {
-            let _ = self.cleanup_file();
+            drop(self.cleanup_file());
         }
     }
 }

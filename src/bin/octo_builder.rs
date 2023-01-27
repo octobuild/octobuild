@@ -93,7 +93,7 @@ impl BuilderService {
         info!("Helper local address: {}", listener.socket());
 
         info!("Found toolchains:");
-        for toolchain in state.toolchain_names().iter() {
+        for toolchain in &state.toolchain_names() {
             info!("- {}", toolchain);
         }
 
@@ -393,7 +393,7 @@ fn main() {
 
             info!("Builder started.");
             let mut builder = None;
-            for signal in rx.iter() {
+            for signal in rx {
                 match signal {
                     State::Start => {
                         info!("Builder: Starting");

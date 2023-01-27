@@ -35,8 +35,9 @@ impl fmt::Display for Statistic {
 }
 
 impl Statistic {
+    #[must_use]
     pub fn new() -> Self {
-        Default::default()
+        Statistic::default()
     }
 
     pub fn add_hit(&self, bytes: usize) {

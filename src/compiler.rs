@@ -189,6 +189,7 @@ impl CommandEnv {
             .insert(CommandEnv::normalize_key(key.into()), value.into())
     }
 
+    #[must_use]
     pub fn iter(&self) -> hash_map::Iter<String, String> {
         self.map.iter()
     }
@@ -215,6 +216,7 @@ impl FromIterator<(String, String)> for CommandEnv {
 }
 
 impl CommandInfo {
+    #[must_use]
     pub fn simple(path: PathBuf) -> Self {
         CommandInfo {
             program: path,
@@ -223,6 +225,7 @@ impl CommandInfo {
         }
     }
 
+    #[must_use]
     pub fn current_dir_join(&self, path: &Path) -> PathBuf {
         match self.current_dir.as_ref() {
             None => path.to_path_buf(),
@@ -230,6 +233,7 @@ impl CommandInfo {
         }
     }
 
+    #[must_use]
     pub fn to_command(&self) -> Command {
         let mut command = Command::new(&self.program);
         command.env_clear();
@@ -534,7 +538,7 @@ pub trait Toolchain: Send + Sync {
 
         // Hash arguments
         hasher.hash_u64(step.args.len() as u64);
-        for arg in step.args.iter() {
+        for arg in &step.args {
             hasher.hash_bytes(arg.as_bytes());
         }
         // Hash input files
@@ -570,8 +574,9 @@ pub trait Toolchain: Send + Sync {
 }
 
 impl CompilerGroup {
+    #[must_use]
     pub fn new() -> Self {
-        Default::default()
+        CompilerGroup::default()
     }
 
     #[allow(clippy::should_implement_trait)]
@@ -584,10 +589,7 @@ impl CompilerGroup {
 impl Compiler for CompilerGroup {
     // Resolve toolchain for command execution.
     fn resolve_toolchain(&self, command: &CommandInfo) -> Option<Arc<dyn Toolchain>> {
-        self.0
-            .iter()
-            .filter_map(|c| c.resolve_toolchain(command))
-            .next()
+        self.0.iter().find_map(|c| c.resolve_toolchain(command))
     }
     // Discover local toolchains.
     fn discover_toolchains(&self) -> Vec<Arc<dyn Toolchain>> {
@@ -697,12 +699,14 @@ pub struct ToolchainHolder {
 }
 
 impl ToolchainHolder {
+    #[must_use]
     pub fn new() -> Self {
         ToolchainHolder {
             toolchains: Arc::new(RwLock::new(HashMap::new())),
         }
     }
 
+    #[must_use]
     pub fn to_vec(&self) -> Vec<Arc<dyn Toolchain>> {
         let read_lock = self.toolchains.read().unwrap();
         read_lock.values().cloned().collect()

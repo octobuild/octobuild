@@ -156,7 +156,7 @@ fn prepare_graph<C: Compiler>(compiler: &C, graph: &XgGraph) -> Result<BuildGrap
     let mut depends: Vec<NodeIndex> = Vec::with_capacity(graph.node_count());
 
     let mut result: BuildGraph = Graph::new();
-    for raw_node in graph.raw_nodes().iter() {
+    for raw_node in graph.raw_nodes() {
         let node: &XgNode = &raw_node.weight;
         let raw_args: String = expand_arg(&node.raw_args, &env_resolver);
         let command = node.command.clone();
@@ -184,7 +184,7 @@ fn prepare_graph<C: Compiler>(compiler: &C, graph: &XgGraph) -> Result<BuildGrap
             // Add task actions
             let mut index = 1;
             let total = actions.len();
-            for action in actions.into_iter() {
+            for action in actions {
                 let action_node = result.add_node(Arc::new(BuildTask {
                     title: format!("{} ({index}/{total})", node.title),
                     action,

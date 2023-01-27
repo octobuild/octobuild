@@ -26,8 +26,9 @@ pub struct ClangCompiler {
 }
 
 impl ClangCompiler {
+    #[must_use]
     pub fn new() -> Self {
-        Default::default()
+        ClangCompiler::default()
     }
 }
 
@@ -40,7 +41,7 @@ impl ClangToolchain {
     pub fn new(path: PathBuf) -> Self {
         ClangToolchain {
             path,
-            identifier: Default::default(),
+            identifier: Lazy::default(),
         }
     }
 }
@@ -100,7 +101,7 @@ impl Toolchain for ClangToolchain {
             .arg("-o")
             .arg("-");
 
-        for arg in task.shared.args.iter() {
+        for arg in &task.shared.args {
             match arg {
                 Arg::Flag { scope, flag } => {
                     if scope.matches(Scope::Preprocessor, state.run_second_cpp, false) {
@@ -113,8 +114,7 @@ impl Toolchain for ClangToolchain {
                         command.arg(value.clone());
                     }
                 }
-                Arg::Input { .. } => {}
-                Arg::Output { .. } => {}
+                Arg::Input { .. } | Arg::Output { .. } => {}
             };
         }
 
@@ -154,7 +154,7 @@ impl Toolchain for ClangToolchain {
         preprocessed: CompilerOutput,
     ) -> Result<CompileStep, Error> {
         let mut args = vec!["-x".to_string(), task.language.clone()];
-        for arg in task.shared.args.iter() {
+        for arg in &task.shared.args {
             match arg {
                 Arg::Flag { scope, flag } => {
                     if scope.matches(
@@ -175,8 +175,7 @@ impl Toolchain for ClangToolchain {
                         args.push(value.clone());
                     }
                 }
-                Arg::Input { .. } => {}
-                Arg::Output { .. } => {}
+                Arg::Input { .. } | Arg::Output { .. } => {}
             };
         }
         Ok(CompileStep::new(

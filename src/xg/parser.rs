@@ -108,7 +108,7 @@ fn parse_build_set<R: Read>(graph: &mut XgGraph, events: &mut EventReader<R>) ->
             _ => {}
         }
     }
-    parse_create_graph(graph, envs, projects)
+    parse_create_graph(graph, &envs, &projects)
 }
 
 fn parse_environments<R: Read>(
@@ -232,7 +232,7 @@ fn parse_tasks<R: Read>(events: &mut EventReader<R>) -> Result<HashMap<String, X
                     let working_dir = take_attr(&mut attrs, "WorkingDir")?;
                     // DependsOn
                     let depends_on: HashSet<String> = match attrs.remove("DependsOn") {
-                        Some(v) => v.split(';').map(|v| v.to_string()).collect(),
+                        Some(v) => v.split(';').map(ToString::to_string).collect(),
                         _ => HashSet::new(),
                     };
 
@@ -283,10 +283,10 @@ fn next_xml_event<R: Read>(reader: &mut EventReader<R>) -> Result<XmlEvent, Erro
 
 fn parse_create_graph(
     graph: &mut XgGraph,
-    envs: HashMap<String, XgEnvironment>,
-    projects: Vec<XgProject>,
+    envs: &HashMap<String, XgEnvironment>,
+    projects: &Vec<XgProject>,
 ) -> Result<(), Error> {
-    for project in projects.into_iter() {
+    for project in projects {
         let env = envs.get(&project.env).ok_or_else(|| {
             Error::new(
                 ErrorKind::InvalidInput,
@@ -300,12 +300,12 @@ fn parse_create_graph(
 
 fn graph_project(
     graph: &mut XgGraph,
-    project: XgProject,
+    project: &XgProject,
     env: &XgEnvironment,
 ) -> Result<(), Error> {
     let mut nodes: Vec<NodeIndex> = Vec::new();
     let mut task_refs: HashMap<&str, NodeIndex> = HashMap::new();
-    for (id, task) in project.tasks.iter() {
+    for (id, task) in &project.tasks {
         let tool = env.tools.get(&task.tool).ok_or_else(|| {
             Error::new(
                 ErrorKind::InvalidInput,
@@ -329,9 +329,9 @@ fn graph_project(
         task_refs.insert(id, node);
         nodes.push(node);
     }
-    for (src_id, task) in project.tasks.iter() {
+    for (src_id, task) in &project.tasks {
         let src = task_refs.get(&src_id[..]).unwrap();
-        for dst_id in task.depends_on.iter() {
+        for dst_id in &task.depends_on {
             let dst = task_refs.get(&dst_id[..]).ok_or_else(|| {
                 Error::new(
                     ErrorKind::InvalidInput,

@@ -9,6 +9,7 @@ use crate::lazy::Lazy;
 use crate::vs::postprocess;
 use lazy_static::lazy_static;
 use regex::bytes::{NoExpand, Regex};
+use std::ffi::OsStr;
 use std::fs::File;
 use std::io::{Cursor, Error};
 use std::path::{Path, PathBuf};
@@ -23,6 +24,7 @@ pub struct VsCompiler {
 }
 
 impl VsCompiler {
+    #[must_use]
     pub fn new(temp_dir: &Arc<TempDir>) -> Self {
         VsCompiler {
             temp_dir: temp_dir.clone(),
@@ -42,7 +44,7 @@ impl VsToolchain {
         VsToolchain {
             temp_dir: temp_dir.clone(),
             path,
-            identifier: Default::default(),
+            identifier: Lazy::default(),
         }
     }
 }
@@ -138,7 +140,7 @@ impl Toolchain for VsToolchain {
             .arg(join_flag("/Fo", &task.output_object)) // /Fo option also set output path for #import directive
             .arg(&task.input_source);
 
-        for arg in task.shared.args.iter() {
+        for arg in &task.shared.args {
             match arg {
                 Arg::Flag { scope, flag } => {
                     if scope.matches(Scope::Preprocessor, state.run_second_cpp, false) {
@@ -150,8 +152,7 @@ impl Toolchain for VsToolchain {
                         command.arg("/".to_string() + flag + value);
                     }
                 }
-                Arg::Input { .. } => {}
-                Arg::Output { .. } => {}
+                Arg::Input { .. } | Arg::Output { .. } => {}
             };
         }
 
@@ -215,8 +216,7 @@ impl Toolchain for VsToolchain {
                             None
                         }
                     }
-                    Arg::Input { .. } => None,
-                    Arg::Output { .. } => None,
+                    Arg::Input { .. } | Arg::Output { .. } => None,
                 }
             })
             .collect();
@@ -266,8 +266,8 @@ impl Toolchain for VsToolchain {
         let input_marker = input_file
             // Save input file name for output filter.
             .file_name()
-            .and_then(|o| o.to_str())
-            .map(|o| o.as_bytes())
+            .and_then(OsStr::to_str)
+            .map(str::as_bytes)
             .unwrap_or(b"");
 
         // Copy required environment variables.
@@ -489,7 +489,7 @@ fn prepare_output(line: &[u8], mut buffer: Vec<u8>, success: bool) -> Vec<u8> {
             static ref RE: Regex =
                 Regex::new(r"(?m)^\S+[^:]*\(\d+\) : warning C4628: .*$\n?").unwrap();
         }
-        buffer = RE.replace_all(&buffer, NoExpand(b"")).to_vec()
+        buffer = RE.replace_all(&buffer, NoExpand(b"")).to_vec();
     }
     buffer
 }

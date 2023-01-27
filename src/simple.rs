@@ -15,6 +15,7 @@ use crate::vs::compiler::VsCompiler;
 use crate::worker::execute_graph;
 use crate::worker::{BuildAction, BuildGraph, BuildResult, BuildTask};
 
+#[must_use]
 pub fn supported_compilers(temp_dir: &Arc<TempDir>) -> CompilerGroup {
     CompilerGroup::new()
         .add(VsCompiler::new(temp_dir))
@@ -75,7 +76,7 @@ where
     let actions = BuildAction::create_tasks(&remote, command_info, CommandArgs::Array(args), exec);
 
     let mut build_graph: BuildGraph = Graph::new();
-    for action in actions.into_iter() {
+    for action in actions {
         build_graph.add_node(Arc::new(BuildTask {
             title: action.title().into_owned(),
             action,

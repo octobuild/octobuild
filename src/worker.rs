@@ -120,6 +120,7 @@ impl BuildAction {
         actions
     }
 
+    #[must_use]
     pub fn title(&self) -> Cow<str> {
         match &self {
             BuildAction::Empty => Cow::Borrowed(""),
@@ -165,7 +166,7 @@ pub fn validate_graph<N, E>(graph: Graph<N, E>) -> Result<Graph<N, E>, Error> {
 
 fn execute_until_failed<F>(
     graph: &BuildGraph,
-    tx_task: crossbeam::channel::Sender<TaskMessage>,
+    tx_task: &crossbeam::channel::Sender<TaskMessage>,
     rx_result: &crossbeam::channel::Receiver<ResultMessage>,
     count: &mut usize,
     update_progress: F,
@@ -183,7 +184,7 @@ where
             .map_err(|e| Error::new(ErrorKind::Other, e))?;
     }
 
-    for message in rx_result.iter() {
+    for message in rx_result {
         assert!(!completed[message.index.index()]);
 
         update_progress(&BuildResult::new(&message, count, graph.node_count()))?;
@@ -262,11 +263,11 @@ where
         // Run all tasks.
         let mut count: usize = 0;
         let result =
-            execute_until_failed(&graph, tx_task, &rx_result, &mut count, &update_progress);
+            execute_until_failed(&graph, &tx_task, &rx_result, &mut count, &update_progress);
         // Cleanup task queue.
         for _ in rx_task.try_iter() {}
         // Wait for in progress task completion.
-        for message in rx_result.iter() {
+        for message in rx_result {
             update_progress(&BuildResult::new(&message, &mut count, graph.node_count()))?;
         }
         result

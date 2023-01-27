@@ -126,7 +126,7 @@ fn main() {
 
             info!("Coordinator started.");
             let mut web = None;
-            for signal in rx.iter() {
+            for signal in rx {
                 match signal {
                     State::Start => {
                         let config = Config::load().unwrap();
