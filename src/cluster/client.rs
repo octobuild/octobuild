@@ -59,7 +59,7 @@ impl<C: Compiler> RemoteCompiler<C> {
 }
 
 impl RemoteSharedMut {
-    fn receive_builders(&self, base_url: &Option<reqwest::Url>) -> Result<Vec<BuilderInfo>, Error> {
+    fn receive_builders(base_url: &Option<reqwest::Url>) -> Result<Vec<BuilderInfo>, Error> {
         match base_url {
             Some(ref base_url) => {
                 let url = base_url.join(RPC_BUILDER_LIST).unwrap();
@@ -175,7 +175,7 @@ impl RemoteToolchain {
                     .client
                     .head(
                         base_url
-                            .join(&format!("{}/{}", RPC_BUILDER_UPLOAD, meta.hash))
+                            .join(&format!("{RPC_BUILDER_UPLOAD}/{}", meta.hash))
                             .unwrap(),
                     )
                     .send()
@@ -192,7 +192,7 @@ impl RemoteToolchain {
                     .client
                     .post(
                         base_url
-                            .join(&format!("{}/{}", RPC_BUILDER_UPLOAD, meta.hash))
+                            .join(&format!("{RPC_BUILDER_UPLOAD}/{}", meta.hash))
                             .unwrap(),
                     )
                     // todo: this is workaround for https://github.com/hyperium/hyper/issues/838
@@ -227,7 +227,7 @@ impl RemoteToolchain {
             if holder.cooldown >= now {
                 return holder.builders.clone();
             }
-            match holder.receive_builders(&self.shared.base_url) {
+            match RemoteSharedMut::receive_builders(&self.shared.base_url) {
                 Ok(builders) => {
                     holder.builders = Arc::new(builders);
                     holder.cooldown = now + Duration::from_secs(5);

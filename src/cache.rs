@@ -32,10 +32,11 @@ pub trait FileHasher {
 }
 
 impl Cache {
+    #[must_use]
     pub fn new(config: &Config) -> Self {
         Cache {
             file_cache: FileCache::new(config),
-            file_hash_cache: Default::default(),
+            file_hash_cache: MemCache::default(),
         }
     }
 

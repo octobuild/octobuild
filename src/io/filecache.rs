@@ -43,6 +43,7 @@ struct CacheFile {
 }
 
 impl FileCache {
+    #[must_use]
     pub fn new(config: &Config) -> Self {
         FileCache {
             cache_dir: config.cache.clone(),
@@ -79,7 +80,7 @@ impl FileCache {
         files.sort_by(|a, b| b.accessed.cmp(&a.accessed));
 
         let mut cache_size: u64 = 0;
-        for item in files.into_iter() {
+        for item in &files {
             cache_size += item.size;
             if cache_size > self.cache_limit {
                 fs::remove_file(&item.path)?;
@@ -145,7 +146,7 @@ fn write_cache(
         return Ok(());
     }
     if let Some(parent) = path.parent() {
-        fs::create_dir_all(parent)?
+        fs::create_dir_all(parent)?;
     }
     let mut stream = lz4::EncoderBuilder::new()
         .level(1)
@@ -196,13 +197,13 @@ fn read_cache(
     if read_exact(&mut stream, HEADER.len())? != HEADER {
         return Err(Error::new(
             ErrorKind::InvalidInput,
-            CacheError::InvalidHeader(path.to_path_buf()),
+            CacheError::InvalidHeader(path.clone()),
         ));
     }
     if read_usize(&mut stream)? != paths.len() {
         return Err(Error::new(
             ErrorKind::InvalidInput,
-            CacheError::PackedFilesMismatch(path.to_path_buf()),
+            CacheError::PackedFilesMismatch(path.clone()),
         ));
     }
     for path in paths.iter() {
@@ -222,14 +223,14 @@ fn read_cache(
     if read_exact(&mut stream, FOOTER.len())? != FOOTER {
         return Err(Error::new(
             ErrorKind::InvalidInput,
-            CacheError::InvalidFooter(path.to_path_buf()),
+            CacheError::InvalidFooter(path.clone()),
         ));
     }
     let mut eof = [0];
     if stream.read(&mut eof)? != 0 {
         return Err(Error::new(
             ErrorKind::InvalidInput,
-            CacheError::InvalidFooter(path.to_path_buf()),
+            CacheError::InvalidFooter(path.clone()),
         ));
     }
     statistic.add_hit(stream.finish().0.len());

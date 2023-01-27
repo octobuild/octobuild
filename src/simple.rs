@@ -9,7 +9,7 @@ use tempdir::TempDir;
 
 use crate::clang::compiler::ClangCompiler;
 use crate::cluster::client::RemoteCompiler;
-use crate::compiler::*;
+use crate::compiler::{CommandArgs, CommandInfo, Compiler, CompilerGroup, SharedState};
 use crate::config::Config;
 use crate::vs::compiler::VsCompiler;
 use crate::worker::execute_graph;
@@ -86,7 +86,7 @@ where
     result
 }
 
-fn print_task_result(result: BuildResult) -> Result<(), Error> {
+fn print_task_result(result: &BuildResult) -> Result<(), Error> {
     result.result.print_output()?;
     Ok(())
 }

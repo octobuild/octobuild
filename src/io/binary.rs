@@ -38,5 +38,5 @@ pub fn read_u64(stream: &mut dyn Read) -> Result<u64> {
 
 #[inline]
 pub fn read_usize(stream: &mut dyn Read) -> Result<usize> {
-    read_u64(stream).map(|i| i as usize)
+    Ok(read_u64(stream)? as usize)
 }

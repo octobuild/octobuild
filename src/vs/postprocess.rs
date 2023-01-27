@@ -160,15 +160,12 @@ impl<'a> ScannerState<'a> {
 
     unsafe fn parse_bom(&mut self) -> Result<(), Error> {
         let bom: [u8; 3] = [0xEF, 0xBB, 0xBF];
-        for bom_char in bom.iter() {
+        for bom_char in &bom {
             match self.peek()? {
                 Some(c) if c == *bom_char => {
                     self.next();
                 }
-                Some(_) => {
-                    return Ok(());
-                }
-                None => {
+                Some(_) | None => {
                     return Ok(());
                 }
             };
@@ -229,10 +226,10 @@ impl<'a> ScannerState<'a> {
                 return Ok(b"\n");
             }
 
-            if self.ptr_end != &self.buf_data[0] {
-                last = *self.ptr_end.offset(-1);
-            } else {
+            if self.ptr_end == &self.buf_data[0] {
                 last = 0;
+            } else {
+                last = *self.ptr_end.offset(-1);
             }
             self.ptr_read = self.ptr_end;
             if !self.read()? {

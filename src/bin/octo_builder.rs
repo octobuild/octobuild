@@ -31,7 +31,7 @@ use octobuild::cluster::common::{
     BuilderInfo, BuilderInfoUpdate, RPC_BUILDER_TASK, RPC_BUILDER_UPDATE, RPC_BUILDER_UPLOAD,
 };
 use octobuild::compiler::CompileInput::Preprocessed;
-use octobuild::compiler::*;
+use octobuild::compiler::{CompileStep, Compiler, CompilerOutput, SharedState, Toolchain};
 use octobuild::config::Config;
 use octobuild::io::tempfile::TempFile;
 use octobuild::simple::create_temp_dir;

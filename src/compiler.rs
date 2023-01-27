@@ -44,6 +44,7 @@ pub enum Scope {
 }
 
 impl Scope {
+    #[must_use]
     pub fn matches(self, scope: Scope, run_second_cpp: bool, output_precompiled: bool) -> bool {
         match scope {
             Scope::Preprocessor => self == Scope::Preprocessor || self == Scope::Shared,
@@ -173,14 +174,14 @@ impl SharedState {
 }
 
 impl CommandEnv {
+    #[must_use]
     pub fn new() -> Self {
-        Default::default()
+        CommandEnv::default()
     }
 
     pub fn get<K: Into<String>>(&self, key: K) -> Option<&str> {
-        self.map
-            .get(&CommandEnv::normalize_key(key.into()))
-            .map(|s| s.as_str())
+        let value = self.map.get(&CommandEnv::normalize_key(key.into()))?;
+        Some(value.as_str())
     }
 
     pub fn insert<K: Into<String>, V: Into<String>>(&mut self, key: K, value: V) -> Option<String> {
@@ -322,6 +323,7 @@ impl BuildTaskResult {
 }
 
 impl OutputInfo {
+    #[must_use]
     pub fn new(output: Output) -> Self {
         OutputInfo {
             status: output.status.code(),
@@ -330,6 +332,7 @@ impl OutputInfo {
         }
     }
 
+    #[must_use]
     pub fn success(&self) -> bool {
         matches!(self.status, Some(e) if e == 0)
     }
@@ -386,6 +389,7 @@ pub struct CompileStep {
 }
 
 impl CompileStep {
+    #[must_use]
     pub fn new(
         task: &CompilationTask,
         preprocessed: CompilerOutput,
@@ -436,6 +440,7 @@ impl CompilerOutput {
         }
     }
 
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         match self {
             CompilerOutput::MemSteam(v) => v.is_empty(),
@@ -443,6 +448,7 @@ impl CompilerOutput {
         }
     }
 
+    #[must_use]
     pub fn len(&self) -> usize {
         match self {
             CompilerOutput::MemSteam(v) => v.len(),

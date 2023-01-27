@@ -28,6 +28,7 @@ pub struct BuilderInfoUpdate {
 }
 
 impl BuilderInfoUpdate {
+    #[must_use]
     pub fn new(info: BuilderInfo) -> Self {
         BuilderInfoUpdate {
             guid: Uuid::new_v4().to_string(),

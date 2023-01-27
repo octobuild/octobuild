@@ -171,7 +171,7 @@ fn execute_until_failed<F>(
     update_progress: F,
 ) -> Result<Option<i32>, Error>
 where
-    F: Fn(BuildResult) -> Result<(), Error>,
+    F: Fn(&BuildResult) -> Result<(), Error>,
 {
     let mut completed: Vec<bool> = vec![false; graph.node_count()];
     for index in graph.externals(EdgeDirection::Outgoing) {
@@ -186,7 +186,7 @@ where
     for message in rx_result.iter() {
         assert!(!completed[message.index.index()]);
 
-        update_progress(BuildResult::new(&message, count, graph.node_count()))?;
+        update_progress(&BuildResult::new(&message, count, graph.node_count()))?;
         let output = message.result.output?;
         if !output.success() {
             let status = output.status;
@@ -228,7 +228,7 @@ pub fn execute_graph<F>(
     update_progress: F,
 ) -> Result<Option<i32>, Error>
 where
-    F: Fn(BuildResult) -> Result<(), Error>,
+    F: Fn(&BuildResult) -> Result<(), Error>,
 {
     let graph = validate_graph(build_graph)?;
     if graph.node_count() == 0 {
@@ -267,7 +267,7 @@ where
         for _ in rx_task.try_iter() {}
         // Wait for in progress task completion.
         for message in rx_result.iter() {
-            update_progress(BuildResult::new(&message, &mut count, graph.node_count()))?;
+            update_progress(&BuildResult::new(&message, &mut count, graph.node_count()))?;
         }
         result
     })

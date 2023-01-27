@@ -80,7 +80,7 @@ pub fn init_logger() {
                 Instant::now(),
                 record.level(),
                 message
-            ))
+            ));
         })
         // Output to stdout and the log file in the temporary directory we made above to test
         .chain(io::stdout())

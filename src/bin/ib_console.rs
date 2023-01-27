@@ -14,7 +14,7 @@ use regex::Regex;
 
 use lazy_static::lazy_static;
 use octobuild::cluster::client::RemoteCompiler;
-use octobuild::compiler::*;
+use octobuild::compiler::{CommandArgs, Compiler, SharedState};
 use octobuild::config::Config;
 use octobuild::simple::create_temp_dir;
 use octobuild::simple::supported_compilers;
@@ -26,9 +26,9 @@ use octobuild::xg;
 use octobuild::xg::parser::{XgGraph, XgNode};
 
 pub fn main() -> Result<(), Box<dyn Error>> {
-    println!("xgConsole ({}):", version::full_version());
+    println!("xgConsole ({}):", version::full());
     let args: Vec<String> = env::args().collect();
-    for arg in args.iter() {
+    for arg in &args {
         println!("  {arg}");
     }
     if args.len() == 1 {
@@ -135,14 +135,14 @@ fn execute(args: &[String]) -> Result<Option<i32>, Box<dyn Error>> {
     }
 
     let mut graph = Graph::new();
-    for arg in files.iter() {
+    for arg in &files {
         let file = File::open(Path::new(arg))?;
         xg::parser::parse(&mut graph, BufReader::new(file))?;
     }
-    let build_graph = validate_graph(graph).and_then(|graph| prepare_graph(&compiler, graph))?;
+    let build_graph = validate_graph(graph).and_then(|graph| prepare_graph(&compiler, &graph))?;
 
     let result = execute_graph(&state, build_graph, config.process_limit, print_task_result);
-    let _ = state.cache.cleanup();
+    drop(state.cache.cleanup());
     println!("{}", state.statistic);
     result.map_err(Into::into)
 }
@@ -151,7 +151,7 @@ fn env_resolver(name: &str) -> Option<String> {
     env::var(name).ok()
 }
 
-fn prepare_graph<C: Compiler>(compiler: &C, graph: XgGraph) -> Result<BuildGraph, std::io::Error> {
+fn prepare_graph<C: Compiler>(compiler: &C, graph: &XgGraph) -> Result<BuildGraph, std::io::Error> {
     let mut remap: Vec<NodeIndex> = Vec::with_capacity(graph.node_count());
     let mut depends: Vec<NodeIndex> = Vec::with_capacity(graph.node_count());
 
@@ -186,7 +186,7 @@ fn prepare_graph<C: Compiler>(compiler: &C, graph: XgGraph) -> Result<BuildGraph
             let total = actions.len();
             for action in actions.into_iter() {
                 let action_node = result.add_node(Arc::new(BuildTask {
-                    title: format!("{} ({}/{})", node.title, index, total),
+                    title: format!("{} ({index}/{total})", node.title),
                     action,
                 }));
                 depends.push(node_index);
@@ -210,7 +210,7 @@ fn prepare_graph<C: Compiler>(compiler: &C, graph: XgGraph) -> Result<BuildGraph
     validate_graph(result)
 }
 
-fn print_task_result(result: BuildResult) -> Result<(), std::io::Error> {
+fn print_task_result(result: &BuildResult) -> Result<(), std::io::Error> {
     println!(
         "#{} {}/{}: {} @ {}s",
         result.worker,

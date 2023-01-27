@@ -27,14 +27,17 @@ pub struct MemReader<'a> {
 }
 
 impl MemStream {
+    #[must_use]
     pub fn new() -> Self {
         Default::default()
     }
 
+    #[must_use]
     pub fn len(&self) -> usize {
         self.size
     }
 
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.size == 0
     }
