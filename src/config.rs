@@ -1,5 +1,6 @@
 use figment::providers::{Env, Format, Serialized, Yaml};
 use figment::Figment;
+use lazy_static::lazy_static;
 use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4};
 use std::path::PathBuf;
 
@@ -14,10 +15,19 @@ pub struct Config {
     pub run_second_cpp: bool,
 }
 
+#[must_use]
+fn project_dirs() -> &'static directories::ProjectDirs {
+    lazy_static! {
+        static ref RESULT: directories::ProjectDirs =
+            directories::ProjectDirs::from("", "", "octobuild").unwrap();
+    }
+    &RESULT
+}
+
 impl Default for Config {
     fn default() -> Self {
         Self {
-            cache: dirs::cache_dir().unwrap().join("octobuild"),
+            cache: project_dirs().cache_dir().into(),
             cache_limit_mb: 64 * 1024,
             coordinator: None,
             coordinator_bind: SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::new(0, 0, 0, 0), 3000)),
@@ -75,7 +85,7 @@ impl Config {
 }
 
 fn local_config_path() -> Option<PathBuf> {
-    Some(dirs::config_dir()?.join("octobuild").join("octobuild.conf"))
+    Some(project_dirs().config_dir().join("octobuild.conf"))
 }
 
 #[cfg(windows)]

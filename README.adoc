@@ -111,12 +111,12 @@ You can list configuration files and check actual configuration by running `ib_c
 
 Environment variables have higher priority than config files.
 
-`OCTOBUILD_CACHE`:: specifies path to directory where octobuild cache is stored.
-Defaults to `%LocalAppData%/octobuild` on Windows, `~/.cache/octobuild` on Linux and `~/Library/Caches/octobuild` on macOS.
-`OCTOBUILD_CACHE_LIMIT_MB`:: specifies octobuild disk cache size limit in megabytes.
-Defaults to 64GB.
-`OCTOBUILD_PROCESS_LIMIT`:: specifies max number of concurrent processes octobuild will spawn.
-Defaults to number of cores.
+`OCTOBUILD_CACHE` (string):: specifies path to directory where octobuild cache is stored.
+Default is `%LocalAppData%/octobuild/cache` on Windows, `~/.cache/octobuild` on Linux and `~/Library/Caches/octobuild` on macOS.
+`OCTOBUILD_CACHE_LIMIT_MB` (number):: specifies octobuild disk cache size limit in megabytes.
+Defaults is 64GB.
+`OCTOBUILD_PROCESS_LIMIT` (number):: specifies max number of concurrent processes octobuild will spawn.
+Default is number of cores.
 
 [[benchmark]]
 == Benchmark

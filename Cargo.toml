@@ -67,7 +67,7 @@ byteorder = "1"
 clap = { version = "4", features = ["derive"] }
 crossbeam-channel = "0.5"
 daemon = { git = "https://github.com/slonopotamus/daemon-rs" }
-dirs = "4"
+directories = "4"
 fern = "0.6"
 figment = { version = "0.10", features = ["env", "yaml"] }
 hex = "0.4"
