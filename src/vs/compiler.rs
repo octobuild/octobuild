@@ -347,7 +347,6 @@ fn vs_identifier(path: &Path) -> Option<String> {
 
     use log::warn;
 
-    use std::ffi::OsStr;
     use std::os::windows::ffi::OsStrExt;
     use std::ptr;
     use std::slice;

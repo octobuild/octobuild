@@ -65,7 +65,7 @@ harness = false
 bincode = "1.2"
 byteorder = "1"
 clap = { version = "4", features = ["derive"] }
-crossbeam = "0.8"
+crossbeam-channel = "0.5"
 daemon = { git = "https://github.com/slonopotamus/daemon-rs" }
 dirs = "4"
 fern = "0.6"

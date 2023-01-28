@@ -166,8 +166,8 @@ pub fn validate_graph<N, E>(graph: Graph<N, E>) -> Result<Graph<N, E>, Error> {
 
 fn execute_until_failed<F>(
     graph: &BuildGraph,
-    tx_task: &crossbeam::channel::Sender<TaskMessage>,
-    rx_result: &crossbeam::channel::Receiver<ResultMessage>,
+    tx_task: &crossbeam_channel::Sender<TaskMessage>,
+    rx_result: &crossbeam_channel::Receiver<ResultMessage>,
     count: &mut usize,
     update_progress: F,
 ) -> Result<Option<i32>, Error>
@@ -236,14 +236,14 @@ where
         return Ok(Some(0));
     }
 
-    let (tx_result, rx_result) = crossbeam::channel::unbounded::<ResultMessage>();
-    let (tx_task, rx_task) = crossbeam::channel::unbounded::<TaskMessage>();
+    let (tx_result, rx_result) = crossbeam_channel::unbounded::<ResultMessage>();
+    let (tx_task, rx_task) = crossbeam_channel::unbounded::<TaskMessage>();
     let num_cpus = max(1, min(process_limit, graph.node_count()));
-    crossbeam::scope(|scope| {
+    std::thread::scope(|scope| {
         for worker_id in 0..num_cpus {
             let local_rx_task = rx_task.clone();
             let local_tx_result = tx_result.clone();
-            scope.spawn(move |_| {
+            scope.spawn(move || {
                 while let Ok(message) = local_rx_task.recv() {
                     match local_tx_result.send(ResultMessage {
                         index: message.index,
@@ -272,7 +272,6 @@ where
         }
         result
     })
-    .unwrap()
 }
 
 #[cfg(test)]
