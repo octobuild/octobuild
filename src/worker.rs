@@ -265,7 +265,8 @@ where
         let result =
             execute_until_failed(&graph, &tx_task, &rx_result, &mut count, &update_progress);
         // Cleanup task queue.
-        for _ in rx_task.try_iter() {}
+        drop(tx_task);
+        drop(rx_task);
         // Wait for in progress task completion.
         for message in rx_result {
             update_progress(&BuildResult::new(&message, &mut count, graph.node_count()))?;
