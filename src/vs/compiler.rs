@@ -418,9 +418,9 @@ fn vs_identifier(path: &Path) -> Option<String> {
 }
 
 #[cfg(windows)]
-fn read_executable_id(path: &Path) -> Result<String, Error> {
+fn read_executable_id(path: &Path) -> crate::Result<String> {
     use byteorder::{LittleEndian, ReadBytesExt};
-    use std::io::{ErrorKind, Read, Seek, SeekFrom};
+    use std::io::{Read, Seek, SeekFrom};
 
     let mut header: Vec<u8> = Vec::with_capacity(0x54);
 
@@ -430,10 +430,7 @@ fn read_executable_id(path: &Path) -> Result<String, Error> {
     file.read_exact(&mut header[..])?;
     // Check MZ header signature
     if header[0..2] != [0x4D, 0x5A] {
-        return Err(Error::new(
-            ErrorKind::InvalidData,
-            "Unexpected file type (MZ header signature not found)",
-        ));
+        return Err("Unexpected file type (MZ header signature not found)".into());
     }
     // Read PE header offset
     let pe_offset = u64::from(Cursor::new(&header[0x3C..0x40]).read_u32::<LittleEndian>()?);
@@ -443,10 +440,7 @@ fn read_executable_id(path: &Path) -> Result<String, Error> {
     file.read_exact(&mut header[..])?;
     // Check PE header signature
     if header[0..4] != [0x50, 0x45, 0x00, 0x00] {
-        return Err(Error::new(
-            ErrorKind::InvalidData,
-            "Unexpected file type (PE header signature not found)",
-        ));
+        return Err("Unexpected file type (PE header signature not found)".into());
     }
     let pe_time_date_stamp = Cursor::new(&header[0x08..0x0C]).read_u32::<LittleEndian>()?;
     let pe_size_of_image = Cursor::new(&header[0x50..0x54]).read_u32::<LittleEndian>()?;
