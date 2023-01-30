@@ -2,6 +2,7 @@ use std::cmp::max;
 use std::collections::hash_map;
 use std::collections::HashMap;
 use std::env;
+use std::ffi::{OsStr, OsString};
 use std::io::{Error, ErrorKind, Write};
 use std::iter::FromIterator;
 use std::path::{Path, PathBuf};
@@ -10,17 +11,19 @@ use std::sync::{Arc, RwLock};
 use std::time::Duration;
 
 use ipc::Semaphore;
+use os_str_bytes::OsStrBytes;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
+use tempfile::{NamedTempFile, TempDir};
+use thiserror::Error;
 
 use crate::cache::{Cache, FileHasher};
-use crate::config::Config;
-use crate::io::statistic::Statistic;
-
 use crate::cmd;
 use crate::compiler::CompileInput::{Preprocessed, Source};
+use crate::config::Config;
 use crate::io::memstream::MemStream;
-use thiserror::Error;
+use crate::io::statistic::Statistic;
+use crate::utils::OsStrExt;
 
 #[derive(Error, Debug)]
 pub enum CompilerError {
@@ -148,20 +151,29 @@ pub struct SharedState {
     pub semaphore: Semaphore,
     pub cache: Cache,
     pub statistic: Statistic,
+    pub temp_dir: TempDir,
     pub run_second_cpp: bool,
+    use_response_files: bool,
 }
 
 #[derive(Default)]
 pub struct CompilerGroup(Vec<Box<dyn Compiler>>);
 
+#[cfg(windows)]
+const NATIVE_EOL: &str = "\r\n";
+#[cfg(not(windows))]
+const NATIVE_EOL: &str = "\n";
+
 impl SharedState {
-    pub fn new(config: &Config) -> Result<Self, Error> {
+    pub fn new(config: &Config) -> std::io::Result<Self> {
         let semaphore = Semaphore::new("octobuild-worker", max(config.process_limit, 1_usize))?;
         Ok(SharedState {
             semaphore,
-            statistic: Statistic::new(),
             cache: Cache::new(config),
+            statistic: Statistic::new(),
+            temp_dir: tempfile::Builder::new().prefix("octobuild").tempdir()?,
             run_second_cpp: config.run_second_cpp,
+            use_response_files: config.use_response_files,
         })
     }
 
@@ -170,6 +182,30 @@ impl SharedState {
         let result = func();
         drop(guard);
         result
+    }
+
+    pub fn do_response_file(
+        &self,
+        args: Vec<OsString>,
+        command: &mut Command,
+    ) -> std::io::Result<Option<NamedTempFile>> {
+        if self.use_response_files {
+            let response_file = tempfile::Builder::new()
+                .suffix(".rsp")
+                .tempfile_in(self.temp_dir.path())?;
+            std::fs::write(
+                response_file.path(),
+                args.iter()
+                    .map(|s| "\"".to_string() + s.to_str().unwrap() + "\"")
+                    .collect::<Vec<String>>()
+                    .join(NATIVE_EOL),
+            )?;
+            command.arg(OsString::from("@").concat(response_file.path().as_os_str()));
+            Ok(Some(response_file))
+        } else {
+            command.args(args);
+            Ok(None)
+        }
     }
 }
 
@@ -349,11 +385,11 @@ pub struct CompilationArgs {
     // Parsed arguments.
     pub args: Vec<Arg>,
     // Input precompiled header file name.
-    pub input_precompiled: Option<PathBuf>,
+    pub pch_in: Option<PathBuf>,
     // Output precompiled header file name.
-    pub output_precompiled: Option<PathBuf>,
+    pub pch_out: Option<PathBuf>,
     // Marker for precompiled header.
-    pub marker_precompiled: Option<String>,
+    pub pch_marker: Option<String>,
     pub deps_file: Option<PathBuf>,
 }
 
@@ -381,15 +417,15 @@ pub enum CompileInput {
 
 pub struct CompileStep {
     // Compiler arguments.
-    pub args: Vec<String>,
-    // Input precompiled header file name.
-    pub input_precompiled: Option<PathBuf>,
+    pub args: Vec<OsString>,
     // Output object file name (None - compile to stdout).
     pub output_object: Option<PathBuf>,
+    // Input precompiled header file name.
+    pub pch_in: Option<PathBuf>,
     // Output precompiled header file name.
-    pub output_precompiled: Option<PathBuf>,
+    pub pch_out: Option<PathBuf>,
     pub input: CompileInput,
-    pub marker_precompiled: Option<String>,
+    pub pch_marker: Option<String>,
 }
 
 impl CompileStep {
@@ -397,16 +433,16 @@ impl CompileStep {
     pub fn new(
         task: &CompilationTask,
         preprocessed: CompilerOutput,
-        args: Vec<String>,
+        args: Vec<OsString>,
         use_precompiled: bool,
         run_second_cpp: bool,
     ) -> Self {
-        assert!(use_precompiled || task.shared.input_precompiled.is_none());
+        assert!(use_precompiled || task.shared.pch_in.is_none());
         CompileStep {
             output_object: Some(task.output_object.clone()),
-            output_precompiled: task.shared.output_precompiled.clone(),
-            input_precompiled: if use_precompiled {
-                task.shared.input_precompiled.clone()
+            pch_out: task.shared.pch_out.clone(),
+            pch_in: if use_precompiled {
+                task.shared.pch_in.clone()
             } else {
                 None
             },
@@ -419,8 +455,8 @@ impl CompileStep {
             } else {
                 Preprocessed(preprocessed)
             },
-            marker_precompiled: if run_second_cpp {
-                task.shared.marker_precompiled.clone()
+            pch_marker: if run_second_cpp {
+                task.shared.pch_marker.clone()
             } else {
                 None
             },
@@ -484,46 +520,36 @@ pub trait Toolchain: Send + Sync {
         args: &[String],
     ) -> Result<Vec<CompilationTask>, String>;
     // Preprocessing source file.
-    fn preprocess_step(
+    fn run_preprocess(
         &self,
         state: &SharedState,
         task: &CompilationTask,
     ) -> Result<PreprocessResult, Error>;
-    // Compile preprocessed file.
-    fn compile_prepare_step(
+    fn create_compile_step(
         &self,
         state: &SharedState,
         task: &CompilationTask,
         preprocessed: CompilerOutput,
-    ) -> Result<CompileStep, Error>;
+    ) -> CompileStep;
 
     // Compile preprocessed file.
-    fn compile_step(&self, state: &SharedState, task: CompileStep) -> Result<OutputInfo, Error>;
-    // Compile preprocessed file.
-    fn compile_memory(
-        &self,
-        state: &SharedState,
-        mut task: CompileStep,
-    ) -> Result<OutputInfo, Error> {
-        task.output_object = None;
-        self.compile_step(state, task)
-    }
+    fn run_compile(&self, state: &SharedState, task: CompileStep) -> Result<OutputInfo, Error>;
 
     fn compile_task(
         &self,
         state: &SharedState,
         task: &CompilationTask,
     ) -> Result<OutputInfo, Error> {
-        let preprocessed = self.preprocess_step(state, task)?;
+        let preprocessed = self.run_preprocess(state, task)?;
         match preprocessed {
             PreprocessResult::Success(preprocessed) => {
-                self.compile_step_cached(state, task, preprocessed)
+                self.run_compile_cached(state, task, preprocessed)
             }
             PreprocessResult::Failed(output) => Ok(output),
         }
     }
 
-    fn compile_step_cached(
+    fn run_compile_cached(
         &self,
         state: &SharedState,
         task: &CompilationTask,
@@ -534,15 +560,15 @@ pub trait Toolchain: Send + Sync {
         hasher.hash_u64(preprocessed.len() as u64);
         preprocessed.copy(&mut hasher)?;
 
-        let step = self.compile_prepare_step(state, task, preprocessed)?;
+        let step = self.create_compile_step(state, task, preprocessed);
 
         // Hash arguments
         hasher.hash_u64(step.args.len() as u64);
         for arg in &step.args {
-            hasher.hash_bytes(arg.as_bytes());
+            hasher.hash_os_string(arg)
         }
         // Hash input files
-        match &step.input_precompiled {
+        match &step.pch_in {
             Some(path) => {
                 hasher.hash_bytes(state.cache.file_hash(path)?.hash.as_bytes());
             }
@@ -551,14 +577,14 @@ pub trait Toolchain: Send + Sync {
             }
         }
         // Store output precompiled flag
-        hasher.hash_u8(u8::from(step.output_precompiled.is_some()));
+        hasher.hash_u8(u8::from(step.pch_out.is_some()));
 
         // Output files list
         let mut outputs: Vec<PathBuf> = Vec::new();
         if let Some(path) = &step.output_object {
             outputs.push(path.clone());
         }
-        if let Some(path) = &step.output_precompiled {
+        if let Some(path) = &step.pch_out {
             outputs.push(path.clone());
         }
 
@@ -567,7 +593,7 @@ pub trait Toolchain: Send + Sync {
             &state.statistic,
             &hex::encode(hasher.finalize()),
             &outputs,
-            || -> Result<OutputInfo, Error> { self.compile_step(state, step) },
+            || -> Result<OutputInfo, Error> { self.run_compile(state, step) },
             || true,
         )
     }
@@ -618,6 +644,10 @@ trait Hasher: Digest {
     fn hash_bytes(&mut self, bytes: &[u8]) {
         self.hash_u64(bytes.len() as u64);
         self.update(bytes);
+    }
+
+    fn hash_os_string(&mut self, str: &OsStr) {
+        self.hash_bytes(str.to_raw_bytes().as_ref());
     }
 }
 

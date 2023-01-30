@@ -1,4 +1,5 @@
 use local_encoding_ng::{Encoder, Encoding};
+use std::ffi::{OsStr, OsString};
 use std::io;
 use std::io::{Error, ErrorKind, Read};
 use std::path::PathBuf;
@@ -95,6 +96,17 @@ pub enum ParamValue<T> {
     None,
     Single(T),
     Many(Vec<T>),
+}
+
+pub trait OsStrExt {
+    fn concat(self, str: &OsStr) -> OsString;
+}
+
+impl OsStrExt for OsString {
+    fn concat(mut self, str: &OsStr) -> OsString {
+        self.push(str);
+        self
+    }
 }
 
 pub fn find_param<T, R, F: Fn(&T) -> Option<R>>(args: &[T], filter: F) -> ParamValue<R> {

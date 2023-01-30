@@ -16,7 +16,6 @@ use lazy_static::lazy_static;
 use octobuild::cluster::client::RemoteCompiler;
 use octobuild::compiler::{CommandArgs, Compiler, SharedState};
 use octobuild::config::Config;
-use octobuild::simple::create_temp_dir;
 use octobuild::simple::supported_compilers;
 use octobuild::version;
 use octobuild::worker::execute_graph;
@@ -120,10 +119,7 @@ fn expand_files(mut files: Vec<PathBuf>, arg: &str) -> Vec<PathBuf> {
 fn execute(args: &[String]) -> Result<Option<i32>, Box<dyn Error>> {
     let config = Config::load()?;
     let state = SharedState::new(&config)?;
-    let compiler = RemoteCompiler::new(
-        &config.coordinator,
-        supported_compilers(&create_temp_dir()?),
-    );
+    let compiler = RemoteCompiler::new(&config.coordinator, supported_compilers());
     let files = args
         .iter()
         .filter(|a| !is_flag(a))

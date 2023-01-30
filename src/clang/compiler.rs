@@ -1,3 +1,4 @@
+use std::ffi::OsString;
 use std::fs::File;
 use std::io::{Error, Write};
 use std::path::{Path, PathBuf};
@@ -73,6 +74,31 @@ impl Compiler for ClangCompiler {
     }
 }
 
+fn collect_args(
+    args: &[Arg],
+    target_scope: Scope,
+    run_second_cpp: bool,
+    output_precompiled: bool,
+    into: &mut Vec<OsString>,
+) {
+    for arg in args {
+        match arg {
+            Arg::Flag { scope, flag } => {
+                if scope.matches(target_scope, run_second_cpp, output_precompiled) {
+                    into.push(OsString::from("-".to_string() + flag));
+                }
+            }
+            Arg::Param { scope, flag, value } => {
+                if scope.matches(target_scope, run_second_cpp, output_precompiled) {
+                    into.push(OsString::from("-".to_string() + flag));
+                    into.push(OsString::from(&value));
+                }
+            }
+            Arg::Input { .. } | Arg::Output { .. } => {}
+        };
+    }
+}
+
 impl Toolchain for ClangToolchain {
     fn identifier(&self) -> Option<String> {
         self.identifier.get(|| clang_identifier(&self.path))
@@ -86,40 +112,33 @@ impl Toolchain for ClangToolchain {
         super::prepare::create_tasks(command, args)
     }
 
-    fn preprocess_step(
+    fn run_preprocess(
         &self,
         state: &SharedState,
         task: &CompilationTask,
     ) -> Result<PreprocessResult, Error> {
-        let mut command = task.shared.command.to_command();
-        command
-            .arg("-E")
-            .arg("-frewrite-includes")
-            .arg("-x")
-            .arg(&task.language)
-            .arg(&task.input_source)
-            .arg("-o")
-            .arg("-");
-
-        for arg in &task.shared.args {
-            match arg {
-                Arg::Flag { scope, flag } => {
-                    if scope.matches(Scope::Preprocessor, state.run_second_cpp, false) {
-                        command.arg("-".to_string() + flag);
-                    }
-                }
-                Arg::Param { scope, flag, value } => {
-                    if scope.matches(Scope::Preprocessor, state.run_second_cpp, false) {
-                        command.arg("-".to_string() + flag);
-                        command.arg(value.clone());
-                    }
-                }
-                Arg::Input { .. } | Arg::Output { .. } => {}
-            };
-        }
+        let mut args = vec![
+            OsString::from("-E"),
+            OsString::from("-frewrite-includes"),
+            OsString::from("-x"),
+            OsString::from(&task.language),
+            OsString::from(&task.input_source),
+            OsString::from("-o"),
+            OsString::from("-"),
+        ];
+        collect_args(
+            &task.shared.args,
+            Scope::Preprocessor,
+            state.run_second_cpp,
+            false,
+            &mut args,
+        );
 
         let output = state.wrap_slow(|| -> io::Result<Output> {
+            let mut command = task.shared.command.to_command();
+            let response_file = state.do_response_file(args, &mut command)?;
             let output = command.output()?;
+            drop(response_file);
 
             if let Some(ref deps_file) = task.shared.deps_file {
                 let data = fs::read_to_string(deps_file)?;
@@ -147,51 +166,43 @@ impl Toolchain for ClangToolchain {
     }
 
     // Compile preprocessed file.
-    fn compile_prepare_step(
+    fn create_compile_step(
         &self,
         state: &SharedState,
         task: &CompilationTask,
         preprocessed: CompilerOutput,
-    ) -> Result<CompileStep, Error> {
-        let mut args = vec!["-x".to_string(), task.language.clone()];
-        for arg in &task.shared.args {
-            match arg {
-                Arg::Flag { scope, flag } => {
-                    if scope.matches(
-                        Scope::Compiler,
-                        state.run_second_cpp,
-                        task.shared.output_precompiled.is_some(),
-                    ) {
-                        args.push("-".to_string() + flag);
-                    }
-                }
-                Arg::Param { scope, flag, value } => {
-                    if scope.matches(
-                        Scope::Compiler,
-                        state.run_second_cpp,
-                        task.shared.output_precompiled.is_some(),
-                    ) {
-                        args.push("-".to_string() + flag);
-                        args.push(value.clone());
-                    }
-                }
-                Arg::Input { .. } | Arg::Output { .. } => {}
-            };
-        }
-        Ok(CompileStep::new(
-            task,
-            preprocessed,
-            args,
-            false,
+    ) -> CompileStep {
+        let mut args = vec![OsString::from("-x"), OsString::from(&task.language)];
+        collect_args(
+            &task.shared.args,
+            Scope::Compiler,
             state.run_second_cpp,
-        ))
+            task.shared.pch_out.is_some(),
+            &mut args,
+        );
+
+        CompileStep::new(task, preprocessed, args, false, state.run_second_cpp)
     }
 
-    fn compile_step(&self, state: &SharedState, task: CompileStep) -> Result<OutputInfo, Error> {
+    fn run_compile(&self, state: &SharedState, task: CompileStep) -> Result<OutputInfo, Error> {
+        let mut args = task.args.clone();
+        args.push(OsString::from("-c"));
+        match &task.input {
+            Preprocessed(_) => args.push(OsString::from("-")),
+            Source(source) => args.push(OsString::from(&source.path)),
+        };
+
+        args.push(OsString::from("-o"));
+        match task.output_object {
+            None => args.push(OsString::from("-")),
+            Some(v) => args.push(OsString::from(v)),
+        };
+
         // Run compiler.
         state.wrap_slow(|| {
-            let mut command = Command::new(&self.path);
+            // TODO: response file
 
+            let mut command = Command::new(&self.path);
             match &task.input {
                 Preprocessed(_) => {
                     command.env_clear();
@@ -203,18 +214,6 @@ impl Toolchain for ClangToolchain {
                 }
             }
 
-            command.arg("-c").args(&task.args);
-            match &task.input {
-                Preprocessed(_) => command.arg("-"),
-                Source(source) => command.arg(&source.path),
-            };
-
-            command.arg("-o");
-            match task.output_object {
-                None => command.arg("-"),
-                Some(v) => command.arg(v),
-            };
-
             command
                 .stdin(match &task.input {
                     Preprocessed(_) => Stdio::piped(),
@@ -223,6 +222,7 @@ impl Toolchain for ClangToolchain {
                 .stdout(Stdio::piped())
                 .stderr(Stdio::piped());
 
+            let response_file = state.do_response_file(args, &mut command)?;
             let mut child = command.spawn()?;
 
             if let Preprocessed(preprocessed) = task.input {
@@ -230,6 +230,7 @@ impl Toolchain for ClangToolchain {
             }
 
             let output = child.wait_with_output()?;
+            drop(response_file);
             Ok(OutputInfo::new(output))
         })
     }

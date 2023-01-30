@@ -5,7 +5,6 @@ use std::sync::Arc;
 
 use log::error;
 use petgraph::Graph;
-use tempdir::TempDir;
 
 use crate::clang::compiler::ClangCompiler;
 use crate::cluster::client::RemoteCompiler;
@@ -16,14 +15,10 @@ use crate::worker::execute_graph;
 use crate::worker::{BuildAction, BuildGraph, BuildResult, BuildTask};
 
 #[must_use]
-pub fn supported_compilers(temp_dir: &Arc<TempDir>) -> CompilerGroup {
+pub fn supported_compilers() -> CompilerGroup {
     CompilerGroup::new()
-        .add(VsCompiler::new(temp_dir))
+        .add(VsCompiler::new())
         .add(ClangCompiler::new())
-}
-
-pub fn create_temp_dir() -> Result<Arc<TempDir>, Error> {
-    TempDir::new("octobuild").map(Arc::new)
 }
 
 pub fn simple_compile<C, F>(exec: &str, factory: F) -> i32

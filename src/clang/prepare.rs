@@ -36,7 +36,7 @@ pub fn create_tasks(command: CommandInfo, args: &[String]) -> Result<Vec<Compila
         return Err("Can't find source file path.".to_string());
     }
     // Precompiled header file name.
-    let input_precompiled = match find_param(&parsed_args, |arg: &Arg| -> Option<PathBuf> {
+    let pch_in = match find_param(&parsed_args, |arg: &Arg| -> Option<PathBuf> {
         match arg {
             Arg::Input { kind, file, .. } if *kind == InputKind::Precompiled => {
                 Some(PathBuf::from(file))
@@ -51,7 +51,7 @@ pub fn create_tasks(command: CommandInfo, args: &[String]) -> Result<Vec<Compila
         }
     };
     // Precompiled header file name.
-    let marker_precompiled = parsed_args.iter().find_map(|arg| match arg {
+    let pch_marker = parsed_args.iter().find_map(|arg| match arg {
         Arg::Param { flag, value, .. } if *flag == "include" => Some(value.clone()),
         _ => None,
     });
@@ -108,9 +108,9 @@ pub fn create_tasks(command: CommandInfo, args: &[String]) -> Result<Vec<Compila
     let shared = Arc::new(CompilationArgs {
         command,
         args: parsed_args,
-        output_precompiled: None,
-        marker_precompiled,
-        input_precompiled,
+        pch_out: None,
+        pch_marker,
+        pch_in,
         deps_file,
     });
     input_sources
