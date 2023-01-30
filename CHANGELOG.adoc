@@ -1,7 +1,7 @@
 = Changelog
 :icons: font
 
-== Unreleased
+== 0.4.0
 
 * Add support for response files (https://github.com/octobuild/octobuild/issues/80[#80])
 * Fix handling of `cmd.exe` tasks on Windows (https://github.com/octobuild/octobuild/issues/79[#79])
