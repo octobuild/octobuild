@@ -1,6 +1,6 @@
 use std::borrow::Cow;
 use std::cmp::{max, min};
-use std::io::{Error, ErrorKind, Write};
+use std::io::Write;
 use std::sync::Arc;
 use std::time::Instant;
 
@@ -86,7 +86,7 @@ impl<'a> BuildResult<'a> {
         }
     }
 
-    pub fn print(self) -> Result<(), Error> {
+    pub fn print(self) -> crate::Result<()> {
         if let Ok(ref output) = self.result.output {
             std::io::stdout().write_all(&output.stdout)?;
             std::io::stderr().write_all(&output.stderr)?;
@@ -132,7 +132,7 @@ impl BuildAction {
     }
 }
 
-pub fn validate_graph<N, E>(graph: Graph<N, E>) -> Result<Graph<N, E>, Error> {
+pub fn validate_graph<N, E>(graph: Graph<N, E>) -> crate::Result<Graph<N, E>> {
     let mut completed: Vec<bool> = Vec::with_capacity(graph.node_count());
     let mut queue: Vec<NodeIndex> = Vec::with_capacity(graph.node_count());
     if graph.node_count() == 0 {
@@ -158,10 +158,7 @@ pub fn validate_graph<N, E>(graph: Graph<N, E>) -> Result<Graph<N, E>, Error> {
         }
         i += 1;
     }
-    Err(Error::new(
-        ErrorKind::InvalidInput,
-        "Found cycles in build dependencies",
-    ))
+    Err(crate::Error::CyclesInBuildGraph)
 }
 
 fn execute_until_failed<F>(
@@ -170,9 +167,9 @@ fn execute_until_failed<F>(
     rx_result: &crossbeam_channel::Receiver<ResultMessage>,
     count: &mut usize,
     update_progress: F,
-) -> Result<Option<i32>, Error>
+) -> crate::Result<Option<i32>>
 where
-    F: Fn(&BuildResult) -> Result<(), Error>,
+    F: Fn(&BuildResult) -> crate::Result<()>,
 {
     let mut completed: Vec<bool> = vec![false; graph.node_count()];
     for index in graph.externals(EdgeDirection::Outgoing) {
@@ -181,7 +178,7 @@ where
                 index,
                 task: graph.node_weight(index).unwrap().clone(),
             })
-            .map_err(|e| Error::new(ErrorKind::Other, e))?;
+            .map_err(crate::Error::send_error)?;
     }
 
     for message in rx_result {
@@ -202,7 +199,7 @@ where
                         index: source,
                         task: graph.node_weight(source).unwrap().clone(),
                     })
-                    .map_err(|e| Error::new(ErrorKind::Other, e))?;
+                    .map_err(crate::Error::send_error)?;
             }
         }
 
@@ -210,7 +207,9 @@ where
             return Ok(Some(0));
         }
     }
-    panic!("Unexpected end of result pipe");
+    Err(crate::Error::from(
+        "Unexpected end of result pipe".to_string(),
+    ))
 }
 
 fn is_ready<N, E>(graph: &Graph<N, E>, completed: &[bool], source: NodeIndex) -> bool {
@@ -227,9 +226,9 @@ pub fn execute_graph<F>(
     build_graph: BuildGraph,
     process_limit: usize,
     update_progress: F,
-) -> Result<Option<i32>, Error>
+) -> crate::Result<Option<i32>>
 where
-    F: Fn(&BuildResult) -> Result<(), Error>,
+    F: Fn(&BuildResult) -> crate::Result<()>,
 {
     let graph = validate_graph(build_graph)?;
     if graph.node_count() == 0 {

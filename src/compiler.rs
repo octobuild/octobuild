@@ -3,7 +3,7 @@ use std::collections::hash_map;
 use std::collections::HashMap;
 use std::env;
 use std::ffi::{OsStr, OsString};
-use std::io::{Error, ErrorKind, Write};
+use std::io::Write;
 use std::iter::FromIterator;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
@@ -335,7 +335,7 @@ pub struct OutputInfo {
 }
 
 pub struct BuildTaskResult {
-    pub output: Result<OutputInfo, Error>,
+    pub output: crate::Result<OutputInfo>,
     pub duration: Duration,
 }
 
@@ -518,13 +518,13 @@ pub trait Toolchain: Send + Sync {
         &self,
         command: CommandInfo,
         args: &[String],
-    ) -> Result<Vec<CompilationTask>, String>;
+    ) -> crate::Result<Vec<CompilationTask>>;
     // Preprocessing source file.
     fn run_preprocess(
         &self,
         state: &SharedState,
         task: &CompilationTask,
-    ) -> Result<PreprocessResult, Error>;
+    ) -> crate::Result<PreprocessResult>;
     fn create_compile_step(
         &self,
         state: &SharedState,
@@ -533,13 +533,13 @@ pub trait Toolchain: Send + Sync {
     ) -> CompileStep;
 
     // Compile preprocessed file.
-    fn run_compile(&self, state: &SharedState, task: CompileStep) -> Result<OutputInfo, Error>;
+    fn run_compile(&self, state: &SharedState, task: CompileStep) -> crate::Result<OutputInfo>;
 
     fn compile_task(
         &self,
         state: &SharedState,
         task: &CompilationTask,
-    ) -> Result<OutputInfo, Error> {
+    ) -> crate::Result<OutputInfo> {
         let preprocessed = self.run_preprocess(state, task)?;
         match preprocessed {
             PreprocessResult::Success(preprocessed) => {
@@ -554,7 +554,7 @@ pub trait Toolchain: Send + Sync {
         state: &SharedState,
         task: &CompilationTask,
         preprocessed: CompilerOutput,
-    ) -> Result<OutputInfo, Error> {
+    ) -> crate::Result<OutputInfo> {
         let mut hasher = Sha256::new();
         // Get hash from preprocessed data
         hasher.hash_u64(preprocessed.len() as u64);
@@ -593,7 +593,7 @@ pub trait Toolchain: Send + Sync {
             &state.statistic,
             &hex::encode(hasher.finalize()),
             &outputs,
-            || -> Result<OutputInfo, Error> { self.run_compile(state, step) },
+            || -> crate::Result<OutputInfo> { self.run_compile(state, step) },
             || true,
         )
     }
@@ -665,7 +665,7 @@ pub enum CommandArgs {
 }
 
 impl CommandArgs {
-    pub fn append_to(&self, command: &mut Command) -> Result<(), Error> {
+    pub fn append_to(&self, command: &mut Command) -> crate::Result<()> {
         match self {
             CommandArgs::Raw(v) => {
                 #[cfg(windows)]
@@ -696,22 +696,17 @@ pub trait Compiler: Send + Sync {
         &self,
         command: CommandInfo,
         args: CommandArgs,
-    ) -> Result<Vec<ToolchainCompilationTask>, Error> {
-        let toolchain = self.resolve_toolchain(&command).ok_or_else(|| {
-            Error::new(
-                ErrorKind::InvalidInput,
-                CompilerError::ToolchainNotFound(command.program.clone()),
-            )
-        })?;
+    ) -> crate::Result<Vec<ToolchainCompilationTask>> {
+        let toolchain = self
+            .resolve_toolchain(&command)
+            .ok_or_else(|| crate::Error::ToolchainNotFound(command.program.clone()))?;
 
         let argv = match args {
             CommandArgs::Raw(v) => cmd::native::parse(&v)?,
             CommandArgs::Array(v) => v,
         };
 
-        let tasks = toolchain
-            .create_tasks(command, &argv)
-            .map_err(|e| Error::new(ErrorKind::InvalidInput, CompilerError::InvalidArguments(e)))?;
+        let tasks = toolchain.create_tasks(command, &argv)?;
 
         Ok(tasks
             .into_iter()

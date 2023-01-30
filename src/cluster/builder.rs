@@ -1,5 +1,3 @@
-use std::io;
-
 use serde::{Deserialize, Serialize};
 
 use crate::compiler::OutputInfo;
@@ -18,8 +16,8 @@ pub enum CompileResponse {
     Err(String),
 }
 
-impl From<Result<OutputInfo, io::Error>> for CompileResponse {
-    fn from(result: Result<OutputInfo, io::Error>) -> Self {
+impl From<crate::Result<OutputInfo>> for CompileResponse {
+    fn from(result: crate::Result<OutputInfo>) -> Self {
         match result {
             Ok(output) => CompileResponse::Success(output),
             Err(v) => CompileResponse::Err(v.to_string()),

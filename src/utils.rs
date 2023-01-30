@@ -1,7 +1,7 @@
 use local_encoding_ng::{Encoder, Encoding};
 use std::ffi::{OsStr, OsString};
 use std::io;
-use std::io::{Error, ErrorKind, Read};
+use std::io::{Error, Read};
 use std::path::PathBuf;
 use std::time::Instant;
 use std::{env, fs};
@@ -20,7 +20,7 @@ pub fn hash_stream<R: Read>(reader: &mut R) -> Result<String, Error> {
 pub fn expand_response_files(
     base: &Option<PathBuf>,
     args: &[String],
-) -> Result<Vec<String>, Error> {
+) -> crate::Result<Vec<String>> {
     let mut result = Vec::<String>::new();
 
     for item in args {
@@ -42,32 +42,29 @@ pub fn expand_response_files(
     Ok(result)
 }
 
-fn decode_string(data: &[u8]) -> Result<String, Error> {
+fn decode_string(data: &[u8]) -> crate::Result<String> {
     if data.starts_with(&[0xEF, 0xBB, 0xBF]) {
-        String::from_utf8(data[3..].to_vec()).map_err(|e| Error::new(ErrorKind::InvalidInput, e))
+        Ok(String::from_utf8(data[3..].to_vec())?)
     } else if data.starts_with(&[0xFE, 0xFF]) {
-        decode_utf16(&data[2..], |a, b| (a << 8) + b)
+        Ok(decode_utf16(&data[2..], |a, b| (a << 8) + b)?)
     } else if data.starts_with(&[0xFF, 0xFE]) {
-        decode_utf16(&data[2..], |a, b| (b << 8) + a)
+        Ok(decode_utf16(&data[2..], |a, b| (b << 8) + a)?)
     } else {
-        Encoding::ANSI.to_string(data)
+        Ok(Encoding::ANSI.to_string(data)?)
     }
 }
 
-fn decode_utf16<F: Fn(u16, u16) -> u16>(data: &[u8], endian: F) -> Result<String, Error> {
+fn decode_utf16<F: Fn(u16, u16) -> u16>(data: &[u8], endian: F) -> crate::Result<String> {
     let mut utf16 = Vec::new();
     if data.len() % 2 != 0 {
-        return Err(Error::new(
-            ErrorKind::InvalidInput,
-            "Invalid UTF-16 line: odd bytes length",
-        ));
+        return Err(crate::Error::FromUtf16OddLength);
     }
     let mut i = 0;
     while i < data.len() {
         utf16.push(endian(u16::from(data[i]), u16::from(data[i + 1])));
         i += 2;
     }
-    String::from_utf16(&utf16).map_err(|e| Error::new(ErrorKind::InvalidInput, e))
+    Ok(String::from_utf16(&utf16)?)
 }
 
 pub fn init_logger() {

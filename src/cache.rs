@@ -40,19 +40,19 @@ impl Cache {
         }
     }
 
-    pub fn run_file_cached<F: FnOnce() -> Result<OutputInfo, Error>, C: Fn() -> bool>(
+    pub fn run_file_cached<F: FnOnce() -> crate::Result<OutputInfo>, C: Fn() -> bool>(
         &self,
         statistic: &Statistic,
         hash: &str,
         outputs: &[PathBuf],
         worker: F,
         checker: C,
-    ) -> Result<OutputInfo, Error> {
+    ) -> crate::Result<OutputInfo> {
         self.file_cache
             .run_cached(statistic, hash, outputs, worker, checker)
     }
 
-    pub fn cleanup(&self) -> Result<(), Error> {
+    pub fn cleanup(&self) -> crate::Result<()> {
         self.file_cache.cleanup()
     }
 }

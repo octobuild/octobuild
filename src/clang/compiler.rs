@@ -1,6 +1,6 @@
 use std::ffi::OsString;
 use std::fs::File;
-use std::io::{Error, Write};
+use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output, Stdio};
 use std::sync::Arc;
@@ -108,7 +108,7 @@ impl Toolchain for ClangToolchain {
         &self,
         command: CommandInfo,
         args: &[String],
-    ) -> Result<Vec<CompilationTask>, String> {
+    ) -> crate::Result<Vec<CompilationTask>> {
         super::prepare::create_tasks(command, args)
     }
 
@@ -116,7 +116,7 @@ impl Toolchain for ClangToolchain {
         &self,
         state: &SharedState,
         task: &CompilationTask,
-    ) -> Result<PreprocessResult, Error> {
+    ) -> crate::Result<PreprocessResult> {
         let mut args = vec![
             OsString::from("-E"),
             OsString::from("-frewrite-includes"),
@@ -184,7 +184,7 @@ impl Toolchain for ClangToolchain {
         CompileStep::new(task, preprocessed, args, false, state.run_second_cpp)
     }
 
-    fn run_compile(&self, state: &SharedState, task: CompileStep) -> Result<OutputInfo, Error> {
+    fn run_compile(&self, state: &SharedState, task: CompileStep) -> crate::Result<OutputInfo> {
         let mut args = task.args.clone();
         args.push(OsString::from("-c"));
         match &task.input {

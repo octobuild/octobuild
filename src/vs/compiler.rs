@@ -11,7 +11,7 @@ use lazy_static::lazy_static;
 use regex::bytes::{NoExpand, Regex};
 use std::ffi::{OsStr, OsString};
 use std::fs::File;
-use std::io::{Cursor, Error};
+use std::io::Cursor;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 use std::sync::Arc;
@@ -139,7 +139,7 @@ impl Toolchain for VsToolchain {
         &self,
         command: CommandInfo,
         args: &[String],
-    ) -> Result<Vec<CompilationTask>, String> {
+    ) -> crate::Result<Vec<CompilationTask>> {
         super::prepare::create_tasks(command, args)
     }
 
@@ -147,7 +147,7 @@ impl Toolchain for VsToolchain {
         &self,
         state: &SharedState,
         task: &CompilationTask,
-    ) -> Result<PreprocessResult, Error> {
+    ) -> crate::Result<PreprocessResult> {
         let mut args = vec![
             OsString::from("/nologo"),
             OsString::from("/T".to_string() + &task.language),
@@ -220,7 +220,7 @@ impl Toolchain for VsToolchain {
         CompileStep::new(task, preprocessed, args, true, state.run_second_cpp)
     }
 
-    fn run_compile(&self, state: &SharedState, task: CompileStep) -> Result<OutputInfo, Error> {
+    fn run_compile(&self, state: &SharedState, task: CompileStep) -> crate::Result<OutputInfo> {
         let (output_path, temp_output) = match task.output_object {
             Some(v) => (v, None),
             None => {

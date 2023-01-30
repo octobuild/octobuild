@@ -1,5 +1,4 @@
 use std::env;
-use std::io::Error;
 use std::path::PathBuf;
 use std::sync::Arc;
 
@@ -24,7 +23,7 @@ pub fn supported_compilers() -> CompilerGroup {
 pub fn simple_compile<C, F>(exec: &str, factory: F) -> i32
 where
     C: Compiler,
-    F: FnOnce(&Config) -> Result<C, Error>,
+    F: FnOnce(&Config) -> crate::Result<C>,
 {
     let config = match Config::load() {
         Ok(v) => v,
@@ -61,7 +60,7 @@ pub fn compile<C>(
     state: &SharedState,
     exec: &str,
     compiler: C,
-) -> Result<Option<i32>, Error>
+) -> crate::Result<Option<i32>>
 where
     C: Compiler,
 {
@@ -82,7 +81,7 @@ where
     result
 }
 
-fn print_task_result(result: &BuildResult) -> Result<(), Error> {
+fn print_task_result(result: &BuildResult) -> crate::Result<()> {
     result.result.print_output()?;
     Ok(())
 }

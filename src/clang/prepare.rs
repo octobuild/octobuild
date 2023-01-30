@@ -7,9 +7,8 @@ use crate::compiler::{
 };
 use crate::utils::{expand_response_files, find_param, ParamValue};
 
-pub fn create_tasks(command: CommandInfo, args: &[String]) -> Result<Vec<CompilationTask>, String> {
-    let expanded_args =
-        expand_response_files(&command.current_dir, args).map_err(|e| e.to_string())?;
+pub fn create_tasks(command: CommandInfo, args: &[String]) -> crate::Result<Vec<CompilationTask>> {
+    let expanded_args = expand_response_files(&command.current_dir, args)?;
 
     if expanded_args.iter().any(|v| v == "--analyze") {
         // Support only compilation steps
@@ -33,7 +32,7 @@ pub fn create_tasks(command: CommandInfo, args: &[String]) -> Result<Vec<Compila
         })
         .collect();
     if input_sources.is_empty() {
-        return Err("Can't find source file path.".to_string());
+        return Err(crate::Error::from("Can't find source file path."));
     }
     // Precompiled header file name.
     let pch_in = match find_param(&parsed_args, |arg: &Arg| -> Option<PathBuf> {
@@ -47,7 +46,9 @@ pub fn create_tasks(command: CommandInfo, args: &[String]) -> Result<Vec<Compila
         ParamValue::None => None,
         ParamValue::Single(v) => Some(v),
         ParamValue::Many(v) => {
-            return Err(format!("Found too many precompiled header files: {v:?}"));
+            return Err(crate::Error::from(format!(
+                "Found too many precompiled header files: {v:?}"
+            )));
         }
     };
     // Precompiled header file name.
@@ -67,12 +68,16 @@ pub fn create_tasks(command: CommandInfo, args: &[String]) -> Result<Vec<Compila
         ParamValue::None => None,
         ParamValue::Single(v) => {
             if input_sources.len() > 1 {
-                return Err("Cannot specify -o when generating multiple output files".to_string());
+                return Err(crate::Error::from(
+                    "Cannot specify -o when generating multiple output files",
+                ));
             }
             Some(v)
         }
         ParamValue::Many(v) => {
-            return Err(format!("Found too many output object files: {v:?}"));
+            return Err(crate::Error::from(format!(
+                "Found too many output object files: {v:?}"
+            )));
         }
     };
 
@@ -97,12 +102,16 @@ pub fn create_tasks(command: CommandInfo, args: &[String]) -> Result<Vec<Compila
                     return Ok(Vec::new());
                 }
                 _ => {
-                    return Err(format!("Unknown source language type: {v}"));
+                    return Err(crate::Error::from(format!(
+                        "Unknown source language type: {v}"
+                    )));
                 }
             }
         }
         ParamValue::Many(v) => {
-            return Err(format!("Found too many output object files: {v:?}"));
+            return Err(crate::Error::from(format!(
+                "Found too many output object files: {v:?}"
+            )));
         }
     };
     let shared = Arc::new(CompilationArgs {

@@ -41,7 +41,7 @@ impl Default for Config {
 }
 
 impl Config {
-    pub fn load() -> figment::error::Result<Config> {
+    pub fn load() -> crate::Result<Config> {
         let mut figment = Figment::from(Serialized::defaults(Config::default()));
 
         for path in vec![global_config_path(), local_config_path()]
@@ -51,7 +51,7 @@ impl Config {
             figment = figment.merge(Yaml::file(path));
         }
 
-        figment.merge(Env::prefixed("OCTOBUILD_")).extract()
+        Ok(figment.merge(Env::prefixed("OCTOBUILD_")).extract()?)
     }
 
     pub fn help() {

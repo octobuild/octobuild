@@ -51,14 +51,14 @@ impl FileCache {
         }
     }
 
-    pub fn run_cached<F: FnOnce() -> Result<OutputInfo, Error>, C: Fn() -> bool>(
+    pub fn run_cached<F: FnOnce() -> crate::Result<OutputInfo>, C: Fn() -> bool>(
         &self,
         statistic: &Statistic,
         hash: &str,
         outputs: &[PathBuf],
         worker: F,
         checker: C,
-    ) -> Result<OutputInfo, Error> {
+    ) -> crate::Result<OutputInfo> {
         let path = self
             .cache_dir
             .join(&hash[0..2])
@@ -75,7 +75,7 @@ impl FileCache {
         Ok(output)
     }
 
-    pub fn cleanup(&self) -> Result<(), Error> {
+    pub fn cleanup(&self) -> crate::Result<()> {
         let mut files = find_cache_files(&self.cache_dir, Vec::new())?;
         files.sort_by(|a, b| b.accessed.cmp(&a.accessed));
 
@@ -90,7 +90,7 @@ impl FileCache {
     }
 }
 
-fn find_cache_files(dir: &Path, mut files: Vec<CacheFile>) -> Result<Vec<CacheFile>, Error> {
+fn find_cache_files(dir: &Path, mut files: Vec<CacheFile>) -> crate::Result<Vec<CacheFile>> {
     for entry in fs::read_dir(dir)? {
         let entry = entry?;
         let path = entry.path();

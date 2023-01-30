@@ -263,7 +263,7 @@ impl Toolchain for RemoteToolchain {
         &self,
         command: CommandInfo,
         args: &[String],
-    ) -> Result<Vec<CompilationTask>, String> {
+    ) -> crate::Result<Vec<CompilationTask>> {
         self.local.create_tasks(command, args)
     }
 
@@ -272,7 +272,7 @@ impl Toolchain for RemoteToolchain {
         &self,
         state: &SharedState,
         task: &CompilationTask,
-    ) -> Result<PreprocessResult, Error> {
+    ) -> crate::Result<PreprocessResult> {
         self.local.run_preprocess(state, task)
     }
 
@@ -286,11 +286,11 @@ impl Toolchain for RemoteToolchain {
         self.local.create_compile_step(state, task, preprocessed)
     }
 
-    fn run_compile(&self, state: &SharedState, task: CompileStep) -> Result<OutputInfo, Error> {
+    fn run_compile(&self, state: &SharedState, task: CompileStep) -> crate::Result<OutputInfo> {
         match self.compile_remote(state, &task) {
             Ok(response) => match response {
                 CompileResponse::Success(output) => Ok(output),
-                CompileResponse::Err(err) => Err(Error::new(ErrorKind::Other, err)),
+                CompileResponse::Err(err) => Err(err.into()),
             },
             Err(e) => {
                 trace!("Fallback to local build: {}", e);

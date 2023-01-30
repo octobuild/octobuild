@@ -1,9 +1,7 @@
 #![allow(non_snake_case)]
 
-use std::error::Error;
-
 mod ib_console;
 
-fn main() -> Result<(), Box<dyn Error>> {
+fn main() -> octobuild::Result<()> {
     ib_console::main()
 }

@@ -1,4 +1,3 @@
-use std::io::Error;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
@@ -7,9 +6,8 @@ use crate::compiler::{
 };
 use crate::utils::{expand_response_files, find_param, ParamValue};
 
-pub fn create_tasks(command: CommandInfo, args: &[String]) -> Result<Vec<CompilationTask>, String> {
-    let expanded_args = expand_response_files(&command.current_dir, args)
-        .map_err(|e: Error| format!("IO error: {e}"))?;
+pub fn create_tasks(command: CommandInfo, args: &[String]) -> crate::Result<Vec<CompilationTask>> {
+    let expanded_args = expand_response_files(&command.current_dir, args)?;
 
     let parsed_args = parse_arguments(expanded_args.iter())?;
     // Source file name.
@@ -23,7 +21,9 @@ pub fn create_tasks(command: CommandInfo, args: &[String]) -> Result<Vec<Compila
         })
         .collect();
     if input_sources.is_empty() {
-        return Err("Can't find source file path.".to_string());
+        return Err(crate::Error::from(
+            "Can't find source file path.".to_string(),
+        ));
     }
     // Precompiled header file name.
     let precompiled_file = match find_param(&parsed_args, |arg: &Arg| -> Option<PathBuf> {
@@ -37,7 +37,9 @@ pub fn create_tasks(command: CommandInfo, args: &[String]) -> Result<Vec<Compila
         ParamValue::None => None,
         ParamValue::Single(v) => Some(v),
         ParamValue::Many(v) => {
-            return Err(format!("Found too many precompiled header files: {v:?}"));
+            return Err(crate::Error::from(format!(
+                "Found too many precompiled header files: {v:?}"
+            )));
         }
     };
     let cwd = command.current_dir.clone();
@@ -76,10 +78,10 @@ pub fn create_tasks(command: CommandInfo, args: &[String]) -> Result<Vec<Compila
             }
         }
         ParamValue::Many(v) => {
-            return Err(format!(
+            return Err(crate::Error::from(format!(
                 "Found too many precompiled header markers: {}",
                 v.iter().map(|item| item.1.clone()).collect::<String>()
-            ));
+            )));
         }
     };
     // Output object file name.
@@ -95,7 +97,9 @@ pub fn create_tasks(command: CommandInfo, args: &[String]) -> Result<Vec<Compila
             ParamValue::None => None,
             ParamValue::Single(v) => Some(v),
             ParamValue::Many(v) => {
-                return Err(format!("Found too many output object files: {v:?}"));
+                return Err(crate::Error::from(format!(
+                    "Found too many output object files: {v:?}"
+                )));
             }
         }
         .map(|path| cwd.as_ref().map(|cwd| cwd.join(&path)).unwrap_or(path));
@@ -109,7 +113,9 @@ pub fn create_tasks(command: CommandInfo, args: &[String]) -> Result<Vec<Compila
         ParamValue::None => None,
         ParamValue::Single(v) => Some(v),
         ParamValue::Many(v) => {
-            return Err(format!("Found too many output object files: {v:?}"));
+            return Err(crate::Error::from(format!(
+                "Found too many output object files: {v:?}"
+            )));
         }
     };
     let shared = Arc::new(CompilationArgs {

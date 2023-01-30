@@ -1,9 +1,8 @@
 #![allow(non_snake_case)]
 
 use std::env;
-use std::error::Error;
 use std::fs::File;
-use std::io::{BufReader, ErrorKind};
+use std::io::BufReader;
 use std::path::{Path, PathBuf};
 use std::process;
 use std::sync::Arc;
@@ -24,7 +23,7 @@ use octobuild::worker::{BuildAction, BuildGraph, BuildResult, BuildTask};
 use octobuild::xg;
 use octobuild::xg::parser::{XgGraph, XgNode};
 
-pub fn main() -> Result<(), Box<dyn Error>> {
+pub fn main() -> octobuild::Result<()> {
     println!("xgConsole ({}):", version::full());
     let args: Vec<String> = env::args().collect();
     for arg in &args {
@@ -80,7 +79,7 @@ fn expand_files(mut files: Vec<PathBuf>, arg: &str) -> Vec<PathBuf> {
         Regex::new(&result).unwrap()
     }
 
-    fn find_files(dir: &Path, mask: &str) -> std::io::Result<Vec<PathBuf>> {
+    fn find_files(dir: &Path, mask: &str) -> octobuild::Result<Vec<PathBuf>> {
         let mut result = Vec::new();
         let expr = mask_to_regex(&mask.to_lowercase());
         for entry in fs::read_dir(dir)? {
@@ -116,7 +115,7 @@ fn expand_files(mut files: Vec<PathBuf>, arg: &str) -> Vec<PathBuf> {
     files
 }
 
-fn execute(args: &[String]) -> Result<Option<i32>, Box<dyn Error>> {
+fn execute(args: &[String]) -> octobuild::Result<Option<i32>> {
     let config = Config::load()?;
     let state = SharedState::new(&config)?;
     let compiler = RemoteCompiler::new(&config.coordinator, supported_compilers());
@@ -125,9 +124,7 @@ fn execute(args: &[String]) -> Result<Option<i32>, Box<dyn Error>> {
         .filter(|a| !is_flag(a))
         .fold(Vec::new(), |state, a| expand_files(state, a));
     if files.is_empty() {
-        return Err(
-            std::io::Error::new(ErrorKind::InvalidInput, "Build task files not found").into(),
-        );
+        return Err(octobuild::Error::NoTaskFiles);
     }
 
     let mut graph = Graph::new();
@@ -140,14 +137,14 @@ fn execute(args: &[String]) -> Result<Option<i32>, Box<dyn Error>> {
     let result = execute_graph(&state, build_graph, config.process_limit, print_task_result);
     drop(state.cache.cleanup());
     println!("{}", state.statistic);
-    result.map_err(Into::into)
+    result
 }
 
 fn env_resolver(name: &str) -> Option<String> {
     env::var(name).ok()
 }
 
-fn prepare_graph<C: Compiler>(compiler: &C, graph: &XgGraph) -> Result<BuildGraph, std::io::Error> {
+fn prepare_graph<C: Compiler>(compiler: &C, graph: &XgGraph) -> octobuild::Result<BuildGraph> {
     let mut remap: Vec<NodeIndex> = Vec::with_capacity(graph.node_count());
     let mut depends: Vec<NodeIndex> = Vec::with_capacity(graph.node_count());
 
@@ -206,7 +203,7 @@ fn prepare_graph<C: Compiler>(compiler: &C, graph: &XgGraph) -> Result<BuildGrap
     validate_graph(result)
 }
 
-fn print_task_result(result: &BuildResult) -> Result<(), std::io::Error> {
+fn print_task_result(result: &BuildResult) -> octobuild::Result<()> {
     println!(
         "#{} {}/{}: {} @ {}s",
         result.worker,
