@@ -1,8 +1,15 @@
-use std::io::{Error, ErrorKind};
+use std::ffi::{OsStr, OsString};
 
 // Parsing command line arguments from singe line.
-pub fn parse(cmd: &str) -> Result<Vec<String>, Error> {
-    shlex::split(cmd).ok_or_else(|| Error::new(ErrorKind::InvalidData, "Unable to parse"))
+pub fn parse(cmd: &str) -> crate::Result<Vec<String>> {
+    shlex::split(cmd)
+        .ok_or_else(|| crate::Error::Generic(format!("Unable to parse commandline: {cmd}")))
+}
+
+#[must_use]
+pub fn quote(arg: impl AsRef<OsStr>) -> OsString {
+    let quoted = shlex::quote(arg.as_ref().to_str().unwrap());
+    OsString::from(quoted.as_ref())
 }
 
 #[test]

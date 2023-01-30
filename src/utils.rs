@@ -96,11 +96,11 @@ pub enum ParamValue<T> {
 }
 
 pub trait OsStrExt {
-    fn concat(self, str: &OsStr) -> OsString;
+    fn concat(self, str: impl AsRef<OsStr>) -> OsString;
 }
 
 impl OsStrExt for OsString {
-    fn concat(mut self, str: &OsStr) -> OsString {
+    fn concat(mut self, str: impl AsRef<OsStr>) -> OsString {
         self.push(str);
         self
     }

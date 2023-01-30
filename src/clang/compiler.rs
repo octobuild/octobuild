@@ -4,17 +4,18 @@ use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output, Stdio};
 use std::sync::Arc;
-use std::{env, fs, io};
+use std::{env, fs};
 
 use regex::Regex;
 
 use crate::compiler::CompileInput::{Preprocessed, Source};
 use crate::compiler::{
-    Arg, CommandInfo, CompilationTask, CompileStep, Compiler, CompilerOutput, OutputInfo,
-    PreprocessResult, Scope, SharedState, Toolchain, ToolchainHolder,
+    Arg, CommandInfo, CompilationTask, CompileStep, Compiler, CompilerOutput, OsCommandArgs,
+    OutputInfo, PreprocessResult, Scope, SharedState, Toolchain, ToolchainHolder,
 };
 use crate::lazy::Lazy;
 use lazy_static::lazy_static;
+use os_str_bytes::OsStrBytes;
 
 lazy_static! {
     static ref RE_CLANG: regex::bytes::Regex =
@@ -85,13 +86,13 @@ fn collect_args(
         match arg {
             Arg::Flag { scope, flag } => {
                 if scope.matches(target_scope, run_second_cpp, output_precompiled) {
-                    into.push(OsString::from("-".to_string() + flag));
+                    into.push(OsString::from(format!("-{flag}")));
                 }
             }
             Arg::Param { scope, flag, value } => {
                 if scope.matches(target_scope, run_second_cpp, output_precompiled) {
-                    into.push(OsString::from("-".to_string() + flag));
-                    into.push(OsString::from(&value));
+                    into.push(OsString::from(format!("-{flag}")));
+                    into.push(OsString::from(value));
                 }
             }
             Arg::Input { .. } | Arg::Output { .. } => {}
@@ -134,9 +135,10 @@ impl Toolchain for ClangToolchain {
             &mut args,
         );
 
-        let output = state.wrap_slow(|| -> io::Result<Output> {
+        let output = state.wrap_slow(|| -> crate::Result<Output> {
             let mut command = task.shared.command.to_command();
-            let response_file = state.do_response_file(args, &mut command)?;
+            let response_file =
+                state.do_response_file(OsCommandArgs::Regular(args), &mut command)?;
             let output = command.output()?;
             drop(response_file);
 
@@ -144,7 +146,7 @@ impl Toolchain for ClangToolchain {
                 let data = fs::read_to_string(deps_file)?;
                 if let Some(end) = data.strip_prefix('-') {
                     let mut f = File::create(deps_file)?;
-                    f.write_all(task.output_object.to_string_lossy().as_bytes())?;
+                    f.write_all(&task.output_object.to_raw_bytes())?;
                     f.write_all(end.as_bytes())?;
                 }
             }
@@ -222,7 +224,8 @@ impl Toolchain for ClangToolchain {
                 .stdout(Stdio::piped())
                 .stderr(Stdio::piped());
 
-            let response_file = state.do_response_file(args, &mut command)?;
+            let response_file =
+                state.do_response_file(OsCommandArgs::Regular(args), &mut command)?;
             let mut child = command.spawn()?;
 
             if let Preprocessed(preprocessed) = task.input {

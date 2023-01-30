@@ -103,27 +103,27 @@ pub enum Arg {
 }
 
 impl Arg {
-    pub fn flag<F: Into<String>>(scope: Scope, flag: F) -> Arg {
+    pub fn flag(scope: Scope, flag: impl Into<String>) -> Arg {
         Arg::Flag {
             scope,
             flag: flag.into(),
         }
     }
-    pub fn param<F: Into<String>, V: Into<String>>(scope: Scope, flag: F, value: V) -> Arg {
+    pub fn param(scope: Scope, flag: impl Into<String>, value: impl Into<String>) -> Arg {
         Arg::Param {
             scope,
             flag: flag.into(),
             value: value.into(),
         }
     }
-    pub fn input<F: Into<String>, P: Into<String>>(kind: InputKind, flag: F, file: P) -> Arg {
+    pub fn input(kind: InputKind, flag: impl Into<String>, file: impl Into<String>) -> Arg {
         Arg::Input {
             kind,
             flag: flag.into(),
             file: file.into(),
         }
     }
-    pub fn output<F: Into<String>, P: Into<String>>(kind: OutputKind, flag: F, file: P) -> Arg {
+    pub fn output(kind: OutputKind, flag: impl Into<String>, file: impl Into<String>) -> Arg {
         Arg::Output {
             kind,
             flag: flag.into(),
@@ -139,11 +139,8 @@ pub struct CommandEnv {
 
 #[derive(Clone, Debug)]
 pub struct CommandInfo {
-    // Program executable
     pub program: PathBuf,
-    // Working directory
     pub current_dir: Option<PathBuf>,
-    // Environment variables
     pub env: Arc<CommandEnv>,
 }
 
@@ -158,11 +155,6 @@ pub struct SharedState {
 
 #[derive(Default)]
 pub struct CompilerGroup(Vec<Box<dyn Compiler>>);
-
-#[cfg(windows)]
-const NATIVE_EOL: &str = "\r\n";
-#[cfg(not(windows))]
-const NATIVE_EOL: &str = "\n";
 
 impl SharedState {
     pub fn new(config: &Config) -> std::io::Result<Self> {
@@ -186,24 +178,19 @@ impl SharedState {
 
     pub fn do_response_file(
         &self,
-        args: Vec<OsString>,
+        args: OsCommandArgs,
         command: &mut Command,
-    ) -> std::io::Result<Option<NamedTempFile>> {
+    ) -> crate::Result<Option<NamedTempFile>> {
         if self.use_response_files {
             let response_file = tempfile::Builder::new()
                 .suffix(".rsp")
                 .tempfile_in(self.temp_dir.path())?;
-            std::fs::write(
-                response_file.path(),
-                args.iter()
-                    .map(|s| "\"".to_string() + s.to_str().unwrap() + "\"")
-                    .collect::<Vec<String>>()
-                    .join(NATIVE_EOL),
-            )?;
+            let contents = args.join();
+            std::fs::write(response_file.path(), contents.to_raw_bytes())?;
             command.arg(OsString::from("@").concat(response_file.path().as_os_str()));
             Ok(Some(response_file))
         } else {
-            command.args(args);
+            args.append_to(command)?;
             Ok(None)
         }
     }
@@ -661,12 +648,15 @@ pub struct ToolchainCompilationTask {
 #[derive(Debug, Clone)]
 pub enum CommandArgs {
     Raw(String),
-    Array(Vec<String>),
+    Regular(Vec<String>),
 }
 
 impl CommandArgs {
     pub fn append_to(&self, command: &mut Command) -> crate::Result<()> {
         match self {
+            CommandArgs::Regular(v) => {
+                command.args(v);
+            }
             CommandArgs::Raw(v) => {
                 #[cfg(windows)]
                 {
@@ -678,8 +668,40 @@ impl CommandArgs {
                     command.args(cmd::native::parse(v)?);
                 }
             }
-            CommandArgs::Array(v) => {
+        }
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone)]
+pub enum OsCommandArgs {
+    Raw(OsString),
+    Regular(Vec<OsString>),
+}
+
+impl OsCommandArgs {
+    pub fn join(self) -> OsString {
+        match self {
+            OsCommandArgs::Raw(v) => v,
+            OsCommandArgs::Regular(v) => cmd::native::join(&v),
+        }
+    }
+
+    pub fn append_to(&self, command: &mut Command) -> crate::Result<()> {
+        match self {
+            OsCommandArgs::Regular(v) => {
                 command.args(v);
+            }
+            OsCommandArgs::Raw(v) => {
+                #[cfg(windows)]
+                {
+                    use std::os::windows::process::CommandExt;
+                    command.raw_arg(v);
+                }
+                #[cfg(not(windows))]
+                {
+                    command.args(cmd::native::parse(v.to_str().unwrap())?);
+                }
             }
         }
         Ok(())
@@ -703,7 +725,7 @@ pub trait Compiler: Send + Sync {
 
         let argv = match args {
             CommandArgs::Raw(v) => cmd::native::parse(&v)?,
-            CommandArgs::Array(v) => v,
+            CommandArgs::Regular(v) => v,
         };
 
         let tasks = toolchain.create_tasks(command, &argv)?;

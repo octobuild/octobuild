@@ -62,7 +62,7 @@ name = "vs_postprocess"
 harness = false
 
 [dependencies]
-bincode = "1.2"
+bincode = "1"
 byteorder = "1"
 clap = { version = "4", features = ["derive"] }
 crossbeam-channel = "0.5"
@@ -85,10 +85,10 @@ petgraph = "0.6"
 rand = "0.8"
 regex = "1"
 reqwest = { version = "0.11", features = ["blocking"] }
-serde = { version = "1.0", features = ["derive"] }
+serde = { version = "1", features = ["derive"] }
 serde_yaml = "0.9"
 sha2 = "0.10"
-shlex = "1.1"
+shlex = "1"
 tempfile = "3"
 thiserror = "1"
 url = {version = "2", features = ["serde"]}
@@ -96,7 +96,7 @@ uuid = { version = "1", features = ["v4"] }
 xml-rs = "0.8"
 
 [target.'cfg(windows)'.build-dependencies]
-cc = "1.0"
+cc = "1"
 
 [target.'cfg(windows)'.dependencies]
 winapi = { version = "0.3", features = ["winver"] }
