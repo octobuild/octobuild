@@ -7,7 +7,7 @@ authors = [
 ]
 edition = "2021"
 readme = "README.adoc"
-description = "Simple distributed compile system for C++"
+description = "Compiler cache for Unreal Engine"
 homepage = "https://github.com/octobuild/octobuild"
 repository = "https://github.com/octobuild/octobuild.git"
 license = "MIT"

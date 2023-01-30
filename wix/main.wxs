@@ -72,7 +72,7 @@
 
         <Package Id='*'
             Keywords='Installer'
-            Description='Simple distributed compile system for C++'
+            Description='Compiler cache for Unreal Engine'
             Manufacturer='Artem V. Navrotskiy'
             InstallerVersion='450'
             Languages='1033'
