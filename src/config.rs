@@ -25,6 +25,12 @@ fn project_dirs() -> &'static directories::ProjectDirs {
     &RESULT
 }
 
+// Windows has 32KB commandline length limit, so we have to use response files to circumvent that.
+#[cfg(windows)]
+const DEFAULT_USE_RESPONSE_FILES: bool = true;
+#[cfg(not(windows))]
+const DEFAULT_USE_RESPONSE_FILES: bool = false;
+
 impl Default for Config {
     fn default() -> Self {
         Self {
@@ -35,7 +41,7 @@ impl Default for Config {
             helper_bind: SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::new(0, 0, 0, 0), 0)),
             process_limit: num_cpus::get(),
             run_second_cpp: true,
-            use_response_files: true,
+            use_response_files: DEFAULT_USE_RESPONSE_FILES,
         }
     }
 }

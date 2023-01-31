@@ -1,6 +1,7 @@
-use std::io::Error;
+use std::ffi::{OsStr, OsString};
 use std::iter;
 use std::iter::Peekable;
+use std::os::windows::ffi::{OsStrExt, OsStringExt};
 use std::str::Chars;
 
 trait CharsExt {
@@ -23,7 +24,7 @@ impl CharsExt for Peekable<Chars<'_>> {
 
 // Parsing command line arguments from singe line.
 // See also: http://msdn.microsoft.com/en-us/library/17w5ykft.aspx
-pub fn parse(cmd_line: &str) -> Result<Vec<String>, Error> {
+pub fn parse(cmd_line: &str) -> crate::Result<Vec<String>> {
     const BACKSLASH: char = '\\';
     const QUOTE: char = '"';
     const TAB: char = '\t';
@@ -99,6 +100,43 @@ pub fn parse(cmd_line: &str) -> Result<Vec<String>, Error> {
         ret_val.push(String::from_iter(&cur[..]));
     }
     Ok(ret_val)
+}
+
+#[must_use]
+pub fn quote(arg: impl AsRef<OsStr>) -> OsString {
+    let arg_ref = arg.as_ref();
+
+    let mut result = Vec::<u16>::new();
+    let need_quote = arg_ref.is_empty()
+        || arg_ref
+            .encode_wide()
+            .any(|c| c == ' ' as u16 || c == '\t' as u16);
+
+    if need_quote {
+        result.push('"' as u16);
+    }
+
+    let mut backslashes: usize = 0;
+    for x in arg_ref.encode_wide() {
+        if x == '\\' as u16 {
+            backslashes += 1;
+        } else {
+            if x == '"' as u16 {
+                // Add n+1 backslashes to total 2n+1 before internal '"'.
+                result.extend((0..=backslashes).map(|_| '\\' as u16));
+            }
+            backslashes = 0;
+        }
+        result.push(x);
+    }
+
+    if need_quote {
+        // Add n backslashes to total 2n before ending '"'.
+        result.extend((0..backslashes).map(|_| '\\' as u16));
+        result.push('"' as u16);
+    }
+
+    OsStringExt::from_wide(&result)
 }
 
 #[test]

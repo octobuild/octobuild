@@ -1,12 +1,14 @@
+use crate::cmd;
 use crate::compiler::CompileInput::{Preprocessed, Source};
 use crate::compiler::{
-    Arg, CommandInfo, CompilationTask, CompileStep, Compiler, CompilerOutput, OutputInfo,
-    PreprocessResult, Scope, SharedState, Toolchain, ToolchainHolder,
+    Arg, CommandInfo, CompilationTask, CompileStep, Compiler, CompilerOutput, OsCommandArgs,
+    OutputInfo, PreprocessResult, Scope, SharedState, Toolchain, ToolchainHolder,
 };
 use crate::io::memstream::MemStream;
 use crate::lazy::Lazy;
 use crate::utils::OsStrExt;
 use crate::vs::postprocess;
+use cmd::native::quote;
 use lazy_static::lazy_static;
 use regex::bytes::{NoExpand, Regex};
 use std::ffi::{OsStr, OsString};
@@ -117,12 +119,12 @@ fn collect_args(
         match arg {
             Arg::Flag { scope, flag } => {
                 if scope.matches(target_scope, run_second_cpp, output_precompiled) {
-                    into.push(OsString::from("/".to_string() + flag));
+                    into.push(OsString::from(format!("/{flag}")));
                 }
             }
             Arg::Param { scope, flag, value } => {
                 if scope.matches(target_scope, run_second_cpp, output_precompiled) {
-                    into.push(OsString::from("/".to_string() + flag + value));
+                    into.push(OsString::from("/").concat(flag).concat(quote(value)));
                 }
             }
             Arg::Input { .. } | Arg::Output { .. } => {}
@@ -150,11 +152,11 @@ impl Toolchain for VsToolchain {
     ) -> crate::Result<PreprocessResult> {
         let mut args = vec![
             OsString::from("/nologo"),
-            OsString::from("/T".to_string() + &task.language),
+            OsString::from("/T".to_string()).concat(&task.language),
             OsString::from("/E"),
             OsString::from("/we4002"), // C4002: too many actual parameters for macro 'identifier'
-            OsString::from("/Fo").concat(task.output_object.as_os_str()), // /Fo option also set output path for #import directive
-            OsString::from(&task.input_source),
+            OsString::from("/Fo").concat(quote(&task.output_object)), // /Fo option also set output path for #import directive
+            quote(&task.input_source),
         ];
         collect_args(
             &task.shared.args,
@@ -164,9 +166,10 @@ impl Toolchain for VsToolchain {
             &mut args,
         );
 
-        let output = state.wrap_slow(|| -> std::io::Result<Output> {
+        let output = state.wrap_slow(|| -> crate::Result<Output> {
             let mut command = task.shared.command.to_command();
-            let response_file = state.do_response_file(args, &mut command)?;
+            let response_file = state
+                .do_response_file(OsCommandArgs::Raw(args.join(" ".as_ref())), &mut command)?;
             let output = command.output()?;
             drop(response_file);
             Ok(output)
@@ -233,12 +236,12 @@ impl Toolchain for VsToolchain {
 
         let mut args = task.args.clone();
         args.push(OsString::from("/c"));
-        args.push(OsString::from("/Fo").concat(output_path.as_os_str()));
+        args.push(OsString::from("/Fo").concat(quote(output_path)));
 
         // Output files.
         if let Some(path) = task.pch_out {
             assert!(path.is_absolute());
-            args.push(OsString::from("/Fp").concat(path.as_os_str()));
+            args.push(OsString::from("/Fp").concat(quote(path)));
         }
 
         let (input_path, temp_input, current_dir_override) = match &task.input {
@@ -257,18 +260,18 @@ impl Toolchain for VsToolchain {
                 }
             }
         };
-        args.push(OsString::from(&input_path));
+        args.push(quote(&input_path));
 
         // Use precompiled header
         if let Some(path) = task.pch_in {
             assert!(path.is_absolute());
             if let Some(pch_marker) = &task.pch_marker {
-                args.push(OsString::from("/Yu".to_string() + pch_marker));
+                args.push(OsString::from("/Yu").concat(quote(pch_marker)));
             } else {
                 args.push(OsString::from("/Yu"));
             }
 
-            args.push(OsString::from("/Fp").concat(path.as_os_str()));
+            args.push(OsString::from("/Fp").concat(quote(&path)));
         }
 
         // Run compiler.
@@ -281,7 +284,7 @@ impl Toolchain for VsToolchain {
             .unwrap_or(b"");
 
         // Execute.
-        let output = state.wrap_slow(|| -> std::io::Result<Output> {
+        let output = state.wrap_slow(|| -> crate::Result<Output> {
             let mut command = Command::new(&self.path);
 
             command
@@ -297,7 +300,8 @@ impl Toolchain for VsToolchain {
                 command.env(name, value);
             }
 
-            let response_file = state.do_response_file(args, &mut command)?;
+            let response_file = state
+                .do_response_file(OsCommandArgs::Raw(args.join(" ".as_ref())), &mut command)?;
             let output = command.output()?;
             drop(temp_input);
             drop(response_file);
@@ -372,7 +376,7 @@ fn vs_identifier(path: &Path) -> Option<String> {
         let mut value_data: LPVOID = ptr::null_mut();
         if winver::VerQueryValueW(
             data.as_ptr() as LPCVOID,
-            utf16(OsStr::new("\\VarFileInfo\\Translation")).as_ptr(),
+            utf16("\\VarFileInfo\\Translation".as_ref()).as_ptr(),
             &mut value_data,
             &mut value_size,
         ) == 0
@@ -392,7 +396,7 @@ fn vs_identifier(path: &Path) -> Option<String> {
         let mut value_data: LPVOID = ptr::null_mut();
         if winver::VerQueryValueW(
             data.as_ptr() as LPCVOID,
-            utf16(OsStr::new(&(translation_key + "\\ProductVersion"))).as_ptr(),
+            utf16((translation_key + "\\ProductVersion").as_ref()).as_ptr(),
             &mut value_data,
             &mut value_size,
         ) == 0

@@ -1,6 +1,10 @@
 = Changelog
 :icons: font
 
+== Unreleased
+
+* Handle special chars (quotes, whitespace, backslash, etc) in response files properly
+
 == 0.4.0
 
 * Add support for response files (https://github.com/octobuild/octobuild/issues/80[#80])

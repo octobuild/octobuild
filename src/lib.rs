@@ -42,8 +42,6 @@ pub mod clang {
 
 pub mod cmd {
     pub mod native;
-    pub mod unix;
-    pub mod windows;
 }
 
 pub mod simple;
