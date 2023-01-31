@@ -89,6 +89,7 @@ pub enum Arg {
         scope: Scope,
         flag: String,
         value: String,
+        spaceable: bool,
     },
     Input {
         kind: InputKind,
@@ -109,11 +110,17 @@ impl Arg {
             flag: flag.into(),
         }
     }
-    pub fn param(scope: Scope, flag: impl Into<String>, value: impl Into<String>) -> Arg {
+    pub fn param(
+        scope: Scope,
+        flag: impl Into<String>,
+        value: impl Into<String>,
+        spaceable: bool,
+    ) -> Arg {
         Arg::Param {
             scope,
             flag: flag.into(),
             value: value.into(),
+            spaceable,
         }
     }
     pub fn input(kind: InputKind, flag: impl Into<String>, file: impl Into<String>) -> Arg {

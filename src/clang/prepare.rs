@@ -217,9 +217,10 @@ fn parse_argument(iter: &mut Iter<String>) -> Option<Result<Arg, String>> {
                             },
                             prefix,
                             value,
+                            true,
                         )),
                         "o" => Ok(Arg::output(OutputKind::Object, prefix, value)),
-                        _ => Ok(Arg::param(scope, prefix, value)),
+                        _ => Ok(Arg::param(scope, prefix, value, true)),
                     }
                 }
                 None => match flag {
@@ -288,7 +289,7 @@ fn test_parse_argument_precompile() {
     assert_eq!(
         parse_arguments(&args).unwrap(),
         [
-            Arg::param(Scope::Ignore, "x", "c++-header"),
+            Arg::param(Scope::Ignore, "x", "c++-header", true),
             Arg::flag(Scope::Shared, "pipe"),
             Arg::flag(Scope::Compiler, "Wall"),
             Arg::flag(Scope::Compiler, "Werror"),
@@ -302,13 +303,13 @@ fn test_parse_argument_precompile() {
             Arg::flag(Scope::Shared, "g3"),
             Arg::flag(Scope::Shared, "gdwarf-3"),
             Arg::flag(Scope::Shared, "O2"),
-            Arg::param(Scope::Shared, "D", "_LINUX64"),
-            Arg::param(Scope::Preprocessor, "I", "Engine/Source"),
-            Arg::param(Scope::Preprocessor, "I", "Developer/Public"),
-            Arg::param(Scope::Preprocessor, "I", "Runtime/Core/Private"),
-            Arg::param(Scope::Shared, "D", "IS_PROGRAM=1"),
-            Arg::param(Scope::Shared, "D", "UNICODE"),
-            Arg::param(Scope::Shared, "D", "IS_MONOLITHIC=1"),
+            Arg::param(Scope::Shared, "D", "_LINUX64", true),
+            Arg::param(Scope::Preprocessor, "I", "Engine/Source", true),
+            Arg::param(Scope::Preprocessor, "I", "Developer/Public", true),
+            Arg::param(Scope::Preprocessor, "I", "Runtime/Core/Private", true),
+            Arg::param(Scope::Shared, "D", "IS_PROGRAM=1", true),
+            Arg::param(Scope::Shared, "D", "UNICODE", true),
+            Arg::param(Scope::Shared, "D", "IS_MONOLITHIC=1", true),
             Arg::flag(Scope::Shared, "std=c++11"),
             Arg::output(OutputKind::Object, "o", "CorePrivatePCH.h.pch"),
             Arg::input(InputKind::Source, "", "CorePrivatePCH.h")

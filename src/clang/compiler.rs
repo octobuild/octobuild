@@ -89,7 +89,12 @@ fn collect_args(
                     into.push(OsString::from(format!("-{flag}")));
                 }
             }
-            Arg::Param { scope, flag, value } => {
+            Arg::Param {
+                scope,
+                flag,
+                value,
+                spaceable: _spaceable,
+            } => {
                 if scope.matches(target_scope, run_second_cpp, output_precompiled) {
                     into.push(OsString::from(format!("-{flag}")));
                     into.push(OsString::from(value));

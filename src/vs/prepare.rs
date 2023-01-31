@@ -219,13 +219,13 @@ fn parse_argument<S: AsRef<str>, I: Iterator<Item = S>>(
                                 if has_param_prefix(value.as_ref()) {
                                     Err(arg.as_ref().to_string())
                                 } else {
-                                    Ok(Arg::param(scope, prefix, value.as_ref()))
+                                    Ok(Arg::param(scope, prefix, value.as_ref(), true))
                                 }
                             }
                             _ => Err(arg.as_ref().to_string()),
                         }
                     } else {
-                        Ok(Arg::param(scope, prefix, &flag[prefix.len()..]))
+                        Ok(Arg::param(scope, prefix, &flag[prefix.len()..], false))
                     }
                 }
                 None => match flag {
@@ -233,7 +233,7 @@ fn parse_argument<S: AsRef<str>, I: Iterator<Item = S>>(
                     "bigobj" => Ok(Arg::flag(Scope::Compiler, flag)),
                     "FC" | "d2vzeroupper" | "failfast" => Ok(Arg::flag(Scope::Shared, flag)),
                     "X" => Ok(Arg::flag(Scope::Preprocessor, flag)),
-                    s if s.starts_with('T') => Ok(Arg::param(Scope::Ignore, "T", &s[1..])),
+                    s if s.starts_with('T') => Ok(Arg::param(Scope::Ignore, "T", &s[1..], false)),
                     s if s.starts_with('O') => Ok(Arg::flag(Scope::Shared, flag)),
                     s if s.starts_with('G') => Ok(Arg::flag(Scope::Shared, flag)),
                     s if s.starts_with("RTC") => Ok(Arg::flag(Scope::Shared, flag)),
@@ -257,7 +257,9 @@ fn parse_argument<S: AsRef<str>, I: Iterator<Item = S>>(
                     s if s.starts_with("Yc") => Ok(Arg::output(OutputKind::Marker, "Yc", &s[2..])),
                     s if s.starts_with("Yu") => Ok(Arg::input(InputKind::Marker, "Yu", &s[2..])),
                     s if s.starts_with("Yl") => Ok(Arg::flag(Scope::Shared, flag)),
-                    s if s.starts_with("FI") => Ok(Arg::param(Scope::Preprocessor, "FI", &s[2..])),
+                    s if s.starts_with("FI") => {
+                        Ok(Arg::param(Scope::Preprocessor, "FI", &s[2..], false))
+                    }
                     s if s.starts_with("analyze") => Ok(Arg::flag(Scope::Shared, flag)),
                     _ => Err(arg.as_ref().to_string()),
                 },

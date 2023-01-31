@@ -122,9 +122,19 @@ fn collect_args(
                     into.push(OsString::from(format!("/{flag}")));
                 }
             }
-            Arg::Param { scope, flag, value } => {
+            Arg::Param {
+                scope,
+                flag,
+                value,
+                spaceable: needs_space,
+            } => {
                 if scope.matches(target_scope, run_second_cpp, output_precompiled) {
-                    into.push(OsString::from("/").concat(flag).concat(quote(value)));
+                    if *needs_space {
+                        into.push(OsString::from("/").concat(flag));
+                        into.push(quote(value));
+                    } else {
+                        into.push(OsString::from("/").concat(flag).concat(quote(value)));
+                    }
                 }
             }
             Arg::Input { .. } | Arg::Output { .. } => {}
