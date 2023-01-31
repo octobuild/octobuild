@@ -308,13 +308,13 @@ fn test_parse_argument() {
     assert_eq!(
         parse_arguments(args.iter()).unwrap(),
         [
-            Arg::param(Scope::Ignore, "T", "P"),
+            Arg::param(Scope::Ignore, "T", "P", false),
             Arg::flag(Scope::Ignore, "c"),
             Arg::input(InputKind::Marker, "Yu", "sample.h"),
             Arg::input(InputKind::Precompiled, "Fp", "sample.h.pch"),
             Arg::output(OutputKind::Object, "Fo", "sample.cpp.o"),
-            Arg::param(Scope::Shared, "D", "TEST"),
-            Arg::param(Scope::Shared, "D", "TEST2"),
+            Arg::param(Scope::Shared, "D", "TEST", false),
+            Arg::param(Scope::Shared, "D", "TEST2", true),
             Arg::flag(Scope::Shared, "arch:AVX"),
             Arg::input(InputKind::Source, "", "sample.cpp")
         ]

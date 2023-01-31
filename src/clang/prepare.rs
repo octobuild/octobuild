@@ -331,7 +331,12 @@ fn test_parse_argument_compile() {
         parse_arguments(&args).unwrap(),
         [
             Arg::flag(Scope::Ignore, "c"),
-            Arg::param(Scope::Preprocessor, "include-pch", "CorePrivatePCH.h.pch"),
+            Arg::param(
+                Scope::Preprocessor,
+                "include-pch",
+                "CorePrivatePCH.h.pch",
+                true
+            ),
             Arg::flag(Scope::Shared, "pipe"),
             Arg::flag(Scope::Compiler, "Wall"),
             Arg::flag(Scope::Compiler, "Werror"),
@@ -345,12 +350,12 @@ fn test_parse_argument_compile() {
             Arg::flag(Scope::Shared, "g3"),
             Arg::flag(Scope::Shared, "gdwarf-3"),
             Arg::flag(Scope::Shared, "O2"),
-            Arg::param(Scope::Shared, "D", "IS_PROGRAM=1"),
-            Arg::param(Scope::Shared, "D", "UNICODE"),
-            Arg::param(Scope::Shared, "D", "IS_MONOLITHIC=1"),
-            Arg::param(Scope::Ignore, "x", "c++"),
+            Arg::param(Scope::Shared, "D", "IS_PROGRAM=1", true),
+            Arg::param(Scope::Shared, "D", "UNICODE", true),
+            Arg::param(Scope::Shared, "D", "IS_MONOLITHIC=1", true),
+            Arg::param(Scope::Ignore, "x", "c++", true),
             Arg::flag(Scope::Shared, "std=c++11"),
-            Arg::param(Scope::Preprocessor, "include", "CorePrivatePCH.h"),
+            Arg::param(Scope::Preprocessor, "include", "CorePrivatePCH.h", true),
             Arg::output(OutputKind::Object, "o", "Module.Core.cpp.o"),
             Arg::input(InputKind::Source, "", "Module.Core.cpp")
         ]
