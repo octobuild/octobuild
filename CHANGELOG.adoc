@@ -4,6 +4,7 @@
 == Unreleased
 
 * Handle special chars (quotes, whitespace, backslash, etc) in response files properly
+* Fixes for building of engine itself
 
 == 0.4.0
 
