@@ -2,7 +2,7 @@ use crate::cmd;
 use crate::compiler::CompileInput::{Preprocessed, Source};
 use crate::compiler::{
     Arg, CommandInfo, CompilationTask, CompileStep, Compiler, CompilerOutput, OsCommandArgs,
-    OutputInfo, PreprocessResult, Scope, SharedState, Toolchain, ToolchainHolder,
+    OutputInfo, PCHUsage, PreprocessResult, Scope, SharedState, Toolchain, ToolchainHolder,
 };
 use crate::io::memstream::MemStream;
 use crate::lazy::Lazy;
@@ -115,6 +115,10 @@ fn collect_args(
     output_precompiled: bool,
     into: &mut Vec<OsString>,
 ) {
+    if output_precompiled {
+        into.push(OsString::from("/Yc"));
+    }
+
     for arg in args {
         match arg {
             Arg::Flag { scope, flag } => {
@@ -151,8 +155,9 @@ impl Toolchain for VsToolchain {
         &self,
         command: CommandInfo,
         args: &[String],
+        run_second_cpp: bool,
     ) -> crate::Result<Vec<CompilationTask>> {
-        super::prepare::create_tasks(command, args)
+        super::prepare::create_tasks(command, args, run_second_cpp)
     }
 
     fn run_preprocess(
@@ -171,7 +176,7 @@ impl Toolchain for VsToolchain {
         collect_args(
             &task.shared.args,
             Scope::Preprocessor,
-            state.run_second_cpp,
+            false,
             false,
             &mut args,
         );
@@ -186,19 +191,30 @@ impl Toolchain for VsToolchain {
         })?;
 
         if output.status.success() {
-            let mut content = MemStream::new();
-            if task.shared.pch_in.is_some() || task.shared.pch_out.is_some() {
-                postprocess::filter_preprocessed(
-                    &mut Cursor::new(output.stdout),
-                    &mut content,
-                    &task.shared.pch_marker,
-                    task.shared.pch_out.is_some(),
-                )?;
-                Ok(PreprocessResult::Success(CompilerOutput::MemSteam(content)))
-            } else {
-                Ok(PreprocessResult::Success(CompilerOutput::Vec(
+            match &task.shared.pch_usage {
+                PCHUsage::None => Ok(PreprocessResult::Success(CompilerOutput::Vec(
                     output.stdout,
-                )))
+                ))),
+                PCHUsage::In(v) => {
+                    let mut content = MemStream::new();
+                    postprocess::filter_preprocessed(
+                        &mut Cursor::new(output.stdout),
+                        &mut content,
+                        &v.marker,
+                        false,
+                    )?;
+                    Ok(PreprocessResult::Success(CompilerOutput::MemSteam(content)))
+                }
+                PCHUsage::Out(v) => {
+                    let mut content = MemStream::new();
+                    postprocess::filter_preprocessed(
+                        &mut Cursor::new(output.stdout),
+                        &mut content,
+                        &v.marker,
+                        true,
+                    )?;
+                    Ok(PreprocessResult::Success(CompilerOutput::MemSteam(content)))
+                }
             }
         } else {
             Ok(PreprocessResult::Failed(OutputInfo {
@@ -212,7 +228,6 @@ impl Toolchain for VsToolchain {
     // Compile preprocessed file.
     fn create_compile_step(
         &self,
-        state: &SharedState,
         task: &CompilationTask,
         preprocessed: CompilerOutput,
     ) -> CompileStep {
@@ -220,17 +235,14 @@ impl Toolchain for VsToolchain {
             OsString::from("/nologo"),
             OsString::from("/T".to_string() + &task.language),
         ];
-        if task.shared.pch_out.is_some() {
-            args.push(OsString::from("/Yc"));
-        }
         collect_args(
             &task.shared.args,
             Scope::Compiler,
-            state.run_second_cpp,
-            task.shared.pch_out.is_some(),
+            task.shared.run_second_cpp,
+            task.shared.pch_usage.is_out(),
             &mut args,
         );
-        CompileStep::new(task, preprocessed, args, true, state.run_second_cpp)
+        CompileStep::new(task, preprocessed, args)
     }
 
     fn run_compile(&self, state: &SharedState, task: CompileStep) -> crate::Result<OutputInfo> {
@@ -248,10 +260,22 @@ impl Toolchain for VsToolchain {
         args.push(OsString::from("/c"));
         args.push(OsString::from("/Fo").concat(quote(output_path)));
 
-        // Output files.
-        if let Some(path) = task.pch_out {
-            assert!(path.is_absolute());
-            args.push(OsString::from("/Fp").concat(quote(path)));
+        match &task.pch_usage {
+            PCHUsage::None => {}
+            PCHUsage::In(v) => {
+                assert!(v.path.is_absolute());
+                if let Some(pch_marker) = &v.marker {
+                    assert!(Path::new(pch_marker).is_absolute());
+                    args.push(OsString::from("/Yu").concat(quote(pch_marker)));
+                } else {
+                    args.push(OsString::from("/Yu"));
+                }
+                args.push(OsString::from("/Fp").concat(quote(&v.path)));
+            }
+            PCHUsage::Out(v) => {
+                assert!(v.path.is_absolute());
+                args.push(OsString::from("/Fp").concat(quote(&v.path)));
+            }
         }
 
         let (input_path, temp_input, current_dir_override) = match &task.input {
@@ -271,18 +295,6 @@ impl Toolchain for VsToolchain {
             }
         };
         args.push(quote(&input_path));
-
-        // Use precompiled header
-        if let Some(path) = task.pch_in {
-            assert!(path.is_absolute());
-            if let Some(pch_marker) = &task.pch_marker {
-                args.push(OsString::from("/Yu").concat(quote(pch_marker)));
-            } else {
-                args.push(OsString::from("/Yu"));
-            }
-
-            args.push(OsString::from("/Fp").concat(quote(&path)));
-        }
 
         // Run compiler.
 

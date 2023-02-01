@@ -67,8 +67,13 @@ where
     let command_info = CommandInfo::simple(PathBuf::from(exec));
     let remote = RemoteCompiler::new(&config.coordinator, compiler);
     let args = env::args().skip(1).collect();
-    let actions =
-        BuildAction::create_tasks(&remote, command_info, CommandArgs::Regular(args), exec);
+    let actions = BuildAction::create_tasks(
+        &remote,
+        command_info,
+        CommandArgs::Regular(args),
+        exec,
+        config.run_second_cpp,
+    );
 
     let mut build_graph: BuildGraph = Graph::new();
     for action in actions {

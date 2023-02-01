@@ -114,8 +114,9 @@ impl Toolchain for ClangToolchain {
         &self,
         command: CommandInfo,
         args: &[String],
+        run_second_cpp: bool,
     ) -> crate::Result<Vec<CompilationTask>> {
-        super::prepare::create_tasks(command, args)
+        super::prepare::create_tasks(command, args, run_second_cpp)
     }
 
     fn run_preprocess(
@@ -135,7 +136,7 @@ impl Toolchain for ClangToolchain {
         collect_args(
             &task.shared.args,
             Scope::Preprocessor,
-            state.run_second_cpp,
+            false,
             false,
             &mut args,
         );
@@ -175,7 +176,6 @@ impl Toolchain for ClangToolchain {
     // Compile preprocessed file.
     fn create_compile_step(
         &self,
-        state: &SharedState,
         task: &CompilationTask,
         preprocessed: CompilerOutput,
     ) -> CompileStep {
@@ -183,12 +183,12 @@ impl Toolchain for ClangToolchain {
         collect_args(
             &task.shared.args,
             Scope::Compiler,
-            state.run_second_cpp,
-            task.shared.pch_out.is_some(),
+            task.shared.run_second_cpp,
+            task.shared.pch_usage.is_some(),
             &mut args,
         );
 
-        CompileStep::new(task, preprocessed, args, false, state.run_second_cpp)
+        CompileStep::new(task, preprocessed, args)
     }
 
     fn run_compile(&self, state: &SharedState, task: CompileStep) -> crate::Result<OutputInfo> {

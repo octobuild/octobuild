@@ -1,3 +1,4 @@
+use crate::io::filecache::CacheError;
 use std::path::PathBuf;
 use thiserror::Error;
 
@@ -51,14 +52,16 @@ pub mod worker;
 pub enum Error {
     #[error(transparent)]
     Bincode(#[from] bincode::Error),
+    #[error(transparent)]
+    Cache(#[from] CacheError),
     #[error("Found cycles in build graph")]
     CyclesInBuildGraph,
     #[error(transparent)]
     Figment(#[from] figment::Error),
     #[error(transparent)]
-    FromUtf8Error(#[from] std::string::FromUtf8Error),
+    FromUtf8(#[from] std::string::FromUtf8Error),
     #[error(transparent)]
-    FromUtf16Error(#[from] std::string::FromUtf16Error),
+    FromUtf16(#[from] std::string::FromUtf16Error),
     #[error("Invalid UTF-16 line: odd bytes length")]
     FromUtf16OddLength,
     #[error("Internal error: {0}")]

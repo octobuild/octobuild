@@ -2,7 +2,7 @@ use std::cmp::min;
 use std::ffi::OsString;
 use std::fs;
 use std::fs::{File, OpenOptions};
-use std::io::{Error, ErrorKind, Read, Seek, SeekFrom, Write};
+use std::io::{Read, Seek, SeekFrom, Write};
 use std::path::{Path, PathBuf};
 
 use std::time::SystemTime;
@@ -109,7 +109,7 @@ fn find_cache_files(dir: &Path, mut files: Vec<CacheFile>) -> crate::Result<Vec<
     Ok(files)
 }
 
-fn write_cached_file<W: Write>(stream: &mut W, path: &Path) -> Result<(), Error> {
+fn write_cached_file<W: Write>(stream: &mut W, path: &Path) -> crate::Result<()> {
     let mut buf: [u8; DEFAULT_BUF_SIZE] = [0; DEFAULT_BUF_SIZE];
     let mut file = File::open(path)?;
     let total_size = file.seek(SeekFrom::End(0))?;
@@ -122,13 +122,12 @@ fn write_cached_file<W: Write>(stream: &mut W, path: &Path) -> Result<(), Error>
             break;
         }
         if size == 0 {
-            return Err(Error::new(
-                ErrorKind::BrokenPipe,
-                "Unexpected end of stream",
+            return Err(crate::Error::Generic(
+                "Unexpected end of stream".to_string(),
             ));
         }
         if need_size < size as u64 {
-            return Err(Error::new(ErrorKind::BrokenPipe, "Expected end of stream"));
+            return Err(crate::Error::Generic("Expected end of stream".to_string()));
         }
         stream.write_all(&buf[0..size])?;
         need_size -= size as u64;
@@ -141,7 +140,7 @@ fn write_cache(
     path: &Path,
     paths: &[PathBuf],
     output: &OutputInfo,
-) -> Result<(), Error> {
+) -> crate::Result<()> {
     if !output.success() {
         return Ok(());
     }
@@ -160,10 +159,10 @@ fn write_cache(
     stream.write_all(FOOTER)?;
     let (writer, result) = stream.finish();
     statistic.add_miss(writer.len());
-    result
+    Ok(result?)
 }
 
-fn read_cached_file<R: Read>(stream: &mut R, path: &Path) -> Result<(), Error> {
+fn read_cached_file<R: Read>(stream: &mut R, path: &Path) -> crate::Result<()> {
     let mut buf: [u8; DEFAULT_BUF_SIZE] = [0; DEFAULT_BUF_SIZE];
     let total_size = read_u64(stream)?;
     let mut need_size = total_size;
@@ -174,7 +173,7 @@ fn read_cached_file<R: Read>(stream: &mut R, path: &Path) -> Result<(), Error> {
         let need = min(buf.len() as u64, need_size) as usize;
         let size = stream.read(&mut buf[0..need])?;
         if size == 0 {
-            return Err(Error::new(ErrorKind::BrokenPipe, "Expected end of stream"));
+            return Err(crate::Error::Generic("Expected end of stream".to_string()));
         }
         file.write_all(&buf[0..size])?;
         need_size -= size as u64;
@@ -186,7 +185,7 @@ fn read_cache(
     statistic: &Statistic,
     path: &PathBuf,
     paths: &[PathBuf],
-) -> Result<OutputInfo, Error> {
+) -> crate::Result<OutputInfo> {
     let mut file = OpenOptions::new()
         .read(true)
         .write(true)
@@ -195,23 +194,17 @@ fn read_cache(
     file.rewind()?;
     let mut stream = lz4::Decoder::new(Counter::reader(file))?;
     if read_exact(&mut stream, HEADER.len())? != HEADER {
-        return Err(Error::new(
-            ErrorKind::InvalidInput,
-            CacheError::InvalidHeader(path.clone()),
-        ));
+        return Err(CacheError::InvalidHeader(path.clone()).into());
     }
     if read_usize(&mut stream)? != paths.len() {
-        return Err(Error::new(
-            ErrorKind::InvalidInput,
-            CacheError::PackedFilesMismatch(path.clone()),
-        ));
+        return Err(CacheError::PackedFilesMismatch(path.clone()).into());
     }
     for path in paths {
         let mut temp_name = OsString::from("~tmp~");
         temp_name.push(path.file_name().unwrap());
         let temp = path.with_file_name(temp_name);
         drop(fs::remove_file(path));
-        match read_cached_file(&mut stream, &temp).and_then(|_| fs::rename(&temp, path)) {
+        match read_cached_file(&mut stream, &temp).and_then(|_| Ok(fs::rename(&temp, path)?)) {
             Ok(_) => {}
             Err(e) => {
                 drop(fs::remove_file(&temp));
@@ -221,40 +214,34 @@ fn read_cache(
     }
     let output = read_output(&mut stream)?;
     if read_exact(&mut stream, FOOTER.len())? != FOOTER {
-        return Err(Error::new(
-            ErrorKind::InvalidInput,
-            CacheError::InvalidFooter(path.clone()),
-        ));
+        return Err(CacheError::InvalidFooter(path.clone()).into());
     }
     let mut eof = [0];
     if stream.read(&mut eof)? != 0 {
-        return Err(Error::new(
-            ErrorKind::InvalidInput,
-            CacheError::InvalidFooter(path.clone()),
-        ));
+        return Err(CacheError::InvalidFooter(path.clone()).into());
     }
     statistic.add_hit(stream.finish().0.len());
     Ok(output)
 }
 
-fn write_blob(stream: &mut dyn Write, blob: &[u8]) -> Result<(), Error> {
+fn write_blob(stream: &mut dyn Write, blob: &[u8]) -> crate::Result<()> {
     write_usize(stream, blob.len())?;
     stream.write_all(blob)?;
     Ok(())
 }
 
-fn read_blob(stream: &mut dyn Read) -> Result<Vec<u8>, Error> {
+fn read_blob(stream: &mut dyn Read) -> crate::Result<Vec<u8>> {
     let size = read_usize(stream)?;
-    read_exact(stream, size)
+    Ok(read_exact(stream, size)?)
 }
 
-fn write_output(stream: &mut dyn Write, output: &OutputInfo) -> Result<(), Error> {
+fn write_output(stream: &mut dyn Write, output: &OutputInfo) -> crate::Result<()> {
     write_blob(stream, &output.stdout)?;
     write_blob(stream, &output.stderr)?;
     Ok(())
 }
 
-fn read_output(stream: &mut dyn Read) -> Result<OutputInfo, Error> {
+fn read_output(stream: &mut dyn Read) -> crate::Result<OutputInfo> {
     let stdout = read_blob(stream)?;
     let stderr = read_blob(stream)?;
     Ok(OutputInfo {

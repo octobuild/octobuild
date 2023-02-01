@@ -2,11 +2,16 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use crate::compiler::{
-    Arg, CommandInfo, CompilationArgs, CompilationTask, InputKind, OutputKind, Scope,
+    Arg, CommandInfo, CompilationArgs, CompilationTask, InputKind, OutputKind, PCHArgs, PCHUsage,
+    Scope,
 };
 use crate::utils::{expand_response_files, find_param, ParamValue};
 
-pub fn create_tasks(command: CommandInfo, args: &[String]) -> crate::Result<Vec<CompilationTask>> {
+pub fn create_tasks(
+    command: CommandInfo,
+    args: &[String],
+    run_second_cpp: bool,
+) -> crate::Result<Vec<CompilationTask>> {
     let expanded_args = expand_response_files(&command.current_dir, args)?;
 
     let parsed_args = parse_arguments(expanded_args.iter())?;
@@ -19,6 +24,7 @@ pub fn create_tasks(command: CommandInfo, args: &[String]) -> crate::Result<Vec<
             }
             _ => None,
         })
+        .flat_map(|v| command.absolutize(&v))
         .collect();
     if input_sources.is_empty() {
         return Err(crate::Error::from(
@@ -35,19 +41,15 @@ pub fn create_tasks(command: CommandInfo, args: &[String]) -> crate::Result<Vec<
         }
     }) {
         ParamValue::None => None,
-        ParamValue::Single(v) => Some(v),
+        ParamValue::Single(v) => Some(command.absolutize(&v)?),
         ParamValue::Many(v) => {
             return Err(crate::Error::from(format!(
                 "Found too many precompiled header files: {v:?}"
             )));
         }
     };
-    let cwd = command.current_dir.clone();
     // Precompiled header file name.
-    let pch_marker;
-    let pch_in;
-    let pch_out;
-    match find_param(&parsed_args, |arg: &Arg| -> Option<(bool, String)> {
+    let pch_param = find_param(&parsed_args, |arg: &Arg| -> Option<(bool, String)> {
         match arg {
             Arg::Input { kind, file, .. } if *kind == InputKind::Marker => {
                 Some((true, file.clone()))
@@ -57,52 +59,62 @@ pub fn create_tasks(command: CommandInfo, args: &[String]) -> crate::Result<Vec<
             }
             _ => None,
         }
-    }) {
-        ParamValue::None => {
-            pch_marker = None;
-            pch_in = None;
-            pch_out = None;
-        }
+    });
+    let pch_usage: PCHUsage = match pch_param {
+        ParamValue::None => crate::Result::<PCHUsage>::Ok(PCHUsage::None),
         ParamValue::Single((input, path)) => {
             let precompiled_path = match precompiled_file {
                 Some(v) => v,
-                None => PathBuf::from(&path).with_extension(".pch"),
+                None => PathBuf::from(&path).with_extension("pch"),
             };
-            pch_marker = if path.is_empty() { None } else { Some(path) };
-            if input {
-                pch_out = None;
-                pch_in = Some(precompiled_path);
+            let pch_marker = if path.is_empty() {
+                None
             } else {
-                pch_in = None;
-                pch_out = Some(precompiled_path);
+                Some(
+                    command
+                        .absolutize(Path::new(&path))?
+                        .as_os_str()
+                        .to_os_string(),
+                )
+            };
+            if input {
+                Ok(PCHUsage::In(PCHArgs {
+                    path: command.absolutize(&precompiled_path)?,
+                    marker: pch_marker,
+                }))
+            } else {
+                Ok(PCHUsage::Out(PCHArgs {
+                    path: command.absolutize(&precompiled_path)?,
+                    marker: pch_marker,
+                }))
             }
         }
         ParamValue::Many(v) => {
             return Err(crate::Error::from(format!(
-                "Found too many precompiled header markers: {}",
-                v.iter().map(|item| item.1.clone()).collect::<String>()
+                "Found too many precompiled header markers: {:?}",
+                v.iter().map(|item| item.1.clone()).collect::<PathBuf>()
+            )));
+        }
+    }?;
+
+    // Output object file name.
+    let output_param = find_param(&parsed_args, |arg: &Arg| -> Option<PathBuf> {
+        match arg {
+            Arg::Output { kind, file, .. } if *kind == OutputKind::Object => {
+                Some(PathBuf::from(file))
+            }
+            _ => None,
+        }
+    });
+    let output_object: Option<PathBuf> = match output_param {
+        ParamValue::None => None,
+        ParamValue::Single(v) => Some(command.absolutize(&v)?),
+        ParamValue::Many(v) => {
+            return Err(crate::Error::from(format!(
+                "Found too many output object files: {v:?}"
             )));
         }
     };
-    // Output object file name.
-    let output_object: Option<PathBuf> =
-        match find_param(&parsed_args, |arg: &Arg| -> Option<PathBuf> {
-            match arg {
-                Arg::Output { kind, file, .. } if *kind == OutputKind::Object => {
-                    Some(PathBuf::from(file))
-                }
-                _ => None,
-            }
-        }) {
-            ParamValue::None => None,
-            ParamValue::Single(v) => Some(v),
-            ParamValue::Many(v) => {
-                return Err(crate::Error::from(format!(
-                    "Found too many output object files: {v:?}"
-                )));
-            }
-        }
-        .map(|path| cwd.as_ref().map(|cwd| cwd.join(&path)).unwrap_or(path));
     // Language
     let language: Option<String> = match find_param(&parsed_args, |arg: &Arg| -> Option<String> {
         match arg {
@@ -120,16 +132,14 @@ pub fn create_tasks(command: CommandInfo, args: &[String]) -> crate::Result<Vec<
     };
     let shared = Arc::new(CompilationArgs {
         args: parsed_args,
-        pch_in: pch_in.map(|path| command.current_dir_join(&path)),
-        pch_out: pch_out.map(|path| command.current_dir_join(&path)),
-        pch_marker,
+        pch_usage,
         command,
         deps_file: None,
+        run_second_cpp,
     });
     input_sources
         .into_iter()
-        .map(|source| {
-            let input_source = cwd.as_ref().map(|cwd| cwd.join(&source)).unwrap_or(source);
+        .map(|input_source| {
             let language = language
                 .as_ref()
                 .map_or_else(|| detect_language(&input_source), |lang| Some(lang.clone()))
@@ -164,25 +174,30 @@ fn detect_language(path: &Path) -> Option<String> {
 fn get_output_object(
     input_source: &Path,
     output_object: &Option<PathBuf>,
-) -> Result<PathBuf, String> {
-    output_object.as_ref().map_or_else(
-        || Ok(input_source.with_extension("obj")),
+) -> crate::Result<PathBuf> {
+    let result = output_object.as_ref().map_or_else(
+        || {
+            assert!(input_source.is_absolute());
+            Ok(input_source.with_extension("obj"))
+        },
         |path| {
+            assert!(path.is_absolute());
             if path.is_dir() {
                 input_source
                     .file_name()
                     .map(|name| path.join(name).with_extension("obj"))
                     .ok_or_else(|| {
-                        format!(
-                            "Input file path does not contains file name: {}",
+                        crate::Error::Generic(format!(
+                            "Input file path does not contain file name: {}",
                             input_source.to_string_lossy()
-                        )
+                        ))
                     })
             } else {
                 Ok(path.clone())
             }
         },
-    )
+    )?;
+    Ok(result)
 }
 
 fn parse_arguments<S: AsRef<str>, I: Iterator<Item = S>>(mut iter: I) -> Result<Vec<Arg>, String> {

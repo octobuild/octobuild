@@ -1,3 +1,4 @@
+use std::ffi::OsString;
 use std::fs;
 use std::io::Cursor;
 
@@ -5,7 +6,7 @@ use clap::Parser;
 
 use octobuild::vs::postprocess;
 
-fn bench_filter(path: &str, marker: &Option<String>, keep_headers: bool, num: usize) -> Vec<u8> {
+fn bench_filter(path: &str, marker: &Option<OsString>, keep_headers: bool, num: usize) -> Vec<u8> {
     let source = fs::read(path).unwrap();
 
     let mut total: usize = 0;
@@ -49,5 +50,10 @@ struct Args {
 fn main() {
     let args = Args::parse();
 
-    bench_filter(&args.input, &args.marker, args.keep, args.count);
+    bench_filter(
+        &args.input,
+        &args.marker.map(OsString::from),
+        args.keep,
+        args.count,
+    );
 }

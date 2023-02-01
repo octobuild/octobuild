@@ -31,7 +31,9 @@ use octobuild::cluster::common::{
     BuilderInfo, BuilderInfoUpdate, RPC_BUILDER_TASK, RPC_BUILDER_UPDATE, RPC_BUILDER_UPLOAD,
 };
 use octobuild::compiler::CompileInput::Preprocessed;
-use octobuild::compiler::{CompileStep, Compiler, CompilerOutput, SharedState, Toolchain};
+use octobuild::compiler::{
+    CompileStep, Compiler, CompilerOutput, PCHArgs, PCHUsage, SharedState, Toolchain,
+};
 use octobuild::config::Config;
 use octobuild::io::tempfile::TempFile;
 use octobuild::simple::supported_compilers;
@@ -169,7 +171,7 @@ impl<D> Middleware<D> for RpcBuilderTaskHandler {
         {
             info!("Received task from: {}", req.origin.remote_addr);
             let request: CompileRequest = bincode::deserialize_from(&mut req.origin).unwrap();
-            let precompiled: Option<PathBuf> = match request.precompiled_hash {
+            let pch_usage: PCHUsage = match request.precompiled_hash {
                 Some(ref hash) => {
                     if !is_valid_sha256(hash) {
                         return Err(NickelError::new(
@@ -188,17 +190,16 @@ impl<D> Middleware<D> for RpcBuilderTaskHandler {
                             StatusCode::FailedDependency,
                         ));
                     }
-                    Some(path)
+                    PCHUsage::In(PCHArgs { path, marker: None })
                 }
-                None => None,
+                None => PCHUsage::None,
             };
             let compile_step = CompileStep {
                 output_object: None,
-                pch_out: None,
-                pch_in: precompiled,
+                pch_usage,
                 args: request.args.iter().map(OsString::from).collect(),
                 input: Preprocessed(CompilerOutput::Vec(request.preprocessed_data)),
-                pch_marker: None,
+                run_second_cpp: false,
             };
 
             let toolchain: Arc<dyn Toolchain> =

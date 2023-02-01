@@ -132,7 +132,8 @@ fn execute(args: &[String]) -> octobuild::Result<Option<i32>> {
         let file = File::open(Path::new(arg))?;
         xg::parser::parse(&mut graph, BufReader::new(file))?;
     }
-    let build_graph = validate_graph(graph).and_then(|graph| prepare_graph(&compiler, &graph))?;
+    let build_graph =
+        validate_graph(graph).and_then(|graph| prepare_graph(&compiler, &graph, &config))?;
 
     let result = execute_graph(&state, build_graph, config.process_limit, print_task_result);
     drop(state.cache.cleanup());
@@ -144,7 +145,11 @@ fn env_resolver(name: &str) -> Option<String> {
     env::var(name).ok()
 }
 
-fn prepare_graph<C: Compiler>(compiler: &C, graph: &XgGraph) -> octobuild::Result<BuildGraph> {
+fn prepare_graph<C: Compiler>(
+    compiler: &C,
+    graph: &XgGraph,
+    config: &Config,
+) -> octobuild::Result<BuildGraph> {
     let mut remap: Vec<NodeIndex> = Vec::with_capacity(graph.node_count());
     let mut depends: Vec<NodeIndex> = Vec::with_capacity(graph.node_count());
 
@@ -159,6 +164,7 @@ fn prepare_graph<C: Compiler>(compiler: &C, graph: &XgGraph) -> octobuild::Resul
             command.clone(),
             CommandArgs::Raw(raw_args),
             &node.title,
+            config.run_second_cpp,
         );
         let node_index = NodeIndex::new(remap.len());
         if actions.len() == 1 {

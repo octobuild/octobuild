@@ -1,7 +1,9 @@
 use local_encoding_ng::{Encoder, Encoding};
+use std::ffi::OsString;
 use std::io::{Error, ErrorKind, Read, Write};
 use std::ptr;
 use std::slice;
+
 use thiserror::Error;
 
 #[derive(Error, Clone, Copy, Debug)]
@@ -25,7 +27,7 @@ const BUF_SIZE: usize = 0x10000;
 pub fn filter_preprocessed(
     reader: &mut dyn Read,
     writer: &mut dyn Write,
-    marker: &Option<String>,
+    marker: &Option<OsString>,
     keep_headers: bool,
 ) -> Result<(), Error> {
     let mut state = ScannerState {
@@ -53,10 +55,11 @@ pub fn filter_preprocessed(
         state.parse_bom()?;
         state.marker = match marker.as_ref() {
             Some(v) => {
+                let m = v.to_str().unwrap().to_string();
                 if state.utf8 {
-                    Some(Vec::from(v.as_bytes()))
+                    Some(Vec::from(m.as_bytes()))
                 } else {
-                    Some(Encoding::ANSI.to_bytes(&v.replace('\\', "/"))?)
+                    Some(Encoding::ANSI.to_bytes(&m.replace('\\', "/"))?)
                 }
             }
             None => None,
@@ -464,12 +467,13 @@ unsafe fn delta(beg: *const u8, end: *const u8) -> usize {
 
 #[cfg(test)]
 mod test {
+    use std::ffi::OsString;
     use std::io::{Cursor, Write};
 
     fn check_filter_pass(
         original: &str,
         expected: &str,
-        marker: &Option<String>,
+        marker: &Option<OsString>,
         keep_headers: bool,
         eol: &str,
     ) {
@@ -494,7 +498,7 @@ mod test {
         }
     }
 
-    fn check_filter(original: &str, expected: &str, marker: Option<String>, keep_headers: bool) {
+    fn check_filter(original: &str, expected: &str, marker: Option<OsString>, keep_headers: bool) {
         check_filter_pass(original, expected, &marker, keep_headers, "\n");
         check_filter_pass(original, expected, &marker, keep_headers, "\r\n");
     }
@@ -524,7 +528,7 @@ int main(int argc, char **argv) {
 	return 0;
 }
 "#,
-            Some("sample header.h".to_string()),
+            Some(OsString::from("sample header.h")),
             true,
         )
     }
@@ -550,7 +554,7 @@ int main(int argc, char **argv) {
 	return 0;
 }
 "#,
-            Some("sample header.h".to_string()),
+            Some(OsString::from("sample header.h")),
             false,
         );
     }
@@ -576,7 +580,7 @@ int main(int argc, char **argv) {
     return 0;
 }
 "#,
-            Some("STDafx.h".to_string()),
+            Some(OsString::from("STDafx.h")),
             false,
         );
     }
@@ -667,7 +671,9 @@ int main(int argc, char **argv) {
 	return 0;
 }
 "#,
-            Some("e:\\work\\octobuild\\test_cl\\sample header.h".to_string()),
+            Some(OsString::from(
+                "e:\\work\\octobuild\\test_cl\\sample header.h",
+            )),
             true,
         );
     }

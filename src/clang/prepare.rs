@@ -3,11 +3,15 @@ use std::slice::Iter;
 use std::sync::Arc;
 
 use crate::compiler::{
-    Arg, CommandInfo, CompilationArgs, CompilationTask, InputKind, OutputKind, Scope,
+    Arg, CommandInfo, CompilationArgs, CompilationTask, InputKind, OutputKind, PCHUsage, Scope,
 };
 use crate::utils::{expand_response_files, find_param, ParamValue};
 
-pub fn create_tasks(command: CommandInfo, args: &[String]) -> crate::Result<Vec<CompilationTask>> {
+pub fn create_tasks(
+    command: CommandInfo,
+    args: &[String],
+    run_second_cpp: bool,
+) -> crate::Result<Vec<CompilationTask>> {
     let expanded_args = expand_response_files(&command.current_dir, args)?;
 
     if expanded_args.iter().any(|v| v == "--analyze") {
@@ -34,6 +38,7 @@ pub fn create_tasks(command: CommandInfo, args: &[String]) -> crate::Result<Vec<
     if input_sources.is_empty() {
         return Err(crate::Error::from("Can't find source file path."));
     }
+    /*
     // Precompiled header file name.
     let pch_in = match find_param(&parsed_args, |arg: &Arg| -> Option<PathBuf> {
         match arg {
@@ -56,6 +61,8 @@ pub fn create_tasks(command: CommandInfo, args: &[String]) -> crate::Result<Vec<
         Arg::Param { flag, value, .. } if *flag == "include" => Some(value.clone()),
         _ => None,
     });
+     */
+
     // Output object file name.
     let output_object = match find_param(&parsed_args, |arg: &Arg| -> Option<PathBuf> {
         match arg {
@@ -117,10 +124,10 @@ pub fn create_tasks(command: CommandInfo, args: &[String]) -> crate::Result<Vec<
     let shared = Arc::new(CompilationArgs {
         command,
         args: parsed_args,
-        pch_out: None,
-        pch_marker,
-        pch_in,
+        // No PCH support for clang for now
+        pch_usage: PCHUsage::None,
         deps_file,
+        run_second_cpp,
     });
     input_sources
         .into_iter()

@@ -101,9 +101,10 @@ impl BuildAction {
         command: CommandInfo,
         args: CommandArgs,
         title: &str,
+        run_second_cpp: bool,
     ) -> Vec<BuildAction> {
         let actions: Vec<BuildAction> = compiler
-            .create_tasks(command.clone(), args.clone())
+            .create_tasks(command.clone(), args.clone(), run_second_cpp)
             .map(|tasks| {
                 tasks
                     .into_iter()

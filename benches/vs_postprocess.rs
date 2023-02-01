@@ -1,3 +1,4 @@
+use std::ffi::OsString;
 use std::fs;
 use std::io::Cursor;
 
@@ -13,7 +14,9 @@ fn filter_preprocessed_benchmark(c: &mut Criterion) {
             .unwrap()
             .join(PathBuf::from("filter_preprocessed.i"));
         let source = fs::read(f).unwrap();
-        let marker = Some("c:\\bozaro\\github\\octobuild\\test_cl\\sample.h".to_string());
+        let marker = Some(OsString::from(
+            "c:\\bozaro\\github\\octobuild\\test_cl\\sample.h",
+        ));
 
         b.iter(|| {
             let mut result = Vec::with_capacity(source.len());

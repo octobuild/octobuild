@@ -114,7 +114,7 @@ impl RemoteToolchain {
         let addr = self
             .remote_endpoint(&name)
             .ok_or_else(|| Error::new(ErrorKind::Other, "Can't find helper for toolchain"))?;
-        if task.pch_out.is_some() {
+        if task.pch_usage.is_some() {
             return Err(Error::new(
                 ErrorKind::Other,
                 "Remote precompiled header generation is not supported",
@@ -138,7 +138,11 @@ impl RemoteToolchain {
                 .map(|s| s.to_str().unwrap().to_string())
                 .collect(),
             preprocessed_data: preprocessed.to_vec(),
-            precompiled_hash: self.upload_precompiled(state, &task.pch_in, &base_url)?,
+            precompiled_hash: self.upload_precompiled(
+                state,
+                &task.pch_usage.get_in(),
+                &base_url,
+            )?,
         };
         let request_payload = bincode::serialize(&request).unwrap();
         let mut resp: reqwest::blocking::Response = self
@@ -165,7 +169,7 @@ impl RemoteToolchain {
     fn upload_precompiled(
         &self,
         state: &SharedState,
-        precompiled: &Option<PathBuf>,
+        precompiled: &Option<&PathBuf>,
         base_url: &reqwest::Url,
     ) -> Result<Option<String>, Error> {
         match precompiled {
@@ -263,8 +267,9 @@ impl Toolchain for RemoteToolchain {
         &self,
         command: CommandInfo,
         args: &[String],
+        run_second_cpp: bool,
     ) -> crate::Result<Vec<CompilationTask>> {
-        self.local.create_tasks(command, args)
+        self.local.create_tasks(command, args, run_second_cpp)
     }
 
     // Preprocessing source file.
@@ -279,11 +284,10 @@ impl Toolchain for RemoteToolchain {
     // Compile preprocessed file.
     fn create_compile_step(
         &self,
-        state: &SharedState,
         task: &CompilationTask,
         preprocessed: CompilerOutput,
     ) -> CompileStep {
-        self.local.create_compile_step(state, task, preprocessed)
+        self.local.create_compile_step(task, preprocessed)
     }
 
     fn run_compile(&self, state: &SharedState, task: CompileStep) -> crate::Result<OutputInfo> {

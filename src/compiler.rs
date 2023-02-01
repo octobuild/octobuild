@@ -12,6 +12,7 @@ use std::time::Duration;
 
 use ipc::Semaphore;
 use os_str_bytes::OsStrBytes;
+use path_absolutize::Absolutize;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use tempfile::{NamedTempFile, TempDir};
@@ -156,7 +157,6 @@ pub struct SharedState {
     pub cache: Cache,
     pub statistic: Statistic,
     pub temp_dir: TempDir,
-    pub run_second_cpp: bool,
     use_response_files: bool,
 }
 
@@ -171,7 +171,6 @@ impl SharedState {
             cache: Cache::new(config),
             statistic: Statistic::new(),
             temp_dir: tempfile::Builder::new().prefix("octobuild").tempdir()?,
-            run_second_cpp: config.run_second_cpp,
             use_response_files: config.use_response_files,
         })
     }
@@ -255,12 +254,12 @@ impl CommandInfo {
         }
     }
 
-    #[must_use]
-    pub fn current_dir_join(&self, path: &Path) -> PathBuf {
-        match self.current_dir.as_ref() {
-            None => path.to_path_buf(),
-            Some(cwd) => cwd.join(path),
-        }
+    pub fn absolutize(&self, path: &Path) -> crate::Result<PathBuf> {
+        Ok(match &self.current_dir {
+            None => path.absolutize(),
+            Some(cwd) => path.absolutize_from(cwd),
+        }?
+        .to_path_buf())
     }
 
     #[must_use]
@@ -372,19 +371,59 @@ impl OutputInfo {
     }
 }
 
+#[derive(Debug, Clone)]
+pub struct PCHArgs {
+    // Precompiled header file name.
+    pub path: PathBuf,
+    // Marker for precompiled header.
+    pub marker: Option<OsString>,
+}
+
+#[derive(Debug, Clone)]
+pub enum PCHUsage {
+    None,
+    In(PCHArgs),
+    Out(PCHArgs),
+}
+
+impl PCHUsage {
+    pub fn is_some(&self) -> bool {
+        match self {
+            PCHUsage::None => false,
+            PCHUsage::In(_) => true,
+            PCHUsage::Out(_) => true,
+        }
+    }
+
+    pub fn is_out(&self) -> bool {
+        self.get_out().is_some()
+    }
+
+    pub fn get_out(&self) -> Option<&PathBuf> {
+        match self {
+            PCHUsage::None => None,
+            PCHUsage::In(_) => None,
+            PCHUsage::Out(v) => Some(&v.path),
+        }
+    }
+    pub fn get_in(&self) -> Option<&PathBuf> {
+        match self {
+            PCHUsage::None => None,
+            PCHUsage::In(v) => Some(&v.path),
+            PCHUsage::Out(_) => None,
+        }
+    }
+}
+
 #[derive(Debug)]
 pub struct CompilationArgs {
     // Original compiler executable.
     pub command: CommandInfo,
     // Parsed arguments.
     pub args: Vec<Arg>,
-    // Input precompiled header file name.
-    pub pch_in: Option<PathBuf>,
-    // Output precompiled header file name.
-    pub pch_out: Option<PathBuf>,
-    // Marker for precompiled header.
-    pub pch_marker: Option<String>,
+    pub pch_usage: PCHUsage,
     pub deps_file: Option<PathBuf>,
+    pub run_second_cpp: bool,
 }
 
 #[derive(Clone, Debug)]
@@ -414,34 +453,19 @@ pub struct CompileStep {
     pub args: Vec<OsString>,
     // Output object file name (None - compile to stdout).
     pub output_object: Option<PathBuf>,
-    // Input precompiled header file name.
-    pub pch_in: Option<PathBuf>,
-    // Output precompiled header file name.
-    pub pch_out: Option<PathBuf>,
+    pub pch_usage: PCHUsage,
     pub input: CompileInput,
-    pub pch_marker: Option<String>,
+    pub run_second_cpp: bool,
 }
 
 impl CompileStep {
     #[must_use]
-    pub fn new(
-        task: &CompilationTask,
-        preprocessed: CompilerOutput,
-        args: Vec<OsString>,
-        use_precompiled: bool,
-        run_second_cpp: bool,
-    ) -> Self {
-        assert!(use_precompiled || task.shared.pch_in.is_none());
+    pub fn new(task: &CompilationTask, preprocessed: CompilerOutput, args: Vec<OsString>) -> Self {
         CompileStep {
             output_object: Some(task.output_object.clone()),
-            pch_out: task.shared.pch_out.clone(),
-            pch_in: if use_precompiled {
-                task.shared.pch_in.clone()
-            } else {
-                None
-            },
+            pch_usage: task.shared.pch_usage.clone(),
             args,
-            input: if run_second_cpp {
+            input: if task.shared.run_second_cpp {
                 Source(SourceInput {
                     path: task.input_source.clone(),
                     current_dir: task.shared.command.current_dir.clone(),
@@ -449,11 +473,7 @@ impl CompileStep {
             } else {
                 Preprocessed(preprocessed)
             },
-            pch_marker: if run_second_cpp {
-                task.shared.pch_marker.clone()
-            } else {
-                None
-            },
+            run_second_cpp: task.shared.run_second_cpp,
         }
     }
 }
@@ -512,6 +532,7 @@ pub trait Toolchain: Send + Sync {
         &self,
         command: CommandInfo,
         args: &[String],
+        run_second_cpp: bool,
     ) -> crate::Result<Vec<CompilationTask>>;
     // Preprocessing source file.
     fn run_preprocess(
@@ -521,7 +542,6 @@ pub trait Toolchain: Send + Sync {
     ) -> crate::Result<PreprocessResult>;
     fn create_compile_step(
         &self,
-        state: &SharedState,
         task: &CompilationTask,
         preprocessed: CompilerOutput,
     ) -> CompileStep;
@@ -554,7 +574,7 @@ pub trait Toolchain: Send + Sync {
         hasher.hash_u64(preprocessed.len() as u64);
         preprocessed.copy(&mut hasher)?;
 
-        let step = self.create_compile_step(state, task, preprocessed);
+        let step = self.create_compile_step(task, preprocessed);
 
         // Hash arguments
         hasher.hash_u64(step.args.len() as u64);
@@ -562,7 +582,7 @@ pub trait Toolchain: Send + Sync {
             hasher.hash_os_string(arg)
         }
         // Hash input files
-        match &step.pch_in {
+        match &step.pch_usage.get_in() {
             Some(path) => {
                 hasher.hash_bytes(state.cache.file_hash(path)?.hash.as_bytes());
             }
@@ -571,14 +591,16 @@ pub trait Toolchain: Send + Sync {
             }
         }
         // Store output precompiled flag
-        hasher.hash_u8(u8::from(step.pch_out.is_some()));
+        hasher.hash_u8(u8::from(step.pch_usage.get_out().is_some()));
 
         // Output files list
         let mut outputs: Vec<PathBuf> = Vec::new();
         if let Some(path) = &step.output_object {
+            assert!(path.is_absolute());
             outputs.push(path.clone());
         }
-        if let Some(path) = &step.pch_out {
+        if let Some(path) = step.pch_usage.get_out() {
+            assert!(path.is_absolute());
             outputs.push(path.clone());
         }
 
@@ -725,6 +747,7 @@ pub trait Compiler: Send + Sync {
         &self,
         command: CommandInfo,
         args: CommandArgs,
+        run_second_cpp: bool,
     ) -> crate::Result<Vec<ToolchainCompilationTask>> {
         let toolchain = self
             .resolve_toolchain(&command)
@@ -735,7 +758,7 @@ pub trait Compiler: Send + Sync {
             CommandArgs::Regular(v) => v,
         };
 
-        let tasks = toolchain.create_tasks(command, &argv)?;
+        let tasks = toolchain.create_tasks(command, &argv, run_second_cpp)?;
 
         Ok(tasks
             .into_iter()
