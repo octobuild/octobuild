@@ -5,6 +5,7 @@ use crate::compiler::{
     OutputInfo, PCHUsage, PreprocessResult, Scope, SharedState, Toolchain, ToolchainHolder,
 };
 use crate::io::memstream::MemStream;
+use crate::io::tempfile::TempFile;
 use crate::lazy::Lazy;
 use crate::utils::OsStrExt;
 use crate::vs::postprocess;
@@ -108,6 +109,22 @@ impl Compiler for VsCompiler {
     }
 }
 
+fn run_postprocess(
+    output: Output,
+    path: &Path,
+    marker: &Option<OsString>,
+    keep_headers: bool,
+) -> crate::Result<PreprocessResult> {
+    let mut content = MemStream::new();
+    postprocess::filter_preprocessed(
+        &mut Cursor::new(output.stdout),
+        &mut content,
+        marker,
+        keep_headers,
+    )
+    .map_err(|e| crate::Error::postprocess(path, e))?;
+    Ok(PreprocessResult::Success(CompilerOutput::MemSteam(content)))
+}
 fn collect_args(
     args: &[Arg],
     target_scope: Scope,
@@ -181,10 +198,10 @@ impl Toolchain for VsToolchain {
             &mut args,
         );
 
+        let mut command = task.shared.command.to_command();
+        let response_file =
+            state.do_response_file(OsCommandArgs::Raw(args.join(" ".as_ref())), &mut command)?;
         let output = state.wrap_slow(|| -> crate::Result<Output> {
-            let mut command = task.shared.command.to_command();
-            let response_file = state
-                .do_response_file(OsCommandArgs::Raw(args.join(" ".as_ref())), &mut command)?;
             let output = command.output()?;
             drop(response_file);
             Ok(output)
@@ -195,26 +212,8 @@ impl Toolchain for VsToolchain {
                 PCHUsage::None => Ok(PreprocessResult::Success(CompilerOutput::Vec(
                     output.stdout,
                 ))),
-                PCHUsage::In(v) => {
-                    let mut content = MemStream::new();
-                    postprocess::filter_preprocessed(
-                        &mut Cursor::new(output.stdout),
-                        &mut content,
-                        &v.marker,
-                        false,
-                    )?;
-                    Ok(PreprocessResult::Success(CompilerOutput::MemSteam(content)))
-                }
-                PCHUsage::Out(v) => {
-                    let mut content = MemStream::new();
-                    postprocess::filter_preprocessed(
-                        &mut Cursor::new(output.stdout),
-                        &mut content,
-                        &v.marker,
-                        true,
-                    )?;
-                    Ok(PreprocessResult::Success(CompilerOutput::MemSteam(content)))
-                }
+                PCHUsage::In(v) => run_postprocess(output, &task.input_source, &v.marker, false),
+                PCHUsage::Out(v) => run_postprocess(output, &task.input_source, &v.marker, true),
             }
         } else {
             Ok(PreprocessResult::Failed(OutputInfo {
@@ -280,9 +279,7 @@ impl Toolchain for VsToolchain {
 
         let (input_path, temp_input, current_dir_override) = match &task.input {
             Preprocessed(preprocessed) => {
-                let input_temp = tempfile::Builder::new()
-                    .suffix(".i")
-                    .tempfile_in(state.temp_dir.path())?;
+                let input_temp = TempFile::new_in(state.temp_dir.path(), ".i");
                 preprocessed.copy(&mut File::create(input_temp.path())?)?;
                 (input_temp.path().to_path_buf(), Some(input_temp), None)
             }

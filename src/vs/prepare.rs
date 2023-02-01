@@ -1,3 +1,4 @@
+use std::ffi::OsString;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
@@ -16,16 +17,13 @@ pub fn create_tasks(
 
     let parsed_args = parse_arguments(expanded_args.iter())?;
     // Source file name.
-    let input_sources: Vec<PathBuf> = parsed_args
-        .iter()
-        .filter_map(|arg| match arg {
-            Arg::Input { kind, file, .. } if *kind == InputKind::Source => {
-                Some(PathBuf::from(file))
-            }
-            _ => None,
-        })
-        .flat_map(|v| command.absolutize(&v))
-        .collect();
+    let mut input_sources = Vec::<PathBuf>::new();
+    for input in parsed_args.iter().filter_map(|arg| match arg {
+        Arg::Input { kind, file, .. } if *kind == InputKind::Source => Some(PathBuf::from(file)),
+        _ => None,
+    }) {
+        input_sources.push(command.absolutize(&input)?);
+    }
     if input_sources.is_empty() {
         return Err(crate::Error::from(
             "Can't find source file path.".to_string(),
@@ -41,7 +39,7 @@ pub fn create_tasks(
         }
     }) {
         ParamValue::None => None,
-        ParamValue::Single(v) => Some(command.absolutize(&v)?),
+        ParamValue::Single(v) => Some(v),
         ParamValue::Many(v) => {
             return Err(crate::Error::from(format!(
                 "Found too many precompiled header files: {v:?}"
@@ -70,21 +68,16 @@ pub fn create_tasks(
             let pch_marker = if path.is_empty() {
                 None
             } else {
-                Some(
-                    command
-                        .absolutize(Path::new(&path))?
-                        .as_os_str()
-                        .to_os_string(),
-                )
+                Some(OsString::from(path))
             };
             if input {
                 Ok(PCHUsage::In(PCHArgs {
-                    path: command.absolutize(&precompiled_path)?,
+                    path: precompiled_path,
                     marker: pch_marker,
                 }))
             } else {
                 Ok(PCHUsage::Out(PCHArgs {
-                    path: command.absolutize(&precompiled_path)?,
+                    path: precompiled_path,
                     marker: pch_marker,
                 }))
             }

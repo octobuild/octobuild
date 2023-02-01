@@ -38,7 +38,7 @@ pub fn main() -> octobuild::Result<()> {
     process::exit(match execute(&args[1..]) {
         Ok(result) => result.unwrap_or(501),
         Err(e) => {
-            println!("FATAL ERROR: {e}");
+            println!("ERROR: {e}");
             500
         }
     })

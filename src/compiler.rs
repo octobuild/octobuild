@@ -600,7 +600,6 @@ pub trait Toolchain: Send + Sync {
             outputs.push(path.clone());
         }
         if let Some(path) = step.pch_usage.get_out() {
-            assert!(path.is_absolute());
             outputs.push(path.clone());
         }
 

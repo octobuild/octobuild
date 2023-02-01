@@ -1,6 +1,9 @@
-use crate::io::filecache::CacheError;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
+
 use thiserror::Error;
+
+use crate::io::filecache::CacheError;
+use crate::vs::postprocess::PostprocessError;
 
 pub mod cache;
 
@@ -70,6 +73,18 @@ pub enum Error {
     IO(#[from] std::io::Error),
     #[error("Build task files not found")]
     NoTaskFiles,
+    #[error("Failed to compile {input_source}: {error}")]
+    Compilation {
+        input_source: PathBuf,
+        error: Box<crate::Error>,
+    },
+    #[error("Failed to postprocess {path}: {error}")]
+    Postprocess {
+        path: PathBuf,
+        error: Box<crate::Error>,
+    },
+    #[error(transparent)]
+    PostprocessError(#[from] PostprocessError),
     #[error(transparent)]
     Reqwest(#[from] reqwest::Error),
     #[error("Toolchain not found: {0}")]
@@ -91,6 +106,13 @@ impl From<&str> for Error {
 impl Error {
     fn send_error<T>(error: crossbeam_channel::SendError<T>) -> Self {
         Error::Generic(error.to_string())
+    }
+
+    fn postprocess(path: &Path, error: crate::Error) -> Self {
+        Self::Postprocess {
+            path: path.to_path_buf(),
+            error: error.into(),
+        }
     }
 }
 

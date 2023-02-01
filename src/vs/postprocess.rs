@@ -6,8 +6,8 @@ use std::slice;
 
 use thiserror::Error;
 
-#[derive(Error, Clone, Copy, Debug)]
-enum PostprocessError {
+#[derive(Error, Clone, Debug)]
+pub enum PostprocessError {
     #[error("unexpected end of line in literal")]
     LiteralEol,
     #[error("unexpected end of stream in literal")]
@@ -16,8 +16,8 @@ enum PostprocessError {
     LiteralTooLong,
     #[error("unexpected end of escape sequence")]
     EscapeEof,
-    #[error("can't find precompiled header marker in preprocessed file")]
-    MarkerNotFound,
+    #[error("can't find precompiled header marker: {0:?}")]
+    MarkerNotFound(OsString),
     #[error("token too long")]
     TokenTooLong,
 }
@@ -29,7 +29,7 @@ pub fn filter_preprocessed(
     writer: &mut dyn Write,
     marker: &Option<OsString>,
     keep_headers: bool,
-) -> Result<(), Error> {
+) -> crate::Result<()> {
     let mut state = ScannerState {
         buf_data: [0; BUF_SIZE],
         ptr_copy: ptr::null(),
@@ -73,10 +73,7 @@ pub fn filter_preprocessed(
                 return state.copy_to_end();
             }
         }
-        Err(Error::new(
-            ErrorKind::InvalidInput,
-            PostprocessError::MarkerNotFound,
-        ))
+        Err(PostprocessError::MarkerNotFound(marker.clone().unwrap()).into())
     }
 }
 
@@ -129,7 +126,7 @@ impl<'a> ScannerState<'a> {
         Ok(self.ptr_read != self.ptr_end)
     }
 
-    unsafe fn copy_to_end(&mut self) -> Result<(), Error> {
+    unsafe fn copy_to_end(&mut self) -> crate::Result<()> {
         self.writer.write_all(slice::from_raw_parts(
             self.ptr_copy,
             delta(self.ptr_copy, self.ptr_end),

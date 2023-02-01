@@ -2,12 +2,21 @@ use std::fs;
 use std::io::Error;
 use std::path::{Path, PathBuf};
 
+use uuid::Uuid;
+
 pub struct TempFile {
     path: Option<PathBuf>,
     disarmed: bool,
 }
 
 impl TempFile {
+    /// Create random file name in specified directory.
+    #[must_use]
+    pub fn new_in(path: &Path, suffix: &str) -> Self {
+        let random_name = Uuid::new_v4().to_string() + suffix;
+        TempFile::wrap(&path.join(random_name))
+    }
+
     /// Wrap path to a temporary file. The file will be automatically
     /// deleted once the returned wrapper is destroyed.
     ///
