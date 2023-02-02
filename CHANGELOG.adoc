@@ -1,6 +1,12 @@
 = Changelog
 :icons: font
 
+== 0.4.2
+
+* Fix compatibility with Unreal Engine 5.1.
++
+It turned out that fix in 0.4.0 had a typo.
+
 == 0.4.1
 
 * Handle special chars (quotes, whitespace, backslash, etc) in response files properly
