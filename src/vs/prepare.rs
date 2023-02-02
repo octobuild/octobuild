@@ -58,26 +58,29 @@ pub fn create_tasks(
             _ => None,
         }
     });
-    let pch_usage: PCHUsage = match pch_param {
+    let pch_usage: PCHUsage = match &pch_param {
         ParamValue::None => crate::Result::<PCHUsage>::Ok(PCHUsage::None),
         ParamValue::Single((input, path)) => {
             let precompiled_path = match precompiled_file {
                 Some(v) => v,
-                None => PathBuf::from(&path).with_extension("pch"),
+                None => PathBuf::from(path).with_extension("pch"),
             };
+            let precompiled_path_abs = command.absolutize(&precompiled_path)?;
             let pch_marker = if path.is_empty() {
                 None
             } else {
                 Some(OsString::from(path))
             };
-            if input {
+            if *input {
                 Ok(PCHUsage::In(PCHArgs {
                     path: precompiled_path,
+                    path_abs: precompiled_path_abs,
                     marker: pch_marker,
                 }))
             } else {
                 Ok(PCHUsage::Out(PCHArgs {
                     path: precompiled_path,
+                    path_abs: precompiled_path_abs,
                     marker: pch_marker,
                 }))
             }

@@ -208,12 +208,22 @@ impl Toolchain for VsToolchain {
         })?;
 
         if output.status.success() {
-            match &task.shared.pch_usage {
-                PCHUsage::None => Ok(PreprocessResult::Success(CompilerOutput::Vec(
+            if task.shared.run_second_cpp {
+                Ok(PreprocessResult::Success(CompilerOutput::Vec(
                     output.stdout,
-                ))),
-                PCHUsage::In(v) => run_postprocess(output, &task.input_source, &v.marker, false),
-                PCHUsage::Out(v) => run_postprocess(output, &task.input_source, &v.marker, true),
+                )))
+            } else {
+                match &task.shared.pch_usage {
+                    PCHUsage::None => Ok(PreprocessResult::Success(CompilerOutput::Vec(
+                        output.stdout,
+                    ))),
+                    PCHUsage::In(v) => {
+                        run_postprocess(output, &task.input_source, &v.marker, false)
+                    }
+                    PCHUsage::Out(v) => {
+                        run_postprocess(output, &task.input_source, &v.marker, true)
+                    }
+                }
             }
         } else {
             Ok(PreprocessResult::Failed(OutputInfo {
@@ -262,9 +272,7 @@ impl Toolchain for VsToolchain {
         match &task.pch_usage {
             PCHUsage::None => {}
             PCHUsage::In(v) => {
-                assert!(v.path.is_absolute());
                 if let Some(pch_marker) = &v.marker {
-                    assert!(Path::new(pch_marker).is_absolute());
                     args.push(OsString::from("/Yu").concat(quote(pch_marker)));
                 } else {
                     args.push(OsString::from("/Yu"));
@@ -272,7 +280,6 @@ impl Toolchain for VsToolchain {
                 args.push(OsString::from("/Fp").concat(quote(&v.path)));
             }
             PCHUsage::Out(v) => {
-                assert!(v.path.is_absolute());
                 args.push(OsString::from("/Fp").concat(quote(&v.path)));
             }
         }

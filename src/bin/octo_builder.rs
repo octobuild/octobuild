@@ -23,6 +23,7 @@ use nickel::{
     HttpRouter, ListeningServer, MediaType, Middleware, MiddlewareResult, Nickel, NickelError,
     Request, Response,
 };
+use path_absolutize::Absolutize;
 use sha2::digest::DynDigest;
 use sha2::{Digest, Sha256};
 
@@ -65,13 +66,13 @@ struct RpcBuilderTaskHandler(Arc<BuilderState>);
 struct RpcBuilderUploadHandler(Arc<BuilderState>);
 
 impl BuilderService {
-    fn new() -> Self {
-        let config = Config::load().unwrap();
+    fn new() -> octobuild::Result<Self> {
+        let config = Config::load()?;
         info!("Helper bind to address: {}", config.helper_bind);
 
         let state = Arc::new(BuilderState {
             name: get_name(),
-            shared: SharedState::new(&config).unwrap(),
+            shared: SharedState::new(&config)?,
             toolchains: BuilderService::discover_toolchains(),
             precompiled_dir: config.cache,
             precompiled: Mutex::new(HashMap::new()),
@@ -98,7 +99,7 @@ impl BuilderService {
         }
 
         let done = Arc::new(AtomicBool::new(false));
-        BuilderService {
+        Ok(BuilderService {
             anoncer: Some(BuilderService::thread_anoncer(
                 state,
                 config.coordinator.unwrap(),
@@ -107,7 +108,7 @@ impl BuilderService {
             )),
             done,
             listener: Some(listener),
-        }
+        })
     }
 
     fn thread_anoncer(
@@ -190,7 +191,12 @@ impl<D> Middleware<D> for RpcBuilderTaskHandler {
                             StatusCode::FailedDependency,
                         ));
                     }
-                    PCHUsage::In(PCHArgs { path, marker: None })
+                    let path_abs = path.absolutize().unwrap().to_path_buf();
+                    PCHUsage::In(PCHArgs {
+                        path,
+                        path_abs,
+                        marker: None,
+                    })
                 }
                 None => PCHUsage::None,
             };

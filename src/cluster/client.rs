@@ -140,7 +140,7 @@ impl RemoteToolchain {
             preprocessed_data: preprocessed.to_vec(),
             precompiled_hash: self.upload_precompiled(
                 state,
-                &task.pch_usage.get_in(),
+                &task.pch_usage.get_in_abs(),
                 &base_url,
             )?,
         };

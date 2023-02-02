@@ -1,5 +1,6 @@
 use std::path::{Path, PathBuf};
 
+use crate::Error::IO;
 use thiserror::Error;
 
 use crate::io::filecache::CacheError;
@@ -59,6 +60,11 @@ pub enum Error {
     Cache(#[from] CacheError),
     #[error("Found cycles in build graph")]
     CyclesInBuildGraph,
+    #[error("Failed to open file {path}: {error}")]
+    FileOpen {
+        path: PathBuf,
+        error: Box<crate::Error>,
+    },
     #[error(transparent)]
     Figment(#[from] figment::Error),
     #[error(transparent)]
@@ -70,12 +76,12 @@ pub enum Error {
     #[error("Internal error: {0}")]
     Generic(String),
     #[error(transparent)]
-    IO(#[from] std::io::Error),
+    IO(std::io::Error),
     #[error("Build task files not found")]
     NoTaskFiles,
-    #[error("Failed to compile {input_source}: {error}")]
+    #[error("Failed to compile {path}: {error}")]
     Compilation {
-        input_source: PathBuf,
+        path: PathBuf,
         error: Box<crate::Error>,
     },
     #[error("Failed to postprocess {path}: {error}")]
@@ -89,6 +95,12 @@ pub enum Error {
     Reqwest(#[from] reqwest::Error),
     #[error("Toolchain not found: {0}")]
     ToolchainNotFound(PathBuf),
+}
+
+impl From<std::io::Error> for Error {
+    fn from(value: std::io::Error) -> Self {
+        IO(value)
+    }
 }
 
 impl From<String> for Error {

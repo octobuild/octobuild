@@ -375,6 +375,7 @@ impl OutputInfo {
 pub struct PCHArgs {
     // Precompiled header file name.
     pub path: PathBuf,
+    pub path_abs: PathBuf,
     // Marker for precompiled header.
     pub marker: Option<OsString>,
 }
@@ -396,20 +397,29 @@ impl PCHUsage {
     }
 
     pub fn is_out(&self) -> bool {
-        self.get_out().is_some()
+        self.get_out_abs().is_some()
     }
 
-    pub fn get_out(&self) -> Option<&PathBuf> {
+    pub fn get_out_abs(&self) -> Option<&PathBuf> {
         match self {
             PCHUsage::None => None,
             PCHUsage::In(_) => None,
-            PCHUsage::Out(v) => Some(&v.path),
+            PCHUsage::Out(v) => Some(&v.path_abs),
         }
     }
+
     pub fn get_in(&self) -> Option<&PathBuf> {
         match self {
             PCHUsage::None => None,
             PCHUsage::In(v) => Some(&v.path),
+            PCHUsage::Out(_) => None,
+        }
+    }
+
+    pub fn get_in_abs(&self) -> Option<&PathBuf> {
+        match self {
+            PCHUsage::None => None,
+            PCHUsage::In(v) => Some(&v.path_abs),
             PCHUsage::Out(_) => None,
         }
     }
@@ -582,8 +592,9 @@ pub trait Toolchain: Send + Sync {
             hasher.hash_os_string(arg)
         }
         // Hash input files
-        match &step.pch_usage.get_in() {
+        match &step.pch_usage.get_in_abs() {
             Some(path) => {
+                assert!(path.is_absolute());
                 hasher.hash_bytes(state.cache.file_hash(path)?.hash.as_bytes());
             }
             None => {
@@ -591,7 +602,7 @@ pub trait Toolchain: Send + Sync {
             }
         }
         // Store output precompiled flag
-        hasher.hash_u8(u8::from(step.pch_usage.get_out().is_some()));
+        hasher.hash_u8(u8::from(step.pch_usage.is_out()));
 
         // Output files list
         let mut outputs: Vec<PathBuf> = Vec::new();
@@ -599,7 +610,8 @@ pub trait Toolchain: Send + Sync {
             assert!(path.is_absolute());
             outputs.push(path.clone());
         }
-        if let Some(path) = step.pch_usage.get_out() {
+        if let Some(path) = step.pch_usage.get_out_abs() {
+            assert!(path.is_absolute());
             outputs.push(path.clone());
         }
 
@@ -609,7 +621,6 @@ pub trait Toolchain: Send + Sync {
             &hex::encode(hasher.finalize()),
             &outputs,
             || -> crate::Result<OutputInfo> { self.run_compile(state, step) },
-            || true,
         )
     }
 }

@@ -40,16 +40,14 @@ impl Cache {
         }
     }
 
-    pub fn run_file_cached<F: FnOnce() -> crate::Result<OutputInfo>, C: Fn() -> bool>(
+    pub fn run_file_cached<F: FnOnce() -> crate::Result<OutputInfo>>(
         &self,
         statistic: &Statistic,
         hash: &str,
         outputs: &[PathBuf],
         worker: F,
-        checker: C,
     ) -> crate::Result<OutputInfo> {
-        self.file_cache
-            .run_cached(statistic, hash, outputs, worker, checker)
+        self.file_cache.run_cached(statistic, hash, outputs, worker)
     }
 
     pub fn cleanup(&self) -> crate::Result<()> {

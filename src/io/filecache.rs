@@ -51,13 +51,12 @@ impl FileCache {
         }
     }
 
-    pub fn run_cached<F: FnOnce() -> crate::Result<OutputInfo>, C: Fn() -> bool>(
+    pub fn run_cached<F: FnOnce() -> crate::Result<OutputInfo>>(
         &self,
         statistic: &Statistic,
         hash: &str,
         outputs: &[PathBuf],
         worker: F,
-        checker: C,
     ) -> crate::Result<OutputInfo> {
         let path = self
             .cache_dir
@@ -69,9 +68,7 @@ impl FileCache {
         }
         // Run task and save result to cache.
         let output = worker()?;
-        if checker() {
-            write_cache(statistic, &path, outputs, &output)?;
-        }
+        write_cache(statistic, &path, outputs, &output)?;
         Ok(output)
     }
 
@@ -110,8 +107,12 @@ fn find_cache_files(dir: &Path, mut files: Vec<CacheFile>) -> crate::Result<Vec<
 }
 
 fn write_cached_file<W: Write>(stream: &mut W, path: &Path) -> crate::Result<()> {
+    assert!(path.is_absolute());
     let mut buf: [u8; DEFAULT_BUF_SIZE] = [0; DEFAULT_BUF_SIZE];
-    let mut file = File::open(path)?;
+    let mut file = File::open(path).map_err(|e| crate::Error::FileOpen {
+        path: path.to_path_buf(),
+        error: Box::new(e.into()),
+    })?;
     let total_size = file.seek(SeekFrom::End(0))?;
     file.rewind()?;
     write_u64(stream, total_size)?;
@@ -153,6 +154,7 @@ fn write_cache(
     stream.write_all(HEADER)?;
     write_usize(&mut stream, paths.len())?;
     for path in paths {
+        assert!(path.is_absolute());
         write_cached_file(&mut stream, path)?;
     }
     write_output(&mut stream, output)?;
@@ -200,6 +202,7 @@ fn read_cache(
         return Err(CacheError::PackedFilesMismatch(path.clone()).into());
     }
     for path in paths {
+        assert!(path.is_absolute());
         let mut temp_name = OsString::from("~tmp~");
         temp_name.push(path.file_name().unwrap());
         let temp = path.with_file_name(temp_name);
