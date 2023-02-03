@@ -8,7 +8,7 @@ use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::Receiver;
-use std::sync::{Arc, Mutex};
+use std::sync::{mpsc, Arc, Mutex};
 use std::thread;
 use std::thread::JoinHandle;
 use std::time::Duration;
@@ -17,13 +17,8 @@ use daemon::Daemon;
 use daemon::DaemonRunner;
 use daemon::State;
 use log::info;
-use nickel::hyper::method::Method;
-use nickel::status::StatusCode;
-use nickel::{
-    HttpRouter, ListeningServer, MediaType, Middleware, MiddlewareResult, Nickel, NickelError,
-    Request, Response,
-};
 use path_absolutize::Absolutize;
+use rouille::{router, try_or_400, Request, Response, Server};
 use sha2::digest::DynDigest;
 use sha2::{Digest, Sha256};
 
@@ -43,8 +38,8 @@ use octobuild::version;
 
 struct BuilderService {
     done: Arc<AtomicBool>,
-    listener: Option<ListeningServer>,
-    anoncer: Option<JoinHandle<()>>,
+    server: Option<(JoinHandle<()>, mpsc::Sender<()>)>,
+    announcer: Option<JoinHandle<()>>,
 }
 
 struct BuilderState {
@@ -61,37 +56,37 @@ struct PrecompiledFile {
 
 const PRECOMPILED_SUFFIX: &str = ".pch";
 
-struct RpcBuilderTaskHandler(Arc<BuilderState>);
-
-struct RpcBuilderUploadHandler(Arc<BuilderState>);
-
 impl BuilderService {
     fn new() -> octobuild::Result<Self> {
         let config = Config::load()?;
         info!("Helper bind to address: {}", config.helper_bind);
 
         let state = Arc::new(BuilderState {
-            name: get_name(),
+            name: hostname::get()?.into_string().unwrap(),
             shared: SharedState::new(&config)?,
             toolchains: BuilderService::discover_toolchains(),
             precompiled_dir: config.cache,
             precompiled: Mutex::new(HashMap::new()),
         });
+        let worker_state = state.clone();
 
-        let mut http = Nickel::new();
-        http.add_route(
-            Method::Head,
-            RPC_BUILDER_UPLOAD.to_string() + "/:hash",
-            RpcBuilderUploadHandler(state.clone()),
-        );
-        http.post(
-            RPC_BUILDER_UPLOAD.to_string() + "/:hash",
-            RpcBuilderUploadHandler(state.clone()),
-        );
-        http.post(RPC_BUILDER_TASK, RpcBuilderTaskHandler(state.clone()));
+        let server = Server::new(config.helper_bind, move |request| {
+            router!(request,
+                (HEAD) [RPC_BUILDER_UPLOAD.to_string() + "/:hash"] => {
+                    try_or_400!(handle_upload(worker_state.clone(), request))
+                },
+                (POST) [RPC_BUILDER_UPLOAD.to_string() + "/:hash"] => {
+                    try_or_400!(handle_upload(worker_state.clone(), request))
+                },
+                (POST) [RPC_BUILDER_TASK] => {
+                    try_or_400!(handle_task(worker_state.clone(), request))
+                },
+                _ => Response::empty_404(),
+            )
+        })
+        .unwrap();
 
-        let listener = http.listen(config.helper_bind).unwrap();
-        info!("Helper local address: {}", listener.socket());
+        info!("Helper local address: {}", server.server_addr());
 
         info!("Found toolchains:");
         for toolchain in &state.toolchain_names() {
@@ -100,18 +95,18 @@ impl BuilderService {
 
         let done = Arc::new(AtomicBool::new(false));
         Ok(BuilderService {
-            anoncer: Some(BuilderService::thread_anoncer(
+            announcer: Some(BuilderService::thread_announcer(
                 state,
                 config.coordinator.unwrap(),
                 done.clone(),
-                listener.socket(),
+                server.server_addr(),
             )),
             done,
-            listener: Some(listener),
+            server: Some(server.stoppable()),
         })
     }
 
-    fn thread_anoncer(
+    fn thread_announcer(
         state: Arc<BuilderState>,
         coordinator: reqwest::Url,
         done: Arc<AtomicBool>,
@@ -161,186 +156,140 @@ impl<'a, R: 'a + Read> Read for ReadWrapper<'a, R> {
     }
 }
 
-impl<D> Middleware<D> for RpcBuilderTaskHandler {
-    fn invoke<'a>(
-        &'a self,
-        req: &mut Request<'a, '_, D>,
-        mut res: Response<'a, D>,
-    ) -> MiddlewareResult<'a, D> {
-        let state = self.0.as_ref();
-        // Receive compilation request.
-        {
-            info!("Received task from: {}", req.origin.remote_addr);
-            let request: CompileRequest = bincode::deserialize_from(&mut req.origin).unwrap();
-            let pch_usage: PCHUsage = match request.precompiled_hash {
-                Some(ref hash) => {
-                    if !is_valid_sha256(hash) {
-                        return Err(NickelError::new(
-                            res,
-                            format!("Invalid hash value: {hash}"),
-                            StatusCode::BadRequest,
-                        ));
-                    }
-                    let path = state
-                        .precompiled_dir
-                        .join(hash.to_string() + PRECOMPILED_SUFFIX);
-                    if !path.exists() {
-                        return Err(NickelError::new(
-                            res,
-                            format!("Precompiled file not found: {hash}"),
-                            StatusCode::FailedDependency,
-                        ));
-                    }
-                    let path_abs = path.absolutize().unwrap().to_path_buf();
-                    PCHUsage::In(PCHArgs {
-                        path,
-                        path_abs,
-                        marker: None,
-                    })
-                }
-                None => PCHUsage::None,
-            };
-            let compile_step = CompileStep {
-                output_object: None,
-                pch_usage,
-                args: request.args.iter().map(OsString::from).collect(),
-                input: Preprocessed(CompilerOutput::Vec(request.preprocessed_data)),
-                run_second_cpp: false,
-            };
-
-            let toolchain: Arc<dyn Toolchain> =
-                state.toolchains.get(&request.toolchain).unwrap().clone();
-            let response =
-                CompileResponse::from(toolchain.run_compile(&state.shared, compile_step));
-            let payload = bincode::serialize(&response).unwrap();
-            res.set(StatusCode::Ok);
-            res.set(MediaType::Bin);
-            res.send(payload)
+fn handle_task(state: Arc<BuilderState>, request: &Request) -> octobuild::Result<Response> {
+    // Receive compilation request.
+    info!("Received task from: {}", &request.remote_addr());
+    let request: CompileRequest = bincode::deserialize_from(request.data().unwrap())?;
+    let pch_usage: PCHUsage = match request.precompiled_hash {
+        Some(ref hash) => {
+            if !is_valid_sha256(hash) {
+                return Ok(
+                    Response::text(format!("Invalid hash value: {hash}")).with_status_code(400)
+                );
+            }
+            let path = state
+                .precompiled_dir
+                .join(hash.to_string() + PRECOMPILED_SUFFIX);
+            if !path.exists() {
+                return Ok(
+                    Response::text(format!("Precompiled file not found: {hash}"))
+                        .with_status_code(424),
+                );
+            }
+            let path_abs = path.absolutize()?.to_path_buf();
+            PCHUsage::In(PCHArgs {
+                path,
+                path_abs,
+                marker: None,
+            })
         }
-    }
+        None => PCHUsage::None,
+    };
+    let compile_step = CompileStep {
+        output_object: None,
+        pch_usage,
+        args: request.args.iter().map(OsString::from).collect(),
+        input: Preprocessed(CompilerOutput::Vec(request.preprocessed_data)),
+        run_second_cpp: false,
+    };
+
+    let toolchain: Arc<dyn Toolchain> = state.toolchains.get(&request.toolchain).unwrap().clone();
+    let response = CompileResponse::from(toolchain.run_compile(&state.shared, compile_step));
+    let payload = bincode::serialize(&response)?;
+    Ok(Response::from_data("application/octet-stream", payload))
 }
 
-impl<D> Middleware<D> for RpcBuilderUploadHandler {
-    fn invoke<'a>(
-        &'a self,
-        request: &mut Request<'a, '_, D>,
-        mut response: Response<'a, D>,
-    ) -> MiddlewareResult<'a, D> {
-        let state = self.0.as_ref();
-        // Receive compilation request.
-        let hash = match request.param("hash") {
-            Some(v) => v.to_string(),
-            None => {
-                return Err(NickelError::new(
-                    response,
-                    "Hash is not defined",
-                    StatusCode::BadRequest,
-                ));
-            }
-        };
-        if !is_valid_sha256(&hash) {
-            return Err(NickelError::new(
-                response,
-                format!("Invalid hash value: {hash}"),
-                StatusCode::BadRequest,
-            ));
+fn handle_upload(state: Arc<BuilderState>, request: &Request) -> octobuild::Result<Response> {
+    // Receive compilation request.
+    let hash = match request.get_param("hash") {
+        Some(v) => v,
+        None => {
+            return Ok(Response::text("Hash is not defined").with_status_code(400));
         }
-        info!(
-            "Received upload from ({}, {}): {} ",
-            request.origin.method, hash, request.origin.remote_addr
-        );
+    };
+    if !is_valid_sha256(&hash) {
+        return Ok(Response::text(format!("Invalid hash value: {hash}")).with_status_code(400));
+    }
+    info!(
+        "Received upload from ({}, {}): {} ",
+        request.method(),
+        hash,
+        request.remote_addr()
+    );
 
-        let path = state
-            .precompiled_dir
-            .join(hash.clone() + PRECOMPILED_SUFFIX);
-        if path.exists() {
-            // File is already uploaded
-            response.set(StatusCode::Accepted);
-            return response.send("");
+    let path = state
+        .precompiled_dir
+        .join(hash.clone() + PRECOMPILED_SUFFIX);
+    if path.exists() {
+        // File is already uploaded
+        return Ok(Response::text("").with_status_code(202));
+    }
+
+    if request.method() == "HEAD" {
+        // File not uploaded.
+        return Ok(Response::text("").with_status_code(404));
+    }
+
+    // Don't upload same file in multiple threads.
+    let precompiled: Arc<PrecompiledFile> = state.get_precompiled(&hash);
+    let lock = precompiled.lock.lock().unwrap();
+    if path.exists() {
+        // File is already uploaded
+        return Ok(Response::text("").with_status_code(202));
+    }
+
+    // Receive uploading file.
+    let temporary = TempFile::wrap(&path.with_extension("tmp"));
+    let mut hasher = Sha256::new();
+    let mut temp = match File::create(temporary.path()) {
+        Ok(f) => f,
+        Err(e) => {
+            return Ok(Response::text(format!("Can't create file: {e}")).with_status_code(500));
         }
+    };
 
-        if request.origin.method == Method::Head {
-            // File not uploaded.
-            response.set(StatusCode::NotFound);
-            return response.send("");
-        }
-
-        // Don't upload same file in multiple threads.
-        let precompiled: Arc<PrecompiledFile> = state.get_precompiled(&hash);
-        let lock = precompiled.lock.lock().unwrap();
-        if path.exists() {
-            // File is already uploaded
-            response.set(StatusCode::Accepted);
-            return response.send("");
-        }
-
-        // Receive uploading file.
-        let tempory = TempFile::wrap(&path.with_extension("tmp"));
-        let mut hasher = Sha256::new();
-        let mut temp = match File::create(tempory.path()) {
-            Ok(f) => f,
+    let mut buf: [u8; DEFAULT_BUF_SIZE] = [0; DEFAULT_BUF_SIZE];
+    let mut total_size = 0;
+    loop {
+        let size = match request.data().unwrap().read(&mut buf) {
+            Ok(v) => v,
             Err(e) => {
-                return Err(NickelError::new(
-                    response,
-                    format!("Can't create file: {e}"),
-                    StatusCode::InternalServerError,
-                ));
+                return Ok(
+                    Response::text(format!("Can't parse request body: {e}")).with_status_code(500)
+                );
             }
         };
-        let mut buf: [u8; DEFAULT_BUF_SIZE] = [0; DEFAULT_BUF_SIZE];
-        let mut total_size = 0;
-        loop {
-            let size = match request.origin.read(&mut buf) {
-                Ok(v) => v,
-                Err(e) => {
-                    return Err(NickelError::new(
-                        response,
-                        format!("Can't parse request body: {e}"),
-                        StatusCode::InternalServerError,
-                    ));
-                }
-            };
-            if size == 0 {
-                break;
-            }
-            total_size += size;
-            match temp.write(&buf[0..size]) {
-                Ok(_) => {}
-                Err(e) => {
-                    return Err(NickelError::new(
-                        response,
-                        format!("Can't write file: {e}"),
-                        StatusCode::InternalServerError,
-                    ));
-                }
-            }
-            Digest::update(&mut hasher, &buf[0..size]);
+        if size == 0 {
+            break;
         }
-        if hex::encode(hasher.finalize()) != hash {
-            return Err(NickelError::new(
-                response,
-                format!("Content hash mismatch: {hash}, {total_size}"),
-                StatusCode::BadRequest,
-            ));
-        }
-        drop(temp);
-
-        match fs::rename(tempory.path(), &path) {
+        total_size += size;
+        match temp.write(&buf[0..size]) {
             Ok(_) => {}
             Err(e) => {
-                if !path.exists() {
-                    return Err(NickelError::new(
-                        response,
-                        format!("Can't rename file: {e}"),
-                        StatusCode::InternalServerError,
-                    ));
-                }
+                return Ok(Response::text(format!("Can't write file: {e}")).with_status_code(500));
             }
         }
-        drop(lock);
-        response.set(StatusCode::Ok);
-        response.send("")
+        Digest::update(&mut hasher, &buf[0..size]);
     }
+    if hex::encode(hasher.finalize()) != hash {
+        return Ok(
+            Response::text(format!("Content hash mismatch: {hash}, {total_size}"))
+                .with_status_code(400),
+        );
+    }
+    drop(temp);
+
+    match fs::rename(temporary.path(), &path) {
+        Ok(_) => {}
+        Err(e) => {
+            if !path.exists() {
+                return Ok(Response::text(format!("Can't rename file: {e}")).with_status_code(500));
+            }
+        }
+    }
+    drop(lock);
+
+    Ok(Response::text(""))
 }
 
 fn is_valid_sha256(hash: &str) -> bool {
@@ -374,18 +323,15 @@ impl Drop for BuilderService {
     fn drop(&mut self) {
         println!("drop begin");
         self.done.store(true, Ordering::Relaxed);
-        if let Some(t) = self.anoncer.take() {
+        if let Some(t) = self.announcer.take() {
             t.join().unwrap();
         }
-        if let Some(t) = self.listener.take() {
-            t.detach();
+        if let Some((handle, sender)) = self.server.take() {
+            sender.send(()).unwrap();
+            handle.join().unwrap();
         }
         println!("drop end");
     }
-}
-
-fn get_name() -> String {
-    hostname::get().unwrap().into_string().unwrap()
 }
 
 fn main() {
