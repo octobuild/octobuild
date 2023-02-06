@@ -171,9 +171,9 @@ Console builds tested on Intel Core i7-9700F, 32GB DDR4 @ 2400MHz, SSD and Unrea
 
 This project requires several patches to Unreal Engine:
 
-* [UE < 5.2 only] https://github.com/EpicGames/UnrealEngine/pull/9903[#9903]: Restore ability to use XGE executor on non-Windows platforms
-* [UE < 5.2 only] https://github.com/EpicGames/UnrealEngine/pull/9932[#9932]: Fix action graph copy action on non-Windows platforms
-* [All UE versions] https://github.com/EpicGames/UnrealEngine/pull/9933[#9933]: Reenable XGE on Linux
+* https://github.com/EpicGames/UnrealEngine/pull/9903[#9903]: Restore ability to use XGE executor on non-Windows platforms (already included in UE >= 5.2)
+* https://github.com/EpicGames/UnrealEngine/pull/9932[#9932]: Fix action graph copy action on non-Windows platforms (already included in UE >= 5.2)
+* https://github.com/EpicGames/UnrealEngine/pull/9933[#9933]: Reenable XGE on Linux
 
 == Building from source
 
