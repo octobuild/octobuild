@@ -65,7 +65,7 @@
         Id='*'
         Name='octobuild'
         UpgradeCode='b4505233-6377-406b-955b-2547d86a99a7'
-        Manufacturer='Artem V. Navrotskiy'
+        Manufacturer='Artem V. Navrotskiy; Marat Radchenko'
         Language='1033'
         Codepage='1252'
         Version='$(var.Version)'>
@@ -73,7 +73,7 @@
         <Package Id='*'
             Keywords='Installer'
             Description='Compiler cache for Unreal Engine'
-            Manufacturer='Artem V. Navrotskiy'
+            Manufacturer='Artem V. Navrotskiy; Marat Radchenko'
             InstallerVersion='450'
             Languages='1033'
             Compressed='yes'
