@@ -1,6 +1,11 @@
 = Changelog
 :icons: font
 
+== 0.4.3
+
+* Silence "Can't use octobuild for task XXX: toolchain not found" logspam
+* Specify all authors in MSI metadata
+
 == 0.4.2
 
 * Fix compatibility with Unreal Engine 5.1.
