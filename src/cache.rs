@@ -44,7 +44,7 @@ impl Cache {
         &self,
         statistic: &Statistic,
         hash: &str,
-        outputs: &[PathBuf],
+        outputs: Vec<PathBuf>,
         worker: F,
     ) -> crate::Result<OutputInfo> {
         self.file_cache.run_cached(statistic, hash, outputs, worker)

@@ -1,4 +1,3 @@
-use std::cmp::min;
 use std::ffi::OsString;
 use std::fs;
 use std::fs::{File, OpenOptions};
@@ -12,7 +11,6 @@ use crate::config::Config;
 use crate::io::binary::{read_exact, read_u64, read_usize, write_u64, write_usize};
 use crate::io::counter::Counter;
 use crate::io::statistic::Statistic;
-use crate::utils::DEFAULT_BUF_SIZE;
 use thiserror::Error;
 
 const HEADER: &[u8] = b"OBCF\x00\x03";
@@ -55,7 +53,7 @@ impl FileCache {
         &self,
         statistic: &Statistic,
         hash: &str,
-        outputs: &[PathBuf],
+        outputs: Vec<PathBuf>,
         worker: F,
     ) -> crate::Result<OutputInfo> {
         let path = self
@@ -63,7 +61,7 @@ impl FileCache {
             .join(&hash[0..2])
             .join(hash[2..].to_string() + SUFFIX);
         // Try to read data from cache.
-        if let Ok(output) = read_cache(statistic, &path, outputs) {
+        if let Ok(output) = read_cache(statistic, &path, &outputs) {
             return Ok(output);
         }
         // Run task and save result to cache.
@@ -106,32 +104,18 @@ fn find_cache_files(dir: &Path, mut files: Vec<CacheFile>) -> crate::Result<Vec<
     Ok(files)
 }
 
-fn write_cached_file<W: Write>(stream: &mut W, path: &Path) -> crate::Result<()> {
+fn write_cached_file<W: Write>(stream: &mut W, path: PathBuf) -> crate::Result<()> {
     assert!(path.is_absolute());
-    let mut buf: [u8; DEFAULT_BUF_SIZE] = [0; DEFAULT_BUF_SIZE];
-    let mut file = File::open(path).map_err(|e| crate::Error::FileOpen {
-        path: path.to_path_buf(),
+    let mut file = File::open(&path).map_err(|e| crate::Error::FileOpen {
+        path,
         error: Box::new(e.into()),
     })?;
     let total_size = file.seek(SeekFrom::End(0))?;
     file.rewind()?;
     write_u64(stream, total_size)?;
-    let mut need_size = total_size;
-    loop {
-        let size = file.read(&mut buf)?;
-        if size == 0 && need_size == 0 {
-            break;
-        }
-        if size == 0 {
-            return Err(crate::Error::Generic(
-                "Unexpected end of stream".to_string(),
-            ));
-        }
-        if need_size < size as u64 {
-            return Err(crate::Error::Generic("Expected end of stream".to_string()));
-        }
-        stream.write_all(&buf[0..size])?;
-        need_size -= size as u64;
+    let written = std::io::copy(&mut file, stream)?;
+    if written != total_size {
+        return Err(crate::Error::Generic("Expected end of stream".to_string()));
     }
     Ok(())
 }
@@ -139,7 +123,7 @@ fn write_cached_file<W: Write>(stream: &mut W, path: &Path) -> crate::Result<()>
 fn write_cache(
     statistic: &Statistic,
     path: &Path,
-    paths: &[PathBuf],
+    paths: Vec<PathBuf>,
     output: &OutputInfo,
 ) -> crate::Result<()> {
     if !output.success() {
@@ -165,20 +149,12 @@ fn write_cache(
 }
 
 fn read_cached_file<R: Read>(stream: &mut R, path: &Path) -> crate::Result<()> {
-    let mut buf: [u8; DEFAULT_BUF_SIZE] = [0; DEFAULT_BUF_SIZE];
-    let total_size = read_u64(stream)?;
-    let mut need_size = total_size;
-
+    let size = read_u64(stream)?;
     let mut file = File::create(path)?;
-    file.set_len(total_size)?;
-    while need_size > 0 {
-        let need = min(buf.len() as u64, need_size) as usize;
-        let size = stream.read(&mut buf[0..need])?;
-        if size == 0 {
-            return Err(crate::Error::Generic("Expected end of stream".to_string()));
-        }
-        file.write_all(&buf[0..size])?;
-        need_size -= size as u64;
+    file.set_len(size)?;
+    let written = std::io::copy(&mut stream.take(size), &mut file)?;
+    if written != size {
+        return Err(crate::Error::Generic("Expected end of stream".to_string()));
     }
     Ok(())
 }

@@ -3,7 +3,7 @@ use std::ffi::OsString;
 use std::fs;
 use std::fs::File;
 use std::io;
-use std::io::{Read, Write};
+use std::io::Read;
 use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -33,7 +33,6 @@ use octobuild::compiler::{
 use octobuild::config::Config;
 use octobuild::io::tempfile::TempFile;
 use octobuild::simple::supported_compilers;
-use octobuild::utils::DEFAULT_BUF_SIZE;
 use octobuild::version;
 
 struct BuilderService {
@@ -241,43 +240,22 @@ fn handle_upload(state: Arc<BuilderState>, request: &Request) -> octobuild::Resu
     // Receive uploading file.
     let temporary = TempFile::wrap(&path.with_extension("tmp"));
     let mut hasher = Sha256::new();
-    let mut temp = match File::create(temporary.path()) {
+    let temp = match File::create(temporary.path()) {
         Ok(f) => f,
         Err(e) => {
             return Ok(Response::text(format!("Can't create file: {e}")).with_status_code(500));
         }
     };
 
-    let mut buf: [u8; DEFAULT_BUF_SIZE] = [0; DEFAULT_BUF_SIZE];
-    let mut total_size = 0;
-    loop {
-        let size = match request.data().unwrap().read(&mut buf) {
-            Ok(v) => v,
-            Err(e) => {
-                return Ok(
-                    Response::text(format!("Can't parse request body: {e}")).with_status_code(500)
-                );
-            }
-        };
-        if size == 0 {
-            break;
-        }
-        total_size += size;
-        match temp.write(&buf[0..size]) {
-            Ok(_) => {}
-            Err(e) => {
-                return Ok(Response::text(format!("Can't write file: {e}")).with_status_code(500));
-            }
-        }
-        Digest::update(&mut hasher, &buf[0..size]);
-    }
+    let mut tee = tee::TeeReader::new(request.data().unwrap(), temp);
+    let written = std::io::copy(&mut tee, &mut hasher)?;
+
     if hex::encode(hasher.finalize()) != hash {
         return Ok(
-            Response::text(format!("Content hash mismatch: {hash}, {total_size}"))
+            Response::text(format!("Content hash mismatch: {hash}, {written}"))
                 .with_status_code(400),
         );
     }
-    drop(temp);
 
     match fs::rename(temporary.path(), &path) {
         Ok(_) => {}

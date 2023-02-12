@@ -619,7 +619,7 @@ pub trait Toolchain: Send + Sync {
         state.cache.run_file_cached(
             &state.statistic,
             &hex::encode(hasher.finalize()),
-            &outputs,
+            outputs,
             || -> crate::Result<OutputInfo> { self.run_compile(state, step) },
         )
     }
