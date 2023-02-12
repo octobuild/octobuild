@@ -89,7 +89,6 @@ reqwest = { version = "0.11", features = ["blocking"] }
 serde = { version = "1", features = ["derive"] }
 serde_yaml = "0.9"
 sha2 = "0.10"
-shlex = "1"
 tee = "0.1"
 tempfile = "3"
 thiserror = "1"
@@ -103,3 +102,6 @@ cc = "1"
 [target.'cfg(windows)'.dependencies]
 winapi = { version = "0.3", features = ["winver"] }
 winreg = "0.10"
+
+[target.'cfg(not(windows))'.dependencies]
+shlex = "1"
