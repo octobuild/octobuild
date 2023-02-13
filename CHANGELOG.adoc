@@ -1,6 +1,10 @@
 = Changelog
 :icons: font
 
+== Unreleased
+
+* Add support for `/fsanitize=address` for MSVC
+
 == 0.4.3
 
 * Silence "Can't use octobuild for task XXX: toolchain not found" logspam

@@ -252,6 +252,7 @@ fn parse_argument<S: AsRef<str>, I: Iterator<Item = S>>(
                     s if s.starts_with("d2Zi+") => Ok(Arg::flag(Scope::Shared, flag)),
                     s if s.starts_with("std:") => Ok(Arg::flag(Scope::Shared, flag)),
                     s if s.starts_with("MP") => Ok(Arg::flag(Scope::Compiler, flag)),
+                    s if s.starts_with("fsanitize=") => Ok(Arg::flag(Scope::Shared, flag)),
                     s if s.starts_with("MD") => Ok(Arg::flag(Scope::Shared, flag)),
                     s if s.starts_with("MT") => Ok(Arg::flag(Scope::Shared, flag)),
                     s if s.starts_with("EH") => Ok(Arg::flag(Scope::Shared, flag)),
@@ -311,7 +312,7 @@ fn has_param_prefix(arg: &str) -> bool {
 #[test]
 fn test_parse_argument() {
     let args: Vec<String> =
-        "/TP /c /Yusample.h /Fpsample.h.pch /Fosample.cpp.o /DTEST /D TEST2 /arch:AVX \
+        "/TP /c /Yusample.h /Fpsample.h.pch /Fosample.cpp.o /DTEST /D TEST2 /arch:AVX /fsanitize=address \
          sample.cpp"
             .split(' ')
             .map(|x| x.to_string())
@@ -327,6 +328,7 @@ fn test_parse_argument() {
             Arg::param(Scope::Shared, "D", "TEST", false),
             Arg::param(Scope::Shared, "D", "TEST2", true),
             Arg::flag(Scope::Shared, "arch:AVX"),
+            Arg::flag(Scope::Shared, "fsanitize=address"),
             Arg::input(InputKind::Source, "", "sample.cpp")
         ]
     )
