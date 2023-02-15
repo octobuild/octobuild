@@ -148,7 +148,7 @@ fn write_cache(
     Ok(result?)
 }
 
-fn read_cached_file<R: Read>(stream: &mut R, path: &Path) -> crate::Result<()> {
+fn read_cached_file(stream: &mut impl Read, path: &Path) -> crate::Result<()> {
     let size = read_u64(stream)?;
     let mut file = File::create(path)?;
     file.set_len(size)?;
@@ -203,24 +203,24 @@ fn read_cache(
     Ok(output)
 }
 
-fn write_blob(stream: &mut dyn Write, blob: &[u8]) -> crate::Result<()> {
+fn write_blob(stream: &mut impl Write, blob: &[u8]) -> crate::Result<()> {
     write_usize(stream, blob.len())?;
     stream.write_all(blob)?;
     Ok(())
 }
 
-fn read_blob(stream: &mut dyn Read) -> crate::Result<Vec<u8>> {
+fn read_blob(stream: &mut impl Read) -> crate::Result<Vec<u8>> {
     let size = read_usize(stream)?;
     Ok(read_exact(stream, size)?)
 }
 
-fn write_output(stream: &mut dyn Write, output: &OutputInfo) -> crate::Result<()> {
+fn write_output(stream: &mut impl Write, output: &OutputInfo) -> crate::Result<()> {
     write_blob(stream, &output.stdout)?;
     write_blob(stream, &output.stderr)?;
     Ok(())
 }
 
-fn read_output(stream: &mut dyn Read) -> crate::Result<OutputInfo> {
+fn read_output(stream: &mut impl Read) -> crate::Result<OutputInfo> {
     let stdout = read_blob(stream)?;
     let stderr = read_blob(stream)?;
     Ok(OutputInfo {

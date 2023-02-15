@@ -25,8 +25,8 @@ pub enum PostprocessError {
 const BUF_SIZE: usize = 0x10000;
 
 pub fn filter_preprocessed(
-    reader: &mut dyn Read,
-    writer: &mut dyn Write,
+    reader: &mut impl Read,
+    writer: &mut impl Write,
     marker: &Option<OsString>,
     keep_headers: bool,
 ) -> crate::Result<()> {
@@ -77,14 +77,18 @@ pub fn filter_preprocessed(
     }
 }
 
-struct ScannerState<'a> {
+struct ScannerState<'a, R, W>
+where
+    R: Read,
+    W: Write,
+{
     buf_data: [u8; BUF_SIZE],
     ptr_copy: *const u8,
     ptr_read: *const u8,
     ptr_end: *const u8,
 
-    reader: &'a mut dyn Read,
-    writer: &'a mut dyn Write,
+    reader: &'a mut R,
+    writer: &'a mut W,
 
     keep_headers: bool,
     marker: Option<Vec<u8>>,
@@ -95,7 +99,11 @@ struct ScannerState<'a> {
     done: bool,
 }
 
-impl<'a> ScannerState<'a> {
+impl<'a, R, W> ScannerState<'a, R, W>
+where
+    R: Read,
+    W: Write,
+{
     unsafe fn write(&mut self, data: &[u8]) -> Result<(), Error> {
         self.flush()?;
         self.writer.write_all(data)?;

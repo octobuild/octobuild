@@ -12,7 +12,7 @@ use std::io::{Read, Result, Write};
 /// (not returned as part of the error). If this is unacceptable, then it is
 /// recommended to use the `push_at_least` or `read` methods.
 #[allow(clippy::uninit_vec)]
-pub fn read_exact(stream: &mut dyn Read, len: usize) -> Result<Vec<u8>> {
+pub fn read_exact(stream: &mut impl Read, len: usize) -> Result<Vec<u8>> {
     let mut buf = Vec::with_capacity(len);
     unsafe {
         buf.set_len(len);
@@ -22,21 +22,21 @@ pub fn read_exact(stream: &mut dyn Read, len: usize) -> Result<Vec<u8>> {
 }
 
 #[inline]
-pub fn write_u64(stream: &mut dyn Write, i: u64) -> Result<()> {
+pub fn write_u64(stream: &mut impl Write, i: u64) -> Result<()> {
     stream.write_u64::<LittleEndian>(i)
 }
 
 #[inline]
-pub fn write_usize(stream: &mut dyn Write, i: usize) -> Result<()> {
+pub fn write_usize(stream: &mut impl Write, i: usize) -> Result<()> {
     write_u64(stream, i as u64)
 }
 
 #[inline]
-pub fn read_u64(stream: &mut dyn Read) -> Result<u64> {
+pub fn read_u64(stream: &mut impl Read) -> Result<u64> {
     stream.read_u64::<LittleEndian>()
 }
 
 #[inline]
-pub fn read_usize(stream: &mut dyn Read) -> Result<usize> {
+pub fn read_usize(stream: &mut impl Read) -> Result<usize> {
     Ok(read_u64(stream)? as usize)
 }
