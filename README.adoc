@@ -13,7 +13,7 @@ image:https://img.shields.io/chocolatey/v/octobuild[Chocolatey package,link=http
 [[overview]]
 == Overview
 
-This project allows you to speedup re-compilation of Unreal Engine (and UE-based games) by caching intermediate compilation files.
+This project allows you to speedup re-compilation of Unreal Engine (and UE-based games) by caching intermediate compilation files, reducing time by <<benchmark,60-90%>>.
 
 [[supported-platforms]]
 == Supported platforms
