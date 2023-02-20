@@ -19,6 +19,7 @@ This project allows you to speedup re-compilation of Unreal Engine (and UE-based
 == Supported platforms
 
 * Linux
+* macOS
 * PS4
 * PS5
 * Win64

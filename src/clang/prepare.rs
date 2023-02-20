@@ -103,8 +103,8 @@ pub fn create_tasks(
         ParamValue::None => None,
         ParamValue::Single(v) => {
             match &v[..] {
-                "c" | "c++" => Some(v.to_string()),
-                "c-header" | "c++-header" => {
+                "c" | "c++" | "objective-c++" => Some(v.to_string()),
+                "c-header" | "c++-header" | "objective-c++-header" => {
                     // Precompiled headers must build locally
                     return Ok(Vec::new());
                 }
@@ -240,6 +240,7 @@ fn parse_argument(iter: &mut Iter<String>) -> Option<Result<Arg, String>> {
                     s if s.starts_with('W') => Ok(Arg::flag(Scope::Compiler, flag)),
                     s if s.starts_with('m') => Ok(Arg::flag(Scope::Shared, flag)),
                     s if s.starts_with("std=") => Ok(Arg::flag(Scope::Shared, flag)),
+                    s if s.starts_with("stdlib=") => Ok(Arg::flag(Scope::Shared, flag)),
                     _ => Err(arg.to_string()),
                 },
             }
@@ -256,8 +257,8 @@ fn parse_argument(iter: &mut Iter<String>) -> Option<Result<Arg, String>> {
 
 fn is_spaceable_param(flag: &str) -> Option<(&str, Scope, bool)> {
     match flag {
-        "include" | "include-pch" => Some((flag, Scope::Preprocessor, false)),
-        "target" => Some((flag, Scope::Shared, false)),
+        "include" | "include-pch" | "isysroot" => Some((flag, Scope::Preprocessor, false)),
+        "arch" | "target" => Some((flag, Scope::Shared, false)),
         _ => {
             for prefix in ["D", "o"] {
                 if flag.starts_with(prefix) {
@@ -269,7 +270,7 @@ fn is_spaceable_param(flag: &str) -> Option<(&str, Scope, bool)> {
                     return Some((prefix, Scope::Ignore, false));
                 }
             }
-            for prefix in ["I", "MF"] {
+            for prefix in ["I", "MF", "isystem"] {
                 if flag.starts_with(prefix) {
                     return Some((prefix, Scope::Preprocessor, false));
                 }

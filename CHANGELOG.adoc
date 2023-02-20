@@ -4,6 +4,7 @@
 == Unreleased
 
 * Add support for `/fsanitize=address` for MSVC
+* Initial support for macOS (https://github.com/octobuild/octobuild/issues/78[#78])
 
 == 0.4.3
 
