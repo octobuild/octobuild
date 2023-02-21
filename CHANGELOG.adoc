@@ -5,6 +5,7 @@
 
 * Add support for `/fsanitize=address` for MSVC
 * Initial support for macOS (https://github.com/octobuild/octobuild/issues/78[#78])
+* Fix compilation of `.gch` files using Clang. Broken in 0.4.3
 
 == 0.4.3
 

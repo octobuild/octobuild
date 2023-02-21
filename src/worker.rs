@@ -11,7 +11,6 @@ use crate::compiler::{
     BuildTaskResult, CommandArgs, CommandInfo, CompilationTask, Compiler, OutputInfo, SharedState,
     Toolchain,
 };
-use crate::Error;
 
 pub type BuildGraph = Graph<Arc<BuildTask>, ()>;
 
@@ -104,7 +103,7 @@ impl BuildAction {
         title: &str,
         run_second_cpp: bool,
     ) -> Vec<BuildAction> {
-        compiler
+        let actions: Vec<BuildAction> = compiler
             .create_tasks(command.clone(), args.clone(), run_second_cpp)
             .map(|tasks| {
                 tasks
@@ -114,13 +113,17 @@ impl BuildAction {
             })
             .unwrap_or_else(|e| {
                 match e {
-                    Error::ToolchainNotFound(_) => {}
+                    crate::Error::ToolchainNotFound(_) => {}
                     e => {
                         println!("Can't use octobuild for task {title}: {e}");
                     }
                 }
-                vec![BuildAction::Exec(command, args)]
-            })
+                Vec::new()
+            });
+        if actions.is_empty() {
+            return vec![BuildAction::Exec(command, args)];
+        }
+        actions
     }
 
     #[must_use]
