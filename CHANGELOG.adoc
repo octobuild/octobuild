@@ -1,7 +1,7 @@
 = Changelog
 :icons: font
 
-== Unreleased
+== 0.5.0
 
 * Add support for `/fsanitize=address` for MSVC
 * Initial support for macOS (https://github.com/octobuild/octobuild/issues/78[#78])
