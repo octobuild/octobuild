@@ -31,13 +31,7 @@ debug = true
 debug = true
 
 [[bin]]
-name = "ib_console"
-
-[[bin]]
-name = "xgConsole"
-
-[[bin]]
-name = "agent"
+name = "octo_agent"
 
 [[bin]]
 name = "octo_builder"
@@ -52,7 +46,10 @@ name = "octo_clang"
 name = "octo_coordinator"
 
 [[bin]]
-name = "filter_cl"
+name = "ib_console"
+
+[[bin]]
+name = "xgConsole"
 
 [dev-dependencies]
 criterion = "0.4"

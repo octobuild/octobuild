@@ -107,7 +107,7 @@
                     
                     <Directory Id='Bin' Name='bin'>
                         <Component Id='agent_Comp' Guid='c4e9db58-087f-4ef2-98e4-0d880f6efd79'>
-                            <File Source='$(var.CargoTargetBinDir)\agent.exe'/>
+                            <File Source='$(var.CargoTargetBinDir)\octo_agent.exe'/>
                             <ServiceInstall
                                     DisplayName='Octobuild Agent'
                                     ErrorControl='normal'
