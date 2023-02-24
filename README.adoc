@@ -9,6 +9,7 @@ Artem Navrotskiy; Marat Radchenko
 image:{uri-project}/workflows/CI/badge.svg?branch=master[Build Status,link={uri-ci}]
 image:https://img.shields.io/github/release/{slug}.svg[Download,link={uri-project}/releases/latest]
 image:https://img.shields.io/chocolatey/v/octobuild[Chocolatey package,link=https://community.chocolatey.org/packages/octobuild]
+image:https://img.shields.io/homebrew/v/octobuild[Homebrew formula,link=https://formulae.brew.sh/formula/octobuild]
 
 [[overview]]
 == Overview
@@ -60,7 +61,7 @@ winget install octobuild
 
 You can install octobuild on Ubuntu/Debian using the following commands:
 
-[source,bash]
+[source,shell]
 ----
 # Set up repository
 curl -1sLf 'https://dl.cloudsmith.io/public/octobuild/octobuild/setup.deb.sh' | sudo -E bash
@@ -74,6 +75,18 @@ sudo apt-get install octobuild
 
 . Download https://github.com/octobuild/octobuild/releases/latest[deb package]
 . Install it via `dpkg -i <octobuild>.deb`
+
+[installation-macos]
+=== Homebrew (macOS/Linux)
+
+octobuild is available via https://brew.sh/[Homebrew package manager].
+
+If you already have Homebrew configured, you can install octobuild with a single command:
+
+[source,shell]
+----
+brew install octobuild
+----
 
 [[Usage]]
 == Usage
