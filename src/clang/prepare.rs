@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::slice::Iter;
 use std::sync::Arc;
 
@@ -64,14 +64,17 @@ pub fn create_tasks(
      */
 
     // Output object file name.
-    let output_object = match find_param(&parsed_args, |arg: &Arg| -> Option<PathBuf> {
-        match arg {
-            Arg::Output { kind, file, .. } if *kind == OutputKind::Object => {
-                Some(PathBuf::from(file))
+    let output_object = match find_param(
+        &parsed_args,
+        |arg: &Arg| -> Option<crate::Result<PathBuf>> {
+            match arg {
+                Arg::Output { kind, file, .. } if *kind == OutputKind::Object => {
+                    Some(command.absolutize(Path::new(file)))
+                }
+                _ => None,
             }
-            _ => None,
-        }
-    }) {
+        },
+    ) {
         ParamValue::None => None,
         ParamValue::Single(v) => {
             if input_sources.len() > 1 {
@@ -86,12 +89,18 @@ pub fn create_tasks(
                 "Found too many output object files: {v:?}"
             )));
         }
-    };
+    }
+    .map_or(Ok(None), |v| v.map(Some))?;
 
-    let deps_file = parsed_args.iter().find_map(|arg| match arg {
-        Arg::Param { flag, value, .. } if *flag == "MF" => Some(PathBuf::from(value)),
-        _ => None,
-    });
+    let deps_file = parsed_args
+        .iter()
+        .find_map(|arg| match arg {
+            Arg::Param { flag, value, .. } if *flag == "MF" => {
+                Some(command.absolutize(Path::new(&value)))
+            }
+            _ => None,
+        })
+        .map_or(Ok(None), |v| v.map(Some))?;
 
     // Language
     let language: Option<String> = match find_param(&parsed_args, |arg: &Arg| -> Option<String> {

@@ -27,6 +27,16 @@ pub fn expand_response_files(
             continue;
         }
 
+        // Hack for macOS
+        if item.ends_with('/')
+            || item.starts_with("@rpath")
+            || item.starts_with("@loader_path")
+            || item.starts_with("@executable_path")
+        {
+            result.push(item.to_string());
+            continue;
+        }
+
         let path = match &base {
             Some(p) => p.join(&item[1..]),
             None => PathBuf::from(&item[1..]),

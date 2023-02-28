@@ -149,6 +149,7 @@ impl Toolchain for ClangToolchain {
             drop(response_file);
 
             if let Some(ref deps_file) = task.shared.deps_file {
+                assert!(deps_file.is_absolute());
                 let data = fs::read_to_string(deps_file)?;
                 if let Some(end) = data.strip_prefix('-') {
                     let mut f = File::create(deps_file)?;
