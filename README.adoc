@@ -95,7 +95,7 @@ You do not need to use octobuild directly.
 Just build Unreal Engine as usual, via Unreal Build Tool, Unreal Automation Tool or your IDE.
 Under the hood, they will automatically use octobuild.
 
-Also see <<linux-notes>>.
+Also see <<linux-notes>> and <<macos-notes>>.
 
 [[configuration]]
 == Configuration files
@@ -185,9 +185,18 @@ Console builds tested on Intel Core i7-9700F, 32GB DDR4 @ 2400MHz, SSD and Unrea
 
 This project requires several patches to Unreal Engine:
 
+* https://github.com/EpicGames/UnrealEngine/pull/9933[#9933]: Allow usage of octobuild on Linux
 * https://github.com/EpicGames/UnrealEngine/pull/9903[#9903]: Restore ability to use XGE executor on non-Windows platforms (already included in UE >= 5.2)
 * https://github.com/EpicGames/UnrealEngine/pull/9932[#9932]: Fix action graph copy action on non-Windows platforms (already included in UE >= 5.2)
-* https://github.com/EpicGames/UnrealEngine/pull/9933[#9933]: Reenable XGE on Linux
+
+[[macos-notes]]
+== macOS notes
+
+This project requires minor patching of Unreal Engine:
+
+* https://github.com/EpicGames/UnrealEngine/pull/10191[#10191]: Allow usage of octobuild on macOS
+* https://github.com/EpicGames/UnrealEngine/pull/9903[#9903]: Restore ability to use XGE executor on non-Windows platforms (already included in UE >= 5.2)
+* https://github.com/EpicGames/UnrealEngine/pull/9932[#9932]: Fix action graph copy action on non-Windows platforms (already included in UE >= 5.2)
 
 == Building from source
 
