@@ -1,7 +1,7 @@
 = Changelog
 :icons: font
 
-== Unreleased
+== 0.5.1
 
 * Fix compilation of engine itself on macOS
 
