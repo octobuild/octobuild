@@ -195,7 +195,7 @@ This project requires several patches to Unreal Engine:
 
 This project requires minor patching of Unreal Engine:
 
-* https://github.com/EpicGames/UnrealEngine/pull/10191[#10191]: Allow usage of octobuild on macOS
+* https://github.com/EpicGames/UnrealEngine/pull/10191[#10191]: Allow usage of octobuild on macOS (already included in UE >= 5.3)
 * https://github.com/EpicGames/UnrealEngine/pull/9903[#9903]: Restore ability to use XGE executor on non-Windows platforms (already included in UE >= 5.2)
 * https://github.com/EpicGames/UnrealEngine/pull/9932[#9932]: Fix action graph copy action on non-Windows platforms (already included in UE >= 5.2)
 
