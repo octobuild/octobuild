@@ -1,7 +1,7 @@
 = Changelog
 :icons: font
 
-== Unreleased
+== 0.5.2
 
 * Make exit codes compatible with xgConsole
 
