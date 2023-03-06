@@ -1,6 +1,10 @@
 = Changelog
 :icons: font
 
+== Unreleased
+
+* Make exit codes compatible with xgConsole
+
 == 0.5.1
 
 * Fix compilation of engine itself on macOS

@@ -173,7 +173,7 @@ fn execute_until_failed<F>(
     rx_result: &crossbeam_channel::Receiver<ResultMessage>,
     count: &mut usize,
     update_progress: F,
-) -> crate::Result<Option<i32>>
+) -> crate::Result<()>
 where
     F: Fn(&BuildResult) -> crate::Result<()>,
 {
@@ -193,8 +193,7 @@ where
         update_progress(&BuildResult::new(&message, count, graph.node_count()))?;
         let output = message.result.output?;
         if !output.success() {
-            let status = output.status;
-            return Ok(status);
+            return Err(crate::Error::from("Build failed".to_string()));
         }
         completed[message.index.index()] = true;
 
@@ -210,7 +209,7 @@ where
         }
 
         if *count == completed.len() {
-            return Ok(Some(0));
+            return Ok(());
         }
     }
     Err(crate::Error::from(
@@ -232,13 +231,13 @@ pub fn execute_graph<F>(
     build_graph: BuildGraph,
     process_limit: usize,
     update_progress: F,
-) -> crate::Result<Option<i32>>
+) -> crate::Result<()>
 where
     F: Fn(&BuildResult) -> crate::Result<()>,
 {
     let graph = validate_graph(build_graph)?;
     if graph.node_count() == 0 {
-        return Ok(Some(0));
+        return Ok(());
     }
 
     let (tx_result, rx_result) = crossbeam_channel::unbounded::<ResultMessage>();

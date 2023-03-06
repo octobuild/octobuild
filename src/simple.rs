@@ -47,10 +47,10 @@ where
         }
     };
     match compile(&config, &state, exec, compiler) {
-        Ok(status) => status.unwrap_or(503),
+        Ok(_) => 0,
         Err(e) => {
             println!("FATAL ERROR: {e}");
-            500
+            1
         }
     }
 }
@@ -60,7 +60,7 @@ pub fn compile<C>(
     state: &SharedState,
     exec: &str,
     compiler: C,
-) -> crate::Result<Option<i32>>
+) -> crate::Result<()>
 where
     C: Compiler,
 {

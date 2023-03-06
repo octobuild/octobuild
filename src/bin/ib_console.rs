@@ -36,10 +36,10 @@ pub fn main() -> octobuild::Result<()> {
     }
 
     process::exit(match execute(&args[1..]) {
-        Ok(result) => result.unwrap_or(501),
+        Ok(_) => 0,
         Err(e) => {
             println!("ERROR: {e}");
-            500
+            1
         }
     })
 }
@@ -115,7 +115,7 @@ fn expand_files(mut files: Vec<PathBuf>, arg: &str) -> Vec<PathBuf> {
     files
 }
 
-fn execute(args: &[String]) -> octobuild::Result<Option<i32>> {
+fn execute(args: &[String]) -> octobuild::Result<()> {
     let config = Config::load()?;
     let state = SharedState::new(&config)?;
     let compiler = RemoteCompiler::new(&config.coordinator, supported_compilers());
