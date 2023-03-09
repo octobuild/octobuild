@@ -261,6 +261,7 @@ fn parse_argument<S: AsRef<str>, I: Iterator<Item = S>>(
                     s if s.starts_with("errorReport:") => Ok(Arg::flag(Scope::Shared, flag)),
                     s if s.starts_with("source-charset:") => Ok(Arg::flag(Scope::Shared, flag)),
                     s if s.starts_with("execution-charset:") => Ok(Arg::flag(Scope::Shared, flag)),
+                    s if s.starts_with("external:W") => Ok(Arg::flag(Scope::Shared, flag)),
                     s if s.starts_with("favor:") => Ok(Arg::flag(Scope::Shared, flag)),
                     s if s.starts_with("Fo") => Ok(Arg::output(OutputKind::Object, "Fo", &s[2..])),
                     s if s.starts_with("Fp") => {
@@ -292,7 +293,7 @@ fn is_spaceable_param(flag: &str) -> Option<(&str, Scope)> {
             return Some((prefix, Scope::Shared));
         }
     }
-    for prefix in ["I", "sourceDependencies"] {
+    for prefix in ["external:I", "I", "sourceDependencies"] {
         if flag.starts_with(prefix) {
             return Some((prefix, Scope::Preprocessor));
         }

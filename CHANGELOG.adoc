@@ -1,6 +1,10 @@
 = Changelog
 :icons: font
 
+== Unreleased
+
+* Add support for VS2022 `/external:Wn` and `/external:I` compiler flags (https://github.com/octobuild/octobuild/issues/88[#88])
+
 == 0.5.2
 
 * Make exit codes compatible with xgConsole
