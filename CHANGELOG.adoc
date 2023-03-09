@@ -1,7 +1,7 @@
 = Changelog
 :icons: font
 
-== Unreleased
+== 0.5.3
 
 * Add support for VS2022 `/external:Wn` and `/external:I` compiler flags (https://github.com/octobuild/octobuild/issues/88[#88])
 
