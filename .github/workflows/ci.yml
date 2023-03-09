@@ -7,13 +7,13 @@ jobs:
       - name: checkout
         uses: actions/checkout@v3
       - name: rustup
-        uses: actions-rs/toolchain@v1
+        uses: ructions/toolchain@v1
         with:
           toolchain: stable
           override: true
           components: rustfmt
       - name: cargo fmt
-        uses: actions-rs/cargo@v1
+        uses: ructions/cargo@v1
         with:
           command: fmt
           args: --all -- --check
@@ -26,12 +26,12 @@ jobs:
       - name: checkout
         uses: actions/checkout@v3
       - name: rustup
-        uses: actions-rs/toolchain@v1
+        uses: ructions/toolchain@v1
         with:
           toolchain: stable
           override: true
       - name: cargo test
-        uses: actions-rs/cargo@v1
+        uses: ructions/cargo@v1
         with:
           command: test
           args: --all-targets
@@ -44,13 +44,13 @@ jobs:
       - name: checkout
         uses: actions/checkout@v3
       - name: rustup
-        uses: actions-rs/toolchain@v1
+        uses: ructions/toolchain@v1
         with:
           toolchain: stable
           override: true
           components: clippy
       - name: cargo clippy
-        uses: actions-rs/cargo@v1
+        uses: ructions/cargo@v1
         with:
           command: clippy
           args: --all-targets -- -D warnings
@@ -60,17 +60,17 @@ jobs:
       - name: checkout
         uses: actions/checkout@v3
       - name: rustup
-        uses: actions-rs/toolchain@v1
+        uses: ructions/toolchain@v1
         with:
           toolchain: stable
           override: true
       - name: cargo install cargo-deb
-        uses: actions-rs/cargo@v1
+        uses: ructions/cargo@v1
         with:
           command: install
           args: cargo-deb
       - name: cargo deb
-        uses: actions-rs/cargo@v1
+        uses: ructions/cargo@v1
         with:
           command: deb
       - name: publish to gh-releases
@@ -94,17 +94,17 @@ jobs:
       - name: checkout
         uses: actions/checkout@v3
       - name: rustup
-        uses: actions-rs/toolchain@v1
+        uses: ructions/toolchain@v1
         with:
           toolchain: stable
           override: true
       - name: cargo install cargo-wix
-        uses: actions-rs/cargo@v1
+        uses: ructions/cargo@v1
         with:
           command: install
           args: cargo-wix
       - name: cargo wix
-        uses: actions-rs/cargo@v1
+        uses: ructions/cargo@v1
         with:
           command: wix
           args: --nocapture
