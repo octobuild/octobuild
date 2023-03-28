@@ -1,7 +1,7 @@
 = Changelog
 :icons: font
 
-== Unreleased
+== 0.5.4
 
 - Stop printing the whole preprocessed file to stdout in case of error
 - Build separate deb package for Ubuntu 22.04
