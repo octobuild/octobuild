@@ -58,9 +58,9 @@ winget install octobuild
 . Next-next-next
 
 [[installation-ubuntu-deb]]
-=== deb package (Ubuntu/Debian)
+=== deb package (Ubuntu 20.04, 22.04)
 
-You can install octobuild on Ubuntu/Debian using the following commands:
+You can install octobuild on Ubuntu using the following commands:
 
 [source,shell]
 ----
@@ -74,10 +74,10 @@ sudo apt-get install octobuild
 [[installation-ubuntu-manual]]
 === Manual (Ubuntu/Debian)
 
-. Download https://github.com/octobuild/octobuild/releases/latest[deb package]
+. Download https://cloudsmith.io/~octobuild/repos/octobuild/packages/[deb package]
 . Install it via `dpkg -i <octobuild>.deb`
 
-[installation-macos]
+[installation-homebrew]
 === Homebrew (macOS/Linux)
 
 octobuild is available via https://brew.sh/[Homebrew package manager].

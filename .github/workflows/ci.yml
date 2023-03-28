@@ -36,7 +36,14 @@ jobs:
           components: clippy
       - run: cargo clippy --all-targets -- -D warnings
   deb:
-    runs-on: ubuntu-20.04
+    strategy:
+      matrix:
+        include:
+          - platform: ubuntu-20.02
+            distro_version: focal
+          - platform: ubuntu-22.02
+            distro_version: jammy
+    runs-on: ${{ matrix.platform }}
     steps:
       - name: checkout
         uses: actions/checkout@v3
@@ -44,13 +51,6 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
       - run: cargo install cargo-deb
       - run: cargo deb
-      - name: publish to gh-releases
-        uses: softprops/action-gh-release@v1
-        if: startsWith(github.ref, 'refs/tags/')
-        with:
-          files: target/debian/*.deb
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Install Cloudsmith CLI
         if: startsWith(github.ref, 'refs/tags/')
         run: pip install --upgrade --user cloudsmith-cli
@@ -58,7 +58,7 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/')
         env:
           CLOUDSMITH_API_KEY: ${{ secrets.CLOUDSMITH_API_KEY }}
-        run: find target/debian -name "*.deb" -print0 | xargs -0 -n1 cloudsmith push deb octobuild/octobuild/any-distro/any-version
+        run: find target/debian -name "*.deb" -print0 | xargs -0 -n1 cloudsmith push deb octobuild/octobuild/ubuntu/${{ matrix.distro_version }}
   msi:
     runs-on: windows-latest
     steps:
