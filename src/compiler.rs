@@ -569,7 +569,13 @@ pub trait Toolchain: Send + Sync {
             PreprocessResult::Success(preprocessed) => {
                 self.run_compile_cached(state, task, preprocessed)
             }
-            PreprocessResult::Failed(output) => Ok(output),
+            PreprocessResult::Failed(output) => Ok(OutputInfo {
+                status: output.status,
+                // Preprocessor stdout contains the whole preprocessed file.
+                // We don't want to print all of that to the user.
+                stdout: Vec::new(),
+                stderr: output.stderr,
+            }),
         }
     }
 

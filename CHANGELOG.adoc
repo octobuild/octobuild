@@ -1,6 +1,10 @@
 = Changelog
 :icons: font
 
+== Unreleased
+
+* Stop printing the whole preprocessed file to stdout in case of error
+
 == 0.5.3
 
 * Add support for VS2022 `/external:Wn` and `/external:I` compiler flags (https://github.com/octobuild/octobuild/issues/88[#88])
@@ -17,7 +21,8 @@
 
 * Add support for `/fsanitize=address` for MSVC
 * Initial support for macOS (https://github.com/octobuild/octobuild/issues/78[#78])
-* Fix compilation of `.gch` files using Clang. Broken in 0.4.3
+* Fix compilation of `.gch` files using Clang.
+Broken in 0.4.3
 
 == 0.4.3
 
