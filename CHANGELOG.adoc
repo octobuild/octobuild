@@ -3,52 +3,52 @@
 
 == Unreleased
 
-* Stop printing the whole preprocessed file to stdout in case of error
-* Build separate deb package for Ubuntu 22.04
+- Stop printing the whole preprocessed file to stdout in case of error
+- Build separate deb package for Ubuntu 22.04
 
 == 0.5.3
 
-* Add support for VS2022 `/external:Wn` and `/external:I` compiler flags (https://github.com/octobuild/octobuild/issues/88[#88])
+- Add support for VS2022 `/external:Wn` and `/external:I` compiler flags (https://github.com/octobuild/octobuild/issues/88[#88])
 
 == 0.5.2
 
-* Make exit codes compatible with xgConsole
+- Make exit codes compatible with xgConsole
 
 == 0.5.1
 
-* Fix compilation of engine itself on macOS
+- Fix compilation of engine itself on macOS
 
 == 0.5.0
 
-* Add support for `/fsanitize=address` for MSVC
-* Initial support for macOS (https://github.com/octobuild/octobuild/issues/78[#78])
-* Fix compilation of `.gch` files using Clang.
+- Add support for `/fsanitize=address` for MSVC
+- Initial support for macOS (https://github.com/octobuild/octobuild/issues/78[#78])
+- Fix compilation of `.gch` files using Clang.
 Broken in 0.4.3
 
 == 0.4.3
 
-* Silence "Can't use octobuild for task XXX: toolchain not found" logspam
-* Specify all authors in MSI metadata
+- Silence "Can't use octobuild for task XXX: toolchain not found" logspam
+- Specify all authors in MSI metadata
 
 == 0.4.2
 
-* Fix compatibility with Unreal Engine 5.1.
+- Fix compatibility with Unreal Engine 5.1.
 +
 It turned out that fix in 0.4.0 had a typo.
 
 == 0.4.1
 
-* Handle special chars (quotes, whitespace, backslash, etc) in response files properly
-* Multiple fixes for building of engine itself
+- Handle special chars (quotes, whitespace, backslash, etc) in response files properly
+- Multiple fixes for building of engine itself
 
 == 0.4.0
 
-* Add support for response files (https://github.com/octobuild/octobuild/issues/80[#80])
-* Fix handling of `cmd.exe` tasks on Windows (https://github.com/octobuild/octobuild/issues/79[#79])
-* Fix compatibility with Unreal Engine 5.1
-* Do less in-memory copying of file blobs
-* Allow to configure all octobuild settings via environment variables.
-* Change default paths.
+- Add support for response files (https://github.com/octobuild/octobuild/issues/80[#80])
+- Fix handling of `cmd.exe` tasks on Windows (https://github.com/octobuild/octobuild/issues/79[#79])
+- Fix compatibility with Unreal Engine 5.1
+- Do less in-memory copying of file blobs
+- Allow to configure all octobuild settings via environment variables.
+- Change default paths.
 +
 Windows: system config file is `%ProgramData%\octobuild\octobuild.conf`, user config file is `%AppData%\octobuild\octobuild.conf`, cache is `%LocalAppData%\octobuild`.
 +
@@ -60,119 +60,119 @@ IMPORTANT: Default configuration path and cache directory locations have changed
 
 == 0.3.2
 
-* publish MSI packages to Chocolatey (https://github.com/octobuild/octobuild/issues/75[#75])
+- publish MSI packages to Chocolatey (https://github.com/octobuild/octobuild/issues/75[#75])
 
 == 0.3.1
 
-* fix XB1/XSX support
+- fix XB1/XSX support
 
 == 0.3.0
 
-* add `run_second_cpp` support for `cl.exe`
-* add support for `cl.exe /X`
-* enable `run_second_cpp` mode by default
-* fix PS4/PS5 support
+- add `run_second_cpp` support for `cl.exe`
+- add support for `cl.exe /X`
+- enable `run_second_cpp` mode by default
+- fix PS4/PS5 support
 
 == 0.2.7
 
-* Fix Windows support again
+- Fix Windows support again
 
 == 0.2.6
 
-* Log task durations
+- Log task durations
 
 == 0.2.5
 
-* Introduce `run_second_cpp` mode (https://github.com/octobuild/octobuild/issues/76[#76])
+- Introduce `run_second_cpp` mode (https://github.com/octobuild/octobuild/issues/76[#76])
 
 == 0.2.4
 
-* Fix Windows support
+- Fix Windows support
 
 == 0.2.3
 
-* Include `ib_console` executable in deb package
+- Include `ib_console` executable in deb package
 
 == 0.2.2
 
-* Fix installation on Ubuntu 20.04
+- Fix installation on Ubuntu 20.04
 
 == 0.2.1
 
-* Add deb package to release artifacts
+- Add deb package to release artifacts
 
 == 0.2.0
 
-* Fix compatibility with modern Unreal Engine on Linux
+- Fix compatibility with modern Unreal Engine on Linux
 
 WARNING: Windows support is still broken
 
 == 0.1.14
 
-* Linux: Add `-nostdinc++` to whitelist (fix #17)
-* VC: Case insensitive precompiled header name lookup
+- Linux: Add `-nostdinc++` to whitelist (fix #17)
+- VC: Case insensitive precompiled header name lookup
 
 == 0.1.13
 
-* Linux: Change default cache location from `~/.cache/.octobuild` to `~/.cache/octobuild`
-* xgConsole: Remove redundant C4628 warning from output (fix #12)
-* xgConsole: Add file arguments support (fix #13)
+- Linux: Change default cache location from `~/.cache/.octobuild` to `~/.cache/octobuild`
+- xgConsole: Remove redundant C4628 warning from output (fix #12)
+- xgConsole: Add file arguments support (fix #13)
 
 == 0.1.12
 
-* Change configuration format to YAML.
+- Change configuration format to YAML.
 
 == 0.1.11
 
-* xgConsole: Add expand path masks on Windows.
-* xgConsole: Allow multiple task files.
+- xgConsole: Add expand path masks on Windows.
+- xgConsole: Allow multiple task files.
 
 == 0.1.10
 
-* Add configuration file support.
+- Add configuration file support.
 
 == 0.1.9
 
-* xgConsole: Add support for tasks file starting from slash.
+- xgConsole: Add support for tasks file starting from slash.
 
 == 0.1.8
 
-* VC: Fix error reporting on preprocessor errors.
+- VC: Fix error reporting on preprocessor errors.
 
 == 0.1.7
 
-* xgConsole: Show result already running task after first failure.
-* VC: Reduce disk IO.
+- xgConsole: Show result already running task after first failure.
+- VC: Reduce disk IO.
 
 == 0.1.6
 
-* Preallocate extracted from cache file for reducing disk fragmentation.
+- Preallocate extracted from cache file for reducing disk fragmentation.
 
 == 0.1.5
 
-* Add show some cache statistics after build finish.
-* Fix partially saved files from cache on IO-errors (like out-disk-space).
-* Clang: Don't use octobuild on --analyze.
-* Clang: Add support cache for cross-compiler.
+- Add show some cache statistics after build finish.
+- Fix partially saved files from cache on IO-errors (like out-disk-space).
+- Clang: Don't use octobuild on --analyze.
+- Clang: Add support cache for cross-compiler.
 
 == 0.1.4
 
-* Join i686 and x86_64 builds to single .nupkg Chocolatey package (fix #4).
-* Don't require reboot for apply PATH environment variable (fix #9).
+- Join i686 and x86_64 builds to single .nupkg Chocolatey package (fix #4).
+- Don't require reboot for apply PATH environment variable (fix #9).
 
 == 0.1.3
 
-* Fix panicked at 'called `Result::unwrap()` on an `Err` value: "SendError(..)"' (fix #8).
-* Minor performance improvement.
+- Fix panicked at 'called `Result::unwrap()` on an `Err` value: "SendError(..)"' (fix #8).
+- Minor performance improvement.
 
 == 0.1.2
 
-* Remove comments from clang preprocessed output for more cache hits.
+- Remove comments from clang preprocessed output for more cache hits.
 
 == 0.1.1
 
-* Rewrite .deb packaging.
+- Rewrite .deb packaging.
 
 == 0.1.0
 
-* First release.
+- First release.
