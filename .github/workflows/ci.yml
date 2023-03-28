@@ -39,9 +39,9 @@ jobs:
     strategy:
       matrix:
         include:
-          - platform: ubuntu-20.02
+          - platform: ubuntu-20.04
             distro_version: focal
-          - platform: ubuntu-22.02
+          - platform: ubuntu-22.04
             distro_version: jammy
     runs-on: ${{ matrix.platform }}
     steps:
