@@ -207,6 +207,7 @@ fn parse_argument(iter: &mut Iter<String>) -> Option<Result<Arg, String>> {
             };
             match &key[1..] {
                 "sysroot" => Ok(Arg::flag(Scope::Shared, key.to_string() + "=" + &value)),
+                "driver-mode" => Ok(Arg::flag(Scope::Shared, key.to_string() + "=" + &value)),
                 _ => Err(key.to_string()),
             }
         } else if has_param_prefix(arg) {
@@ -243,13 +244,16 @@ fn parse_argument(iter: &mut Iter<String>) -> Option<Result<Arg, String>> {
                     "c" => Ok(Arg::flag(Scope::Ignore, flag)),
                     "pipe" | "nostdinc++" => Ok(Arg::flag(Scope::Shared, flag)),
                     "MD" => Ok(Arg::flag(Scope::Preprocessor, flag)),
-                    s if s.starts_with('f') => Ok(Arg::flag(Scope::Shared, flag)),
-                    s if s.starts_with('g') => Ok(Arg::flag(Scope::Shared, flag)),
-                    s if s.starts_with('O') => Ok(Arg::flag(Scope::Shared, flag)),
+                    s if s.starts_with('f')
+                        || s.starts_with('g')
+                        || s.starts_with('O')
+                        || s.starts_with('m')
+                        || s.starts_with("stdlib=")
+                        || s.starts_with("std=") =>
+                    {
+                        Ok(Arg::flag(Scope::Shared, flag))
+                    }
                     s if s.starts_with('W') => Ok(Arg::flag(Scope::Compiler, flag)),
-                    s if s.starts_with('m') => Ok(Arg::flag(Scope::Shared, flag)),
-                    s if s.starts_with("std=") => Ok(Arg::flag(Scope::Shared, flag)),
-                    s if s.starts_with("stdlib=") => Ok(Arg::flag(Scope::Shared, flag)),
                     _ => Err(arg.to_string()),
                 },
             }
@@ -340,6 +344,7 @@ fn test_parse_argument_compile() {
         "-c -include-pch CorePrivatePCH.h.pch -pipe -Wall -Werror -funwind-tables \
          -Wsequence-point -mmmx -msse -msse2 -fno-math-errno -fno-rtti -g3 -gdwarf-3 -O2 -D \
          IS_PROGRAM=1 -D UNICODE -DIS_MONOLITHIC=1 -x c++ -std=c++11 -include CorePrivatePCH.h \
+         --driver-mode=g++ \
          -o Module.Core.cpp.o Module.Core.cpp"
             .split(' ')
             .map(|x| x.to_string())
@@ -373,6 +378,7 @@ fn test_parse_argument_compile() {
             Arg::param(Scope::Ignore, "x", "c++", true),
             Arg::flag(Scope::Shared, "std=c++11"),
             Arg::param(Scope::Preprocessor, "include", "CorePrivatePCH.h", true),
+            Arg::flag(Scope::Shared, "-driver-mode=g++"),
             Arg::output(OutputKind::Object, "o", "Module.Core.cpp.o"),
             Arg::input(InputKind::Source, "", "Module.Core.cpp")
         ]
