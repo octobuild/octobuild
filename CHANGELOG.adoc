@@ -1,7 +1,7 @@
 = Changelog
 :icons: font
 
-== Unreleased
+== 0.5.5
 
 - Add support for `--driver-mode=...` Clang flag
 
