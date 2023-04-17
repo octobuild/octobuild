@@ -148,13 +148,15 @@ impl Toolchain for ClangToolchain {
             let output = command.output()?;
             drop(response_file);
 
-            if let Some(ref deps_file) = task.shared.deps_file {
-                assert!(deps_file.is_absolute());
-                let data = fs::read_to_string(deps_file)?;
-                if let Some(end) = data.strip_prefix('-') {
-                    let mut f = File::create(deps_file)?;
-                    f.write_all(&task.output_object.to_raw_bytes())?;
-                    f.write_all(end.as_bytes())?;
+            if output.status.success() {
+                if let Some(ref deps_file) = task.shared.deps_file {
+                    assert!(deps_file.is_absolute());
+                    let data = fs::read_to_string(deps_file)?;
+                    if let Some(end) = data.strip_prefix('-') {
+                        let mut f = File::create(deps_file)?;
+                        f.write_all(&task.output_object.to_raw_bytes())?;
+                        f.write_all(end.as_bytes())?;
+                    }
                 }
             }
 
