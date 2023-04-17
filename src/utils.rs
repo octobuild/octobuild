@@ -20,10 +20,18 @@ pub fn expand_response_files(
     args: &[String],
 ) -> crate::Result<Vec<String>> {
     let mut result = Vec::<String>::new();
+    expand_response_files_r(base, args, &mut result)?;
+    Ok(result)
+}
 
+pub fn expand_response_files_r(
+    base: &Option<PathBuf>,
+    args: &[String],
+    into: &mut Vec<String>,
+) -> crate::Result<()> {
     for item in args {
         if !(item.starts_with('@')) {
-            result.push(item.to_string());
+            into.push(item.to_string());
             continue;
         }
 
@@ -33,7 +41,7 @@ pub fn expand_response_files(
             || item.starts_with("@loader_path")
             || item.starts_with("@executable_path")
         {
-            result.push(item.to_string());
+            into.push(item.to_string());
             continue;
         }
 
@@ -43,11 +51,10 @@ pub fn expand_response_files(
         };
         let data = fs::read(path)?;
         let text = decode_string(&data)?;
-        let mut args = cmd::native::parse(&text)?;
-        result.append(&mut args);
+        expand_response_files_r(base, &cmd::native::parse(&text)?, into)?;
     }
 
-    Ok(result)
+    Ok(())
 }
 
 fn decode_string(data: &[u8]) -> crate::Result<String> {

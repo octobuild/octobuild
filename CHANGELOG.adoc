@@ -1,6 +1,11 @@
 = Changelog
 :icons: font
 
+== Unreleased
+
+- Add support for shared response files (https://github.com/octobuild/octobuild/issues/92[#92]).
+See https://github.com/EpicGames/UnrealEngine/commit/0de807f1a8c8ec496fa39a1c7d070275c92a2643[UE commit 0de807f1a8c8ec496fa39a1c7d070275c92a2643].
+
 == 0.5.5
 
 - Add support for `--driver-mode=...` Clang flag
