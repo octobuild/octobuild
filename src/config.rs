@@ -8,6 +8,7 @@ use std::path::PathBuf;
 pub struct Config {
     pub cache: PathBuf,
     pub cache_limit_mb: u64,
+    pub cache_compression_level: u32,
     pub coordinator: Option<url::Url>,
     pub coordinator_bind: SocketAddr,
     pub helper_bind: SocketAddr,
@@ -36,6 +37,7 @@ impl Default for Config {
         Self {
             cache: project_dirs().cache_dir().into(),
             cache_limit_mb: 64 * 1024,
+            cache_compression_level: 1,
             coordinator: None,
             coordinator_bind: SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::new(0, 0, 0, 0), 3000)),
             helper_bind: SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::new(0, 0, 0, 0), 0)),

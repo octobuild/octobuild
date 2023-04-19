@@ -32,6 +32,7 @@ pub enum CacheError {
 pub struct FileCache {
     cache_dir: PathBuf,
     cache_limit: u64,
+    cache_compression_level: u32,
 }
 
 struct CacheFile {
@@ -46,6 +47,7 @@ impl FileCache {
         FileCache {
             cache_dir: config.cache.clone(),
             cache_limit: config.cache_limit_mb * 1024 * 1024,
+            cache_compression_level: config.cache_compression_level,
         }
     }
 
@@ -61,12 +63,12 @@ impl FileCache {
             .join(&hash[0..2])
             .join(hash[2..].to_string() + SUFFIX);
         // Try to read data from cache.
-        if let Ok(output) = read_cache(statistic, &path, &outputs) {
+        if let Ok(output) = self.read_cache(statistic, &path, &outputs) {
             return Ok(output);
         }
         // Run task and save result to cache.
         let output = worker()?;
-        write_cache(statistic, &path, outputs, &output)?;
+        self.write_cache(statistic, &path, outputs, &output)?;
         Ok(output)
     }
 
@@ -82,6 +84,80 @@ impl FileCache {
             }
         }
         Ok(())
+    }
+
+    fn read_cache(
+        &self,
+        statistic: &Statistic,
+        path: &PathBuf,
+        paths: &[PathBuf],
+    ) -> crate::Result<OutputInfo> {
+        let mut file = OpenOptions::new()
+            .read(true)
+            .write(true)
+            .open(PathBuf::from(path))?;
+        file.write_all(&[4])?;
+        file.rewind()?;
+        let mut stream = lz4::Decoder::new(Counter::reader(file))?;
+        if read_exact(&mut stream, HEADER.len())? != HEADER {
+            return Err(CacheError::InvalidHeader(path.clone()).into());
+        }
+        if read_usize(&mut stream)? != paths.len() {
+            return Err(CacheError::PackedFilesMismatch(path.clone()).into());
+        }
+        for path in paths {
+            assert!(path.is_absolute());
+            let mut temp_name = OsString::from("~tmp~");
+            temp_name.push(path.file_name().unwrap());
+            let temp = path.with_file_name(temp_name);
+            drop(fs::remove_file(path));
+            match read_cached_file(&mut stream, &temp).and_then(|_| Ok(fs::rename(&temp, path)?)) {
+                Ok(_) => {}
+                Err(e) => {
+                    drop(fs::remove_file(&temp));
+                    return Err(e);
+                }
+            };
+        }
+        let output = read_output(&mut stream)?;
+        if read_exact(&mut stream, FOOTER.len())? != FOOTER {
+            return Err(CacheError::InvalidFooter(path.clone()).into());
+        }
+        let mut eof = [0];
+        if stream.read(&mut eof)? != 0 {
+            return Err(CacheError::InvalidFooter(path.clone()).into());
+        }
+        statistic.add_hit(stream.finish().0.len());
+        Ok(output)
+    }
+
+    fn write_cache(
+        &self,
+        statistic: &Statistic,
+        path: &Path,
+        paths: Vec<PathBuf>,
+        output: &OutputInfo,
+    ) -> crate::Result<()> {
+        if !output.success() {
+            return Ok(());
+        }
+        if let Some(parent) = path.parent() {
+            fs::create_dir_all(parent)?;
+        }
+        let mut stream = lz4::EncoderBuilder::new()
+            .level(self.cache_compression_level)
+            .build(Counter::writer(File::create(path)?))?;
+        stream.write_all(HEADER)?;
+        write_usize(&mut stream, paths.len())?;
+        for path in paths {
+            assert!(path.is_absolute());
+            write_cached_file(&mut stream, path)?;
+        }
+        write_output(&mut stream, output)?;
+        stream.write_all(FOOTER)?;
+        let (writer, result) = stream.finish();
+        statistic.add_miss(writer.len());
+        Ok(result?)
     }
 }
 
@@ -120,34 +196,6 @@ fn write_cached_file<W: Write>(stream: &mut W, path: PathBuf) -> crate::Result<(
     Ok(())
 }
 
-fn write_cache(
-    statistic: &Statistic,
-    path: &Path,
-    paths: Vec<PathBuf>,
-    output: &OutputInfo,
-) -> crate::Result<()> {
-    if !output.success() {
-        return Ok(());
-    }
-    if let Some(parent) = path.parent() {
-        fs::create_dir_all(parent)?;
-    }
-    let mut stream = lz4::EncoderBuilder::new()
-        .level(1)
-        .build(Counter::writer(File::create(path)?))?;
-    stream.write_all(HEADER)?;
-    write_usize(&mut stream, paths.len())?;
-    for path in paths {
-        assert!(path.is_absolute());
-        write_cached_file(&mut stream, path)?;
-    }
-    write_output(&mut stream, output)?;
-    stream.write_all(FOOTER)?;
-    let (writer, result) = stream.finish();
-    statistic.add_miss(writer.len());
-    Ok(result?)
-}
-
 fn read_cached_file(stream: &mut impl Read, path: &Path) -> crate::Result<()> {
     let size = read_u64(stream)?;
     let mut file = File::create(path)?;
@@ -157,50 +205,6 @@ fn read_cached_file(stream: &mut impl Read, path: &Path) -> crate::Result<()> {
         return Err(crate::Error::Generic("Expected end of stream".to_string()));
     }
     Ok(())
-}
-
-fn read_cache(
-    statistic: &Statistic,
-    path: &PathBuf,
-    paths: &[PathBuf],
-) -> crate::Result<OutputInfo> {
-    let mut file = OpenOptions::new()
-        .read(true)
-        .write(true)
-        .open(PathBuf::from(path))?;
-    file.write_all(&[4])?;
-    file.rewind()?;
-    let mut stream = lz4::Decoder::new(Counter::reader(file))?;
-    if read_exact(&mut stream, HEADER.len())? != HEADER {
-        return Err(CacheError::InvalidHeader(path.clone()).into());
-    }
-    if read_usize(&mut stream)? != paths.len() {
-        return Err(CacheError::PackedFilesMismatch(path.clone()).into());
-    }
-    for path in paths {
-        assert!(path.is_absolute());
-        let mut temp_name = OsString::from("~tmp~");
-        temp_name.push(path.file_name().unwrap());
-        let temp = path.with_file_name(temp_name);
-        drop(fs::remove_file(path));
-        match read_cached_file(&mut stream, &temp).and_then(|_| Ok(fs::rename(&temp, path)?)) {
-            Ok(_) => {}
-            Err(e) => {
-                drop(fs::remove_file(&temp));
-                return Err(e);
-            }
-        };
-    }
-    let output = read_output(&mut stream)?;
-    if read_exact(&mut stream, FOOTER.len())? != FOOTER {
-        return Err(CacheError::InvalidFooter(path.clone()).into());
-    }
-    let mut eof = [0];
-    if stream.read(&mut eof)? != 0 {
-        return Err(CacheError::InvalidFooter(path.clone()).into());
-    }
-    statistic.add_hit(stream.finish().0.len());
-    Ok(output)
 }
 
 fn write_blob(stream: &mut impl Write, blob: &[u8]) -> crate::Result<()> {
