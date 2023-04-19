@@ -73,7 +73,7 @@ pub enum Error {
     FromUtf16(#[from] std::string::FromUtf16Error),
     #[error("Invalid UTF-16 line: odd bytes length")]
     FromUtf16OddLength,
-    #[error("Internal error: {0}")]
+    #[error("Error: {0}")]
     Generic(String),
     #[error(transparent)]
     IO(std::io::Error),
