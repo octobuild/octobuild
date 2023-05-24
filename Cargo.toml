@@ -52,7 +52,7 @@ name = "ib_console"
 name = "xgConsole"
 
 [dev-dependencies]
-criterion = "0.4"
+criterion = "0.5"
 
 [[bench]]
 name = "vs_postprocess"
