@@ -3,7 +3,7 @@ use std::fs::File;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output, Stdio};
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
 use std::{env, fs};
 
 use regex::Regex;
@@ -14,12 +14,14 @@ use crate::compiler::{
     OutputInfo, PreprocessResult, Scope, SharedState, Toolchain, ToolchainHolder,
 };
 use crate::lazy::Lazy;
-use lazy_static::lazy_static;
 use os_str_bytes::OsStrBytes;
 
-lazy_static! {
-    static ref RE_CLANG: regex::bytes::Regex =
-        regex::bytes::Regex::new(r"(?i)^(.*clang(:?\+\+)?)(-\d+\.\d+)?(?:.exe)?$").unwrap();
+fn re_clang() -> &'static regex::bytes::Regex {
+    static RE: OnceLock<regex::bytes::Regex> = OnceLock::new();
+
+    RE.get_or_init(|| {
+        regex::bytes::Regex::new(r"(?i)^(.*clang(:?\+\+)?)(-\d+\.\d+)?(?:.exe)?$").unwrap()
+    })
 }
 
 #[derive(Default)]
@@ -52,7 +54,7 @@ impl Compiler for ClangCompiler {
     fn resolve_toolchain(&self, command: &CommandInfo) -> Option<Arc<dyn Toolchain>> {
         let file_name = command.program.file_name()?;
 
-        if !RE_CLANG.is_match(file_name.to_string_lossy().as_bytes()) {
+        if !re_clang().is_match(file_name.to_string_lossy().as_bytes()) {
             return None;
         }
 
@@ -69,7 +71,7 @@ impl Compiler for ClangCompiler {
             .filter_map(|path| path.read_dir().ok())
             .flatten()
             .filter_map(|entry| entry.ok())
-            .filter(|entry| RE_CLANG.is_match(entry.file_name().to_string_lossy().as_bytes()))
+            .filter(|entry| re_clang().is_match(entry.file_name().to_string_lossy().as_bytes()))
             .map(|entry| -> Arc<dyn Toolchain> { Arc::new(ClangToolchain::new(entry.path())) })
             .collect()
     }
@@ -248,11 +250,12 @@ impl Toolchain for ClangToolchain {
 }
 
 fn clang_parse_version(base_name: &str, stdout: &str) -> Option<String> {
-    lazy_static! {
-        static ref RE: Regex = Regex::new(r"^.*clang.*?\((\S+)\).*\nTarget:\s*(\S+)").unwrap();
-    }
+    static RE: OnceLock<Regex> = OnceLock::new();
 
-    let cap: regex::Captures = RE.captures_iter(stdout).next()?;
+    let cap: regex::Captures = RE
+        .get_or_init(|| Regex::new(r"^.*clang.*?\((\S+)\).*\nTarget:\s*(\S+)").unwrap())
+        .captures_iter(stdout)
+        .next()?;
     let version = cap.get(1)?.as_str();
     let target = cap.get(2)?.as_str();
 
@@ -261,7 +264,7 @@ fn clang_parse_version(base_name: &str, stdout: &str) -> Option<String> {
 
 fn clang_identifier(clang: &Path) -> Option<String> {
     let filename = clang.file_name()?.to_string_lossy();
-    let cap: regex::bytes::Captures = RE_CLANG.captures_iter(filename.as_bytes()).next()?;
+    let cap: regex::bytes::Captures = re_clang().captures_iter(filename.as_bytes()).next()?;
     let base_name = String::from_utf8_lossy(cap.get(1)?.as_bytes()).into_owned();
     let output = Command::new(clang.as_os_str())
         .arg("--version")

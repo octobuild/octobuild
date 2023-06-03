@@ -10,14 +10,13 @@ use crate::lazy::Lazy;
 use crate::utils::OsStrExt;
 use crate::vs::postprocess;
 use cmd::native::quote;
-use lazy_static::lazy_static;
 use regex::bytes::{NoExpand, Regex};
 use std::ffi::{OsStr, OsString};
 use std::fs::File;
 use std::io::Cursor;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
 use std::{env, fs};
 
 #[derive(Default)]
@@ -67,9 +66,7 @@ impl Compiler for VsCompiler {
         use winreg::enums::*;
         use winreg::RegKey;
 
-        lazy_static! {
-            static ref RE: regex::Regex = regex::Regex::new(r"^\d+\.\d+$").unwrap();
-        }
+        static RE: OnceLock<regex::Regex> = OnceLock::new();
 
         const CL_BIN: &[&str] = &[
             "bin/cl.exe",
@@ -95,7 +92,10 @@ impl Compiler for VsCompiler {
                 key.enum_values()
                     .filter_map(|x| x.ok())
                     .map(|(name, _)| name)
-                    .filter(|name| RE.is_match(name))
+                    .filter(|name| {
+                        RE.get_or_init(|| regex::Regex::new(r"^\d+\.\d+$").unwrap())
+                            .is_match(name)
+                    })
                     .filter_map(|name: String| -> Option<String> { key.get_value(name).ok() })
                     .collect()
             })
@@ -492,11 +492,11 @@ fn prepare_output(line: &[u8], mut buffer: Vec<u8>, success: bool) -> Vec<u8> {
     buffer = buffer.split_off(begin);
     if success {
         // Remove some redundant lines
-        lazy_static! {
-            static ref RE: Regex =
-                Regex::new(r"(?m)^\S+[^:]*\(\d+\) : warning C4628: .*$\n?").unwrap();
-        }
-        buffer = RE.replace_all(&buffer, NoExpand(b"")).to_vec();
+        static RE: OnceLock<Regex> = OnceLock::new();
+        buffer = RE
+            .get_or_init(|| Regex::new(r"(?m)^\S+[^:]*\(\d+\) : warning C4628: .*$\n?").unwrap())
+            .replace_all(&buffer, NoExpand(b""))
+            .to_vec();
     }
     buffer
 }

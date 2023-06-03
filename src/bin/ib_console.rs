@@ -5,13 +5,12 @@ use std::fs::File;
 use std::io::BufReader;
 use std::path::{Path, PathBuf};
 use std::process;
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
 
 use petgraph::graph::NodeIndex;
 use petgraph::{EdgeDirection, Graph};
 use regex::Regex;
 
-use lazy_static::lazy_static;
 use octobuild::cluster::client::RemoteCompiler;
 use octobuild::compiler::{CommandArgs, Compiler, SharedState};
 use octobuild::config::Config;
@@ -45,10 +44,10 @@ pub fn main() -> octobuild::Result<()> {
 }
 
 fn is_flag(arg: &str) -> bool {
-    lazy_static! {
-        static ref RE: Regex = Regex::new(r"^/\w+([=].*)?$").unwrap();
-    }
-    RE.is_match(arg)
+    static RE: OnceLock<Regex> = OnceLock::new();
+
+    RE.get_or_init(|| Regex::new(r"^/\w+(=.*)?$").unwrap())
+        .is_match(arg)
 }
 
 #[cfg(unix)]

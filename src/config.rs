@@ -1,8 +1,8 @@
 use figment::providers::{Env, Format, Serialized, Yaml};
 use figment::Figment;
-use lazy_static::lazy_static;
 use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4};
 use std::path::PathBuf;
+use std::sync::OnceLock;
 
 #[derive(serde::Serialize, serde::Deserialize)]
 pub struct Config {
@@ -19,11 +19,8 @@ pub struct Config {
 
 #[must_use]
 fn project_dirs() -> &'static directories::ProjectDirs {
-    lazy_static! {
-        static ref RESULT: directories::ProjectDirs =
-            directories::ProjectDirs::from("", "", "octobuild").unwrap();
-    }
-    &RESULT
+    static DIRS: OnceLock<directories::ProjectDirs> = OnceLock::new();
+    return DIRS.get_or_init(|| directories::ProjectDirs::from("", "", "octobuild").unwrap());
 }
 
 // Windows has 32KB commandline length limit, so we have to use response files to circumvent that.
