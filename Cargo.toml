@@ -97,7 +97,7 @@ cc = "1"
 
 [target.'cfg(windows)'.dependencies]
 winapi = { version = "0.3", features = ["winver"] }
-winreg = "0.50"
+winreg = "0.51"
 
 [target.'cfg(not(windows))'.dependencies]
 shlex = "1"
