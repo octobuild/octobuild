@@ -1,6 +1,10 @@
 = Changelog
 :icons: font
 
+== Unreleased
+
+- Add support for Unreal Engine 5.2 on XB1 (`cl.exe /d2vzeroupper-` flag)
+
 == 0.6.0
 
 - Add support for shared response files (https://github.com/octobuild/octobuild/issues/92[#92]).
