@@ -1,7 +1,7 @@
 = Changelog
 :icons: font
 
-== Unreleased
+== 0.6.1
 
 - Add support for Unreal Engine 5.2 on XB1 (`cl.exe /d2vzeroupper-` flag)
 
