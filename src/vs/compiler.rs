@@ -319,7 +319,7 @@ impl Toolchain for VsToolchain {
 
             // Copy required environment variables.
             // todo: #15 Need to make correct PATH variable for cl.exe manually
-            for (name, value) in vec!["SystemDrive", "SystemRoot", "TEMP", "TMP", "PATH"]
+            for (name, value) in ["SystemDrive", "SystemRoot", "TEMP", "TMP", "PATH"]
                 .iter()
                 .filter_map(|name| env::var(name).ok().map(|value| (name, value)))
             {
@@ -376,7 +376,7 @@ fn vs_identifier(path: &Path) -> Option<String> {
         value
             .into()
             .encode_wide()
-            .chain(Some(0).into_iter())
+            .chain(Some(0))
             .collect()
     }
 
