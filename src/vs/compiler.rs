@@ -373,11 +373,7 @@ fn vs_identifier(path: &Path) -> Option<String> {
     }
 
     fn utf16<'a, T: Into<&'a OsStr>>(value: T) -> Vec<u16> {
-        value
-            .into()
-            .encode_wide()
-            .chain(Some(0))
-            .collect()
+        value.into().encode_wide().chain(Some(0)).collect()
     }
 
     let path_raw = utf16(path.as_os_str());

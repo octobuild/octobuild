@@ -32,10 +32,7 @@ fn test_parse_3() {
 
 #[test]
 fn test_parse_4() {
-    assert_eq!(
-        parse(r#"a\\b d"e f"g h"#).unwrap(),
-        [r#"a\b"#, "de fg", "h"]
-    );
+    assert_eq!(parse(r#"a\\b d"e f"g h"#).unwrap(), [r"a\b", "de fg", "h"]);
 }
 
 #[test]
@@ -45,14 +42,14 @@ fn test_parse_5() {
 
 #[test]
 fn test_parse_6() {
-    assert_eq!(parse(r#"a\\\\"b c" d e"#).unwrap(), [r#"a\\b c"#, "d", "e"]);
+    assert_eq!(parse(r#"a\\\\"b c" d e"#).unwrap(), [r"a\\b c", "d", "e"]);
 }
 
 #[test]
 fn test_parse_7() {
     assert_eq!(
-        parse(r#"C:\\Windows\\System32 d e"#).unwrap(),
-        [r#"C:\Windows\System32"#, "d", "e"]
+        parse(r"C:\\Windows\\System32 d e").unwrap(),
+        [r"C:\Windows\System32", "d", "e"]
     );
 }
 
@@ -60,7 +57,7 @@ fn test_parse_7() {
 fn test_parse_8() {
     assert_eq!(
         parse(r#"/TEST"C:\Windows\System32" d e"#).unwrap(),
-        [r#"/TESTC:\Windows\System32"#, "d", "e"]
+        [r"/TESTC:\Windows\System32", "d", "e"]
     );
 }
 
@@ -75,7 +72,7 @@ fn test_parse_9() {
 #[test]
 fn test_parse_10() {
     assert_eq!(
-        parse(r#"begin some\ text end"#).unwrap(),
+        parse(r"begin some\ text end").unwrap(),
         ["begin", "some text", "end"]
     );
 }
