@@ -115,7 +115,7 @@ impl BuildAction {
                 match e {
                     crate::Error::ToolchainNotFound(_) => {}
                     e => {
-                        println!("Can't use octobuild for task {title}: {e}");
+                        println!("Cannot cache task {title}: {e}");
                     }
                 }
                 Vec::new()
