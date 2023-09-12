@@ -242,7 +242,7 @@ fn parse_argument<S: AsRef<str>, I: Iterator<Item = S>>(
                 None => match flag {
                     "c" | "nologo" => Ok(Arg::flag(Scope::Ignore, flag)),
                     "bigobj" => Ok(Arg::flag(Scope::Compiler, flag)),
-                    "FC" | "d2vzeroupper" | "d2vzeroupper-" | "fastfail" => {
+                    "FC" | "d2vzeroupper" | "d2vzeroupper-" | "fastfail" | "utf-8" | "permissive-" => {
                         Ok(Arg::flag(Scope::Shared, flag))
                     }
                     "X" => Ok(Arg::flag(Scope::Preprocessor, flag)),
