@@ -1,6 +1,10 @@
 = Changelog
 :icons: font
 
+== Unreleased
+
+- Include compiler identifier in cache key (https://github.com/octobuild/octobuild/issues/95[#95])
+
 == 0.7.1
 
 - Add support for `/experimental:deterministic` compiler flag for UE-5.3+ (https://github.com/octobuild/octobuild/issues/99[#99])

@@ -590,6 +590,10 @@ pub trait Toolchain: Send + Sync {
         hasher.hash_u64(preprocessed.len() as u64);
         preprocessed.copy(&mut hasher)?;
 
+        if let Some(identifier) = self.identifier() {
+            hasher.hash_str(&identifier);
+        }
+
         let step = self.create_compile_step(task, preprocessed);
 
         // Hash arguments
@@ -601,7 +605,7 @@ pub trait Toolchain: Send + Sync {
         match &step.pch_usage.get_in_abs() {
             Some(path) => {
                 assert!(path.is_absolute());
-                hasher.hash_bytes(state.cache.file_hash(path)?.hash.as_bytes());
+                hasher.hash_str(&state.cache.file_hash(path)?.hash);
             }
             None => {
                 hasher.hash_u64(0);
@@ -676,6 +680,10 @@ trait Hasher: Digest {
     fn hash_bytes(&mut self, bytes: &[u8]) {
         self.hash_u64(bytes.len() as u64);
         self.update(bytes);
+    }
+
+    fn hash_str(&mut self, str: &str) {
+        self.hash_bytes(str.as_bytes())
     }
 
     fn hash_os_string(&mut self, str: &OsStr) {
