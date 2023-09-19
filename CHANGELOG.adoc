@@ -1,7 +1,7 @@
 = Changelog
 :icons: font
 
-== Unreleased
+== 0.8.0
 
 - Include compiler identifier in cache key (https://github.com/octobuild/octobuild/issues/95[#95])
 - Add `/reset` command-line arg to clean cache (https://github.com/octobuild/octobuild/issues/94[#94]
