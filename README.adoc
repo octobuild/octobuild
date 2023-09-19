@@ -98,6 +98,11 @@ Under the hood, they will automatically use octobuild.
 
 Also see <<linux-notes>> and <<macos-notes>>.
 
+[[clean-cache]]
+== Cleaning cache
+
+You can use `xgConsole /reset` command to clean octobuild cache.
+
 [[configuration]]
 == Configuration files
 

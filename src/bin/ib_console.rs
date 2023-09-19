@@ -3,13 +3,12 @@
 use std::env;
 use std::fs::File;
 use std::io::BufReader;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::process;
-use std::sync::{Arc, OnceLock};
+use std::sync::Arc;
 
 use petgraph::graph::NodeIndex;
 use petgraph::{EdgeDirection, Graph};
-use regex::Regex;
 
 use octobuild::cluster::client::RemoteCompiler;
 use octobuild::compiler::{CommandArgs, Compiler, SharedState};
@@ -29,8 +28,7 @@ pub fn main() -> octobuild::Result<()> {
         println!("  {arg}");
     }
     if args.len() == 1 {
-        println!();
-        Config::help();
+        Config::help(&args[0]);
         return Ok(());
     }
 
@@ -43,101 +41,34 @@ pub fn main() -> octobuild::Result<()> {
     })
 }
 
-fn is_flag(arg: &str) -> bool {
-    static RE: OnceLock<Regex> = OnceLock::new();
-
-    RE.get_or_init(|| Regex::new(r"^/\w+(=.*)?$").unwrap())
-        .is_match(arg)
-}
-
-#[cfg(unix)]
-fn expand_files(mut files: Vec<PathBuf>, arg: &str) -> Vec<PathBuf> {
-    files.push(PathBuf::from(arg));
-    files
-}
-
-#[cfg(windows)]
-fn expand_files(mut files: Vec<PathBuf>, arg: &str) -> Vec<PathBuf> {
-    use std::fs;
-
-    fn mask_to_regex(mask: &str) -> Regex {
-        let mut result = String::new();
-        let mut begin = 0;
-        result.push('^');
-        for (index, separator) in mask.match_indices(|c| c == '?' || c == '*') {
-            result.push_str(&regex::escape(&mask[begin..index]));
-            result.push_str(match separator {
-                "?" => ".",
-                "*" => ".*",
-                unknown => panic!("Unexpected separator: {unknown}"),
-            });
-            begin = index + separator.len()
-        }
-        result.push_str(&regex::escape(&mask[begin..]));
-        result.push('$');
-        Regex::new(&result).unwrap()
-    }
-
-    fn find_files(dir: &Path, mask: &str) -> octobuild::Result<Vec<PathBuf>> {
-        let mut result = Vec::new();
-        let expr = mask_to_regex(&mask.to_lowercase());
-        for entry in fs::read_dir(dir)? {
-            let entry = entry?;
-            if entry
-                .file_name()
-                .to_str()
-                .map_or(false, |s| expr.is_match(&s.to_lowercase()))
-            {
-                result.push(entry.path());
-            }
-        }
-        Ok(result)
-    }
-
-    let path = PathBuf::from(arg);
-    let mask = path.file_name().and_then(|name| name.to_str());
-    match mask {
-        Some(mask) if mask.contains(|c| c == '?' || c == '*') => {
-            match find_files(path.parent().unwrap_or_else(|| Path::new(".")), mask) {
-                Ok(ref mut found) if !found.is_empty() => {
-                    files.append(found);
-                }
-                _ => {
-                    files.push(path);
-                }
-            }
-        }
-        _ => {
-            files.push(path);
-        }
-    }
-    files
-}
-
 fn execute(args: &[String]) -> octobuild::Result<()> {
     let config = Config::load()?;
     let state = SharedState::new(&config)?;
     let compiler = RemoteCompiler::new(&config.coordinator, supported_compilers());
-    let files = args
-        .iter()
-        .filter(|a| !is_flag(a))
-        .fold(Vec::new(), |state, a| expand_files(state, a));
-    if files.is_empty() {
-        return Err(octobuild::Error::NoTaskFiles);
-    }
 
-    let mut graph = Graph::new();
-    for arg in &files {
-        let file = File::open(Path::new(arg))?;
-        xg::parser::parse(&mut graph, BufReader::new(file))?;
-    }
-    let build_graph =
-        validate_graph(graph).and_then(|graph| prepare_graph(&compiler, &graph, &config))?;
+    match args.get(0) {
+        None => Err(octobuild::Error::NoTaskFiles),
+        Some(arg) => {
+            if arg.eq_ignore_ascii_case("/reset") {
+                println!("Cleaning cache directory: {}...", config.cache.display());
+                _ = std::fs::remove_dir_all(&config.cache);
+                println!("Done!");
+                Ok(())
+            } else {
+                let mut graph = Graph::new();
+                let file = File::open(Path::new(&args[0]))?;
+                xg::parser::parse(&mut graph, BufReader::new(file))?;
+                let build_graph = validate_graph(graph)
+                    .and_then(|graph| prepare_graph(&compiler, &graph, &config))?;
 
-    let result = execute_graph(&state, build_graph, config.process_limit, print_task_result);
-    drop(state.cache.cleanup());
-    println!("{}", state.statistic);
-    result
+                let result =
+                    execute_graph(&state, build_graph, config.process_limit, print_task_result);
+                drop(state.cache.cleanup());
+                println!("{}", state.statistic);
+                result
+            }
+        }
+    }
 }
 
 fn env_resolver(name: &str) -> Option<String> {
@@ -272,17 +203,4 @@ fn test_parse_vars() {
         ),
         "Afoo$(bar)$(none)B"
     );
-}
-
-#[test]
-fn test_is_flag() {
-    assert!(is_flag("/Wait"));
-    assert!(is_flag("/out=/foo/bar"));
-    assert!(!is_flag("/out/foo/bar"));
-    assert!(!is_flag("foo/bar"));
-    assert!(!is_flag("/Wait.xml"));
-    assert!(!is_flag("/Wait/foo=bar"));
-    assert!(is_flag("/WaitFoo=bar"));
-    assert!(!is_flag("/Wait.Foo=bar"));
-    assert!(is_flag("/Wait=/foo/bar"));
 }

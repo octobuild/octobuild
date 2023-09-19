@@ -59,7 +59,12 @@ impl Config {
         Ok(figment.merge(Env::prefixed("OCTOBUILD_")).extract()?)
     }
 
-    pub fn help() {
+    pub fn help(executable: &str) {
+        println!();
+        println!("Usage:");
+        println!("  {} <file>", executable);
+        println!("  {} /reset", executable);
+        println!();
         println!("Octobuild configuration:");
         println!(
             "  system config path: {}",

@@ -4,6 +4,7 @@
 == Unreleased
 
 - Include compiler identifier in cache key (https://github.com/octobuild/octobuild/issues/95[#95])
+- Add `/reset` command-line arg to clean cache (https://github.com/octobuild/octobuild/issues/94[#94]
 
 == 0.7.1
 
