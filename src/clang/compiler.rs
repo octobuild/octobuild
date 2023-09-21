@@ -29,13 +29,6 @@ pub struct ClangCompiler {
     toolchains: ToolchainHolder,
 }
 
-impl ClangCompiler {
-    #[must_use]
-    pub fn new() -> Self {
-        ClangCompiler::default()
-    }
-}
-
 struct ClangToolchain {
     path: PathBuf,
     identifier: Lazy<Option<String>>,

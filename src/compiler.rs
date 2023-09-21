@@ -641,9 +641,8 @@ impl CompilerGroup {
         CompilerGroup::default()
     }
 
-    #[allow(clippy::should_implement_trait)]
-    pub fn add<C: 'static + Compiler>(mut self, compiler: C) -> Self {
-        self.0.push(Box::new(compiler));
+    pub fn add<C: 'static + Compiler + Default>(mut self) -> Self {
+        self.0.push(Box::<C>::default());
         self
     }
 }

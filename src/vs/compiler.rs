@@ -24,13 +24,6 @@ pub struct VsCompiler {
     toolchains: ToolchainHolder,
 }
 
-impl VsCompiler {
-    #[must_use]
-    pub fn new() -> Self {
-        VsCompiler::default()
-    }
-}
-
 struct VsToolchain {
     path: PathBuf,
     identifier: Lazy<Option<String>>,

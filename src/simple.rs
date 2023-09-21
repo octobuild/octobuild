@@ -16,8 +16,8 @@ use crate::worker::{BuildAction, BuildGraph, BuildResult, BuildTask};
 #[must_use]
 pub fn supported_compilers() -> CompilerGroup {
     CompilerGroup::new()
-        .add(VsCompiler::new())
-        .add(ClangCompiler::new())
+        .add::<VsCompiler>()
+        .add::<ClangCompiler>()
 }
 
 pub fn simple_compile<C, F>(exec: &str, factory: F) -> i32
