@@ -806,12 +806,6 @@ impl ToolchainHolder {
         }
     }
 
-    #[must_use]
-    pub fn to_vec(&self) -> Vec<Arc<dyn Toolchain>> {
-        let read_lock = self.toolchains.read().unwrap();
-        read_lock.values().cloned().collect()
-    }
-
     pub fn resolve<F: FnOnce(PathBuf) -> Arc<dyn Toolchain>>(
         &self,
         path: &Path,
