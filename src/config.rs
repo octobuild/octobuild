@@ -59,7 +59,7 @@ impl Config {
         Ok(figment.merge(Env::prefixed("OCTOBUILD_")).extract()?)
     }
 
-    pub fn help(executable: &str) {
+    pub fn print_help(&self, executable: &str) {
         println!();
         println!("Usage:");
         println!("  {} <file>", executable);
@@ -80,14 +80,7 @@ impl Config {
         );
         println!();
         println!("Current configuration:");
-        match Config::load() {
-            Ok(c) => {
-                c.show();
-            }
-            Err(e) => {
-                println!("  ERROR: {e}");
-            }
-        }
+        self.show();
         println!();
     }
 

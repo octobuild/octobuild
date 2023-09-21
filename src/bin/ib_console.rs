@@ -27,12 +27,15 @@ pub fn main() -> octobuild::Result<()> {
     for arg in &args {
         println!("  {arg}");
     }
+
+    let config = Config::load()?;
+
     if args.len() == 1 {
-        Config::help(&args[0]);
+        config.print_help(&args[0]);
         return Ok(());
     }
 
-    process::exit(match execute(&args[1..]) {
+    process::exit(match execute(&config, &args[1..]) {
         Ok(_) => 0,
         Err(e) => {
             println!("ERROR: {e}");
@@ -41,9 +44,8 @@ pub fn main() -> octobuild::Result<()> {
     })
 }
 
-fn execute(args: &[String]) -> octobuild::Result<()> {
-    let config = Config::load()?;
-    let state = SharedState::new(&config)?;
+fn execute(config: &Config, args: &[String]) -> octobuild::Result<()> {
+    let state = SharedState::new(config)?;
     let compiler = RemoteCompiler::new(&config.coordinator, supported_compilers());
 
     match args.get(0) {
@@ -58,8 +60,7 @@ fn execute(args: &[String]) -> octobuild::Result<()> {
                 let mut graph = Graph::new();
                 let file = File::open(Path::new(&args[0]))?;
                 xg::parser::parse(&mut graph, BufReader::new(file))?;
-                let build_graph = validate_graph(graph)
-                    .and_then(|graph| prepare_graph(&compiler, &graph, &config))?;
+                let build_graph = prepare_graph(&compiler, validate_graph(graph)?, config)?;
 
                 let result =
                     execute_graph(&state, build_graph, config.process_limit, print_task_result);
@@ -77,7 +78,7 @@ fn env_resolver(name: &str) -> Option<String> {
 
 fn prepare_graph<C: Compiler>(
     compiler: &C,
-    graph: &XgGraph,
+    graph: XgGraph,
     config: &Config,
 ) -> octobuild::Result<BuildGraph> {
     let mut remap: Vec<NodeIndex> = Vec::with_capacity(graph.node_count());
