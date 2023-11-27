@@ -283,7 +283,7 @@ fn is_spaceable_param(flag: &str) -> Option<(&str, Scope, bool)> {
                     return Some((prefix, Scope::Ignore, false));
                 }
             }
-            for prefix in ["I", "MF", "isystem"] {
+            for prefix in ["F", "I", "MF", "isystem"] {
                 if flag.starts_with(prefix) {
                     return Some((prefix, Scope::Preprocessor, false));
                 }
