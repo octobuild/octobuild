@@ -95,9 +95,9 @@ pub fn create_tasks(
     let deps_file = parsed_args
         .iter()
         .find_map(|arg| match arg {
-            Arg::Param { flag, value, .. } if *flag == "MF" => {
-                Some(command.absolutize(Path::new(&value)))
-            }
+            Arg::Param {
+                name: flag, value, ..
+            } if *flag == "MF" => Some(command.absolutize(Path::new(&value))),
             _ => None,
         })
         .map_or(Ok(None), |v| v.map(Some))?;
@@ -105,7 +105,9 @@ pub fn create_tasks(
     // Language
     let language: Option<String> = match find_param(&parsed_args, |arg: &Arg| -> Option<String> {
         match arg {
-            Arg::Param { flag, value, .. } if *flag == "x" => Some(value.clone()),
+            Arg::Param {
+                name: flag, value, ..
+            } if *flag == "x" => Some(value.clone()),
             _ => None,
         }
     }) {
@@ -193,108 +195,247 @@ fn parse_arguments(args: &[String]) -> Result<Vec<Arg>, String> {
     Ok(result)
 }
 
-fn parse_argument(iter: &mut Iter<String>) -> Option<Result<Arg, String>> {
-    match iter.next() {
-        Some(arg) => Some(if arg.starts_with("--") {
-            let (key, value) = match arg.find('=') {
-                Some(position) => (&arg[1..position], arg[position + 1..].to_string()),
-                None => match iter.next() {
-                    Some(v) => (&arg[1..], v.clone()),
-                    _ => {
-                        return Some(Err(arg.to_string()));
-                    }
-                },
-            };
-            match &key[1..] {
-                "sysroot" => Ok(Arg::flag(Scope::Shared, key.to_string() + "=" + &value)),
-                "driver-mode" => Ok(Arg::flag(Scope::Shared, key.to_string() + "=" + &value)),
-                _ => Err(key.to_string()),
-            }
-        } else if has_param_prefix(arg) {
-            let flag = &arg[1..];
-            match is_spaceable_param(flag) {
-                Some((prefix, scope, next_flag)) => {
-                    let value = if flag == prefix {
-                        match iter.next() {
-                            Some(v) if next_flag == has_param_prefix(v) => v.to_string(),
-                            _ => {
-                                return Some(Err(arg.to_string()));
-                            }
-                        }
-                    } else {
-                        flag[prefix.len()..].to_string()
-                    };
-                    match flag {
-                        "D" => Ok(Arg::param(
-                            // Workaround for PS4/PS5
-                            if value.starts_with("DUMMY_DEFINE") {
-                                Scope::Ignore
-                            } else {
-                                scope
-                            },
-                            prefix,
-                            value,
-                            true,
-                        )),
-                        "o" => Ok(Arg::output(OutputKind::Object, prefix, value)),
-                        _ => Ok(Arg::param(scope, prefix, value, true)),
-                    }
-                }
-                None => match flag {
-                    "c" => Ok(Arg::flag(Scope::Ignore, flag)),
-                    "pipe" | "nostdinc++" => Ok(Arg::flag(Scope::Shared, flag)),
-                    "MD" => Ok(Arg::flag(Scope::Preprocessor, flag)),
-                    s if s.starts_with('f')
-                        || s.starts_with('g')
-                        || s.starts_with('O')
-                        || s.starts_with('m')
-                        || s.starts_with("stdlib=")
-                        || s.starts_with("std=") =>
-                    {
-                        Ok(Arg::flag(Scope::Shared, flag))
-                    }
-                    s if s.starts_with('W') => Ok(Arg::flag(Scope::Compiler, flag)),
-                    _ => Err(arg.to_string()),
-                },
-            }
-        } else {
-            Ok(Arg::input(
-                InputKind::Source,
-                String::new(),
-                arg.to_string(),
-            ))
-        }),
-        None => None,
-    }
+struct CompilerArgument {
+    scope: Scope,
+    name: &'static str,
+    value_type: &'static [ArgValueType],
 }
 
-fn is_spaceable_param(flag: &str) -> Option<(&str, Scope, bool)> {
-    match flag {
-        "include" | "include-pch" | "isysroot" => Some((flag, Scope::Preprocessor, false)),
-        "arch" | "target" => Some((flag, Scope::Shared, false)),
-        _ => {
-            for prefix in ["D", "o"] {
-                if flag.starts_with(prefix) {
-                    return Some((prefix, Scope::Shared, false));
+enum ArgValueType {
+    None,
+    Separate,
+    Combined,
+    StartsWith,
+}
+
+const NORMAL: &[ArgValueType] = &[ArgValueType::Separate, ArgValueType::Combined];
+const NONE: &[ArgValueType] = &[ArgValueType::None];
+const PSYCHEDELIC: &[ArgValueType] = &[ArgValueType::StartsWith, ArgValueType::Separate];
+const STARTS_WITH: &[ArgValueType] = &[ArgValueType::StartsWith];
+const SEPARATE: &[ArgValueType] = &[ArgValueType::Separate];
+
+static DASH_DASH_PARAMS: &[CompilerArgument] = &[
+    CompilerArgument {
+        scope: Scope::Shared,
+        name: "driver-mode",
+        value_type: NORMAL,
+    },
+    CompilerArgument {
+        scope: Scope::Shared,
+        name: "gcc-toolchain",
+        value_type: NORMAL,
+    },
+    CompilerArgument {
+        scope: Scope::Shared,
+        name: "no-canonical-prefixes",
+        value_type: NONE,
+    },
+    CompilerArgument {
+        scope: Scope::Shared,
+        name: "sysroot",
+        value_type: NORMAL,
+    },
+];
+
+static DASH_PARAMS: &[CompilerArgument] = &[
+    // Shared
+    CompilerArgument {
+        scope: Scope::Shared,
+        name: "arch",
+        value_type: NORMAL,
+    },
+    CompilerArgument {
+        scope: Scope::Shared,
+        name: "D",
+        value_type: PSYCHEDELIC,
+    },
+    CompilerArgument {
+        scope: Scope::Shared,
+        name: "f",
+        value_type: STARTS_WITH,
+    },
+    CompilerArgument {
+        scope: Scope::Shared,
+        name: "g",
+        value_type: STARTS_WITH,
+    },
+    CompilerArgument {
+        scope: Scope::Shared,
+        name: "m",
+        value_type: STARTS_WITH,
+    },
+    CompilerArgument {
+        scope: Scope::Shared,
+        name: "nostdinc++",
+        value_type: NONE,
+    },
+    CompilerArgument {
+        scope: Scope::Shared,
+        name: "O",
+        value_type: STARTS_WITH,
+    },
+    CompilerArgument {
+        scope: Scope::Shared,
+        name: "o",
+        value_type: SEPARATE,
+    },
+    CompilerArgument {
+        scope: Scope::Shared,
+        name: "pipe",
+        value_type: NONE,
+    },
+    CompilerArgument {
+        scope: Scope::Shared,
+        name: "std",
+        value_type: NORMAL,
+    },
+    CompilerArgument {
+        scope: Scope::Shared,
+        name: "stdlib",
+        value_type: NORMAL,
+    },
+    CompilerArgument {
+        scope: Scope::Shared,
+        name: "target",
+        value_type: NORMAL,
+    },
+    // Preprocessor
+    CompilerArgument {
+        scope: Scope::Preprocessor,
+        name: "F",
+        value_type: STARTS_WITH,
+    },
+    CompilerArgument {
+        scope: Scope::Preprocessor,
+        name: "I",
+        value_type: PSYCHEDELIC,
+    },
+    CompilerArgument {
+        scope: Scope::Preprocessor,
+        name: "include",
+        value_type: NORMAL,
+    },
+    CompilerArgument {
+        scope: Scope::Preprocessor,
+        name: "include-pch",
+        value_type: NORMAL,
+    },
+    CompilerArgument {
+        scope: Scope::Preprocessor,
+        name: "isysroot",
+        value_type: NORMAL,
+    },
+    CompilerArgument {
+        scope: Scope::Preprocessor,
+        name: "isystem",
+        value_type: NORMAL,
+    },
+    CompilerArgument {
+        scope: Scope::Preprocessor,
+        name: "MD",
+        value_type: NONE,
+    },
+    CompilerArgument {
+        scope: Scope::Preprocessor,
+        name: "MF",
+        value_type: NONE,
+    },
+    // Compiler
+    CompilerArgument {
+        scope: Scope::Compiler,
+        name: "W",
+        value_type: PSYCHEDELIC,
+    },
+    // Ignore
+    CompilerArgument {
+        scope: Scope::Ignore,
+        name: "c",
+        value_type: NONE,
+    },
+    CompilerArgument {
+        scope: Scope::Ignore,
+        name: "x",
+        value_type: NORMAL,
+    },
+];
+
+fn handle_argument(
+    prefix: &'static str,
+    key: &str,
+    params: &[CompilerArgument],
+    iter: &mut Iter<String>,
+) -> Option<Arg> {
+    for param in params {
+        for value_type in param.value_type {
+            match value_type {
+                ArgValueType::None => {
+                    if key == param.name {
+                        return Some(Arg::flag(param.scope, prefix, key));
+                    }
+                }
+                ArgValueType::Separate => {
+                    if key == param.name {
+                        return iter
+                            .next()
+                            .map(|v| Arg::param(param.scope, prefix, param.name, v));
+                    }
+                }
+                ArgValueType::Combined => {
+                    if key.starts_with(format!("{}=", param.name).as_str()) {
+                        return Some(Arg::param(
+                            param.scope,
+                            prefix,
+                            param.name,
+                            &key[param.name.len() + 1..],
+                        ));
+                    }
+                }
+                ArgValueType::StartsWith => {
+                    if let Some(v) = key.strip_prefix(param.name) {
+                        if !v.is_empty() {
+                            return Some(Arg::param(param.scope, prefix, param.name, v));
+                        }
+                    }
                 }
             }
-            for prefix in ["x"] {
-                if flag.starts_with(prefix) {
-                    return Some((prefix, Scope::Ignore, false));
-                }
-            }
-            for prefix in ["F", "I", "MF", "isystem"] {
-                if flag.starts_with(prefix) {
-                    return Some((prefix, Scope::Preprocessor, false));
-                }
-            }
-            None
         }
     }
+
+    None
 }
 
-fn has_param_prefix(arg: &str) -> bool {
-    arg.starts_with('-')
+fn parse_argument(iter: &mut Iter<String>) -> Option<Result<Arg, String>> {
+    iter.next().map(|arg| {
+        if let Some(key) = arg.strip_prefix("--") {
+            match handle_argument("--", key, DASH_DASH_PARAMS, iter) {
+                Some(v) => Ok(v),
+                None => Err(arg.to_string()),
+            }
+        } else if let Some(key) = arg.strip_prefix('-') {
+            match handle_argument("-", key, DASH_PARAMS, iter) {
+                Some(v) => match &v {
+                    Arg::Param {
+                        scope: _,
+                        prefix: _,
+                        name: flag,
+                        value,
+                        form: _,
+                    } => {
+                        if flag == "o" {
+                            // Minor hack
+                            Ok(Arg::output(OutputKind::Object, flag, value))
+                        } else {
+                            Ok(v)
+                        }
+                    }
+                    _ => Ok(v),
+                },
+                None => Err(arg.to_string()),
+            }
+        } else {
+            Ok(Arg::input(InputKind::Source, arg.to_string()))
+        }
+    })
 }
 
 #[test]
@@ -303,6 +444,7 @@ fn test_parse_argument_precompile() {
         "-x c++-header -pipe -Wall -Werror -funwind-tables -Wsequence-point -mmmx -msse -msse2 \
          -fno-math-errno -fno-rtti -g3 -gdwarf-3 -O2 -D_LINUX64 -IEngine/Source \
          -IDeveloper/Public -I Runtime/Core/Private -D IS_PROGRAM=1 -D UNICODE \
+         -MD -nostdinc++ --gcc-toolchain=/bla/bla --no-canonical-prefixes \
          -DIS_MONOLITHIC=1 -std=c++11 -o CorePrivatePCH.h.pch CorePrivatePCH.h"
             .split(' ')
             .map(|x| x.to_string())
@@ -310,30 +452,34 @@ fn test_parse_argument_precompile() {
     assert_eq!(
         parse_arguments(&args).unwrap(),
         [
-            Arg::param(Scope::Ignore, "x", "c++-header", true),
-            Arg::flag(Scope::Shared, "pipe"),
-            Arg::flag(Scope::Compiler, "Wall"),
-            Arg::flag(Scope::Compiler, "Werror"),
-            Arg::flag(Scope::Shared, "funwind-tables"),
-            Arg::flag(Scope::Compiler, "Wsequence-point"),
-            Arg::flag(Scope::Shared, "mmmx"),
-            Arg::flag(Scope::Shared, "msse"),
-            Arg::flag(Scope::Shared, "msse2"),
-            Arg::flag(Scope::Shared, "fno-math-errno"),
-            Arg::flag(Scope::Shared, "fno-rtti"),
-            Arg::flag(Scope::Shared, "g3"),
-            Arg::flag(Scope::Shared, "gdwarf-3"),
-            Arg::flag(Scope::Shared, "O2"),
-            Arg::param(Scope::Shared, "D", "_LINUX64", true),
-            Arg::param(Scope::Preprocessor, "I", "Engine/Source", true),
-            Arg::param(Scope::Preprocessor, "I", "Developer/Public", true),
-            Arg::param(Scope::Preprocessor, "I", "Runtime/Core/Private", true),
-            Arg::param(Scope::Shared, "D", "IS_PROGRAM=1", true),
-            Arg::param(Scope::Shared, "D", "UNICODE", true),
-            Arg::param(Scope::Shared, "D", "IS_MONOLITHIC=1", true),
-            Arg::flag(Scope::Shared, "std=c++11"),
+            Arg::param(Scope::Ignore, "-", "x", "c++-header"),
+            Arg::flag(Scope::Shared, "-", "pipe"),
+            Arg::param(Scope::Compiler, "-", "W", "all"),
+            Arg::param(Scope::Compiler, "-", "W", "error"),
+            Arg::param(Scope::Shared, "-", "f", "unwind-tables"),
+            Arg::param(Scope::Compiler, "-", "W", "sequence-point"),
+            Arg::param(Scope::Shared, "-", "m", "mmx"),
+            Arg::param(Scope::Shared, "-", "m", "sse"),
+            Arg::param(Scope::Shared, "-", "m", "sse2"),
+            Arg::param(Scope::Shared, "-", "f", "no-math-errno"),
+            Arg::param(Scope::Shared, "-", "f", "no-rtti"),
+            Arg::param(Scope::Shared, "-", "g", "3"),
+            Arg::param(Scope::Shared, "-", "g", "dwarf-3"),
+            Arg::param(Scope::Shared, "-", "O", "2"),
+            Arg::param(Scope::Shared, "-", "D", "_LINUX64"),
+            Arg::param(Scope::Preprocessor, "-", "I", "Engine/Source"),
+            Arg::param(Scope::Preprocessor, "-", "I", "Developer/Public"),
+            Arg::param(Scope::Preprocessor, "-", "I", "Runtime/Core/Private"),
+            Arg::param(Scope::Shared, "-", "D", "IS_PROGRAM=1"),
+            Arg::param(Scope::Shared, "-", "D", "UNICODE"),
+            Arg::flag(Scope::Preprocessor, "-", "MD"),
+            Arg::flag(Scope::Shared, "-", "nostdinc++"),
+            Arg::param(Scope::Shared, "--", "gcc-toolchain", "/bla/bla"),
+            Arg::flag(Scope::Shared, "--", "no-canonical-prefixes"),
+            Arg::param(Scope::Shared, "-", "D", "IS_MONOLITHIC=1"),
+            Arg::param(Scope::Shared, "-", "std", "c++11"),
             Arg::output(OutputKind::Object, "o", "CorePrivatePCH.h.pch"),
-            Arg::input(InputKind::Source, "", "CorePrivatePCH.h")
+            Arg::input(InputKind::Source, "CorePrivatePCH.h")
         ]
     )
 }
@@ -352,35 +498,35 @@ fn test_parse_argument_compile() {
     assert_eq!(
         parse_arguments(&args).unwrap(),
         [
-            Arg::flag(Scope::Ignore, "c"),
+            Arg::flag(Scope::Ignore, "-", "c"),
             Arg::param(
                 Scope::Preprocessor,
+                "-",
                 "include-pch",
                 "CorePrivatePCH.h.pch",
-                true
             ),
-            Arg::flag(Scope::Shared, "pipe"),
-            Arg::flag(Scope::Compiler, "Wall"),
-            Arg::flag(Scope::Compiler, "Werror"),
-            Arg::flag(Scope::Shared, "funwind-tables"),
-            Arg::flag(Scope::Compiler, "Wsequence-point"),
-            Arg::flag(Scope::Shared, "mmmx"),
-            Arg::flag(Scope::Shared, "msse"),
-            Arg::flag(Scope::Shared, "msse2"),
-            Arg::flag(Scope::Shared, "fno-math-errno"),
-            Arg::flag(Scope::Shared, "fno-rtti"),
-            Arg::flag(Scope::Shared, "g3"),
-            Arg::flag(Scope::Shared, "gdwarf-3"),
-            Arg::flag(Scope::Shared, "O2"),
-            Arg::param(Scope::Shared, "D", "IS_PROGRAM=1", true),
-            Arg::param(Scope::Shared, "D", "UNICODE", true),
-            Arg::param(Scope::Shared, "D", "IS_MONOLITHIC=1", true),
-            Arg::param(Scope::Ignore, "x", "c++", true),
-            Arg::flag(Scope::Shared, "std=c++11"),
-            Arg::param(Scope::Preprocessor, "include", "CorePrivatePCH.h", true),
-            Arg::flag(Scope::Shared, "-driver-mode=g++"),
+            Arg::flag(Scope::Shared, "-", "pipe"),
+            Arg::param(Scope::Compiler, "-", "W", "all"),
+            Arg::param(Scope::Compiler, "-", "W", "error"),
+            Arg::param(Scope::Shared, "-", "f", "unwind-tables"),
+            Arg::param(Scope::Compiler, "-", "W", "sequence-point"),
+            Arg::param(Scope::Shared, "-", "m", "mmx"),
+            Arg::param(Scope::Shared, "-", "m", "sse"),
+            Arg::param(Scope::Shared, "-", "m", "sse2"),
+            Arg::param(Scope::Shared, "-", "f", "no-math-errno"),
+            Arg::param(Scope::Shared, "-", "f", "no-rtti"),
+            Arg::param(Scope::Shared, "-", "g", "3"),
+            Arg::param(Scope::Shared, "-", "g", "dwarf-3"),
+            Arg::param(Scope::Shared, "-", "O", "2"),
+            Arg::param(Scope::Shared, "-", "D", "IS_PROGRAM=1"),
+            Arg::param(Scope::Shared, "-", "D", "UNICODE"),
+            Arg::param(Scope::Shared, "-", "D", "IS_MONOLITHIC=1"),
+            Arg::param(Scope::Ignore, "-", "x", "c++"),
+            Arg::param(Scope::Shared, "-", "std", "c++11"),
+            Arg::param(Scope::Preprocessor, "-", "include", "CorePrivatePCH.h"),
+            Arg::param(Scope::Shared, "--", "driver-mode", "g++"),
             Arg::output(OutputKind::Object, "o", "Module.Core.cpp.o"),
-            Arg::input(InputKind::Source, "", "Module.Core.cpp")
+            Arg::input(InputKind::Source, "Module.Core.cpp")
         ]
     )
 }

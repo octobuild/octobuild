@@ -81,60 +81,86 @@ pub enum OutputKind {
 }
 
 #[derive(Debug, Eq, PartialEq)]
+pub enum ParamForm {
+    Separate,
+    Smushed,
+}
+
+#[derive(Debug, Eq, PartialEq)]
 pub enum Arg {
     Flag {
         scope: Scope,
-        flag: String,
+        prefix: &'static str,
+        name: String,
     },
     Param {
         scope: Scope,
-        flag: String,
+        prefix: &'static str,
+        name: String,
         value: String,
-        spaceable: bool,
+        form: ParamForm,
     },
     Input {
         kind: InputKind,
-        flag: String,
         file: String,
     },
     Output {
         kind: OutputKind,
-        flag: String,
+        name: String,
         file: String,
     },
 }
 
 impl Arg {
-    pub fn flag(scope: Scope, flag: impl Into<String>) -> Arg {
+    pub fn flag(scope: Scope, prefix: &'static str, flag: impl Into<String>) -> Arg {
         Arg::Flag {
             scope,
-            flag: flag.into(),
+            prefix,
+            name: flag.into(),
         }
     }
+
     pub fn param(
         scope: Scope,
-        flag: impl Into<String>,
+        prefix: &'static str,
+        name: impl Into<String>,
         value: impl Into<String>,
-        spaceable: bool,
     ) -> Arg {
         Arg::Param {
             scope,
-            flag: flag.into(),
+            prefix,
+            name: name.into(),
             value: value.into(),
-            spaceable,
+            form: ParamForm::Separate,
         }
     }
-    pub fn input(kind: InputKind, flag: impl Into<String>, file: impl Into<String>) -> Arg {
+
+    pub fn param_ext(
+        scope: Scope,
+        prefix: &'static str,
+        name: impl Into<String>,
+        value: impl Into<String>,
+        form: ParamForm,
+    ) -> Arg {
+        Arg::Param {
+            scope,
+            prefix,
+            name: name.into(),
+            value: value.into(),
+            form,
+        }
+    }
+
+    pub fn input(kind: InputKind, file: impl Into<String>) -> Arg {
         Arg::Input {
             kind,
-            flag: flag.into(),
             file: file.into(),
         }
     }
-    pub fn output(kind: OutputKind, flag: impl Into<String>, file: impl Into<String>) -> Arg {
+    pub fn output(kind: OutputKind, name: impl Into<String>, file: impl Into<String>) -> Arg {
         Arg::Output {
             kind,
-            flag: flag.into(),
+            name: name.into(),
             file: file.into(),
         }
     }

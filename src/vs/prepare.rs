@@ -4,7 +4,7 @@ use std::sync::Arc;
 
 use crate::compiler::{
     Arg, CommandInfo, CompilationArgs, CompilationTask, InputKind, OutputKind, PCHArgs, PCHUsage,
-    Scope,
+    ParamForm, Scope,
 };
 use crate::utils::{expand_response_files, find_param, ParamValue};
 
@@ -114,7 +114,7 @@ pub fn create_tasks(
     // Language
     let language: Option<String> = match find_param(&parsed_args, |arg: &Arg| -> Option<String> {
         match arg {
-            Arg::Param { flag, value, .. } if *flag == "T" => Some(value.clone()),
+            Arg::Param { name, value, .. } if *name == "T" => Some(value.clone()),
             _ => None,
         }
     }) {
@@ -223,26 +223,38 @@ fn parse_argument<S: AsRef<str>, I: Iterator<Item = S>>(
         if has_param_prefix(arg.as_ref()) {
             let flag = &arg.as_ref()[1..];
             match is_spaceable_param(flag) {
-                Some((prefix, scope)) => {
-                    if flag == prefix {
+                Some((key, scope)) => {
+                    if flag == key {
                         match iter.next() {
                             Some(value) => {
                                 if has_param_prefix(value.as_ref()) {
                                     Err(arg.as_ref().to_string())
                                 } else {
-                                    Ok(Arg::param(scope, prefix, value.as_ref(), true))
+                                    Ok(Arg::param_ext(
+                                        scope,
+                                        "/",
+                                        key,
+                                        value.as_ref(),
+                                        ParamForm::Separate,
+                                    ))
                                 }
                             }
                             _ => Err(arg.as_ref().to_string()),
                         }
                     } else {
-                        Ok(Arg::param(scope, prefix, &flag[prefix.len()..], false))
+                        Ok(Arg::param_ext(
+                            scope,
+                            "/",
+                            key,
+                            &flag[key.len()..],
+                            ParamForm::Smushed,
+                        ))
                     }
                 }
                 None => match flag {
-                    "c" | "nologo" => Ok(Arg::flag(Scope::Ignore, flag)),
+                    "c" | "nologo" => Ok(Arg::flag(Scope::Ignore, "/", flag)),
 
-                    "bigobj" => Ok(Arg::flag(Scope::Compiler, flag)),
+                    "bigobj" => Ok(Arg::flag(Scope::Compiler, "/", flag)),
 
                     "FC"
                     | "d2vzeroupper"
@@ -250,47 +262,58 @@ fn parse_argument<S: AsRef<str>, I: Iterator<Item = S>>(
                     | "fastfail"
                     | "utf-8"
                     | "permissive-"
-                    | "experimental:deterministic" => Ok(Arg::flag(Scope::Shared, flag)),
+                    | "experimental:deterministic" => Ok(Arg::flag(Scope::Shared, "/", flag)),
 
-                    "X" => Ok(Arg::flag(Scope::Preprocessor, flag)),
+                    "X" => Ok(Arg::flag(Scope::Preprocessor, "/", flag)),
 
-                    s if s.starts_with('T') => Ok(Arg::param(Scope::Ignore, "T", &s[1..], false)),
-                    s if s.starts_with('O') => Ok(Arg::flag(Scope::Shared, flag)),
-                    s if s.starts_with('G') => Ok(Arg::flag(Scope::Shared, flag)),
-                    s if s.starts_with("RTC") => Ok(Arg::flag(Scope::Shared, flag)),
-                    s if s.starts_with('Z') => Ok(Arg::flag(Scope::Shared, flag)),
-                    s if s.starts_with("d2Zi+") => Ok(Arg::flag(Scope::Shared, flag)),
-                    s if s.starts_with("std:") => Ok(Arg::flag(Scope::Shared, flag)),
-                    s if s.starts_with("MP") => Ok(Arg::flag(Scope::Compiler, flag)),
-                    s if s.starts_with("fsanitize=") => Ok(Arg::flag(Scope::Shared, flag)),
-                    s if s.starts_with("MD") => Ok(Arg::flag(Scope::Shared, flag)),
-                    s if s.starts_with("MT") => Ok(Arg::flag(Scope::Shared, flag)),
-                    s if s.starts_with("EH") => Ok(Arg::flag(Scope::Shared, flag)),
-                    s if s.starts_with("fp:") => Ok(Arg::flag(Scope::Shared, flag)),
-                    s if s.starts_with("arch:") => Ok(Arg::flag(Scope::Shared, flag)),
-                    s if s.starts_with("errorReport:") => Ok(Arg::flag(Scope::Shared, flag)),
-                    s if s.starts_with("source-charset:") => Ok(Arg::flag(Scope::Shared, flag)),
-                    s if s.starts_with("execution-charset:") => Ok(Arg::flag(Scope::Shared, flag)),
-                    s if s.starts_with("external:W") => Ok(Arg::flag(Scope::Shared, flag)),
-                    s if s.starts_with("favor:") => Ok(Arg::flag(Scope::Shared, flag)),
+                    s if s.starts_with('T') => Ok(Arg::param_ext(
+                        Scope::Ignore,
+                        "/",
+                        "T",
+                        &s[1..],
+                        ParamForm::Smushed,
+                    )),
+                    s if s.starts_with('O') => Ok(Arg::flag(Scope::Shared, "/", flag)),
+                    s if s.starts_with('G') => Ok(Arg::flag(Scope::Shared, "/", flag)),
+                    s if s.starts_with("RTC") => Ok(Arg::flag(Scope::Shared, "/", flag)),
+                    s if s.starts_with('Z') => Ok(Arg::flag(Scope::Shared, "/", flag)),
+                    s if s.starts_with("d2Zi+") => Ok(Arg::flag(Scope::Shared, "/", flag)),
+                    s if s.starts_with("std:") => Ok(Arg::flag(Scope::Shared, "/", flag)),
+                    s if s.starts_with("MP") => Ok(Arg::flag(Scope::Compiler, "/", flag)),
+                    s if s.starts_with("fsanitize=") => Ok(Arg::flag(Scope::Shared, "/", flag)),
+                    s if s.starts_with("MD") => Ok(Arg::flag(Scope::Shared, "/", flag)),
+                    s if s.starts_with("MT") => Ok(Arg::flag(Scope::Shared, "/", flag)),
+                    s if s.starts_with("EH") => Ok(Arg::flag(Scope::Shared, "/", flag)),
+                    s if s.starts_with("fp:") => Ok(Arg::flag(Scope::Shared, "/", flag)),
+                    s if s.starts_with("arch:") => Ok(Arg::flag(Scope::Shared, "/", flag)),
+                    s if s.starts_with("errorReport:") => Ok(Arg::flag(Scope::Shared, "/", flag)),
+                    s if s.starts_with("source-charset:") => {
+                        Ok(Arg::flag(Scope::Shared, "/", flag))
+                    }
+                    s if s.starts_with("execution-charset:") => {
+                        Ok(Arg::flag(Scope::Shared, "/", flag))
+                    }
+                    s if s.starts_with("external:W") => Ok(Arg::flag(Scope::Shared, "/", flag)),
+                    s if s.starts_with("favor:") => Ok(Arg::flag(Scope::Shared, "/", flag)),
                     s if s.starts_with("Fo") => Ok(Arg::output(OutputKind::Object, "Fo", &s[2..])),
-                    s if s.starts_with("Fp") => {
-                        Ok(Arg::input(InputKind::Precompiled, "Fp", &s[2..]))
-                    }
+                    s if s.starts_with("Fp") => Ok(Arg::input(InputKind::Precompiled, &s[2..])),
                     s if s.starts_with("Yc") => Ok(Arg::output(OutputKind::Marker, "Yc", &s[2..])),
-                    s if s.starts_with("Yu") => Ok(Arg::input(InputKind::Marker, "Yu", &s[2..])),
-                    s if s.starts_with("Yl") => Ok(Arg::flag(Scope::Shared, flag)),
-                    s if s.starts_with("FI") => {
-                        Ok(Arg::param(Scope::Preprocessor, "FI", &s[2..], false))
-                    }
-                    s if s.starts_with("analyze") => Ok(Arg::flag(Scope::Shared, flag)),
+                    s if s.starts_with("Yu") => Ok(Arg::input(InputKind::Marker, &s[2..])),
+                    s if s.starts_with("Yl") => Ok(Arg::flag(Scope::Shared, "/", flag)),
+                    s if s.starts_with("FI") => Ok(Arg::param_ext(
+                        Scope::Preprocessor,
+                        "/",
+                        "FI",
+                        &s[2..],
+                        ParamForm::Smushed,
+                    )),
+                    s if s.starts_with("analyze") => Ok(Arg::flag(Scope::Shared, "/", flag)),
                     _ => Err(arg.as_ref().to_string()),
                 },
             }
         } else {
             Ok(Arg::Input {
                 kind: InputKind::Source,
-                flag: String::new(),
                 file: arg.as_ref().to_string(),
             })
         }
@@ -331,16 +354,16 @@ fn test_parse_argument() {
     assert_eq!(
         parse_arguments(args.iter()).unwrap(),
         [
-            Arg::param(Scope::Ignore, "T", "P", false),
-            Arg::flag(Scope::Ignore, "c"),
-            Arg::input(InputKind::Marker, "Yu", "sample.h"),
-            Arg::input(InputKind::Precompiled, "Fp", "sample.h.pch"),
+            Arg::param_ext(Scope::Ignore, "/", "T", "P", ParamForm::Smushed),
+            Arg::flag(Scope::Ignore, "/", "c"),
+            Arg::input(InputKind::Marker, "sample.h"),
+            Arg::input(InputKind::Precompiled, "sample.h.pch"),
             Arg::output(OutputKind::Object, "Fo", "sample.cpp.o"),
-            Arg::param(Scope::Shared, "D", "TEST", false),
-            Arg::param(Scope::Shared, "D", "TEST2", true),
-            Arg::flag(Scope::Shared, "arch:AVX"),
-            Arg::flag(Scope::Shared, "fsanitize=address"),
-            Arg::input(InputKind::Source, "", "sample.cpp")
+            Arg::param_ext(Scope::Shared, "/", "D", "TEST", ParamForm::Smushed),
+            Arg::param_ext(Scope::Shared, "/", "D", "TEST2", ParamForm::Separate),
+            Arg::flag(Scope::Shared, "/", "arch:AVX"),
+            Arg::flag(Scope::Shared, "/", "fsanitize=address"),
+            Arg::input(InputKind::Source, "sample.cpp")
         ]
     )
 }

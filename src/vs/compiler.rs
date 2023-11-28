@@ -2,7 +2,8 @@ use crate::cmd;
 use crate::compiler::CompileInput::{Preprocessed, Source};
 use crate::compiler::{
     Arg, CommandInfo, CompilationTask, CompileStep, Compiler, CompilerOutput, OsCommandArgs,
-    OutputInfo, PCHUsage, PreprocessResult, Scope, SharedState, Toolchain, ToolchainHolder,
+    OutputInfo, PCHUsage, ParamForm, PreprocessResult, Scope, SharedState, Toolchain,
+    ToolchainHolder,
 };
 use crate::io::memstream::MemStream;
 use crate::io::tempfile::TempFile;
@@ -131,23 +132,32 @@ fn collect_args(
 
     for arg in args {
         match arg {
-            Arg::Flag { scope, flag } => {
+            Arg::Flag {
+                scope,
+                prefix,
+                name: flag,
+            } => {
                 if scope.matches(target_scope, run_second_cpp, output_precompiled) {
-                    into.push(OsString::from(format!("/{flag}")));
+                    into.push(OsString::from(format!("{prefix}{flag}")));
                 }
             }
             Arg::Param {
                 scope,
-                flag,
+                prefix,
+                name: flag,
                 value,
-                spaceable: needs_space,
+                form,
             } => {
                 if scope.matches(target_scope, run_second_cpp, output_precompiled) {
-                    if *needs_space {
-                        into.push(OsString::from("/").concat(flag));
-                        into.push(quote(value));
-                    } else {
-                        into.push(OsString::from("/").concat(flag).concat(quote(value)));
+                    match form {
+                        ParamForm::Separate => {
+                            into.push(OsString::from(prefix).concat(flag));
+                            // TODO: Why quote?
+                            into.push(quote(value));
+                        }
+                        ParamForm::Smushed => {
+                            into.push(OsString::from(prefix).concat(flag).concat(quote(value)));
+                        }
                     }
                 }
             }

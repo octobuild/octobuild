@@ -79,19 +79,24 @@ fn collect_args(
 ) {
     for arg in args {
         match arg {
-            Arg::Flag { scope, flag } => {
+            Arg::Flag {
+                scope,
+                prefix,
+                name: flag,
+            } => {
                 if scope.matches(target_scope, run_second_cpp, output_precompiled) {
-                    into.push(OsString::from(format!("-{flag}")));
+                    into.push(OsString::from(format!("{prefix}{flag}")));
                 }
             }
             Arg::Param {
                 scope,
-                flag,
+                prefix,
+                name: flag,
                 value,
-                spaceable: _spaceable,
+                form: _,
             } => {
                 if scope.matches(target_scope, run_second_cpp, output_precompiled) {
-                    into.push(OsString::from(format!("-{flag}")));
+                    into.push(OsString::from(format!("{prefix}{flag}")));
                     into.push(OsString::from(value));
                 }
             }

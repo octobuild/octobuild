@@ -4,6 +4,7 @@
 == Unreleased
 
 - Add `clang -F<path>` support for macOS
+- Add support for Android
 
 == 0.8.0
 
