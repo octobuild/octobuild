@@ -227,11 +227,6 @@ static DASH_DASH_PARAMS: &[CompilerArgument] = &[
     },
     CompilerArgument {
         scope: Scope::Shared,
-        name: "no-canonical-prefixes",
-        value_type: NONE,
-    },
-    CompilerArgument {
-        scope: Scope::Shared,
         name: "sysroot",
         value_type: NORMAL,
     },
@@ -263,6 +258,11 @@ static DASH_PARAMS: &[CompilerArgument] = &[
         scope: Scope::Shared,
         name: "m",
         value_type: STARTS_WITH,
+    },
+    CompilerArgument {
+        scope: Scope::Shared,
+        name: "no-canonical-prefixes",
+        value_type: NONE,
     },
     CompilerArgument {
         scope: Scope::Shared,
@@ -444,7 +444,7 @@ fn test_parse_argument_precompile() {
         "-x c++-header -pipe -Wall -Werror -funwind-tables -Wsequence-point -mmmx -msse -msse2 \
          -fno-math-errno -fno-rtti -g3 -gdwarf-3 -O2 -D_LINUX64 -IEngine/Source \
          -IDeveloper/Public -I Runtime/Core/Private -D IS_PROGRAM=1 -D UNICODE \
-         -MD -nostdinc++ --gcc-toolchain=/bla/bla --no-canonical-prefixes \
+         -MD -nostdinc++ --gcc-toolchain=/bla/bla -no-canonical-prefixes \
          -MFpath/to/file \
          -DIS_MONOLITHIC=1 -std=c++11 -o CorePrivatePCH.h.pch CorePrivatePCH.h"
             .split(' ')
@@ -476,7 +476,7 @@ fn test_parse_argument_precompile() {
             Arg::flag(Scope::Preprocessor, "-", "MD"),
             Arg::flag(Scope::Shared, "-", "nostdinc++"),
             Arg::param(Scope::Shared, "--", "gcc-toolchain", "/bla/bla"),
-            Arg::flag(Scope::Shared, "--", "no-canonical-prefixes"),
+            Arg::flag(Scope::Shared, "-", "no-canonical-prefixes"),
             Arg::param(Scope::Preprocessor, "-", "MF", "path/to/file"),
             Arg::param(Scope::Shared, "-", "D", "IS_MONOLITHIC=1"),
             Arg::param(Scope::Shared, "-", "std", "c++11"),
