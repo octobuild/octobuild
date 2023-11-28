@@ -210,6 +210,7 @@ enum ArgValueType {
 
 const NORMAL: &[ArgValueType] = &[ArgValueType::Separate, ArgValueType::Combined];
 const NONE: &[ArgValueType] = &[ArgValueType::None];
+const COMBINED: &[ArgValueType] = &[ArgValueType::Combined];
 const PSYCHEDELIC: &[ArgValueType] = &[ArgValueType::StartsWith, ArgValueType::Separate];
 const STARTS_WITH: &[ArgValueType] = &[ArgValueType::StartsWith];
 const SEPARATE: &[ArgValueType] = &[ArgValueType::Separate];
@@ -229,6 +230,12 @@ static DASH_DASH_PARAMS: &[CompilerArgument] = &[
         scope: Scope::Shared,
         name: "sysroot",
         value_type: NORMAL,
+    },
+    // Hack for Android
+    CompilerArgument {
+        scope: Scope::Shared,
+        name: "target",
+        value_type: COMBINED,
     },
 ];
 
@@ -446,6 +453,7 @@ fn test_parse_argument_precompile() {
          -IDeveloper/Public -I Runtime/Core/Private -D IS_PROGRAM=1 -D UNICODE \
          -MD -nostdinc++ --gcc-toolchain=/bla/bla -no-canonical-prefixes \
          -MFpath/to/file \
+         --target=bla \
          -DIS_MONOLITHIC=1 -std=c++11 -o CorePrivatePCH.h.pch CorePrivatePCH.h"
             .split(' ')
             .map(|x| x.to_string())
@@ -478,6 +486,7 @@ fn test_parse_argument_precompile() {
             Arg::param(Scope::Shared, "--", "gcc-toolchain", "/bla/bla"),
             Arg::flag(Scope::Shared, "-", "no-canonical-prefixes"),
             Arg::param(Scope::Preprocessor, "-", "MF", "path/to/file"),
+            Arg::param(Scope::Shared, "--", "target", "bla"),
             Arg::param(Scope::Shared, "-", "D", "IS_MONOLITHIC=1"),
             Arg::param(Scope::Shared, "-", "std", "c++11"),
             Arg::output(OutputKind::Object, "o", "CorePrivatePCH.h.pch"),
