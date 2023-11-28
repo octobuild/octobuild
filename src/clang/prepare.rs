@@ -3,7 +3,8 @@ use std::slice::Iter;
 use std::sync::Arc;
 
 use crate::compiler::{
-    Arg, CommandInfo, CompilationArgs, CompilationTask, InputKind, OutputKind, PCHUsage, Scope,
+    Arg, CommandInfo, CompilationArgs, CompilationTask, InputKind, OutputKind, PCHUsage, ParamForm,
+    Scope,
 };
 use crate::utils::{expand_response_files, find_param, ParamValue};
 
@@ -201,6 +202,7 @@ struct CompilerArgument {
     value_type: &'static [ArgValueType],
 }
 
+#[derive(Debug, Eq, PartialEq)]
 enum ArgValueType {
     None,
     Separate,
@@ -210,8 +212,7 @@ enum ArgValueType {
 
 const NORMAL: &[ArgValueType] = &[ArgValueType::Separate, ArgValueType::Combined];
 const NONE: &[ArgValueType] = &[ArgValueType::None];
-const COMBINED: &[ArgValueType] = &[ArgValueType::Combined];
-const PSYCHEDELIC: &[ArgValueType] = &[ArgValueType::StartsWith, ArgValueType::Separate];
+const PSYCHEDELIC: &[ArgValueType] = &[ArgValueType::Separate, ArgValueType::StartsWith];
 const STARTS_WITH: &[ArgValueType] = &[ArgValueType::StartsWith];
 const SEPARATE: &[ArgValueType] = &[ArgValueType::Separate];
 
@@ -230,12 +231,6 @@ static DASH_DASH_PARAMS: &[CompilerArgument] = &[
         scope: Scope::Shared,
         name: "sysroot",
         value_type: NORMAL,
-    },
-    // Hack for Android
-    CompilerArgument {
-        scope: Scope::Shared,
-        name: "target",
-        value_type: COMBINED,
     },
 ];
 
@@ -351,7 +346,7 @@ static DASH_PARAMS: &[CompilerArgument] = &[
     CompilerArgument {
         scope: Scope::Compiler,
         name: "W",
-        value_type: PSYCHEDELIC,
+        value_type: STARTS_WITH,
     },
     // Ignore
     CompilerArgument {
@@ -389,18 +384,33 @@ fn handle_argument(
                 }
                 ArgValueType::Combined => {
                     if key.starts_with(format!("{}=", param.name).as_str()) {
-                        return Some(Arg::param(
+                        return Some(Arg::param_ext(
                             param.scope,
                             prefix,
                             param.name,
                             &key[param.name.len() + 1..],
+                            if param.value_type == NORMAL {
+                                ParamForm::Separate
+                            } else {
+                                ParamForm::Smushed
+                            },
                         ));
                     }
                 }
                 ArgValueType::StartsWith => {
                     if let Some(v) = key.strip_prefix(param.name) {
                         if !v.is_empty() {
-                            return Some(Arg::param(param.scope, prefix, param.name, v));
+                            return Some(Arg::param_ext(
+                                param.scope,
+                                prefix,
+                                param.name,
+                                v,
+                                if param.value_type == PSYCHEDELIC {
+                                    ParamForm::Separate
+                                } else {
+                                    ParamForm::Smushed
+                                },
+                            ));
                         }
                     }
                 }
@@ -453,7 +463,7 @@ fn test_parse_argument_precompile() {
          -IDeveloper/Public -I Runtime/Core/Private -D IS_PROGRAM=1 -D UNICODE \
          -MD -nostdinc++ --gcc-toolchain=/bla/bla -no-canonical-prefixes \
          -MFpath/to/file \
-         --target=bla \
+         -target=bla \
          -DIS_MONOLITHIC=1 -std=c++11 -o CorePrivatePCH.h.pch CorePrivatePCH.h"
             .split(' ')
             .map(|x| x.to_string())
@@ -463,18 +473,24 @@ fn test_parse_argument_precompile() {
         [
             Arg::param(Scope::Ignore, "-", "x", "c++-header"),
             Arg::flag(Scope::Shared, "-", "pipe"),
-            Arg::param(Scope::Compiler, "-", "W", "all"),
-            Arg::param(Scope::Compiler, "-", "W", "error"),
-            Arg::param(Scope::Shared, "-", "f", "unwind-tables"),
-            Arg::param(Scope::Compiler, "-", "W", "sequence-point"),
-            Arg::param(Scope::Shared, "-", "m", "mmx"),
-            Arg::param(Scope::Shared, "-", "m", "sse"),
-            Arg::param(Scope::Shared, "-", "m", "sse2"),
-            Arg::param(Scope::Shared, "-", "f", "no-math-errno"),
-            Arg::param(Scope::Shared, "-", "f", "no-rtti"),
-            Arg::param(Scope::Shared, "-", "g", "3"),
-            Arg::param(Scope::Shared, "-", "g", "dwarf-3"),
-            Arg::param(Scope::Shared, "-", "O", "2"),
+            Arg::param_ext(Scope::Compiler, "-", "W", "all", ParamForm::Smushed),
+            Arg::param_ext(Scope::Compiler, "-", "W", "error", ParamForm::Smushed),
+            Arg::param_ext(Scope::Shared, "-", "f", "unwind-tables", ParamForm::Smushed),
+            Arg::param_ext(
+                Scope::Compiler,
+                "-",
+                "W",
+                "sequence-point",
+                ParamForm::Smushed
+            ),
+            Arg::param_ext(Scope::Shared, "-", "m", "mmx", ParamForm::Smushed),
+            Arg::param_ext(Scope::Shared, "-", "m", "sse", ParamForm::Smushed),
+            Arg::param_ext(Scope::Shared, "-", "m", "sse2", ParamForm::Smushed),
+            Arg::param_ext(Scope::Shared, "-", "f", "no-math-errno", ParamForm::Smushed),
+            Arg::param_ext(Scope::Shared, "-", "f", "no-rtti", ParamForm::Smushed),
+            Arg::param_ext(Scope::Shared, "-", "g", "3", ParamForm::Smushed),
+            Arg::param_ext(Scope::Shared, "-", "g", "dwarf-3", ParamForm::Smushed),
+            Arg::param_ext(Scope::Shared, "-", "O", "2", ParamForm::Smushed),
             Arg::param(Scope::Shared, "-", "D", "_LINUX64"),
             Arg::param(Scope::Preprocessor, "-", "I", "Engine/Source"),
             Arg::param(Scope::Preprocessor, "-", "I", "Developer/Public"),
@@ -486,7 +502,7 @@ fn test_parse_argument_precompile() {
             Arg::param(Scope::Shared, "--", "gcc-toolchain", "/bla/bla"),
             Arg::flag(Scope::Shared, "-", "no-canonical-prefixes"),
             Arg::param(Scope::Preprocessor, "-", "MF", "path/to/file"),
-            Arg::param(Scope::Shared, "--", "target", "bla"),
+            Arg::param(Scope::Shared, "-", "target", "bla"),
             Arg::param(Scope::Shared, "-", "D", "IS_MONOLITHIC=1"),
             Arg::param(Scope::Shared, "-", "std", "c++11"),
             Arg::output(OutputKind::Object, "o", "CorePrivatePCH.h.pch"),
@@ -517,18 +533,24 @@ fn test_parse_argument_compile() {
                 "CorePrivatePCH.h.pch",
             ),
             Arg::flag(Scope::Shared, "-", "pipe"),
-            Arg::param(Scope::Compiler, "-", "W", "all"),
-            Arg::param(Scope::Compiler, "-", "W", "error"),
-            Arg::param(Scope::Shared, "-", "f", "unwind-tables"),
-            Arg::param(Scope::Compiler, "-", "W", "sequence-point"),
-            Arg::param(Scope::Shared, "-", "m", "mmx"),
-            Arg::param(Scope::Shared, "-", "m", "sse"),
-            Arg::param(Scope::Shared, "-", "m", "sse2"),
-            Arg::param(Scope::Shared, "-", "f", "no-math-errno"),
-            Arg::param(Scope::Shared, "-", "f", "no-rtti"),
-            Arg::param(Scope::Shared, "-", "g", "3"),
-            Arg::param(Scope::Shared, "-", "g", "dwarf-3"),
-            Arg::param(Scope::Shared, "-", "O", "2"),
+            Arg::param_ext(Scope::Compiler, "-", "W", "all", ParamForm::Smushed),
+            Arg::param_ext(Scope::Compiler, "-", "W", "error", ParamForm::Smushed),
+            Arg::param_ext(Scope::Shared, "-", "f", "unwind-tables", ParamForm::Smushed),
+            Arg::param_ext(
+                Scope::Compiler,
+                "-",
+                "W",
+                "sequence-point",
+                ParamForm::Smushed
+            ),
+            Arg::param_ext(Scope::Shared, "-", "m", "mmx", ParamForm::Smushed),
+            Arg::param_ext(Scope::Shared, "-", "m", "sse", ParamForm::Smushed),
+            Arg::param_ext(Scope::Shared, "-", "m", "sse2", ParamForm::Smushed),
+            Arg::param_ext(Scope::Shared, "-", "f", "no-math-errno", ParamForm::Smushed),
+            Arg::param_ext(Scope::Shared, "-", "f", "no-rtti", ParamForm::Smushed),
+            Arg::param_ext(Scope::Shared, "-", "g", "3", ParamForm::Smushed),
+            Arg::param_ext(Scope::Shared, "-", "g", "dwarf-3", ParamForm::Smushed),
+            Arg::param_ext(Scope::Shared, "-", "O", "2", ParamForm::Smushed),
             Arg::param(Scope::Shared, "-", "D", "IS_PROGRAM=1"),
             Arg::param(Scope::Shared, "-", "D", "UNICODE"),
             Arg::param(Scope::Shared, "-", "D", "IS_MONOLITHIC=1"),
