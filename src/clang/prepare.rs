@@ -558,7 +558,7 @@ fn test_parse_argument_compile() {
             Arg::param(Scope::Shared, "-", "D", "UNICODE"),
             Arg::param(Scope::Shared, "-", "D", "IS_MONOLITHIC=1"),
             Arg::param(Scope::Ignore, "-", "x", "c++"),
-            Arg::param(Scope::Shared, "-", "std", "c++11"),
+            Arg::param_ext(Scope::Shared, "-", "std", "c++11", ParamForm::Combined),
             Arg::param(Scope::Preprocessor, "-", "include", "CorePrivatePCH.h"),
             Arg::param(Scope::Shared, "--", "driver-mode", "g++"),
             Arg::output(OutputKind::Object, "o", "Module.Core.cpp.o"),
