@@ -330,7 +330,7 @@ static DASH_PARAMS: &[CompilerArgument] = &[
     CompilerArgument {
         scope: Scope::Preprocessor,
         name: "isystem",
-        value_type: NORMAL,
+        value_type: PSYCHEDELIC,
     },
     CompilerArgument {
         scope: Scope::Preprocessor,
@@ -464,6 +464,7 @@ fn test_parse_argument_precompile() {
          -MD -nostdinc++ --gcc-toolchain=/bla/bla -no-canonical-prefixes \
          -MFpath/to/file \
          -target=bla \
+         -isystemPATH \
          -DIS_MONOLITHIC=1 -std=c++11 -o CorePrivatePCH.h.pch CorePrivatePCH.h"
             .split(' ')
             .map(|x| x.to_string())
@@ -503,6 +504,7 @@ fn test_parse_argument_precompile() {
             Arg::flag(Scope::Shared, "-", "no-canonical-prefixes"),
             Arg::param(Scope::Preprocessor, "-", "MF", "path/to/file"),
             Arg::param(Scope::Shared, "-", "target", "bla"),
+            Arg::param(Scope::Preprocessor, "-", "isystem", "PATH"),
             Arg::param(Scope::Shared, "-", "D", "IS_MONOLITHIC=1"),
             Arg::param(Scope::Shared, "-", "std", "c++11"),
             Arg::output(OutputKind::Object, "o", "CorePrivatePCH.h.pch"),
