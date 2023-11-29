@@ -233,6 +233,11 @@ static DASH_DASH_PARAMS: &[CompilerArgument] = &[
         name: "sysroot",
         value_type: NORMAL,
     },
+    CompilerArgument {
+        scope: Scope::Shared,
+        name: "target",
+        value_type: COMBINED,
+    },
 ];
 
 static DASH_PARAMS: &[CompilerArgument] = &[
@@ -300,7 +305,7 @@ static DASH_PARAMS: &[CompilerArgument] = &[
     CompilerArgument {
         scope: Scope::Shared,
         name: "target",
-        value_type: NORMAL,
+        value_type: SEPARATE,
     },
     // Preprocessor
     CompilerArgument {
@@ -464,7 +469,8 @@ fn test_parse_argument_precompile() {
          -IDeveloper/Public -I Runtime/Core/Private -D IS_PROGRAM=1 -D UNICODE \
          -MD -nostdinc++ --gcc-toolchain=/bla/bla -no-canonical-prefixes \
          -MFpath/to/file \
-         -target=bla \
+         -target bla \
+         --target=android \
          -isystemPATH \
          -stdlib=libc++ \
          -DIS_MONOLITHIC=1 -std=c++11 -o CorePrivatePCH.h.pch CorePrivatePCH.h"
@@ -506,6 +512,13 @@ fn test_parse_argument_precompile() {
             Arg::flag(Scope::Shared, "-", "no-canonical-prefixes"),
             Arg::param(Scope::Preprocessor, "-", "MF", "path/to/file"),
             Arg::param(Scope::Shared, "-", "target", "bla"),
+            Arg::param_ext(
+                Scope::Shared,
+                "--",
+                "target",
+                "android",
+                ParamForm::Combined
+            ),
             Arg::param(Scope::Preprocessor, "-", "isystem", "PATH"),
             Arg::param_ext(Scope::Shared, "-", "stdlib", "libc++", ParamForm::Combined),
             Arg::param(Scope::Shared, "-", "D", "IS_MONOLITHIC=1"),
