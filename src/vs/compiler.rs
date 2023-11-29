@@ -159,7 +159,12 @@ fn collect_args(
                             into.push(OsString::from(prefix).concat(flag).concat(quote(value)));
                         }
                         ParamForm::Combined => {
-                            into.push(OsString::from(prefix).concat(flag).concat("=").concat(quote(value)));
+                            into.push(
+                                OsString::from(prefix)
+                                    .concat(flag)
+                                    .concat("=")
+                                    .concat(quote(value)),
+                            );
                         }
                     }
                 }

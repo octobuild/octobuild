@@ -9,7 +9,10 @@ use std::{env, fs};
 use regex::Regex;
 
 use crate::compiler::CompileInput::{Preprocessed, Source};
-use crate::compiler::{Arg, CommandInfo, CompilationTask, CompileStep, Compiler, CompilerOutput, OsCommandArgs, OutputInfo, PreprocessResult, Scope, SharedState, Toolchain, ToolchainHolder, ParamForm};
+use crate::compiler::{
+    Arg, CommandInfo, CompilationTask, CompileStep, Compiler, CompilerOutput, OsCommandArgs,
+    OutputInfo, ParamForm, PreprocessResult, Scope, SharedState, Toolchain, ToolchainHolder,
+};
 use crate::lazy::Lazy;
 use os_str_bytes::OsStrBytes;
 
