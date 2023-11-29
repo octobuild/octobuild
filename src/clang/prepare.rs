@@ -226,7 +226,7 @@ static DASH_DASH_PARAMS: &[CompilerArgument] = &[
     CompilerArgument {
         scope: Scope::Shared,
         name: "gcc-toolchain",
-        value_type: NORMAL,
+        value_type: COMBINED,
     },
     CompilerArgument {
         scope: Scope::Shared,
