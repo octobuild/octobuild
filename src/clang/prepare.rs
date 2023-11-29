@@ -230,11 +230,6 @@ static DASH_DASH_PARAMS: &[CompilerArgument] = &[
     },
     CompilerArgument {
         scope: Scope::Shared,
-        name: "stdlib",
-        value_type: COMBINED,
-    },
-    CompilerArgument {
-        scope: Scope::Shared,
         name: "sysroot",
         value_type: NORMAL,
     },
@@ -300,7 +295,7 @@ static DASH_PARAMS: &[CompilerArgument] = &[
     CompilerArgument {
         scope: Scope::Shared,
         name: "stdlib",
-        value_type: NORMAL,
+        value_type: COMBINED,
     },
     CompilerArgument {
         scope: Scope::Shared,
@@ -471,7 +466,7 @@ fn test_parse_argument_precompile() {
          -MFpath/to/file \
          -target=bla \
          -isystemPATH \
-         --stdlib=libc++ \
+         -stdlib=libc++ \
          -DIS_MONOLITHIC=1 -std=c++11 -o CorePrivatePCH.h.pch CorePrivatePCH.h"
             .split(' ')
             .map(|x| x.to_string())
@@ -512,7 +507,7 @@ fn test_parse_argument_precompile() {
             Arg::param(Scope::Preprocessor, "-", "MF", "path/to/file"),
             Arg::param(Scope::Shared, "-", "target", "bla"),
             Arg::param(Scope::Preprocessor, "-", "isystem", "PATH"),
-            Arg::param_ext(Scope::Shared, "--", "stdlib", "libc++", ParamForm::Combined),
+            Arg::param_ext(Scope::Shared, "-", "stdlib", "libc++", ParamForm::Combined),
             Arg::param(Scope::Shared, "-", "D", "IS_MONOLITHIC=1"),
             Arg::param_ext(Scope::Shared, "-", "std", "c++11", ParamForm::Combined),
             Arg::output(OutputKind::Object, "o", "CorePrivatePCH.h.pch"),
