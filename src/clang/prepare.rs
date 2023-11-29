@@ -393,7 +393,7 @@ fn handle_argument(
                             if param.value_type == NORMAL {
                                 ParamForm::Separate
                             } else {
-                                ParamForm::Smushed
+                                ParamForm::Combined
                             },
                         ));
                     }
@@ -507,7 +507,7 @@ fn test_parse_argument_precompile() {
             Arg::param(Scope::Shared, "-", "target", "bla"),
             Arg::param(Scope::Preprocessor, "-", "isystem", "PATH"),
             Arg::param(Scope::Shared, "-", "D", "IS_MONOLITHIC=1"),
-            Arg::param_ext(Scope::Shared, "-", "std", "c++11", ParamForm::Smushed),
+            Arg::param_ext(Scope::Shared, "-", "std", "c++11", ParamForm::Combined),
             Arg::output(OutputKind::Object, "o", "CorePrivatePCH.h.pch"),
             Arg::input(InputKind::Source, "CorePrivatePCH.h")
         ]

@@ -101,6 +101,9 @@ fn collect_args(
                         ParamForm::Smushed => {
                             into.push(OsString::from(format!("{prefix}{flag}{value}")));
                         }
+                        ParamForm::Combined => {
+                            into.push(OsString::from(format!("{prefix}{flag}={value}")));
+                        }
                     }
                 }
             }

@@ -83,6 +83,7 @@ pub enum OutputKind {
 #[derive(Debug, Eq, PartialEq)]
 pub enum ParamForm {
     Separate,
+    Combined,
     Smushed,
 }
 

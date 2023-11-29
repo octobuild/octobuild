@@ -158,6 +158,9 @@ fn collect_args(
                         ParamForm::Smushed => {
                             into.push(OsString::from(prefix).concat(flag).concat(quote(value)));
                         }
+                        ParamForm::Combined => {
+                            into.push(OsString::from(prefix).concat(flag).concat("=").concat(quote(value)));
+                        }
                     }
                 }
             }
