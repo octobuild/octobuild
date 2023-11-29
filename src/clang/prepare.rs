@@ -212,6 +212,7 @@ enum ArgValueType {
 
 const NORMAL: &[ArgValueType] = &[ArgValueType::Separate, ArgValueType::Combined];
 const NONE: &[ArgValueType] = &[ArgValueType::None];
+const COMBINED: &[ArgValueType] = &[ArgValueType::Combined];
 const PSYCHEDELIC: &[ArgValueType] = &[ArgValueType::Separate, ArgValueType::StartsWith];
 const STARTS_WITH: &[ArgValueType] = &[ArgValueType::StartsWith];
 const SEPARATE: &[ArgValueType] = &[ArgValueType::Separate];
@@ -289,7 +290,7 @@ static DASH_PARAMS: &[CompilerArgument] = &[
     CompilerArgument {
         scope: Scope::Shared,
         name: "std",
-        value_type: NORMAL,
+        value_type: COMBINED,
     },
     CompilerArgument {
         scope: Scope::Shared,
@@ -506,7 +507,7 @@ fn test_parse_argument_precompile() {
             Arg::param(Scope::Shared, "-", "target", "bla"),
             Arg::param(Scope::Preprocessor, "-", "isystem", "PATH"),
             Arg::param(Scope::Shared, "-", "D", "IS_MONOLITHIC=1"),
-            Arg::param(Scope::Shared, "-", "std", "c++11"),
+            Arg::param_ext(Scope::Shared, "-", "std", "c++11", ParamForm::Smushed),
             Arg::output(OutputKind::Object, "o", "CorePrivatePCH.h.pch"),
             Arg::input(InputKind::Source, "CorePrivatePCH.h")
         ]

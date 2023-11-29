@@ -9,10 +9,7 @@ use std::{env, fs};
 use regex::Regex;
 
 use crate::compiler::CompileInput::{Preprocessed, Source};
-use crate::compiler::{
-    Arg, CommandInfo, CompilationTask, CompileStep, Compiler, CompilerOutput, OsCommandArgs,
-    OutputInfo, PreprocessResult, Scope, SharedState, Toolchain, ToolchainHolder,
-};
+use crate::compiler::{Arg, CommandInfo, CompilationTask, CompileStep, Compiler, CompilerOutput, OsCommandArgs, OutputInfo, PreprocessResult, Scope, SharedState, Toolchain, ToolchainHolder, ParamForm};
 use crate::lazy::Lazy;
 use os_str_bytes::OsStrBytes;
 
@@ -93,11 +90,18 @@ fn collect_args(
                 prefix,
                 name: flag,
                 value,
-                form: _,
+                form,
             } => {
                 if scope.matches(target_scope, run_second_cpp, output_precompiled) {
-                    into.push(OsString::from(format!("{prefix}{flag}")));
-                    into.push(OsString::from(value));
+                    match form {
+                        ParamForm::Separate => {
+                            into.push(OsString::from(format!("{prefix}{flag}")));
+                            into.push(OsString::from(value));
+                        }
+                        ParamForm::Smushed => {
+                            into.push(OsString::from(format!("{prefix}{flag}{value}")));
+                        }
+                    }
                 }
             }
             Arg::Input { .. } | Arg::Output { .. } => {}
