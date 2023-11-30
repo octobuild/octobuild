@@ -221,7 +221,7 @@ static DASH_DASH_PARAMS: &[CompilerArgument] = &[
     CompilerArgument {
         scope: Scope::Shared,
         name: "driver-mode",
-        value_type: NORMAL,
+        value_type: COMBINED,
     },
     CompilerArgument {
         scope: Scope::Shared,
@@ -508,7 +508,13 @@ fn test_parse_argument_precompile() {
             Arg::param(Scope::Shared, "-", "D", "UNICODE"),
             Arg::flag(Scope::Preprocessor, "-", "MD"),
             Arg::flag(Scope::Shared, "-", "nostdinc++"),
-            Arg::param(Scope::Shared, "--", "gcc-toolchain", "/bla/bla"),
+            Arg::param_ext(
+                Scope::Shared,
+                "--",
+                "gcc-toolchain",
+                "/bla/bla",
+                ParamForm::Combined
+            ),
             Arg::flag(Scope::Shared, "-", "no-canonical-prefixes"),
             Arg::param(Scope::Preprocessor, "-", "MF", "path/to/file"),
             Arg::param(Scope::Shared, "-", "target", "bla"),
@@ -575,7 +581,13 @@ fn test_parse_argument_compile() {
             Arg::param(Scope::Ignore, "-", "x", "c++"),
             Arg::param_ext(Scope::Shared, "-", "std", "c++11", ParamForm::Combined),
             Arg::param(Scope::Preprocessor, "-", "include", "CorePrivatePCH.h"),
-            Arg::param(Scope::Shared, "--", "driver-mode", "g++"),
+            Arg::param_ext(
+                Scope::Shared,
+                "--",
+                "driver-mode",
+                "g++",
+                ParamForm::Combined
+            ),
             Arg::output(OutputKind::Object, "o", "Module.Core.cpp.o"),
             Arg::input(InputKind::Source, "Module.Core.cpp")
         ]
