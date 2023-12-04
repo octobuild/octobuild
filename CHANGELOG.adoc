@@ -1,10 +1,10 @@
 = Changelog
 :icons: font
 
-== Unreleased
+== 0.9.0
 
 - Add `clang -F<path>` support for macOS
-- Add support for Android
+- Add Android support
 
 == 0.8.0
 
