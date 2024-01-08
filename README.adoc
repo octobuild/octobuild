@@ -118,7 +118,7 @@ You can list configuration files and check actual configuration by running `ib_c
 | `$XDG_CONFIG_HOME/octobuild/octobuild.conf` (with fallback to `~/.config/octobuild/octobuild.conf` when `$XDG_CONFIG_HOME` is not set)
 
 | Windows
-| `%ProgramData\octobuild\octobuild.conf`
+| `%ProgramData%\octobuild\octobuild.conf`
 | `%AppData%\octobuild\octobuild.conf`
 
 | macOS
