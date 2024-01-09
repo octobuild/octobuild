@@ -48,7 +48,7 @@ fn execute(config: &Config, args: &[String]) -> octobuild::Result<()> {
     let state = SharedState::new(config)?;
     let compiler = RemoteCompiler::new(&config.coordinator, supported_compilers());
 
-    match args.get(0) {
+    match args.first() {
         None => Err(octobuild::Error::NoTaskFiles),
         Some(arg) => {
             if arg.eq_ignore_ascii_case("/reset") {
