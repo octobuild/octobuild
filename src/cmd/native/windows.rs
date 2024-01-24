@@ -102,7 +102,6 @@ pub fn parse(cmd_line: &str) -> crate::Result<Vec<String>> {
     Ok(ret_val)
 }
 
-#[must_use]
 pub fn quote(arg: impl AsRef<OsStr>) -> crate::Result<OsString> {
     let arg_ref = arg.as_ref();
 
