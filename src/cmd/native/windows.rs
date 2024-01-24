@@ -103,7 +103,7 @@ pub fn parse(cmd_line: &str) -> crate::Result<Vec<String>> {
 }
 
 #[must_use]
-pub fn quote(arg: impl AsRef<OsStr>) -> OsString {
+pub fn quote(arg: impl AsRef<OsStr>) -> crate::Result<OsString> {
     let arg_ref = arg.as_ref();
 
     let mut result = Vec::<u16>::new();
@@ -136,7 +136,7 @@ pub fn quote(arg: impl AsRef<OsStr>) -> OsString {
         result.push('"' as u16);
     }
 
-    OsStringExt::from_wide(&result)
+    Ok(OsStringExt::from_wide(&result))
 }
 
 #[test]

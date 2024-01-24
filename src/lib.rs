@@ -1,3 +1,4 @@
+use shlex::QuoteError;
 use std::path::{Path, PathBuf};
 
 use crate::Error::IO;
@@ -91,6 +92,8 @@ pub enum Error {
     },
     #[error(transparent)]
     PostprocessError(#[from] PostprocessError),
+    #[error(transparent)]
+    QuoteError(#[from] QuoteError),
     #[error(transparent)]
     Reqwest(#[from] reqwest::Error),
     #[error("Toolchain not found: {0}")]

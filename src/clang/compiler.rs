@@ -76,7 +76,7 @@ fn collect_args(
     run_second_cpp: bool,
     output_precompiled: bool,
     into: &mut Vec<OsString>,
-) {
+) -> crate::Result<()> {
     for arg in args {
         match arg {
             Arg::Flag {
@@ -113,6 +113,8 @@ fn collect_args(
             Arg::Input { .. } | Arg::Output { .. } => {}
         };
     }
+
+    Ok(())
 }
 
 impl Toolchain for ClangToolchain {
@@ -149,7 +151,7 @@ impl Toolchain for ClangToolchain {
             false,
             false,
             &mut args,
-        );
+        )?;
 
         let output = state.wrap_slow(|| -> crate::Result<Output> {
             let mut command = task.shared.command.to_command();
@@ -191,7 +193,7 @@ impl Toolchain for ClangToolchain {
         &self,
         task: &CompilationTask,
         preprocessed: CompilerOutput,
-    ) -> CompileStep {
+    ) -> crate::Result<CompileStep> {
         let mut args = vec![OsString::from("-x"), OsString::from(&task.language)];
         collect_args(
             &task.shared.args,
@@ -199,9 +201,9 @@ impl Toolchain for ClangToolchain {
             task.shared.run_second_cpp,
             task.shared.pch_usage.is_some(),
             &mut args,
-        );
+        )?;
 
-        CompileStep::new(task, preprocessed, args)
+        Ok(CompileStep::new(task, preprocessed, args))
     }
 
     fn run_compile(&self, state: &SharedState, task: CompileStep) -> crate::Result<OutputInfo> {

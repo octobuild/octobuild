@@ -215,6 +215,7 @@ const NONE: &[ArgValueType] = &[ArgValueType::None];
 const COMBINED: &[ArgValueType] = &[ArgValueType::Combined];
 const PSYCHEDELIC: &[ArgValueType] = &[ArgValueType::Separate, ArgValueType::StartsWith];
 const STARTS_WITH: &[ArgValueType] = &[ArgValueType::StartsWith];
+const OPTIONAL_STARTS_WITH: &[ArgValueType] = &[ArgValueType::None, ArgValueType::StartsWith];
 const SEPARATE: &[ArgValueType] = &[ArgValueType::Separate];
 
 static DASH_DASH_PARAMS: &[CompilerArgument] = &[
@@ -260,7 +261,7 @@ static DASH_PARAMS: &[CompilerArgument] = &[
     CompilerArgument {
         scope: Scope::Shared,
         name: "g",
-        value_type: STARTS_WITH,
+        value_type: OPTIONAL_STARTS_WITH,
     },
     CompilerArgument {
         scope: Scope::Shared,
@@ -465,7 +466,7 @@ fn parse_argument(iter: &mut Iter<String>) -> Option<Result<Arg, String>> {
 fn test_parse_argument_precompile() {
     let args: Vec<String> =
         "-x c++-header -pipe -Wall -Werror -funwind-tables -Wsequence-point -mmmx -msse -msse2 \
-         -fno-math-errno -fno-rtti -g3 -gdwarf-3 -O2 -D_LINUX64 -IEngine/Source \
+         -fno-math-errno -fno-rtti -g -g3 -gdwarf-3 -O2 -D_LINUX64 -IEngine/Source \
          -IDeveloper/Public -I Runtime/Core/Private -D IS_PROGRAM=1 -D UNICODE \
          -MD -nostdinc++ --gcc-toolchain=/bla/bla -no-canonical-prefixes \
          -MFpath/to/file \
@@ -497,6 +498,7 @@ fn test_parse_argument_precompile() {
             Arg::param_ext(Scope::Shared, "-", "m", "sse2", ParamForm::Smushed),
             Arg::param_ext(Scope::Shared, "-", "f", "no-math-errno", ParamForm::Smushed),
             Arg::param_ext(Scope::Shared, "-", "f", "no-rtti", ParamForm::Smushed),
+            Arg::flag(Scope::Shared, "-", "g"),
             Arg::param_ext(Scope::Shared, "-", "g", "3", ParamForm::Smushed),
             Arg::param_ext(Scope::Shared, "-", "g", "dwarf-3", ParamForm::Smushed),
             Arg::param_ext(Scope::Shared, "-", "O", "2", ParamForm::Smushed),

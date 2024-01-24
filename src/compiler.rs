@@ -218,7 +218,7 @@ impl SharedState {
             let response_file = tempfile::Builder::new()
                 .suffix(".rsp")
                 .tempfile_in(self.temp_dir.path())?;
-            let contents = args.join();
+            let contents = args.join()?;
             std::fs::write(response_file.path(), contents.to_raw_bytes())?;
             command.arg(OsString::from("@").concat(response_file.path().as_os_str()));
             Ok(Some(response_file))
@@ -581,7 +581,7 @@ pub trait Toolchain: Send + Sync {
         &self,
         task: &CompilationTask,
         preprocessed: CompilerOutput,
-    ) -> CompileStep;
+    ) -> crate::Result<CompileStep>;
 
     // Compile preprocessed file.
     fn run_compile(&self, state: &SharedState, task: CompileStep) -> crate::Result<OutputInfo>;
@@ -621,7 +621,7 @@ pub trait Toolchain: Send + Sync {
             hasher.hash_str(&identifier);
         }
 
-        let step = self.create_compile_step(task, preprocessed);
+        let step = self.create_compile_step(task, preprocessed)?;
 
         // Hash arguments
         hasher.hash_u64(step.args.len() as u64);
@@ -759,9 +759,9 @@ pub enum OsCommandArgs {
 }
 
 impl OsCommandArgs {
-    pub fn join(self) -> OsString {
+    pub fn join(self) -> crate::Result<OsString> {
         match self {
-            OsCommandArgs::Raw(v) => v,
+            OsCommandArgs::Raw(v) => Ok(v),
             OsCommandArgs::Regular(v) => cmd::native::join(&v),
         }
     }

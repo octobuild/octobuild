@@ -6,10 +6,9 @@ pub fn parse(cmd: &str) -> crate::Result<Vec<String>> {
         .ok_or_else(|| crate::Error::Generic(format!("Unable to parse commandline: {cmd}")))
 }
 
-#[must_use]
-pub fn quote(arg: impl AsRef<OsStr>) -> OsString {
-    let quoted = shlex::quote(arg.as_ref().to_str().unwrap());
-    OsString::from(quoted.as_ref())
+pub fn quote(arg: impl AsRef<OsStr>) -> crate::Result<OsString> {
+    let quoted = shlex::try_quote(arg.as_ref().to_str().unwrap())?;
+    Ok(OsString::from(quoted.as_ref()))
 }
 
 #[test]

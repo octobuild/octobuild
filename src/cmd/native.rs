@@ -10,11 +10,10 @@ pub use unix::*;
 #[cfg(windows)]
 pub use windows::*;
 
-#[must_use]
-pub fn join<'a, I: IntoIterator<Item = &'a OsString>>(words: I) -> OsString {
-    words
+pub fn join<'a, I: IntoIterator<Item = &'a OsString>>(words: I) -> crate::Result<OsString> {
+    Ok(words
         .into_iter()
         .map(quote)
-        .collect::<Vec<OsString>>()
-        .join(OsStr::new(" "))
+        .collect::<crate::Result<Vec<OsString>>>()?
+        .join(OsStr::new(" ")))
 }

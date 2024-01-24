@@ -125,7 +125,7 @@ fn collect_args(
     run_second_cpp: bool,
     output_precompiled: bool,
     into: &mut Vec<OsString>,
-) {
+) -> crate::Result<()> {
     if output_precompiled {
         into.push(OsString::from("/Yc"));
     }
@@ -153,17 +153,17 @@ fn collect_args(
                         ParamForm::Separate => {
                             into.push(OsString::from(prefix).concat(flag));
                             // TODO: Why quote?
-                            into.push(quote(value));
+                            into.push(quote(value)?);
                         }
                         ParamForm::Smushed => {
-                            into.push(OsString::from(prefix).concat(flag).concat(quote(value)));
+                            into.push(OsString::from(prefix).concat(flag).concat(quote(value)?));
                         }
                         ParamForm::Combined => {
                             into.push(
                                 OsString::from(prefix)
                                     .concat(flag)
                                     .concat("=")
-                                    .concat(quote(value)),
+                                    .concat(quote(value)?),
                             );
                         }
                     }
@@ -172,6 +172,8 @@ fn collect_args(
             Arg::Input { .. } | Arg::Output { .. } => {}
         };
     }
+
+    Ok(())
 }
 
 impl Toolchain for VsToolchain {
@@ -198,8 +200,8 @@ impl Toolchain for VsToolchain {
             OsString::from("/T".to_string()).concat(&task.language),
             OsString::from("/E"),
             OsString::from("/we4002"), // C4002: too many actual parameters for macro 'identifier'
-            OsString::from("/Fo").concat(quote(&task.output_object)), // /Fo option also set output path for #import directive
-            quote(&task.input_source),
+            OsString::from("/Fo").concat(quote(&task.output_object)?), // /Fo option also set output path for #import directive
+            quote(&task.input_source)?,
         ];
         collect_args(
             &task.shared.args,
@@ -207,7 +209,7 @@ impl Toolchain for VsToolchain {
             false,
             false,
             &mut args,
-        );
+        )?;
 
         let mut command = task.shared.command.to_command();
         let response_file =
@@ -250,7 +252,7 @@ impl Toolchain for VsToolchain {
         &self,
         task: &CompilationTask,
         preprocessed: CompilerOutput,
-    ) -> CompileStep {
+    ) -> crate::Result<CompileStep> {
         let mut args = vec![
             OsString::from("/nologo"),
             OsString::from("/T".to_string() + &task.language),
@@ -261,8 +263,8 @@ impl Toolchain for VsToolchain {
             task.shared.run_second_cpp,
             task.shared.pch_usage.is_out(),
             &mut args,
-        );
-        CompileStep::new(task, preprocessed, args)
+        )?;
+        Ok(CompileStep::new(task, preprocessed, args))
     }
 
     fn run_compile(&self, state: &SharedState, task: CompileStep) -> crate::Result<OutputInfo> {
@@ -278,20 +280,20 @@ impl Toolchain for VsToolchain {
 
         let mut args = task.args.clone();
         args.push(OsString::from("/c"));
-        args.push(OsString::from("/Fo").concat(quote(output_path)));
+        args.push(OsString::from("/Fo").concat(quote(output_path)?));
 
         match &task.pch_usage {
             PCHUsage::None => {}
             PCHUsage::In(v) => {
                 if let Some(pch_marker) = &v.marker {
-                    args.push(OsString::from("/Yu").concat(quote(pch_marker)));
+                    args.push(OsString::from("/Yu").concat(quote(pch_marker)?));
                 } else {
                     args.push(OsString::from("/Yu"));
                 }
-                args.push(OsString::from("/Fp").concat(quote(&v.path)));
+                args.push(OsString::from("/Fp").concat(quote(&v.path)?));
             }
             PCHUsage::Out(v) => {
-                args.push(OsString::from("/Fp").concat(quote(&v.path)));
+                args.push(OsString::from("/Fp").concat(quote(&v.path)?));
             }
         }
 
@@ -309,7 +311,7 @@ impl Toolchain for VsToolchain {
                 }
             }
         };
-        args.push(quote(&input_path));
+        args.push(quote(&input_path)?);
 
         // Run compiler.
 

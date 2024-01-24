@@ -286,7 +286,7 @@ impl Toolchain for RemoteToolchain {
         &self,
         task: &CompilationTask,
         preprocessed: CompilerOutput,
-    ) -> CompileStep {
+    ) -> crate::Result<CompileStep> {
         self.local.create_compile_step(task, preprocessed)
     }
 
