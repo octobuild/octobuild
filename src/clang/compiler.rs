@@ -20,7 +20,7 @@ fn re_clang() -> &'static regex::bytes::Regex {
     static RE: OnceLock<regex::bytes::Regex> = OnceLock::new();
 
     RE.get_or_init(|| {
-        regex::bytes::Regex::new(r"(?i)^(.*clang(:?\+\+)?)(-\d+\.\d+)?(?:.exe)?$").unwrap()
+        regex::bytes::Regex::new(r"(?i)^(.*clang(:?\+\+)?)(-\d+\.\d+)?(?:.exe)?$|(?i)^(.*emcc(:?\+\+)?)(-\d+\.\d+)?(?:.bat)?$").unwrap()
     })
 }
 
