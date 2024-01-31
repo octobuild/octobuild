@@ -1,6 +1,10 @@
 = Changelog
 :icons: font
 
+== 1.1.0
+
+- Add support for Emscripten
+
 == 1.0.0
 
 - Add support for PS4/PS5 with Unreal Engine 5.3 (`clang -g`)
