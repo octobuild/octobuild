@@ -76,7 +76,7 @@ local-encoding-ng = "0.1"
 log = "0.4"
 lz4 = "1"
 num_cpus = "1"
-os_str_bytes = { version = "6", features = ["conversions"] }
+os_str_bytes = { version = "7", features = ["conversions"] }
 path-absolutize = "3"
 petgraph = "0.6"
 rand = "0.8"
