@@ -3,6 +3,7 @@ use std::cmp::{max, min};
 use std::io::Write;
 use std::sync::Arc;
 use std::time::Instant;
+use log::error;
 
 use petgraph::graph::NodeIndex;
 use petgraph::{EdgeDirection, Graph};
@@ -115,7 +116,7 @@ impl BuildAction {
                 match e {
                     crate::Error::ToolchainNotFound(_) => {}
                     e => {
-                        println!("Cannot cache task {title}: {e}");
+                        error!("Cannot cache task {title}: {e}");
                     }
                 }
                 Vec::new()

@@ -1,4 +1,5 @@
 use std::env;
+use std::io::{stdout, Write};
 use std::path::PathBuf;
 use std::sync::Arc;
 
@@ -49,7 +50,7 @@ where
     match compile(&config, &state, exec, compiler) {
         Ok(_) => 0,
         Err(e) => {
-            println!("FATAL ERROR: {e}");
+            error!("FATAL ERROR: {e}");
             1
         }
     }
@@ -83,7 +84,7 @@ where
         }));
     }
     let result = execute_graph(state, build_graph, config.process_limit, print_task_result);
-    println!("{}", state.statistic);
+    writeln!(stdout(), "{}", state.statistic)?;
     result
 }
 

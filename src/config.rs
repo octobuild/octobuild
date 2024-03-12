@@ -1,8 +1,10 @@
-use figment::providers::{Env, Format, Serialized, Yaml};
-use figment::Figment;
+use std::io::Write;
 use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4};
 use std::path::PathBuf;
 use std::sync::OnceLock;
+
+use figment::Figment;
+use figment::providers::{Env, Format, Serialized, Yaml};
 
 #[derive(serde::Serialize, serde::Deserialize)]
 pub struct Config {
@@ -59,33 +61,35 @@ impl Config {
         Ok(figment.merge(Env::prefixed("OCTOBUILD_")).extract()?)
     }
 
-    pub fn print_help(&self, executable: &str) {
-        println!();
-        println!("Usage:");
-        println!("  {} <file>", executable);
-        println!("  {} /reset", executable);
-        println!();
-        println!("Octobuild configuration:");
-        println!(
-            "  system config path: {}",
-            global_config_path()
+    pub fn print_help(&self, executable: &str, out: &mut impl Write) -> crate::Result<()> {
+        writeln!(out)?;
+        writeln!(out, "Usage:")?;
+        writeln!(out, "  {} <file>", executable)?;
+        writeln!(out, "  {} /reset", executable)?;
+        writeln!(out, )?;
+        writeln!(out, "Octobuild configuration:")?;
+        writeln!(out,
+                 "  system config path: {}",
+                 global_config_path()
                 .and_then(|v| Some(v.to_str()?.to_string()))
                 .unwrap_or_else(|| "none".to_string())
-        );
-        println!(
-            "  user config path:   {}",
-            local_config_path()
+        )?;
+        writeln!(out,
+                 "  user config path:   {}",
+                 local_config_path()
                 .and_then(|v| Some(v.to_str()?.to_string()))
                 .unwrap_or_else(|| "none".to_string())
-        );
-        println!();
-        println!("Current configuration:");
-        self.show();
-        println!();
+        )?;
+        writeln!(out)?;
+        writeln!(out, "Current configuration:")?;
+        self.show(out)?;
+        writeln!(out)?;
+        
+        Ok(())
     }
 
-    fn show(&self) {
-        println!("{}", serde_yaml::to_string(self).unwrap());
+    fn show(&self, out: &mut impl Write) -> crate::Result<()> {
+        Ok(writeln!(out, "{}", serde_yaml::to_string(self).unwrap())?)
     }
 }
 

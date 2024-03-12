@@ -156,7 +156,6 @@ pub fn create_tasks(
 }
 
 fn detect_language(path: &Path) -> Option<String> {
-    println!("{}", path.to_string_lossy());
     let ext = path.extension()?.to_str()?;
     if ext.eq_ignore_ascii_case("cpp") || ext.eq_ignore_ascii_case("cc") {
         Some("P".to_string())

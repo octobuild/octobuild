@@ -2,7 +2,7 @@
 
 use std::env;
 use std::fs::File;
-use std::io::BufReader;
+use std::io::{BufReader, stderr, stdout, Write};
 use std::path::Path;
 use std::process;
 use std::sync::Arc;
@@ -22,23 +22,23 @@ use octobuild::xg;
 use octobuild::xg::parser::{XgGraph, XgNode};
 
 pub fn main() -> octobuild::Result<()> {
-    println!("xgConsole ({}):", version::full());
+    writeln!(stdout(), "xgConsole ({}):", version::full())?;
     let args: Vec<String> = env::args().collect();
     for arg in &args {
-        println!("  {arg}");
+        writeln!(stdout(),"  {arg}")?;
     }
 
     let config = Config::load()?;
 
     if args.len() == 1 {
-        config.print_help(&args[0]);
+        config.print_help(&args[0], &mut stdout())?;
         return Ok(());
     }
 
     process::exit(match execute(&config, &args[1..]) {
         Ok(_) => 0,
         Err(e) => {
-            println!("ERROR: {e}");
+            writeln!(stderr(), "ERROR: {e}")?;
             1
         }
     })
@@ -52,9 +52,9 @@ fn execute(config: &Config, args: &[String]) -> octobuild::Result<()> {
         None => Err(octobuild::Error::NoTaskFiles),
         Some(arg) => {
             if arg.eq_ignore_ascii_case("/reset") {
-                println!("Cleaning cache directory: {}...", config.cache.display());
+                writeln!(stdout(), "Cleaning cache directory: {}...", config.cache.display())?;
                 _ = std::fs::remove_dir_all(&config.cache);
-                println!("Done!");
+                writeln!(stdout(), "Done!")?;
                 Ok(())
             } else {
                 let mut graph = Graph::new();
@@ -65,7 +65,7 @@ fn execute(config: &Config, args: &[String]) -> octobuild::Result<()> {
                 let result =
                     execute_graph(&state, build_graph, config.process_limit, print_task_result);
                 drop(state.cache.cleanup());
-                println!("{}", state.statistic);
+                writeln!(stdout(), "{}", state.statistic)?;
                 result
             }
         }
@@ -141,14 +141,14 @@ fn prepare_graph<C: Compiler>(
 }
 
 fn print_task_result(result: &BuildResult) -> octobuild::Result<()> {
-    println!(
-        "#{} {}/{}: {} @ {}s",
+    writeln!(stdout(),
+             "#{} {}/{}: {} @ {}s",
         result.worker,
         result.completed,
         result.total,
         result.task.title,
         result.result.duration.as_secs(),
-    );
+    )?;
     result.result.print_output()?;
     Ok(())
 }

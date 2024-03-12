@@ -299,7 +299,6 @@ impl BuilderState {
 
 impl Drop for BuilderService {
     fn drop(&mut self) {
-        println!("drop begin");
         self.done.store(true, Ordering::Relaxed);
         if let Some(t) = self.announcer.take() {
             t.join().unwrap();
@@ -308,7 +307,6 @@ impl Drop for BuilderService {
             sender.send(()).unwrap();
             handle.join().unwrap();
         }
-        println!("drop end");
     }
 }
 

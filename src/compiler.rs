@@ -3,7 +3,7 @@ use std::collections::hash_map;
 use std::collections::HashMap;
 use std::env;
 use std::ffi::{OsStr, OsString};
-use std::io::Write;
+use std::io::{stderr, stdout, Write};
 use std::iter::FromIterator;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
@@ -360,22 +360,22 @@ pub struct BuildTaskResult {
 }
 
 impl BuildTaskResult {
-    pub fn print_output(&self) -> std::io::Result<()> {
+    pub fn print_output(&self) -> crate::Result<()> {
         match &self.output {
             Ok(output) => {
                 if !output.success() {
-                    println!(
+                    writeln!(stderr(),
                         "ERROR: Task failed with exit code: {}",
                         output
                             .status
                             .map_or_else(|| "unknown".to_string(), |v| v.to_string())
-                    );
+                    )?;
                 }
-                std::io::stdout().write_all(&output.stdout)?;
-                std::io::stderr().write_all(&output.stderr)?;
+                stdout().write_all(&output.stdout)?;
+                stderr().write_all(&output.stderr)?;
             }
             Err(e) => {
-                eprintln!("ERROR: {e}");
+                writeln!(stderr(), "ERROR: {e}")?;
             }
         }
         Ok(())
