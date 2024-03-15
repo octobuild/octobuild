@@ -2,7 +2,7 @@
 
 use std::env;
 use std::fs::File;
-use std::io::{BufReader, stderr, stdout, Write};
+use std::io::{stderr, stdout, BufReader, Write};
 use std::path::Path;
 use std::process;
 use std::sync::Arc;
@@ -25,7 +25,7 @@ pub fn main() -> octobuild::Result<()> {
     writeln!(stdout(), "xgConsole ({}):", version::full())?;
     let args: Vec<String> = env::args().collect();
     for arg in &args {
-        writeln!(stdout(),"  {arg}")?;
+        writeln!(stdout(), "  {arg}")?;
     }
 
     let config = Config::load()?;
@@ -52,7 +52,11 @@ fn execute(config: &Config, args: &[String]) -> octobuild::Result<()> {
         None => Err(octobuild::Error::NoTaskFiles),
         Some(arg) => {
             if arg.eq_ignore_ascii_case("/reset") {
-                writeln!(stdout(), "Cleaning cache directory: {}...", config.cache.display())?;
+                writeln!(
+                    stdout(),
+                    "Cleaning cache directory: {}...",
+                    config.cache.display()
+                )?;
                 _ = std::fs::remove_dir_all(&config.cache);
                 writeln!(stdout(), "Done!")?;
                 Ok(())
@@ -141,8 +145,9 @@ fn prepare_graph<C: Compiler>(
 }
 
 fn print_task_result(result: &BuildResult) -> octobuild::Result<()> {
-    writeln!(stdout(),
-             "#{} {}/{}: {} @ {}s",
+    writeln!(
+        stdout(),
+        "#{} {}/{}: {} @ {}s",
         result.worker,
         result.completed,
         result.total,

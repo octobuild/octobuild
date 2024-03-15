@@ -364,7 +364,8 @@ impl BuildTaskResult {
         match &self.output {
             Ok(output) => {
                 if !output.success() {
-                    writeln!(stderr(),
+                    writeln!(
+                        stderr(),
                         "ERROR: Task failed with exit code: {}",
                         output
                             .status

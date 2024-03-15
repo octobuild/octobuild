@@ -3,8 +3,8 @@ use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4};
 use std::path::PathBuf;
 use std::sync::OnceLock;
 
-use figment::Figment;
 use figment::providers::{Env, Format, Serialized, Yaml};
+use figment::Figment;
 
 #[derive(serde::Serialize, serde::Deserialize)]
 pub struct Config {
@@ -66,17 +66,19 @@ impl Config {
         writeln!(out, "Usage:")?;
         writeln!(out, "  {} <file>", executable)?;
         writeln!(out, "  {} /reset", executable)?;
-        writeln!(out, )?;
+        writeln!(out,)?;
         writeln!(out, "Octobuild configuration:")?;
-        writeln!(out,
-                 "  system config path: {}",
-                 global_config_path()
+        writeln!(
+            out,
+            "  system config path: {}",
+            global_config_path()
                 .and_then(|v| Some(v.to_str()?.to_string()))
                 .unwrap_or_else(|| "none".to_string())
         )?;
-        writeln!(out,
-                 "  user config path:   {}",
-                 local_config_path()
+        writeln!(
+            out,
+            "  user config path:   {}",
+            local_config_path()
                 .and_then(|v| Some(v.to_str()?.to_string()))
                 .unwrap_or_else(|| "none".to_string())
         )?;
@@ -84,7 +86,7 @@ impl Config {
         writeln!(out, "Current configuration:")?;
         self.show(out)?;
         writeln!(out)?;
-        
+
         Ok(())
     }
 

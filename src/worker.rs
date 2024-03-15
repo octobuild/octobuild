@@ -1,9 +1,9 @@
+use log::error;
 use std::borrow::Cow;
 use std::cmp::{max, min};
 use std::io::Write;
 use std::sync::Arc;
 use std::time::Instant;
-use log::error;
 
 use petgraph::graph::NodeIndex;
 use petgraph::{EdgeDirection, Graph};
