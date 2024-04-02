@@ -68,7 +68,7 @@ directories = "5"
 fern = "0.6"
 figment = { version = "0.10", features = ["env", "yaml"] }
 hex = "0.4"
-hostname = "0.3"
+hostname = "0.4"
 rouille = "3"
 ipc = { git = "https://github.com/slonopotamus/ipc-rs" }
 libc = "0.2"
