@@ -1,6 +1,10 @@
 = Changelog
 :icons: font
 
+== Unreleased
+
+- Add support for `-sce-stdlib=...` for PS5
+
 == 1.1.0
 
 - Add support for Emscripten

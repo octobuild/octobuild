@@ -295,6 +295,11 @@ static DASH_PARAMS: &[CompilerArgument] = &[
     },
     CompilerArgument {
         scope: Scope::Shared,
+        name: "sce-stdlib",
+        value_type: COMBINED,
+    },
+    CompilerArgument {
+        scope: Scope::Shared,
         name: "std",
         value_type: COMBINED,
     },
@@ -543,7 +548,7 @@ fn test_parse_argument_compile() {
         "-c -include-pch CorePrivatePCH.h.pch -pipe -Wall -Werror -funwind-tables \
          -Wsequence-point -mmmx -msse -msse2 -fno-math-errno -fno-rtti -g3 -gdwarf-3 -O2 -D \
          IS_PROGRAM=1 -D UNICODE -DIS_MONOLITHIC=1 -x c++ -std=c++11 -include CorePrivatePCH.h \
-         --driver-mode=g++ \
+         --driver-mode=g++ -sce-stdlib=v1 \
          -o Module.Core.cpp.o Module.Core.cpp"
             .split(' ')
             .map(|x| x.to_string())
@@ -590,6 +595,7 @@ fn test_parse_argument_compile() {
                 "g++",
                 ParamForm::Combined
             ),
+            Arg::param_ext(Scope::Shared, "-", "sce-stdlib", "v1", ParamForm::Combined),
             Arg::output(OutputKind::Object, "o", "Module.Core.cpp.o"),
             Arg::input(InputKind::Source, "Module.Core.cpp")
         ]
