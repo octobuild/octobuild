@@ -1,9 +1,10 @@
+use std::cmp::Ordering;
+use std::collections::BTreeSet;
 use std::ffi::OsString;
 use std::fs;
 use std::fs::{File, OpenOptions};
 use std::io::{Read, Seek, SeekFrom, Write};
 use std::path::{Path, PathBuf};
-
 use std::time::SystemTime;
 
 use crate::compiler::OutputInfo;
@@ -39,6 +40,37 @@ struct CacheFile {
     path: PathBuf,
     size: u64,
     accessed: SystemTime,
+    modified: SystemTime,
+}
+
+impl PartialEq<Self> for CacheFile {
+    fn eq(&self, other: &Self) -> bool {
+        self.path.eq(&other.path)
+    }
+}
+
+impl Eq for CacheFile {}
+
+impl PartialOrd<Self> for CacheFile {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for CacheFile {
+    fn cmp(&self, other: &Self) -> Ordering {
+        let accessed_cmp = self.accessed.cmp(&other.accessed);
+        if accessed_cmp != Ordering::Equal {
+            return accessed_cmp;
+        }
+
+        let modified_cmp = self.modified.cmp(&other.modified);
+        if modified_cmp != Ordering::Equal {
+            return modified_cmp;
+        }
+
+        self.path.cmp(&other.path)
+    }
 }
 
 impl FileCache {
@@ -73,11 +105,25 @@ impl FileCache {
     }
 
     pub fn cleanup(&self) -> crate::Result<()> {
-        let mut files = find_cache_files(&self.cache_dir, Vec::new())?;
-        files.sort_by(|a, b| b.accessed.cmp(&a.accessed));
+        let mut files = BTreeSet::<CacheFile>::new();
+
+        foreach_cache_file(
+            &self.cache_dir,
+            &mut (|path: PathBuf, metadata: fs::Metadata| -> crate::Result<()> {
+                files.insert(CacheFile {
+                    path,
+                    size: metadata.len(),
+                    accessed: metadata.accessed()?,
+                    modified: metadata.modified()?,
+                });
+                Ok(())
+            }),
+        )?;
 
         let mut cache_size: u64 = 0;
-        for item in &files {
+
+        // Attention, reverse order. We want to keep newer files
+        for item in files.iter().rev() {
             cache_size += item.size;
             if cache_size > self.cache_limit {
                 fs::remove_file(&item.path)?;
@@ -161,23 +207,28 @@ impl FileCache {
     }
 }
 
-fn find_cache_files(dir: &Path, mut files: Vec<CacheFile>) -> crate::Result<Vec<CacheFile>> {
+// TODO: Is it doable without a helper function?
+fn foreach_cache_file<F>(dir: &Path, mut func: F) -> crate::Result<()>
+where
+    F: FnMut(PathBuf, fs::Metadata) -> crate::Result<()>,
+{
+    foreach_cache_file_r(dir, &mut func)
+}
+
+fn foreach_cache_file_r<F>(dir: &Path, func: &mut F) -> crate::Result<()>
+where
+    F: FnMut(PathBuf, fs::Metadata) -> crate::Result<()>,
+{
     for entry in fs::read_dir(dir)? {
         let entry = entry?;
-        let path = entry.path();
-        let stat = fs::metadata(&path)?;
+        let stat = fs::metadata(entry.path())?;
         if stat.is_dir() {
-            let r = find_cache_files(&path, files);
-            files = r?;
+            foreach_cache_file_r(entry.path().as_path(), func)?;
         } else {
-            files.push(CacheFile {
-                path,
-                size: stat.len(),
-                accessed: stat.modified()?,
-            });
+            func(entry.path(), stat)?;
         }
     }
-    Ok(files)
+    Ok(())
 }
 
 fn write_cached_file<W: Write>(stream: &mut W, path: PathBuf) -> crate::Result<()> {
