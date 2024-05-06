@@ -1,6 +1,6 @@
 [package]
 name = "octobuild"
-version = "1.3.0"
+version = "1.3.1"
 authors = [
     "Artem V. Navrotskiy <bozaro@users.noreply.github.com>",
     "Marat Radchenko <marat@slonopotamus.org>",
