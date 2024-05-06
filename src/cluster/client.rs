@@ -1,6 +1,6 @@
 use std::fs;
 use std::fs::File;
-use std::io::{Error, ErrorKind, Read, Write};
+use std::io::{Error, ErrorKind, Write};
 use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::str::FromStr;
@@ -90,14 +90,6 @@ impl<C: Compiler> Compiler for RemoteCompiler<C> {
     // Discover local toolchains.
     fn discover_toolchains(&self) -> Vec<Arc<dyn Toolchain>> {
         self.local.discover_toolchains()
-    }
-}
-
-struct ReadWrapper<'a, R: 'a + Read>(&'a mut R);
-
-impl<'a, R: 'a + Read> Read for ReadWrapper<'a, R> {
-    fn read(&mut self, buf: &mut [u8]) -> Result<usize, Error> {
-        self.0.read(buf)
     }
 }
 
