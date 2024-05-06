@@ -147,14 +147,6 @@ impl BuilderService {
     }
 }
 
-struct ReadWrapper<'a, R: 'a + Read>(&'a mut R);
-
-impl<'a, R: 'a + Read> Read for ReadWrapper<'a, R> {
-    fn read(&mut self, buf: &mut [u8]) -> Result<usize, io::Error> {
-        self.0.read(buf)
-    }
-}
-
 fn handle_task(state: Arc<BuilderState>, request: &Request) -> octobuild::Result<Response> {
     // Receive compilation request.
     info!("Received task from: {}", &request.remote_addr());
