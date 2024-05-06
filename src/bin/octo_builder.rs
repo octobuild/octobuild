@@ -2,8 +2,6 @@ use std::collections::HashMap;
 use std::ffi::OsString;
 use std::fs;
 use std::fs::File;
-use std::io;
-use std::io::Read;
 use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
