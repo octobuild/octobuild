@@ -9,7 +9,7 @@ use figment::Figment;
 #[derive(Copy, Clone, Debug, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum CacheMode {
     None,
-    Readonly,
+    ReadOnly,
     ReadWrite,
 }
 

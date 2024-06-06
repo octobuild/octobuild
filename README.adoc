@@ -142,9 +142,9 @@ Default is number of cores.
 Default is `true` on Windows and `false` on other platforms.
 Enable this if you're getting `ERROR: The filename or extension is too long. (os error 206)` on Windows.
 `OCTOBUILD_CACHE_MODE` (`ReadWrite`, `ReadOnly` or `None`):: controls octobuild cache mode.
-`rw` is default normal operation.
-`ro` allows to read existing files from cache, but doesn't write new files.
-`none` completely disables cache.
+`ReadWrite` is default normal operation.
+`ReadOnly` allows to read existing files from cache, but doesn't write new files.
+`None` completely disables cache.
 
 [[benchmark]]
 == Benchmark
