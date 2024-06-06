@@ -8,7 +8,7 @@ use std::path::{Path, PathBuf};
 use std::time::SystemTime;
 
 use crate::compiler::OutputInfo;
-use crate::config::Config;
+use crate::config::{CacheMode, Config};
 use crate::io::binary::{read_exact, read_u64, read_usize, write_u64, write_usize};
 use crate::io::counter::Counter;
 use crate::io::statistic::Statistic;
@@ -31,6 +31,7 @@ pub enum CacheError {
 }
 
 pub struct FileCache {
+    cache_mode: CacheMode,
     cache_dir: PathBuf,
     cache_limit: u64,
     cache_compression_level: u32,
@@ -77,6 +78,7 @@ impl FileCache {
     #[must_use]
     pub fn new(config: &Config) -> Self {
         FileCache {
+            cache_mode: config.cache_mode,
             cache_dir: config.cache.clone(),
             cache_limit: config.cache_limit_mb * 1024 * 1024,
             cache_compression_level: config.cache_compression_level,
@@ -94,17 +96,28 @@ impl FileCache {
             .cache_dir
             .join(&hash[0..2])
             .join(hash[2..].to_string() + SUFFIX);
-        // Try to read data from cache.
-        if let Ok(output) = self.read_cache(statistic, &path, &outputs) {
-            return Ok(output);
+
+        if self.cache_mode != CacheMode::None {
+            // Try to read data from cache.
+            if let Ok(output) = self.read_cache(statistic, &path, &outputs) {
+                return Ok(output);
+            }
         }
-        // Run task and save result to cache.
+
         let output = worker()?;
-        self.write_cache(statistic, &path, outputs, &output)?;
+
+        if self.cache_mode == CacheMode::ReadWrite {
+            self.write_cache(statistic, &path, outputs, &output)?;
+        }
+
         Ok(output)
     }
 
     pub fn cleanup(&self) -> crate::Result<()> {
+        if self.cache_mode != CacheMode::ReadWrite {
+            return Ok(())
+        }
+
         let mut files = BTreeSet::<CacheFile>::new();
 
         foreach_cache_file(

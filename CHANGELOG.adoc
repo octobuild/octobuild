@@ -1,6 +1,10 @@
 = Changelog
 :icons: font
 
+== Unreleased
+
+- Add option to temporarily disable caching (either fully or by switching to readonly mode)
+
 == 1.3.2
 
 - Rework file cache so it respects atime

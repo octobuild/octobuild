@@ -6,9 +6,17 @@ use std::sync::OnceLock;
 use figment::providers::{Env, Format, Serialized, Yaml};
 use figment::Figment;
 
+#[derive(Copy, Clone, Debug, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
+pub enum CacheMode {
+    None,
+    Readonly,
+    ReadWrite,
+}
+
 #[derive(serde::Serialize, serde::Deserialize)]
 pub struct Config {
     pub cache: PathBuf,
+    pub cache_mode: CacheMode,
     pub cache_limit_mb: u64,
     pub cache_compression_level: u32,
     pub coordinator: Option<url::Url>,
@@ -35,6 +43,7 @@ impl Default for Config {
     fn default() -> Self {
         Self {
             cache: project_dirs().cache_dir().into(),
+            cache_mode: CacheMode::ReadWrite,
             cache_limit_mb: 64 * 1024,
             cache_compression_level: 1,
             coordinator: None,
