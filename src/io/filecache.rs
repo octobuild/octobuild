@@ -115,7 +115,7 @@ impl FileCache {
 
     pub fn cleanup(&self) -> crate::Result<()> {
         if self.cache_mode != CacheMode::ReadWrite {
-            return Ok(())
+            return Ok(());
         }
 
         let mut files = BTreeSet::<CacheFile>::new();
