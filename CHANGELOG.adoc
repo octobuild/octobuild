@@ -1,7 +1,7 @@
 = Changelog
 :icons: font
 
-== Unreleased
+== 1.4.0
 
 - Add option to temporarily disable caching (either fully or by switching to readonly mode)
 - Fix errors not being logged
