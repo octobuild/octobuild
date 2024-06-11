@@ -4,6 +4,8 @@ use daemon::State;
 use std::sync::mpsc::Receiver;
 
 fn main() {
+    env_logger::init();
+    
     let daemon = Daemon {
         name: "octobuild_agent".to_string(),
     };

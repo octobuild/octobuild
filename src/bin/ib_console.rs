@@ -22,6 +22,8 @@ use octobuild::xg;
 use octobuild::xg::parser::{XgGraph, XgNode};
 
 pub fn main() -> octobuild::Result<()> {
+    env_logger::init();
+
     writeln!(stdout(), "xgConsole ({}):", version::full())?;
     let args: Vec<String> = env::args().collect();
     for arg in &args {
