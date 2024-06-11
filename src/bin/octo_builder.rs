@@ -302,7 +302,7 @@ impl Drop for BuilderService {
 
 fn main() {
     env_logger::init();
-    
+
     let daemon = Daemon {
         name: "octobuild_Builder".to_string(),
     };

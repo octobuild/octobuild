@@ -88,7 +88,7 @@ fn list(state: Arc<CoordinatorState>) -> octobuild::Result<Response> {
 
 fn main() {
     env_logger::init();
-    
+
     let daemon = Daemon {
         name: "octobuild_coordinator".to_string(),
     };

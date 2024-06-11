@@ -4,6 +4,8 @@
 == Unreleased
 
 - Add option to temporarily disable caching (either fully or by switching to readonly mode)
+- Fix errors not being logged
+- Add support for Unreal Engine 5.4
 
 == 1.3.2
 
