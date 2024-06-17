@@ -253,11 +253,12 @@ fn parse_argument<S: AsRef<str>, I: Iterator<Item = S>>(
                 None => match flag {
                     "c" | "nologo" => Ok(Arg::flag(Scope::Ignore, "/", flag)),
 
-                    "bigobj" | "d2ExtendedWarningInfo" => Ok(Arg::flag(Scope::Compiler, "/", flag)),
+                    "bigobj" => Ok(Arg::flag(Scope::Compiler, "/", flag)),
 
                     "FC"
                     | "d2vzeroupper"
                     | "d2vzeroupper-"
+                    | "d2ExtendedWarningInfo"
                     | "fastfail"
                     | "utf-8"
                     | "permissive-"
@@ -362,7 +363,7 @@ fn test_parse_argument() {
             Arg::param_ext(Scope::Shared, "/", "D", "TEST2", ParamForm::Separate),
             Arg::flag(Scope::Shared, "/", "arch:AVX"),
             Arg::flag(Scope::Shared, "/", "fsanitize=address"),
-            Arg::flag(Scope::Compiler, "/", "d2ExtendedWarningInfo"),
+            Arg::flag(Scope::Shared, "/", "d2ExtendedWarningInfo"),
             Arg::input(InputKind::Source, "sample.cpp")
         ]
     )
