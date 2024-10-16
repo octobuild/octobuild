@@ -308,9 +308,8 @@ fn write_output(path: &Option<PathBuf>, success: bool, output: &[u8]) -> Result<
         Some(ref path) => {
             if success {
                 let mut f = File::create(path)?;
-                f.write(output).map_err(|e| {
+                f.write(output).inspect_err(|_| {
                     drop(fs::remove_file(path));
-                    e
                 })?;
                 Ok(())
             } else {
