@@ -98,7 +98,7 @@ jobs:
       - name: checkout
         uses: actions/checkout@v4
       - name: publish to Homebrew
-        uses: dawidd6/action-homebrew-bump-formula@v3
+        uses: dawidd6/action-homebrew-bump-formula@v4
         with:
           # See https://github.com/marketplace/actions/homebrew-bump-formula#usage
           token: ${{ secrets.GH_PERSONAL_TOKEN }}
