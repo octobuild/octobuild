@@ -95,8 +95,7 @@ uuid = { version = "1", features = ["v4"] }
 xml-rs = "0.8"
 
 [target.'cfg(windows)'.build-dependencies]
-# Temporary locked to workaround https://github.com/rust-lang/cc-rs/issues/1281
-cc = "=1.1.31"
+cc = "1"
 
 [target.'cfg(windows)'.dependencies]
 winapi = { version = "0.3", features = ["winver"] }

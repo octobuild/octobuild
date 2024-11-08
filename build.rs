@@ -19,7 +19,7 @@ fn get_dest_dir() -> PathBuf {
 
 #[cfg(windows)]
 fn copy_redist_msm(dest_dir: &Path) {
-    let tool = cc::windows_registry::find_tool("x86_64-msvc", "cl.exe").unwrap();
+    let tool = cc::windows_registry::find_tool("x86_64-pc-windows-msvc", "cl.exe").unwrap();
 
     let vc_dir = tool
         .path()
