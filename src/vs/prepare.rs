@@ -327,19 +327,19 @@ fn is_spaceable_param(flag: &str) -> Option<(&str, Scope)> {
             return Some((prefix, Scope::Shared));
         }
     }
-    
+
     for prefix in ["external:I", "I", "sourceDependencies", "experimental:log"] {
         if flag.starts_with(prefix) {
             return Some((prefix, Scope::Preprocessor));
         }
     }
-    
+
     for prefix in ["W", "wd", "we", "wo", "w"] {
         if flag.starts_with(prefix) {
             return Some((prefix, Scope::Compiler));
         }
     }
-    
+
     None
 }
 
