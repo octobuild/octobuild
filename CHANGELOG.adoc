@@ -1,6 +1,10 @@
 = Changelog
 :icons: font
 
+== Unreleased
+
+- Add support for Unreal Engine 5.5 (at least for Windows)
+
 == 1.4.0
 
 - Add option to temporarily disable caching (either fully or by switching to readonly mode)

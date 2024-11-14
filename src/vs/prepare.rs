@@ -259,6 +259,7 @@ fn parse_argument<S: AsRef<str>, I: Iterator<Item = S>>(
                     | "d2vzeroupper"
                     | "d2vzeroupper-"
                     | "d2ExtendedWarningInfo"
+                    | "d2ssa-cfg-question-"
                     | "fastfail"
                     | "utf-8"
                     | "permissive-"
@@ -326,16 +327,19 @@ fn is_spaceable_param(flag: &str) -> Option<(&str, Scope)> {
             return Some((prefix, Scope::Shared));
         }
     }
-    for prefix in ["external:I", "I", "sourceDependencies"] {
+    
+    for prefix in ["external:I", "I", "sourceDependencies", "experimental:log"] {
         if flag.starts_with(prefix) {
             return Some((prefix, Scope::Preprocessor));
         }
     }
+    
     for prefix in ["W", "wd", "we", "wo", "w"] {
         if flag.starts_with(prefix) {
             return Some((prefix, Scope::Compiler));
         }
     }
+    
     None
 }
 
@@ -347,6 +351,7 @@ fn has_param_prefix(arg: &str) -> bool {
 fn test_parse_argument() {
     let args: Vec<String> =
         "/TP /c /Yusample.h /Fpsample.h.pch /Fosample.cpp.o /DTEST /D TEST2 /arch:AVX /fsanitize=address /d2ExtendedWarningInfo \
+         /d2ssa-cfg-question- \
          sample.cpp"
             .split(' ')
             .map(|x| x.to_string())
@@ -364,6 +369,7 @@ fn test_parse_argument() {
             Arg::flag(Scope::Shared, "/", "arch:AVX"),
             Arg::flag(Scope::Shared, "/", "fsanitize=address"),
             Arg::flag(Scope::Shared, "/", "d2ExtendedWarningInfo"),
+            Arg::flag(Scope::Shared, "/", "d2ssa-cfg-question-"),
             Arg::input(InputKind::Source, "sample.cpp")
         ]
     )
