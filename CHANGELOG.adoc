@@ -1,6 +1,10 @@
 = Changelog
 :icons: font
 
+== Unreleased
+
+- Add support for `cl.exe /FS`
+
 == 1.5.0
 
 - Add support for Unreal Engine 5.5 (at least for Windows)

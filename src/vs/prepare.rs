@@ -253,7 +253,7 @@ fn parse_argument<S: AsRef<str>, I: Iterator<Item = S>>(
                 None => match flag {
                     "c" | "nologo" => Ok(Arg::flag(Scope::Ignore, "/", flag)),
 
-                    "bigobj" => Ok(Arg::flag(Scope::Compiler, "/", flag)),
+                    "bigobj" | "FS" => Ok(Arg::flag(Scope::Compiler, "/", flag)),
 
                     "FC"
                     | "d2vzeroupper"
@@ -351,7 +351,7 @@ fn has_param_prefix(arg: &str) -> bool {
 fn test_parse_argument() {
     let args: Vec<String> =
         "/TP /c /Yusample.h /Fpsample.h.pch /Fosample.cpp.o /DTEST /D TEST2 /arch:AVX /fsanitize=address /d2ExtendedWarningInfo \
-         /d2ssa-cfg-question- \
+         /d2ssa-cfg-question- /FS \
          sample.cpp"
             .split(' ')
             .map(|x| x.to_string())
@@ -370,6 +370,7 @@ fn test_parse_argument() {
             Arg::flag(Scope::Shared, "/", "fsanitize=address"),
             Arg::flag(Scope::Shared, "/", "d2ExtendedWarningInfo"),
             Arg::flag(Scope::Shared, "/", "d2ssa-cfg-question-"),
+            Arg::flag(Scope::Compiler, "/", "FS"),
             Arg::input(InputKind::Source, "sample.cpp")
         ]
     )
