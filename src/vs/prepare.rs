@@ -286,6 +286,7 @@ fn parse_argument<S: AsRef<str>, I: Iterator<Item = S>>(
                     s if s.starts_with("MT") => Ok(Arg::flag(Scope::Shared, "/", flag)),
                     s if s.starts_with("EH") => Ok(Arg::flag(Scope::Shared, "/", flag)),
                     s if s.starts_with("fp:") => Ok(Arg::flag(Scope::Shared, "/", flag)),
+                    s if s.starts_with("d2pattern-opt-disable:") => Ok(Arg::flag(Scope::Compiler, "/", flag)),
                     s if s.starts_with("arch:") => Ok(Arg::flag(Scope::Shared, "/", flag)),
                     s if s.starts_with("errorReport:") => Ok(Arg::flag(Scope::Shared, "/", flag)),
                     s if s.starts_with("source-charset:") => {
@@ -351,7 +352,7 @@ fn has_param_prefix(arg: &str) -> bool {
 fn test_parse_argument() {
     let args: Vec<String> =
         "/TP /c /Yusample.h /Fpsample.h.pch /Fosample.cpp.o /DTEST /D TEST2 /arch:AVX /fsanitize=address /d2ExtendedWarningInfo \
-         /d2ssa-cfg-question- /FS \
+         /d2ssa-cfg-question- /FS /d2pattern-opt-disable:-903736918 /d2pattern-opt-disable:586191940 \
          sample.cpp"
             .split(' ')
             .map(|x| x.to_string())
@@ -371,6 +372,8 @@ fn test_parse_argument() {
             Arg::flag(Scope::Shared, "/", "d2ExtendedWarningInfo"),
             Arg::flag(Scope::Shared, "/", "d2ssa-cfg-question-"),
             Arg::flag(Scope::Compiler, "/", "FS"),
+            Arg::flag(Scope::Compiler, "/", "d2pattern-opt-disable:-903736918"),
+            Arg::flag(Scope::Compiler, "/", "d2pattern-opt-disable:586191940"),
             Arg::input(InputKind::Source, "sample.cpp")
         ]
     )

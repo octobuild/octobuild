@@ -4,6 +4,7 @@
 == Unreleased
 
 - Add support for `cl.exe /FS`
+- Add support for `cl.exe /d2pattern-opt-disable:<value>`
 
 == 1.5.0
 
