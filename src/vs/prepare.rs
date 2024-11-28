@@ -286,7 +286,9 @@ fn parse_argument<S: AsRef<str>, I: Iterator<Item = S>>(
                     s if s.starts_with("MT") => Ok(Arg::flag(Scope::Shared, "/", flag)),
                     s if s.starts_with("EH") => Ok(Arg::flag(Scope::Shared, "/", flag)),
                     s if s.starts_with("fp:") => Ok(Arg::flag(Scope::Shared, "/", flag)),
-                    s if s.starts_with("d2pattern-opt-disable:") => Ok(Arg::flag(Scope::Compiler, "/", flag)),
+                    s if s.starts_with("d2pattern-opt-disable:") => {
+                        Ok(Arg::flag(Scope::Compiler, "/", flag))
+                    }
                     s if s.starts_with("arch:") => Ok(Arg::flag(Scope::Shared, "/", flag)),
                     s if s.starts_with("errorReport:") => Ok(Arg::flag(Scope::Shared, "/", flag)),
                     s if s.starts_with("source-charset:") => {
