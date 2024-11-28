@@ -1,7 +1,7 @@
 = Changelog
 :icons: font
 
-== Unreleased
+== 1.6.0
 
 - Add support for `cl.exe /FS`
 - Add support for `cl.exe /d2pattern-opt-disable:<value>`
