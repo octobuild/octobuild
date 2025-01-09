@@ -30,7 +30,7 @@ pub struct Config {
 #[must_use]
 fn project_dirs() -> &'static directories::ProjectDirs {
     static DIRS: OnceLock<directories::ProjectDirs> = OnceLock::new();
-    return DIRS.get_or_init(|| directories::ProjectDirs::from("", "", "octobuild").unwrap());
+    DIRS.get_or_init(|| directories::ProjectDirs::from("", "", "octobuild").unwrap())
 }
 
 // Windows has 32KB commandline length limit, so we have to use response files to circumvent that.

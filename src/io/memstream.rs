@@ -122,7 +122,7 @@ impl<'a> Iterator for Iter<'a> {
     }
 }
 
-impl<'a> Read for MemReader<'a> {
+impl Read for MemReader<'_> {
     fn read(&mut self, buf: &mut [u8]) -> Result<usize> {
         let mut dst_offset = 0;
         while dst_offset < buf.len() {

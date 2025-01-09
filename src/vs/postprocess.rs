@@ -99,7 +99,7 @@ where
     done: bool,
 }
 
-impl<'a, R, W> ScannerState<'a, R, W>
+impl<R, W> ScannerState<'_, R, W>
 where
     R: Read,
     W: Write,
