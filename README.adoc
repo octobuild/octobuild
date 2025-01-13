@@ -2,7 +2,7 @@
 Artem Navrotskiy; Marat Radchenko
 :slug: octobuild/octobuild
 :uri-project: https://github.com/{slug}
-:uri-ci: {uri-project}/actions?query=branch%3Amaster
+:uri-ci: {uri-project}/actions?query=branch%3Amain
 :uri-discuss: https://gitter.im/{slug}
 :source-highlighter: rouge
 
