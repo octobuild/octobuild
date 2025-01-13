@@ -6,7 +6,7 @@ Artem Navrotskiy; Marat Radchenko
 :uri-discuss: https://gitter.im/{slug}
 :source-highlighter: rouge
 
-image:{uri-project}/actions/workflows/ci.yml/badge.svg?branch=master[Build Status,link={uri-ci}]
+image:{uri-project}/actions/workflows/ci.yml/badge.svg?branch=main[Build Status,link={uri-ci}]
 image:https://img.shields.io/github/release/{slug}.svg[Download,link={uri-project}/releases/latest]
 image:https://img.shields.io/chocolatey/v/octobuild[Chocolatey package,link=https://community.chocolatey.org/packages/octobuild]
 image:https://img.shields.io/winget/v/octobuild.octobuild[WinGet package,link=https://winstall.app/apps/octobuild.octobuild]
