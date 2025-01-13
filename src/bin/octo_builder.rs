@@ -263,7 +263,7 @@ fn handle_upload(state: Arc<BuilderState>, request: &Request) -> octobuild::Resu
 fn is_valid_sha256(hash: &str) -> bool {
     hex::decode(hash)
         .ok()
-        .map_or(false, |v| v.len() == Sha256::new().output_size() * 2)
+        .is_some_and(|v| v.len() == Sha256::new().output_size() * 2)
 }
 
 impl BuilderState {

@@ -324,7 +324,7 @@ impl CommandInfo {
         if allow_current_dir
             || executable
                 .parent()
-                .map_or(false, |path| !path.as_os_str().is_empty())
+                .is_some_and(|path| !path.as_os_str().is_empty())
         {
             if let Some(exe) = self
                 .current_dir
