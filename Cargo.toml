@@ -64,7 +64,7 @@ byteorder = "1"
 clap = { version = "4", features = ["derive"] }
 crossbeam-channel = "0.5"
 daemon = { git = "https://github.com/octobuild/daemon-rs" }
-directories = "5"
+directories = "6"
 env_logger = "0.11"
 fern = "0.7"
 figment = { version = "0.10", features = ["env", "yaml"] }
