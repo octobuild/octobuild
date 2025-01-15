@@ -79,7 +79,7 @@ lz4 = "1"
 num_cpus = "1"
 os_str_bytes = { version = "7", features = ["conversions"] }
 path-absolutize = "3"
-petgraph = "0.6"
+petgraph = "0.7"
 rand = "0.8"
 regex = "1"
 reqwest = { version = "0.12", features = ["blocking"] }
