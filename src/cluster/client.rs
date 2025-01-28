@@ -8,6 +8,7 @@ use std::sync::{Arc, RwLock};
 use std::time::{Duration, Instant};
 
 use log::{trace, warn};
+use rand::seq::IteratorRandom;
 use reqwest::blocking::Client;
 use reqwest::StatusCode;
 
@@ -244,7 +245,10 @@ impl RemoteToolchain {
     fn remote_endpoint(&self, toolchain_name: &str) -> Option<SocketAddr> {
         let name = toolchain_name.to_string();
         let all_builders = self.builders();
-        let builder = get_random_builder(&all_builders, |b| b.toolchains.contains(&name))?;
+        let builder = all_builders
+            .iter()
+            .filter(|b| b.toolchains.contains(&name))
+            .choose(&mut rand::rng())?;
         SocketAddr::from_str(&builder.endpoint).ok()
     }
 }
@@ -318,16 +322,4 @@ fn write_output(path: &Option<PathBuf>, success: bool, output: &[u8]) -> Result<
         }
         None => Ok(()),
     }
-}
-
-fn get_random_builder<F: Fn(&BuilderInfo) -> bool>(
-    builders: &[BuilderInfo],
-    filter: F,
-) -> Option<&BuilderInfo> {
-    let filtered: Vec<&BuilderInfo> = builders.iter().filter(|b| filter(b)).collect();
-    if filtered.is_empty() {
-        return None;
-    }
-
-    Some(filtered[rand::random::<usize>() % filtered.len()])
 }
