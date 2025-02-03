@@ -1,6 +1,10 @@
 = Changelog
 :icons: font
 
+== Unreleased
+
+- Fix cross-compilation from Windows to Linux with `OCTOBUILD_USE_RESPONSE_FILES=true` (https://github.com/octobuild/octobuild/issues/117[#117])
+
 == 1.6.0
 
 - Add support for `cl.exe /FS`
