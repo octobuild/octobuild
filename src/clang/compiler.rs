@@ -156,7 +156,7 @@ impl Toolchain for ClangToolchain {
         let output = state.wrap_slow(|| -> crate::Result<Output> {
             let mut command = task.shared.command.to_command();
             let response_file =
-                state.do_response_file(OsCommandArgs::Regular(args), &mut command)?;
+                state.do_response_file(OsCommandArgs::Array(args), &mut command)?;
             let output = command.output()?;
             drop(response_file);
 
@@ -245,7 +245,7 @@ impl Toolchain for ClangToolchain {
                 .stderr(Stdio::piped());
 
             let response_file =
-                state.do_response_file(OsCommandArgs::Regular(args), &mut command)?;
+                state.do_response_file(OsCommandArgs::Array(args), &mut command)?;
             let mut child = command.spawn()?;
 
             if let Preprocessed(preprocessed) = task.input {

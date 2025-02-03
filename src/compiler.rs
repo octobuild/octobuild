@@ -755,24 +755,24 @@ impl CommandArgs {
 
 #[derive(Debug, Clone)]
 pub enum OsCommandArgs {
-    Raw(OsString),
-    Regular(Vec<OsString>),
+    String(OsString),
+    Array(Vec<OsString>),
 }
 
 impl OsCommandArgs {
     pub fn join(self) -> crate::Result<OsString> {
         match self {
-            OsCommandArgs::Raw(v) => Ok(v),
-            OsCommandArgs::Regular(v) => cmd::native::join(&v),
+            OsCommandArgs::String(v) => Ok(v),
+            OsCommandArgs::Array(v) => cmd::native::join(&v),
         }
     }
 
     pub fn append_to(&self, command: &mut Command) -> crate::Result<()> {
         match self {
-            OsCommandArgs::Regular(v) => {
+            OsCommandArgs::Array(v) => {
                 command.args(v);
             }
-            OsCommandArgs::Raw(v) => {
+            OsCommandArgs::String(v) => {
                 #[cfg(windows)]
                 {
                     use std::os::windows::process::CommandExt;

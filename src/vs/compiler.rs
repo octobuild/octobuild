@@ -213,7 +213,7 @@ impl Toolchain for VsToolchain {
 
         let mut command = task.shared.command.to_command();
         let response_file =
-            state.do_response_file(OsCommandArgs::Raw(args.join(" ".as_ref())), &mut command)?;
+            state.do_response_file(OsCommandArgs::String(args.join(" ".as_ref())), &mut command)?;
         let output = state.wrap_slow(|| -> crate::Result<Output> {
             let output = command.output()?;
             drop(response_file);
@@ -340,7 +340,7 @@ impl Toolchain for VsToolchain {
             }
 
             let response_file = state
-                .do_response_file(OsCommandArgs::Raw(args.join(" ".as_ref())), &mut command)?;
+                .do_response_file(OsCommandArgs::String(args.join(" ".as_ref())), &mut command)?;
             let output = command.output()?;
             drop(temp_input);
             drop(response_file);
