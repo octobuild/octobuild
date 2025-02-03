@@ -1,7 +1,7 @@
 = Changelog
 :icons: font
 
-== Unreleased
+== 1.7.0
 
 - Fix cross-compilation from Windows to Linux with `OCTOBUILD_USE_RESPONSE_FILES=true` (https://github.com/octobuild/octobuild/issues/117[#117])
 
