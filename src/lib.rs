@@ -1,7 +1,6 @@
 use shlex::QuoteError;
 use std::path::{Path, PathBuf};
 
-use crate::Error::IO;
 use thiserror::Error;
 
 use crate::io::filecache::CacheError;
@@ -77,7 +76,7 @@ pub enum Error {
     #[error("Error: {0}")]
     Generic(String),
     #[error(transparent)]
-    IO(std::io::Error),
+    IO(#[from] std::io::Error),
     #[error("Build task files not found")]
     NoTaskFiles,
     #[error("Failed to compile {path}: {error}")]
@@ -100,12 +99,6 @@ pub enum Error {
     ToolchainNotFound(PathBuf),
 }
 
-impl From<std::io::Error> for Error {
-    fn from(value: std::io::Error) -> Self {
-        IO(value)
-    }
-}
-
 impl From<String> for Error {
     fn from(value: String) -> Self {
         Error::Generic(value)
@@ -125,7 +118,7 @@ impl Error {
 
     fn postprocess(path: &Path, error: crate::Error) -> Self {
         Self::Postprocess {
-            path: path.to_path_buf(),
+            path: path.into(),
             error: error.into(),
         }
     }
