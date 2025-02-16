@@ -1,4 +1,5 @@
 use crate::cmd;
+use crate::Error::Generic;
 use local_encoding_ng::{Encoder, Encoding};
 use sha2::{Digest, Sha256};
 use std::collections::{HashSet, VecDeque};
@@ -8,7 +9,6 @@ use std::io::{Error, Read};
 use std::path::PathBuf;
 use std::time::Instant;
 use std::{env, fs};
-use crate::Error::Generic;
 
 pub fn hash_stream<R: Read>(reader: &mut R) -> Result<String, Error> {
     let mut hasher = Sha256::new();
@@ -48,7 +48,10 @@ pub fn expand_response_files(
         };
 
         if !visited.insert(path.clone()) {
-            return Err(Generic(format!("Cycle in response files detected! {}", path.to_string_lossy())))
+            return Err(Generic(format!(
+                "Cycle in response files detected! {}",
+                path.to_string_lossy()
+            )));
         }
 
         let data = fs::read(path)?;

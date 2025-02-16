@@ -179,12 +179,10 @@ where
 {
     let mut completed: Vec<bool> = vec![false; graph.node_count()];
     for index in graph.externals(EdgeDirection::Outgoing) {
-        tx_task
-            .send(TaskMessage {
-                index,
-                task: graph.node_weight(index).unwrap().clone(),
-            })
-            .map_err(crate::Error::send_error)?;
+        tx_task.send(TaskMessage {
+            index,
+            task: graph.node_weight(index).unwrap().clone(),
+        })?;
     }
 
     for message in rx_result {
@@ -199,12 +197,10 @@ where
 
         for source in graph.neighbors_directed(message.index, EdgeDirection::Incoming) {
             if is_ready(graph, &completed, source) {
-                tx_task
-                    .send(TaskMessage {
-                        index: source,
-                        task: graph.node_weight(source).unwrap().clone(),
-                    })
-                    .map_err(crate::Error::send_error)?;
+                tx_task.send(TaskMessage {
+                    index: source,
+                    task: graph.node_weight(source).unwrap().clone(),
+                })?;
             }
         }
 

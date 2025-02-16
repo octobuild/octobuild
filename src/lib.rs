@@ -1,6 +1,6 @@
+use crossbeam_channel::SendError;
 use shlex::QuoteError;
 use std::path::{Path, PathBuf};
-
 use thiserror::Error;
 
 use crate::io::filecache::CacheError;
@@ -111,11 +111,13 @@ impl From<&str> for Error {
     }
 }
 
-impl Error {
-    fn send_error<T>(error: crossbeam_channel::SendError<T>) -> Self {
-        Error::Generic(error.to_string())
+impl<T> From<SendError<T>> for Error {
+    fn from(value: SendError<T>) -> Self {
+        Error::Generic(value.to_string())
     }
+}
 
+impl Error {
     fn postprocess(path: &Path, error: crate::Error) -> Self {
         Self::Postprocess {
             path: path.into(),
