@@ -1,13 +1,14 @@
+use crate::cmd;
 use local_encoding_ng::{Encoder, Encoding};
+use sha2::{Digest, Sha256};
+use std::collections::{HashSet, VecDeque};
 use std::ffi::{OsStr, OsString};
 use std::io;
 use std::io::{Error, Read};
 use std::path::PathBuf;
 use std::time::Instant;
 use std::{env, fs};
-
-use crate::cmd;
-use sha2::{Digest, Sha256};
+use crate::Error::Generic;
 
 pub fn hash_stream<R: Read>(reader: &mut R) -> Result<String, Error> {
     let mut hasher = Sha256::new();
@@ -19,19 +20,15 @@ pub fn expand_response_files(
     base: &Option<PathBuf>,
     args: Vec<String>,
 ) -> crate::Result<Vec<String>> {
-    let mut result = Vec::<String>::new();
-    expand_response_files_r(base, args, &mut result)?;
-    Ok(result)
-}
+    let mut visited = HashSet::<PathBuf>::new();
+    let mut queue = VecDeque::<String>::new();
+    args.into_iter().for_each(|arg| queue.push_back(arg));
 
-pub fn expand_response_files_r(
-    base: &Option<PathBuf>,
-    args: Vec<String>,
-    into: &mut Vec<String>,
-) -> crate::Result<()> {
-    for item in args {
+    let mut result = Vec::<String>::new();
+
+    while let Some(item) = queue.pop_front() {
         if !item.starts_with('@') {
-            into.push(item.to_string());
+            result.push(item);
             continue;
         }
 
@@ -41,7 +38,7 @@ pub fn expand_response_files_r(
             || item.starts_with("@loader_path")
             || item.starts_with("@executable_path")
         {
-            into.push(item.to_string());
+            result.push(item);
             continue;
         }
 
@@ -49,13 +46,19 @@ pub fn expand_response_files_r(
             Some(p) => p.join(&item[1..]),
             None => PathBuf::from(&item[1..]),
         };
+
+        if !visited.insert(path.clone()) {
+            return Err(Generic(format!("Cycle in response files detected! {}", path.to_string_lossy())))
+        }
+
         let data = fs::read(path)?;
         let text = decode_string(&data)?;
-        let inner_args = cmd::native::parse(&text)?;
-        expand_response_files_r(base, inner_args, into)?;
+        cmd::native::parse(&text)?
+            .into_iter()
+            .for_each(|arg| queue.push_back(arg));
     }
 
-    Ok(())
+    Ok(result)
 }
 
 fn decode_string(data: &[u8]) -> crate::Result<String> {

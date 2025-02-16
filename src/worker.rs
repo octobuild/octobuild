@@ -193,7 +193,7 @@ where
         update_progress(&BuildResult::new(&message, count, graph.node_count()))?;
         let output = message.result.output?;
         if !output.success() {
-            return Err(crate::Error::from("Build failed".to_string()));
+            return Err(crate::Error::from("Build failed"));
         }
         completed[message.index.index()] = true;
 

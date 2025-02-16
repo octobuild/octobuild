@@ -255,7 +255,7 @@ fn write_cached_file<W: Write>(stream: &mut W, path: PathBuf) -> crate::Result<(
     write_u64(stream, total_size)?;
     let written = std::io::copy(&mut file, stream)?;
     if written != total_size {
-        return Err(crate::Error::Generic("Expected end of stream".to_string()));
+        return Err(crate::Error::from("Expected end of stream"));
     }
     Ok(())
 }
@@ -266,7 +266,7 @@ fn read_cached_file(stream: &mut impl Read, path: &Path) -> crate::Result<()> {
     file.set_len(size)?;
     let written = std::io::copy(&mut stream.take(size), &mut file)?;
     if written != size {
-        return Err(crate::Error::Generic("Expected end of stream".to_string()));
+        return Err(crate::Error::from("Expected end of stream"));
     }
     Ok(())
 }
