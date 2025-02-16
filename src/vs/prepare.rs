@@ -1,12 +1,12 @@
-use std::ffi::OsString;
-use std::path::{Path, PathBuf};
-use std::sync::Arc;
-
 use crate::compiler::{
     Arg, CommandInfo, CompilationArgs, CompilationTask, InputKind, OutputKind, PCHArgs, PCHUsage,
     ParamForm, Scope,
 };
 use crate::utils::{expand_response_files, find_param, ParamValue};
+use std::ffi::OsString;
+use std::path::{Path, PathBuf};
+use std::sync::Arc;
+use std::vec::IntoIter;
 
 pub fn create_tasks(
     command: CommandInfo,
@@ -15,7 +15,7 @@ pub fn create_tasks(
 ) -> crate::Result<Vec<CompilationTask>> {
     let expanded_args = expand_response_files(&command.current_dir, args)?;
 
-    let parsed_args = parse_arguments(expanded_args.iter())?;
+    let parsed_args = parse_arguments(expanded_args)?;
     // Source file name.
     let mut input_sources = Vec::<PathBuf>::new();
     for input in parsed_args.iter().filter_map(|arg| match arg {
@@ -195,9 +195,10 @@ fn get_output_object(
     Ok(result)
 }
 
-fn parse_arguments<S: AsRef<str>, I: Iterator<Item = S>>(mut iter: I) -> Result<Vec<Arg>, String> {
+fn parse_arguments(args: Vec<String>) -> Result<Vec<Arg>, String> {
     let mut result: Vec<Arg> = Vec::new();
     let mut errors: Vec<String> = Vec::new();
+    let mut iter = args.into_iter();
     while let Some(parse_result) = parse_argument(&mut iter) {
         match parse_result {
             Ok(arg) => {
@@ -215,30 +216,22 @@ fn parse_arguments<S: AsRef<str>, I: Iterator<Item = S>>(mut iter: I) -> Result<
 }
 
 #[allow(clippy::cognitive_complexity)]
-fn parse_argument<S: AsRef<str>, I: Iterator<Item = S>>(
-    iter: &mut I,
-) -> Option<Result<Arg, String>> {
+fn parse_argument(iter: &mut IntoIter<String>) -> Option<Result<Arg, String>> {
     iter.next().map(|arg| {
-        if has_param_prefix(arg.as_ref()) {
-            let flag = &arg.as_ref()[1..];
+        if has_param_prefix(&arg) {
+            let flag = &arg[1..];
             match is_spaceable_param(flag) {
                 Some((key, scope)) => {
                     if flag == key {
                         match iter.next() {
                             Some(value) => {
-                                if has_param_prefix(value.as_ref()) {
-                                    Err(arg.as_ref().to_string())
+                                if has_param_prefix(&value) {
+                                    Err(arg)
                                 } else {
-                                    Ok(Arg::param_ext(
-                                        scope,
-                                        "/",
-                                        key,
-                                        value.as_ref(),
-                                        ParamForm::Separate,
-                                    ))
+                                    Ok(Arg::param_ext(scope, "/", key, value, ParamForm::Separate))
                                 }
                             }
-                            _ => Err(arg.as_ref().to_string()),
+                            _ => Err(arg),
                         }
                     } else {
                         Ok(Arg::param_ext(
@@ -312,13 +305,13 @@ fn parse_argument<S: AsRef<str>, I: Iterator<Item = S>>(
                         ParamForm::Smushed,
                     )),
                     s if s.starts_with("analyze") => Ok(Arg::flag(Scope::Shared, "/", flag)),
-                    _ => Err(arg.as_ref().to_string()),
+                    _ => Err(arg),
                 },
             }
         } else {
             Ok(Arg::Input {
                 kind: InputKind::Source,
-                file: arg.as_ref().to_string(),
+                file: arg,
             })
         }
     })
@@ -360,7 +353,7 @@ fn test_parse_argument() {
             .map(|x| x.to_string())
             .collect();
     assert_eq!(
-        parse_arguments(args.iter()).unwrap(),
+        parse_arguments(args).unwrap(),
         [
             Arg::param_ext(Scope::Ignore, "/", "T", "P", ParamForm::Smushed),
             Arg::flag(Scope::Ignore, "/", "c"),

@@ -1,12 +1,11 @@
-use std::path::{Path, PathBuf};
-use std::slice::Iter;
-use std::sync::Arc;
-
 use crate::compiler::{
     Arg, CommandInfo, CompilationArgs, CompilationTask, InputKind, OutputKind, PCHUsage, ParamForm,
     Scope,
 };
 use crate::utils::{expand_response_files, find_param, ParamValue};
+use std::path::{Path, PathBuf};
+use std::sync::Arc;
+use std::vec::IntoIter;
 
 pub fn create_tasks(
     command: CommandInfo,
@@ -25,7 +24,7 @@ pub fn create_tasks(
         return Ok(Vec::new());
     }
 
-    let parsed_args = parse_arguments(&expanded_args)?;
+    let parsed_args = parse_arguments(expanded_args)?;
     // Source file name.
     let input_sources: Vec<PathBuf> = parsed_args
         .iter()
@@ -176,10 +175,10 @@ pub fn create_tasks(
         .collect()
 }
 
-fn parse_arguments(args: &[String]) -> Result<Vec<Arg>, String> {
+fn parse_arguments(args: Vec<String>) -> Result<Vec<Arg>, String> {
     let mut result: Vec<Arg> = Vec::new();
     let mut errors: Vec<String> = Vec::new();
-    let mut iter = args.iter();
+    let mut iter = args.into_iter();
     while let Some(parse_result) = parse_argument(&mut iter) {
         match parse_result {
             Ok(arg) => {
@@ -377,7 +376,7 @@ fn handle_argument(
     prefix: &'static str,
     key: &str,
     params: &[CompilerArgument],
-    iter: &mut Iter<String>,
+    iter: &mut IntoIter<String>,
 ) -> Option<Arg> {
     for param in params {
         for value_type in param.value_type {
@@ -433,12 +432,12 @@ fn handle_argument(
     None
 }
 
-fn parse_argument(iter: &mut Iter<String>) -> Option<Result<Arg, String>> {
+fn parse_argument(iter: &mut IntoIter<String>) -> Option<Result<Arg, String>> {
     iter.next().map(|arg| {
         if let Some(key) = arg.strip_prefix("--") {
             match handle_argument("--", key, DASH_DASH_PARAMS, iter) {
                 Some(v) => Ok(v),
-                None => Err(arg.to_string()),
+                None => Err(arg),
             }
         } else if let Some(key) = arg.strip_prefix('-') {
             match handle_argument("-", key, DASH_PARAMS, iter) {
@@ -459,10 +458,10 @@ fn parse_argument(iter: &mut Iter<String>) -> Option<Result<Arg, String>> {
                     }
                     _ => Ok(v),
                 },
-                None => Err(arg.to_string()),
+                None => Err(arg),
             }
         } else {
-            Ok(Arg::input(InputKind::Source, arg.to_string()))
+            Ok(Arg::input(InputKind::Source, arg))
         }
     })
 }
@@ -484,7 +483,7 @@ fn test_parse_argument_precompile() {
             .map(|x| x.to_string())
             .collect();
     assert_eq!(
-        parse_arguments(&args).unwrap(),
+        parse_arguments(args).unwrap(),
         [
             Arg::param(Scope::Ignore, "-", "x", "c++-header"),
             Arg::flag(Scope::Shared, "-", "pipe"),
@@ -554,7 +553,7 @@ fn test_parse_argument_compile() {
             .map(|x| x.to_string())
             .collect();
     assert_eq!(
-        parse_arguments(&args).unwrap(),
+        parse_arguments(args).unwrap(),
         [
             Arg::flag(Scope::Ignore, "-", "c"),
             Arg::param(
