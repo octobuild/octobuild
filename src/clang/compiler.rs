@@ -125,7 +125,7 @@ impl Toolchain for ClangToolchain {
     fn create_tasks(
         &self,
         command: CommandInfo,
-        args: &[String],
+        args: Vec<String>,
         run_second_cpp: bool,
     ) -> crate::Result<Vec<CompilationTask>> {
         super::prepare::create_tasks(command, args, run_second_cpp)

@@ -17,7 +17,7 @@ pub fn hash_stream<R: Read>(reader: &mut R) -> Result<String, Error> {
 
 pub fn expand_response_files(
     base: &Option<PathBuf>,
-    args: &[String],
+    args: Vec<String>,
 ) -> crate::Result<Vec<String>> {
     let mut result = Vec::<String>::new();
     expand_response_files_r(base, args, &mut result)?;
@@ -26,7 +26,7 @@ pub fn expand_response_files(
 
 pub fn expand_response_files_r(
     base: &Option<PathBuf>,
-    args: &[String],
+    args: Vec<String>,
     into: &mut Vec<String>,
 ) -> crate::Result<()> {
     for item in args {
@@ -51,7 +51,8 @@ pub fn expand_response_files_r(
         };
         let data = fs::read(path)?;
         let text = decode_string(&data)?;
-        expand_response_files_r(base, &cmd::native::parse(&text)?, into)?;
+        let inner_args = cmd::native::parse(&text)?;
+        expand_response_files_r(base, inner_args, into)?;
     }
 
     Ok(())

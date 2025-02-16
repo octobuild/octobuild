@@ -11,15 +11,15 @@ use petgraph::graph::NodeIndex;
 use petgraph::{EdgeDirection, Graph};
 
 use octobuild::cluster::client::RemoteCompiler;
-use octobuild::compiler::{CommandArgs, Compiler, SharedState};
+use octobuild::compiler::{Compiler, SharedState};
 use octobuild::config::Config;
 use octobuild::simple::supported_compilers;
-use octobuild::version;
 use octobuild::worker::execute_graph;
 use octobuild::worker::validate_graph;
 use octobuild::worker::{BuildAction, BuildGraph, BuildResult, BuildTask};
 use octobuild::xg;
 use octobuild::xg::parser::{XgGraph, XgNode};
+use octobuild::{cmd, version};
 
 pub fn main() -> octobuild::Result<()> {
     env_logger::init();
@@ -94,12 +94,12 @@ fn prepare_graph<C: Compiler>(
     for raw_node in graph.raw_nodes() {
         let node: &XgNode = &raw_node.weight;
         let raw_args: String = expand_arg(&node.raw_args, &env_resolver);
-        let command = node.command.clone();
+        let args = cmd::native::parse(&raw_args)?;
 
         let actions = BuildAction::create_tasks(
             compiler,
-            command.clone(),
-            CommandArgs::String(raw_args),
+            node.command.clone(),
+            args,
             &node.title,
             config.run_second_cpp,
         );

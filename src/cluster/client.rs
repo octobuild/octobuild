@@ -262,7 +262,7 @@ impl Toolchain for RemoteToolchain {
     fn create_tasks(
         &self,
         command: CommandInfo,
-        args: &[String],
+        args: Vec<String>,
         run_second_cpp: bool,
     ) -> crate::Result<Vec<CompilationTask>> {
         self.local.create_tasks(command, args, run_second_cpp)

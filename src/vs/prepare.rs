@@ -10,7 +10,7 @@ use crate::utils::{expand_response_files, find_param, ParamValue};
 
 pub fn create_tasks(
     command: CommandInfo,
-    args: &[String],
+    args: Vec<String>,
     run_second_cpp: bool,
 ) -> crate::Result<Vec<CompilationTask>> {
     let expanded_args = expand_response_files(&command.current_dir, args)?;

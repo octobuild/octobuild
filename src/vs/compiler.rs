@@ -151,8 +151,7 @@ fn collect_args(
                     match form {
                         ParamForm::Separate => {
                             into.push(OsString::from(prefix).concat(flag));
-                            // TODO: Why quote?
-                            into.push(quote(value)?);
+                            into.push(value.into());
                         }
                         ParamForm::Smushed => {
                             into.push(OsString::from(prefix).concat(flag).concat(quote(value)?));
@@ -183,7 +182,7 @@ impl Toolchain for VsToolchain {
     fn create_tasks(
         &self,
         command: CommandInfo,
-        args: &[String],
+        args: Vec<String>,
         run_second_cpp: bool,
     ) -> crate::Result<Vec<CompilationTask>> {
         super::prepare::create_tasks(command, args, run_second_cpp)
@@ -200,7 +199,7 @@ impl Toolchain for VsToolchain {
             OsString::from("/E"),
             OsString::from("/we4002"), // C4002: too many actual parameters for macro 'identifier'
             OsString::from("/Fo").concat(quote(&task.output_object)?), // /Fo option also set output path for #import directive
-            quote(&task.input_source)?,
+            OsString::from(&task.input_source),
         ];
         collect_args(
             &task.shared.args,
