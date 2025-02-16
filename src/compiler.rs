@@ -211,19 +211,19 @@ impl SharedState {
 
     pub fn do_response_file(
         &self,
-        args: OsCommandArgs,
+        args: Vec<OsString>,
         command: &mut Command,
     ) -> crate::Result<Option<NamedTempFile>> {
         if self.use_response_files {
             let response_file = tempfile::Builder::new()
                 .suffix(".rsp")
                 .tempfile_in(self.temp_dir.path())?;
-            let contents = args.join()?;
+            let contents = cmd::native::join(&args)?;
             std::fs::write(response_file.path(), contents.to_raw_bytes())?;
             command.arg(OsString::from("@").concat(response_file.path().as_os_str()));
             Ok(Some(response_file))
         } else {
-            args.append_to(command)?;
+            command.args(args);
             Ok(None)
         }
     }
@@ -727,17 +727,17 @@ pub struct ToolchainCompilationTask {
 
 #[derive(Debug, Clone)]
 pub enum CommandArgs {
-    Raw(String),
-    Regular(Vec<String>),
+    String(String),
+    Vec(Vec<String>),
 }
 
 impl CommandArgs {
     pub fn append_to(&self, command: &mut Command) -> crate::Result<()> {
         match self {
-            CommandArgs::Regular(v) => {
+            CommandArgs::Vec(v) => {
                 command.args(v);
             }
-            CommandArgs::Raw(v) => {
+            CommandArgs::String(v) => {
                 #[cfg(windows)]
                 {
                     use std::os::windows::process::CommandExt;
@@ -746,41 +746,6 @@ impl CommandArgs {
                 #[cfg(not(windows))]
                 {
                     command.args(cmd::native::parse(v)?);
-                }
-            }
-        }
-        Ok(())
-    }
-}
-
-#[derive(Debug, Clone)]
-pub enum OsCommandArgs {
-    String(OsString),
-    Array(Vec<OsString>),
-}
-
-impl OsCommandArgs {
-    pub fn join(self) -> crate::Result<OsString> {
-        match self {
-            OsCommandArgs::String(v) => Ok(v),
-            OsCommandArgs::Array(v) => cmd::native::join(&v),
-        }
-    }
-
-    pub fn append_to(&self, command: &mut Command) -> crate::Result<()> {
-        match self {
-            OsCommandArgs::Array(v) => {
-                command.args(v);
-            }
-            OsCommandArgs::String(v) => {
-                #[cfg(windows)]
-                {
-                    use std::os::windows::process::CommandExt;
-                    command.raw_arg(v);
-                }
-                #[cfg(not(windows))]
-                {
-                    command.args(cmd::native::parse(v.to_str().unwrap())?);
                 }
             }
         }
@@ -805,8 +770,8 @@ pub trait Compiler: Send + Sync {
             .ok_or_else(|| crate::Error::ToolchainNotFound(command.program.clone()))?;
 
         let argv = match args {
-            CommandArgs::Raw(v) => cmd::native::parse(&v)?,
-            CommandArgs::Regular(v) => v,
+            CommandArgs::String(v) => cmd::native::parse(&v)?,
+            CommandArgs::Vec(v) => v,
         };
 
         let tasks = toolchain.create_tasks(command, &argv, run_second_cpp)?;

@@ -71,7 +71,7 @@ where
     let actions = BuildAction::create_tasks(
         &remote,
         command_info,
-        CommandArgs::Regular(args),
+        CommandArgs::Vec(args),
         exec,
         config.run_second_cpp,
     );

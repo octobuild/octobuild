@@ -99,7 +99,7 @@ fn prepare_graph<C: Compiler>(
         let actions = BuildAction::create_tasks(
             compiler,
             command.clone(),
-            CommandArgs::Raw(raw_args),
+            CommandArgs::String(raw_args),
             &node.title,
             config.run_second_cpp,
         );

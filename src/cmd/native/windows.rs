@@ -138,6 +138,14 @@ pub fn quote(arg: impl AsRef<OsStr>) -> crate::Result<OsString> {
     Ok(OsStringExt::from_wide(&result))
 }
 
+pub fn join<'a, I: IntoIterator<Item = &'a OsString>>(words: I) -> crate::Result<OsString> {
+    Ok(words
+        .into_iter()
+        .map(quote)
+        .collect::<crate::Result<Vec<OsString>>>()?
+        .join(OsStr::new(" ")))
+}
+
 #[test]
 fn test_parse_1() {
     assert_eq!(parse("\"abc\" d e").unwrap(), ["abc", "d", "e"]);

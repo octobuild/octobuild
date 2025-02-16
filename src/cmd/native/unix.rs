@@ -8,7 +8,12 @@ pub fn parse(cmd: &str) -> crate::Result<Vec<String>> {
 
 pub fn quote(arg: impl AsRef<OsStr>) -> crate::Result<OsString> {
     let quoted = shlex::try_quote(arg.as_ref().to_str().unwrap())?;
-    Ok(OsString::from(quoted.as_ref()))
+    Ok(quoted.as_ref().into())
+}
+
+pub fn join<'a, I: IntoIterator<Item = &'a OsString>>(words: I) -> crate::Result<OsString> {
+    let result = shlex::try_join(words.into_iter().map(|x| x.to_str().unwrap()))?;
+    Ok(result.into())
 }
 
 #[test]

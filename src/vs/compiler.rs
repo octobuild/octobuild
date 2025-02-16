@@ -1,9 +1,8 @@
 use crate::cmd;
 use crate::compiler::CompileInput::{Preprocessed, Source};
 use crate::compiler::{
-    Arg, CommandInfo, CompilationTask, CompileStep, Compiler, CompilerOutput, OsCommandArgs,
-    OutputInfo, PCHUsage, ParamForm, PreprocessResult, Scope, SharedState, Toolchain,
-    ToolchainHolder,
+    Arg, CommandInfo, CompilationTask, CompileStep, Compiler, CompilerOutput, OutputInfo, PCHUsage,
+    ParamForm, PreprocessResult, Scope, SharedState, Toolchain, ToolchainHolder,
 };
 use crate::io::memstream::MemStream;
 use crate::io::tempfile::TempFile;
@@ -212,8 +211,7 @@ impl Toolchain for VsToolchain {
         )?;
 
         let mut command = task.shared.command.to_command();
-        let response_file =
-            state.do_response_file(OsCommandArgs::String(args.join(" ".as_ref())), &mut command)?;
+        let response_file = state.do_response_file(args, &mut command)?;
         let output = state.wrap_slow(|| -> crate::Result<Output> {
             let output = command.output()?;
             drop(response_file);
@@ -339,8 +337,7 @@ impl Toolchain for VsToolchain {
                 command.env(name, value);
             }
 
-            let response_file = state
-                .do_response_file(OsCommandArgs::String(args.join(" ".as_ref())), &mut command)?;
+            let response_file = state.do_response_file(args, &mut command)?;
             let output = command.output()?;
             drop(temp_input);
             drop(response_file);
