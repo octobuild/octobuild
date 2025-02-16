@@ -30,7 +30,7 @@ pub fn expand_response_files_r(
     into: &mut Vec<String>,
 ) -> crate::Result<()> {
     for item in args {
-        if !(item.starts_with('@')) {
+        if !item.starts_with('@') {
             into.push(item.to_string());
             continue;
         }
