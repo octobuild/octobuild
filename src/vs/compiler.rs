@@ -118,6 +118,7 @@ fn run_postprocess(
     .map_err(|e| crate::Error::postprocess(path, e))?;
     Ok(PreprocessResult::Success(CompilerOutput::MemSteam(content)))
 }
+
 fn collect_args(
     args: &[Arg],
     target_scope: Scope,
@@ -151,8 +152,7 @@ fn collect_args(
                     match form {
                         ParamForm::Separate => {
                             into.push(OsString::from(prefix).concat(flag));
-                            // TODO: Why quote?
-                            into.push(quote(value)?);
+                            into.push(value.into());
                         }
                         ParamForm::Smushed => {
                             into.push(OsString::from(prefix).concat(flag).concat(quote(value)?));
@@ -200,7 +200,7 @@ impl Toolchain for VsToolchain {
             OsString::from("/E"),
             OsString::from("/we4002"), // C4002: too many actual parameters for macro 'identifier'
             OsString::from("/Fo").concat(quote(&task.output_object)?), // /Fo option also set output path for #import directive
-            quote(&task.input_source)?,
+            task.input_source.clone().into_os_string(),
         ];
         collect_args(
             &task.shared.args,
