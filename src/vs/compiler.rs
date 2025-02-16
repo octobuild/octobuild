@@ -151,7 +151,8 @@ fn collect_args(
                     match form {
                         ParamForm::Separate => {
                             into.push(OsString::from(prefix).concat(flag));
-                            into.push(value.into());
+                            // TODO: Why quote?
+                            into.push(quote(value)?);
                         }
                         ParamForm::Smushed => {
                             into.push(OsString::from(prefix).concat(flag).concat(quote(value)?));
@@ -199,7 +200,7 @@ impl Toolchain for VsToolchain {
             OsString::from("/E"),
             OsString::from("/we4002"), // C4002: too many actual parameters for macro 'identifier'
             OsString::from("/Fo").concat(quote(&task.output_object)?), // /Fo option also set output path for #import directive
-            OsString::from(&task.input_source),
+            quote(&task.input_source)?,
         ];
         collect_args(
             &task.shared.args,

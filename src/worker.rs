@@ -9,7 +9,8 @@ use petgraph::graph::NodeIndex;
 use petgraph::{EdgeDirection, Graph};
 
 use crate::compiler::{
-    BuildTaskResult, CommandInfo, CompilationTask, Compiler, OutputInfo, SharedState, Toolchain,
+    BuildTaskResult, CommandArgs, CommandInfo, CompilationTask, Compiler, OutputInfo, SharedState,
+    Toolchain,
 };
 
 pub type BuildGraph = Graph<Arc<BuildTask>, ()>;
@@ -30,7 +31,7 @@ impl BuildTask {
             }),
             BuildAction::Exec(command_info, args) => state.wrap_slow(|| {
                 let mut command = command_info.to_command();
-                command.args(args);
+                args.append_to(&mut command)?;
                 let output = command.output()?;
                 Ok(OutputInfo::new(output))
             }),
@@ -45,7 +46,7 @@ impl BuildTask {
 
 pub enum BuildAction {
     Empty,
-    Exec(CommandInfo, Vec<String>),
+    Exec(CommandInfo, CommandArgs),
     Compilation(Arc<dyn Toolchain>, CompilationTask),
 }
 
@@ -99,7 +100,7 @@ impl BuildAction {
     pub fn create_tasks<C: Compiler>(
         compiler: &C,
         command: CommandInfo,
-        args: Vec<String>,
+        args: CommandArgs,
         title: &str,
         run_second_cpp: bool,
     ) -> Vec<BuildAction> {

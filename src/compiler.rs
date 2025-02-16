@@ -725,6 +725,34 @@ pub struct ToolchainCompilationTask {
     pub task: CompilationTask,
 }
 
+#[derive(Debug, Clone)]
+pub enum CommandArgs {
+    String(String),
+    Vec(Vec<String>),
+}
+
+impl CommandArgs {
+    pub fn append_to(&self, command: &mut Command) -> crate::Result<()> {
+        match self {
+            CommandArgs::Vec(v) => {
+                command.args(v);
+            }
+            CommandArgs::String(v) => {
+                #[cfg(windows)]
+                {
+                    use std::os::windows::process::CommandExt;
+                    command.raw_arg(v);
+                }
+                #[cfg(not(windows))]
+                {
+                    command.args(cmd::native::parse(v)?);
+                }
+            }
+        }
+        Ok(())
+    }
+}
+
 pub trait Compiler: Send + Sync {
     // Resolve toolchain for command execution.
     fn resolve_toolchain(&self, command: &CommandInfo) -> Option<Arc<dyn Toolchain>>;
@@ -734,14 +762,19 @@ pub trait Compiler: Send + Sync {
     fn create_tasks(
         &self,
         command: CommandInfo,
-        args: Vec<String>,
+        args: CommandArgs,
         run_second_cpp: bool,
     ) -> crate::Result<Vec<ToolchainCompilationTask>> {
         let toolchain = self
             .resolve_toolchain(&command)
             .ok_or_else(|| crate::Error::ToolchainNotFound(command.program.clone()))?;
 
-        let tasks = toolchain.create_tasks(command, args, run_second_cpp)?;
+        let argv = match args {
+            CommandArgs::String(v) => cmd::native::parse(&v)?,
+            CommandArgs::Vec(v) => v,
+        };
+
+        let tasks = toolchain.create_tasks(command, argv, run_second_cpp)?;
 
         Ok(tasks
             .into_iter()

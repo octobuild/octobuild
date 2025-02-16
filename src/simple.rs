@@ -8,7 +8,7 @@ use petgraph::Graph;
 
 use crate::clang::compiler::ClangCompiler;
 use crate::cluster::client::RemoteCompiler;
-use crate::compiler::{CommandInfo, Compiler, CompilerGroup, SharedState};
+use crate::compiler::{CommandArgs, CommandInfo, Compiler, CompilerGroup, SharedState};
 use crate::config::Config;
 use crate::vs::compiler::VsCompiler;
 use crate::worker::execute_graph;
@@ -68,8 +68,13 @@ where
     let command_info = CommandInfo::simple(PathBuf::from(exec));
     let remote = RemoteCompiler::new(&config.coordinator, compiler);
     let args = env::args().skip(1).collect();
-    let actions =
-        BuildAction::create_tasks(&remote, command_info, args, exec, config.run_second_cpp);
+    let actions = BuildAction::create_tasks(
+        &remote,
+        command_info,
+        CommandArgs::Vec(args),
+        exec,
+        config.run_second_cpp,
+    );
 
     let mut build_graph: BuildGraph = Graph::new();
     for action in actions {
