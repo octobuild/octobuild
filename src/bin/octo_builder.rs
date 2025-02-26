@@ -150,15 +150,15 @@ fn handle_task(state: Arc<BuilderState>, request: &Request) -> octobuild::Result
     info!("Received task from: {}", &request.remote_addr());
     let request: CompileRequest = bincode::deserialize_from(request.data().unwrap())?;
     let pch_usage: PCHUsage = match request.precompiled_hash {
-        Some(ref hash) => {
-            if !is_valid_sha256(hash) {
+        Some(hash) => {
+            if !is_valid_sha256(&hash) {
                 return Ok(
                     Response::text(format!("Invalid hash value: {hash}")).with_status_code(400)
                 );
             }
             let path = state
                 .precompiled_dir
-                .join(hash.to_string() + PRECOMPILED_SUFFIX);
+                .join(hash.clone() + PRECOMPILED_SUFFIX);
             if !path.exists() {
                 return Ok(
                     Response::text(format!("Precompiled file not found: {hash}"))

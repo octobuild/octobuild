@@ -169,9 +169,9 @@ fn expand_arg<F: Fn(&str) -> Option<String>>(arg: &str, resolver: &F) -> String 
                 Some(end) => {
                     let name = &suffix[begin + 2..begin + end];
                     match resolver(name) {
-                        Some(ref value) => {
+                        Some(value) => {
                             result += &suffix[..begin];
-                            result += value;
+                            result += &value;
                         }
                         None => {
                             result += &suffix[..=begin + end];

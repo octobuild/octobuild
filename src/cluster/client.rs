@@ -62,7 +62,7 @@ impl<C: Compiler> RemoteCompiler<C> {
 impl RemoteSharedMut {
     fn receive_builders(base_url: &Option<reqwest::Url>) -> Result<Vec<BuilderInfo>, Error> {
         match base_url {
-            Some(ref base_url) => {
+            Some(base_url) => {
                 let url = base_url.join(RPC_BUILDER_LIST).unwrap();
                 let mut response =
                     reqwest::blocking::get(url).map_err(|e| Error::new(ErrorKind::Other, e))?;
@@ -166,7 +166,7 @@ impl RemoteToolchain {
         base_url: &reqwest::Url,
     ) -> Result<Option<String>, Error> {
         match precompiled {
-            Some(ref path) => {
+            Some(path) => {
                 // Get precompiled header file hash
                 let meta = state.cache.file_hash(path)?;
                 // Check is precompiled header uploaded
@@ -309,7 +309,7 @@ fn get_base_url(addr: &SocketAddr) -> reqwest::Url {
 
 fn write_output(path: &Option<PathBuf>, success: bool, output: &[u8]) -> Result<(), Error> {
     match path {
-        Some(ref path) => {
+        Some(path) => {
             if success {
                 let mut f = File::create(path)?;
                 f.write(output).inspect_err(|_| {
