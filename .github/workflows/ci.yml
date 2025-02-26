@@ -39,8 +39,6 @@ jobs:
     strategy:
       matrix:
         include:
-          - platform: ubuntu-20.04
-            distro_version: focal
           - platform: ubuntu-22.04
             distro_version: jammy
           - platform: ubuntu-24.04
