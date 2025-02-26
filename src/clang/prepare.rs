@@ -3,7 +3,7 @@ use crate::compiler::{
     Scope,
 };
 use crate::utils::{expand_response_files, find_param, ParamValue};
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::sync::Arc;
 use std::vec::IntoIter;
 
@@ -29,9 +29,7 @@ pub fn create_tasks(
     let input_sources: Vec<PathBuf> = parsed_args
         .iter()
         .filter_map(|arg| match arg {
-            Arg::Input { kind, file, .. } if *kind == InputKind::Source => {
-                Some(PathBuf::from(file))
-            }
+            Arg::Input { kind, file, .. } if *kind == InputKind::Source => Some(file.clone()),
             _ => None,
         })
         .collect();
@@ -69,7 +67,7 @@ pub fn create_tasks(
         |arg: &Arg| -> Option<crate::Result<PathBuf>> {
             match arg {
                 Arg::Output { kind, file, .. } if *kind == OutputKind::Object => {
-                    Some(command.absolutize(Path::new(file)))
+                    Some(command.absolutize(file))
                 }
                 _ => None,
             }
@@ -95,9 +93,9 @@ pub fn create_tasks(
     let deps_file = parsed_args
         .iter()
         .find_map(|arg| match arg {
-            Arg::Param {
-                name: flag, value, ..
-            } if *flag == "MF" => Some(command.absolutize(Path::new(&value))),
+            Arg::Output { kind, file, .. } if *kind == OutputKind::Deps => {
+                Some(command.absolutize(file))
+            }
             _ => None,
         })
         .map_or(Ok(None), |v| v.map(Some))?;
@@ -451,7 +449,17 @@ fn parse_argument(iter: &mut IntoIter<String>) -> Option<Result<Arg, String>> {
                     } => {
                         if flag == "o" {
                             // Minor hack
-                            Ok(Arg::output(OutputKind::Object, flag, value))
+                            Ok(Arg::Output {
+                                kind: OutputKind::Object,
+                                name: flag.into(),
+                                file: PathBuf::from(value),
+                            })
+                        } else if flag == "MF" {
+                            Ok(Arg::Output {
+                                kind: OutputKind::Deps,
+                                name: flag.into(),
+                                file: PathBuf::from(value),
+                            })
                         } else {
                             Ok(v)
                         }
@@ -461,7 +469,10 @@ fn parse_argument(iter: &mut IntoIter<String>) -> Option<Result<Arg, String>> {
                 None => Err(arg),
             }
         } else {
-            Ok(Arg::input(InputKind::Source, arg))
+            Ok(Arg::Input {
+                kind: InputKind::Source,
+                file: PathBuf::from(arg),
+            })
         }
     })
 }
@@ -522,7 +533,11 @@ fn test_parse_argument_precompile() {
                 ParamForm::Combined
             ),
             Arg::flag(Scope::Shared, "-", "no-canonical-prefixes"),
-            Arg::param(Scope::Preprocessor, "-", "MF", "path/to/file"),
+            Arg::Output {
+                kind: OutputKind::Deps,
+                name: "MF".into(),
+                file: "path/to/file".into()
+            },
             Arg::param(Scope::Shared, "-", "target", "bla"),
             Arg::param_ext(
                 Scope::Shared,
@@ -535,8 +550,15 @@ fn test_parse_argument_precompile() {
             Arg::param_ext(Scope::Shared, "-", "stdlib", "libc++", ParamForm::Combined),
             Arg::param(Scope::Shared, "-", "D", "IS_MONOLITHIC=1"),
             Arg::param_ext(Scope::Shared, "-", "std", "c++11", ParamForm::Combined),
-            Arg::output(OutputKind::Object, "o", "CorePrivatePCH.h.pch"),
-            Arg::input(InputKind::Source, "CorePrivatePCH.h")
+            Arg::Output {
+                kind: OutputKind::Object,
+                name: "o".into(),
+                file: "CorePrivatePCH.h.pch".into(),
+            },
+            Arg::Input {
+                kind: InputKind::Source,
+                file: "CorePrivatePCH.h".into(),
+            }
         ]
     )
 }
@@ -595,8 +617,15 @@ fn test_parse_argument_compile() {
                 ParamForm::Combined
             ),
             Arg::param_ext(Scope::Shared, "-", "sce-stdlib", "v1", ParamForm::Combined),
-            Arg::output(OutputKind::Object, "o", "Module.Core.cpp.o"),
-            Arg::input(InputKind::Source, "Module.Core.cpp")
+            Arg::Output {
+                kind: OutputKind::Object,
+                name: "o".into(),
+                file: "Module.Core.cpp.o".into(),
+            },
+            Arg::Input {
+                kind: InputKind::Source,
+                file: "Module.Core.cpp".into(),
+            },
         ]
     )
 }

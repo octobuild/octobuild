@@ -19,7 +19,7 @@ pub fn create_tasks(
     // Source file name.
     let mut input_sources = Vec::<PathBuf>::new();
     for input in parsed_args.iter().filter_map(|arg| match arg {
-        Arg::Input { kind, file, .. } if *kind == InputKind::Source => Some(PathBuf::from(file)),
+        Arg::Input { kind, file, .. } if *kind == InputKind::Source => Some(file.clone()),
         _ => None,
     }) {
         input_sources.push(command.absolutize(&input)?);
@@ -47,7 +47,7 @@ pub fn create_tasks(
         }
     };
     // Precompiled header file name.
-    let pch_param = find_param(&parsed_args, |arg: &Arg| -> Option<(bool, String)> {
+    let pch_param = find_param(&parsed_args, |arg: &Arg| -> Option<(bool, PathBuf)> {
         match arg {
             Arg::Input { kind, file, .. } if *kind == InputKind::Marker => {
                 Some((true, file.clone()))
@@ -66,7 +66,7 @@ pub fn create_tasks(
                 None => PathBuf::from(path).with_extension("pch"),
             };
             let precompiled_path_abs = command.absolutize(&precompiled_path)?;
-            let pch_marker = if path.is_empty() {
+            let pch_marker = if path.as_os_str().is_empty() {
                 None
             } else {
                 Some(OsString::from(path))
@@ -292,10 +292,24 @@ fn parse_argument(iter: &mut IntoIter<String>) -> Option<Result<Arg, String>> {
                     }
                     s if s.starts_with("external:W") => Ok(Arg::flag(Scope::Shared, "/", flag)),
                     s if s.starts_with("favor:") => Ok(Arg::flag(Scope::Shared, "/", flag)),
-                    s if s.starts_with("Fo") => Ok(Arg::output(OutputKind::Object, "Fo", &s[2..])),
-                    s if s.starts_with("Fp") => Ok(Arg::input(InputKind::Precompiled, &s[2..])),
-                    s if s.starts_with("Yc") => Ok(Arg::output(OutputKind::Marker, "Yc", &s[2..])),
-                    s if s.starts_with("Yu") => Ok(Arg::input(InputKind::Marker, &s[2..])),
+                    s if s.starts_with("Fo") => Ok(Arg::Output {
+                        kind: OutputKind::Object,
+                        name: "Fo".into(),
+                        file: PathBuf::from(&s[2..]),
+                    }),
+                    s if s.starts_with("Fp") => Ok(Arg::Input {
+                        kind: InputKind::Precompiled,
+                        file: PathBuf::from(&s[2..]),
+                    }),
+                    s if s.starts_with("Yc") => Ok(Arg::Output {
+                        kind: OutputKind::Marker,
+                        name: "Yc".into(),
+                        file: PathBuf::from(&s[2..]),
+                    }),
+                    s if s.starts_with("Yu") => Ok(Arg::Input {
+                        kind: InputKind::Marker,
+                        file: PathBuf::from(&s[2..]),
+                    }),
                     s if s.starts_with("Yl") => Ok(Arg::flag(Scope::Shared, "/", flag)),
                     s if s.starts_with("FI") => Ok(Arg::param_ext(
                         Scope::Preprocessor,
@@ -311,7 +325,7 @@ fn parse_argument(iter: &mut IntoIter<String>) -> Option<Result<Arg, String>> {
         } else {
             Ok(Arg::Input {
                 kind: InputKind::Source,
-                file: arg,
+                file: PathBuf::from(arg),
             })
         }
     })
@@ -357,9 +371,19 @@ fn test_parse_argument() {
         [
             Arg::param_ext(Scope::Ignore, "/", "T", "P", ParamForm::Smushed),
             Arg::flag(Scope::Ignore, "/", "c"),
-            Arg::input(InputKind::Marker, "sample.h"),
-            Arg::input(InputKind::Precompiled, "sample.h.pch"),
-            Arg::output(OutputKind::Object, "Fo", "sample.cpp.o"),
+            Arg::Input {
+                kind: InputKind::Marker,
+                file: "sample.h".into(),
+            },
+            Arg::Input {
+                kind: InputKind::Precompiled,
+                file: "sample.h.pch".into(),
+            },
+            Arg::Output {
+                kind: OutputKind::Object,
+                name: "Fo".into(),
+                file: "sample.cpp.o".into(),
+            },
             Arg::param_ext(Scope::Shared, "/", "D", "TEST", ParamForm::Smushed),
             Arg::param_ext(Scope::Shared, "/", "D", "TEST2", ParamForm::Separate),
             Arg::flag(Scope::Shared, "/", "arch:AVX"),
@@ -369,7 +393,10 @@ fn test_parse_argument() {
             Arg::flag(Scope::Compiler, "/", "FS"),
             Arg::flag(Scope::Compiler, "/", "d2pattern-opt-disable:-903736918"),
             Arg::flag(Scope::Compiler, "/", "d2pattern-opt-disable:586191940"),
-            Arg::input(InputKind::Source, "sample.cpp")
+            Arg::Input {
+                kind: InputKind::Source,
+                file: "sample.cpp".into(),
+            },
         ]
     )
 }

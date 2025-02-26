@@ -16,6 +16,10 @@ use crate::compiler::{
 use crate::lazy::Lazy;
 use os_str_bytes::OsStrBytes;
 
+fn normalize_path(path: &Path) -> OsString {
+    OsString::from(path.to_str().unwrap().replace("\\", "\\\\"))
+}
+
 fn re_clang() -> &'static regex::bytes::Regex {
     static RE: OnceLock<regex::bytes::Regex> = OnceLock::new();
 
@@ -141,10 +145,16 @@ impl Toolchain for ClangToolchain {
             OsString::from("-frewrite-includes"),
             OsString::from("-x"),
             OsString::from(&task.language),
-            OsString::from(&task.input_source),
+            normalize_path(&task.input_source),
             OsString::from("-o"),
             OsString::from("-"),
         ];
+
+        if let Some(ref deps_file) = task.shared.deps_file {
+            args.push("-MF".into());
+            args.push(normalize_path(deps_file));
+        }
+
         collect_args(
             &task.shared.args,
             Scope::Preprocessor,
@@ -210,13 +220,13 @@ impl Toolchain for ClangToolchain {
         args.push(OsString::from("-c"));
         match &task.input {
             Preprocessed(_) => args.push(OsString::from("-")),
-            Source(source) => args.push(OsString::from(&source.path)),
+            Source(source) => args.push(normalize_path(&source.path)),
         };
 
         args.push(OsString::from("-o"));
         match task.output_object {
             None => args.push(OsString::from("-")),
-            Some(v) => args.push(OsString::from(v)),
+            Some(v) => args.push(normalize_path(&v)),
         };
 
         // Run compiler.

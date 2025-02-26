@@ -78,6 +78,7 @@ pub enum InputKind {
 pub enum OutputKind {
     Object,
     Marker,
+    Deps,
 }
 
 #[derive(Debug, Eq, PartialEq)]
@@ -103,12 +104,12 @@ pub enum Arg {
     },
     Input {
         kind: InputKind,
-        file: String,
+        file: PathBuf,
     },
     Output {
         kind: OutputKind,
         name: String,
-        file: String,
+        file: PathBuf,
     },
 }
 
@@ -149,20 +150,6 @@ impl Arg {
             name: name.into(),
             value: value.into(),
             form,
-        }
-    }
-
-    pub fn input(kind: InputKind, file: impl Into<String>) -> Arg {
-        Arg::Input {
-            kind,
-            file: file.into(),
-        }
-    }
-    pub fn output(kind: OutputKind, name: impl Into<String>, file: impl Into<String>) -> Arg {
-        Arg::Output {
-            kind,
-            name: name.into(),
-            file: file.into(),
         }
     }
 }
@@ -834,23 +821,20 @@ fn fn_find_exec_native(mut path: PathBuf) -> Option<PathBuf> {
     if path.is_file() {
         return Some(path);
     }
-    if path
-        .extension()
-        .and_then(|ext| ext.to_str())
-        .map_or(true, |s| s.to_lowercase() != "exe")
-    {
+
+    if path.extension()?.to_str()?.to_lowercase() != "exe" {
         let name_with_ext = path.file_name().map(|n| {
             let mut name = n.to_os_string();
             name.push(".exe");
             name
-        });
-        if let Some(n) = name_with_ext {
-            path.set_file_name(n);
-            if path.is_file() {
-                return Some(path);
-            }
+        })?;
+
+        path.set_file_name(name_with_ext);
+        if path.is_file() {
+            return Some(path);
         }
     }
+
     None
 }
 
