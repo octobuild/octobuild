@@ -71,7 +71,7 @@ figment = { version = "0.10", features = ["env", "yaml"] }
 hex = "0.4"
 hostname = "0.4"
 rouille = "3"
-ipc = { git = "https://github.com/slonopotamus/ipc-rs" }
+ipc = { git = "https://github.com/octobuild/ipc-rs" }
 libc = "0.2"
 local-encoding-ng = "0.1"
 log = "0.4"
