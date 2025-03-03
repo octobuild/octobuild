@@ -60,7 +60,7 @@ winget install octobuild
 . Next-next-next
 
 [[installation-ubuntu-deb]]
-=== deb package (Ubuntu 20.04, 22.04)
+=== deb package (Ubuntu 22.04, 24.04)
 
 You can install octobuild on Ubuntu using the following commands:
 
