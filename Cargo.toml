@@ -61,7 +61,6 @@ harness = false
 [dependencies]
 bincode = "2"
 byteorder = "1"
-clap = { version = "4", features = ["derive"] }
 crossbeam-channel = "0.5"
 daemon = { git = "https://github.com/octobuild/daemon-rs" }
 directories = "6"
