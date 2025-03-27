@@ -1,3 +1,8 @@
+use bincode::{Decode, Encode};
+use ipc::Semaphore;
+use os_str_bytes::OsStrBytes;
+use path_absolutize::Absolutize;
+use sha2::{Digest, Sha256};
 use std::cmp::max;
 use std::collections::hash_map;
 use std::collections::HashMap;
@@ -9,12 +14,6 @@ use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 use std::sync::{Arc, RwLock};
 use std::time::Duration;
-
-use ipc::Semaphore;
-use os_str_bytes::OsStrBytes;
-use path_absolutize::Absolutize;
-use serde::{Deserialize, Serialize};
-use sha2::{Digest, Sha256};
 use tempfile::{NamedTempFile, TempDir};
 use thiserror::Error;
 
@@ -334,7 +333,7 @@ impl CommandInfo {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Decode, Encode, Debug)]
 pub struct OutputInfo {
     pub status: Option<i32>,
     pub stdout: Vec<u8>,

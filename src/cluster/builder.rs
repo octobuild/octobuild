@@ -1,8 +1,8 @@
-use serde::{Deserialize, Serialize};
+use bincode::{Decode, Encode};
 
 use crate::compiler::OutputInfo;
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Decode, Encode, Debug)]
 pub struct CompileRequest {
     pub toolchain: String,
     pub args: Vec<String>,
@@ -10,7 +10,7 @@ pub struct CompileRequest {
     pub precompiled_hash: Option<String>,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Decode, Encode, Debug)]
 pub enum CompileResponse {
     Success(OutputInfo),
     Err(String),

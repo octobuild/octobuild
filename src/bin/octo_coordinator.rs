@@ -34,7 +34,8 @@ impl CoordinatorState {
 }
 
 fn update(state: Arc<CoordinatorState>, request: &Request) -> octobuild::Result<Response> {
-    let mut update: BuilderInfoUpdate = bincode::deserialize_from(request.data().unwrap())?;
+    let mut update: BuilderInfoUpdate =
+        bincode::decode_from_std_read(&mut request.data().unwrap(), bincode::config::standard())?;
     // Fix inspecified endpoint IP address.
     let endpoint = match SocketAddr::from_str(&update.info.endpoint) {
         Ok(v) => v,
@@ -55,7 +56,7 @@ fn update(state: Arc<CoordinatorState>, request: &Request) -> octobuild::Result<
         let mut holder = state.builders.write().unwrap();
         let now = Instant::now();
         holder.retain(|e| (e.guid != update.guid) && (e.timeout >= now));
-        payload = bincode::serialize(&update.info)?;
+        payload = bincode::encode_to_vec(&update.info, bincode::config::standard())?;
         holder.push(BuilderState {
             guid: update.guid,
             info: update.info,
@@ -82,7 +83,7 @@ fn list(state: Arc<CoordinatorState>) -> octobuild::Result<Response> {
 
     Ok(Response::from_data(
         "application/octet-stream",
-        bincode::serialize(&builders)?,
+        bincode::encode_to_vec(&builders, bincode::config::standard())?,
     ))
 }
 

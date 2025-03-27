@@ -59,7 +59,7 @@ name = "vs_postprocess"
 harness = false
 
 [dependencies]
-bincode = "1"
+bincode = "2"
 byteorder = "1"
 clap = { version = "4", features = ["derive"] }
 crossbeam-channel = "0.5"

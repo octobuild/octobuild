@@ -67,7 +67,7 @@ impl RemoteSharedMut {
                 let mut response =
                     reqwest::blocking::get(url).map_err(|e| Error::new(ErrorKind::Other, e))?;
 
-                bincode::deserialize_from(&mut response)
+                bincode::decode_from_std_read(&mut response, bincode::config::standard())
                     .map_err(|e| Error::new(ErrorKind::InvalidData, e))
             }
             None => Ok(Vec::new()),
@@ -137,7 +137,8 @@ impl RemoteToolchain {
                 &base_url,
             )?,
         };
-        let request_payload = bincode::serialize(&request).unwrap();
+        let request_payload =
+            bincode::encode_to_vec(&request, bincode::config::standard()).unwrap();
         let mut resp: reqwest::blocking::Response = self
             .shared
             .client
@@ -146,8 +147,9 @@ impl RemoteToolchain {
             .send()
             .map_err(|e| Error::new(ErrorKind::Other, e))?;
         // Receive compilation result.
-        let result: CompileResponse = bincode::deserialize_from(&mut resp)
-            .map_err(|e| Error::new(ErrorKind::InvalidData, e))?;
+        let result: CompileResponse =
+            bincode::decode_from_std_read(&mut resp, bincode::config::standard())
+                .map_err(|e| Error::new(ErrorKind::InvalidData, e))?;
         if let CompileResponse::Success(ref output) = result {
             write_output(
                 &task.output_object,

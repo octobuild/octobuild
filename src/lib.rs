@@ -55,7 +55,9 @@ pub mod worker;
 #[derive(Debug, Error)]
 pub enum Error {
     #[error(transparent)]
-    Bincode(#[from] bincode::Error),
+    BincodeEncode(#[from] bincode::error::EncodeError),
+    #[error(transparent)]
+    BincodeDecode(#[from] bincode::error::DecodeError),
     #[error(transparent)]
     Cache(#[from] CacheError),
     #[error("Found cycles in build graph")]
