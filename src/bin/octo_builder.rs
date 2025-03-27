@@ -121,7 +121,7 @@ impl BuilderService {
             while !done.load(Ordering::Relaxed) {
                 match client
                     .post(coordinator.join(RPC_BUILDER_UPDATE).unwrap())
-                    .body(bincode::serialize(&info).unwrap())
+                    .body(bincode::encode_to_vec(&info, bincode::config::standard()).unwrap())
                     .send()
                 {
                     Ok(_) => {}
@@ -148,7 +148,8 @@ impl BuilderService {
 fn handle_task(state: Arc<BuilderState>, request: &Request) -> octobuild::Result<Response> {
     // Receive compilation request.
     info!("Received task from: {}", &request.remote_addr());
-    let request: CompileRequest = bincode::deserialize_from(request.data().unwrap())?;
+    let request: CompileRequest =
+        bincode::decode_from_std_read(&mut request.data().unwrap(), bincode::config::standard())?;
     let pch_usage: PCHUsage = match request.precompiled_hash {
         Some(hash) => {
             if !is_valid_sha256(&hash) {
@@ -184,7 +185,7 @@ fn handle_task(state: Arc<BuilderState>, request: &Request) -> octobuild::Result
 
     let toolchain: Arc<dyn Toolchain> = state.toolchains.get(&request.toolchain).unwrap().clone();
     let response = CompileResponse::from(toolchain.run_compile(&state.shared, compile_step));
-    let payload = bincode::serialize(&response)?;
+    let payload = bincode::encode_to_vec(&response, bincode::config::standard())?;
     Ok(Response::from_data("application/octet-stream", payload))
 }
 
