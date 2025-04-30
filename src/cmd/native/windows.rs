@@ -64,7 +64,7 @@ pub fn parse(cmd_line: &str) -> crate::Result<Vec<String>> {
             BACKSLASH => {
                 let backslash_count = code_units.advance_while(|w| w == BACKSLASH) + 1;
                 if code_units.peek() == Some(&QUOTE) {
-                    cur.extend(iter::repeat(BACKSLASH).take(backslash_count / 2));
+                    cur.extend(iter::repeat_n(BACKSLASH,backslash_count / 2));
                     // The quote is escaped if there are an odd number of backslashes.
                     if backslash_count % 2 == 1 {
                         code_units.next();
@@ -72,7 +72,7 @@ pub fn parse(cmd_line: &str) -> crate::Result<Vec<String>> {
                     }
                 } else {
                     // If there is no quote on the end then there is no escaping.
-                    cur.extend(iter::repeat(BACKSLASH).take(backslash_count));
+                    cur.extend(iter::repeat_n(BACKSLASH, backslash_count));
                 }
             }
             // If `in_quotes` and not backslash escaped (see above) then a quote either
