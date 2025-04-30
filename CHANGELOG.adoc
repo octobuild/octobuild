@@ -1,6 +1,10 @@
 = Changelog
 :icons: font
 
+== Unreleased
+
+* Allow all users to query Windows service status so Unreal Engine uses octobuild when ran as remote user via ssh (https://github.com/octobuild/octobuild/issues/142[#142])
+
 == 1.7.1
 
 - Fix PlayStation regression in 1.7.0 (https://github.com/octobuild/octobuild/issues/134[#134])

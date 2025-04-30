@@ -115,6 +115,9 @@
                                     Name='Incredibuild Agent'
                                     Start='auto'
                                     Type='ownProcess'>
+                                <util:PermissionEx
+                                        User="Everyone"
+                                        ServiceQueryStatus="yes"/>
                                 <util:ServiceConfig
                                         FirstFailureActionType="restart"
                                         SecondFailureActionType="restart"
