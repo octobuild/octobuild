@@ -68,7 +68,7 @@ pub enum Error {
         error: Box<crate::Error>,
     },
     #[error(transparent)]
-    Figment(#[from] figment::Error),
+    Figment(#[from] Box<figment::Error>),
     #[error(transparent)]
     FromUtf8(#[from] std::string::FromUtf8Error),
     #[error(transparent)]

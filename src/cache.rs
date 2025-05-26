@@ -6,7 +6,7 @@ use crate::io::statistic::Statistic;
 use crate::utils::hash_stream;
 use std::fs;
 use std::fs::File;
-use std::io::{Error, ErrorKind};
+use std::io::Error;
 use std::path::{Path, PathBuf};
 use std::time::SystemTime;
 
@@ -87,6 +87,6 @@ impl FileHasher for Cache {
                     })
                 },
             )
-            .map_err(|e| Error::new(ErrorKind::Other, e.error_msg))
+            .map_err(|e| Error::other(e.error_msg))
     }
 }

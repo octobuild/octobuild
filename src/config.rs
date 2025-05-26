@@ -67,7 +67,10 @@ impl Config {
             figment = figment.merge(Yaml::file(path));
         }
 
-        Ok(figment.merge(Env::prefixed("OCTOBUILD_")).extract()?)
+        Ok(figment
+            .merge(Env::prefixed("OCTOBUILD_"))
+            .extract()
+            .map_err(Box::from)?)
     }
 
     pub fn print_help(&self, executable: &str, out: &mut impl Write) -> crate::Result<()> {

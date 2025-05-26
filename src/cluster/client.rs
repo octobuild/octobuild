@@ -64,8 +64,7 @@ impl RemoteSharedMut {
         match base_url {
             Some(base_url) => {
                 let url = base_url.join(RPC_BUILDER_LIST).unwrap();
-                let mut response =
-                    reqwest::blocking::get(url).map_err(|e| Error::new(ErrorKind::Other, e))?;
+                let mut response = reqwest::blocking::get(url).map_err(Error::other)?;
 
                 bincode::decode_from_std_read(&mut response, bincode::config::standard())
                     .map_err(|e| Error::new(ErrorKind::InvalidData, e))
@@ -102,14 +101,13 @@ impl RemoteToolchain {
     ) -> Result<CompileResponse, Error> {
         let name = self
             .identifier()
-            .ok_or_else(|| Error::new(ErrorKind::Other, "Can't get toolchain name"))?;
+            .ok_or_else(|| Error::other("Can't get toolchain name"))?;
 
         let addr = self
             .remote_endpoint(&name)
-            .ok_or_else(|| Error::new(ErrorKind::Other, "Can't find helper for toolchain"))?;
+            .ok_or_else(|| Error::other("Can't find helper for toolchain"))?;
         if task.pch_usage.is_some() {
-            return Err(Error::new(
-                ErrorKind::Other,
+            return Err(Error::other(
                 "Remote precompiled header generation is not supported",
             ));
         }
@@ -145,7 +143,7 @@ impl RemoteToolchain {
             .post(base_url.join(RPC_BUILDER_TASK).unwrap())
             .body(request_payload)
             .send()
-            .map_err(|e| Error::new(ErrorKind::Other, e))?;
+            .map_err(Error::other)?;
         // Receive compilation result.
         let result: CompileResponse =
             bincode::decode_from_std_read(&mut resp, bincode::config::standard())
