@@ -1,7 +1,7 @@
 = Changelog
 :icons: font
 
-== Unreleased
+== 1.8.0
 
 * Add support for `cl.exe /diagnostics:caret` for UE-5.6 (https://github.com/octobuild/octobuild/issues/144[#144])
 
