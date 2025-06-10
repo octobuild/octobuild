@@ -1,6 +1,10 @@
 = Changelog
 :icons: font
 
+== Unreleased
+
+* Add support for `cl.exe /diagnostics:caret` for UE-5.6 (https://github.com/octobuild/octobuild/issues/144[#144])
+
 == 1.7.2
 
 * Allow all users to query Windows service status so Unreal Engine uses octobuild when ran as remote user via ssh (https://github.com/octobuild/octobuild/issues/142[#142])

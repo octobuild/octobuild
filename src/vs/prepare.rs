@@ -282,6 +282,7 @@ fn parse_argument(iter: &mut IntoIter<String>) -> Option<Result<Arg, String>> {
                     s if s.starts_with("d2pattern-opt-disable:") => {
                         Ok(Arg::flag(Scope::Compiler, "/", flag))
                     }
+                    s if s.starts_with("diagnostics:") => Ok(Arg::flag(Scope::Shared, "/", flag)),
                     s if s.starts_with("arch:") => Ok(Arg::flag(Scope::Shared, "/", flag)),
                     s if s.starts_with("errorReport:") => Ok(Arg::flag(Scope::Shared, "/", flag)),
                     s if s.starts_with("source-charset:") => {
@@ -361,7 +362,7 @@ fn has_param_prefix(arg: &str) -> bool {
 fn test_parse_argument() {
     let args: Vec<String> =
         "/TP /c /Yusample.h /Fpsample.h.pch /Fosample.cpp.o /DTEST /D TEST2 /arch:AVX /fsanitize=address /d2ExtendedWarningInfo \
-         /d2ssa-cfg-question- /FS /d2pattern-opt-disable:-903736918 /d2pattern-opt-disable:586191940 \
+         /d2ssa-cfg-question- /FS /d2pattern-opt-disable:-903736918 /d2pattern-opt-disable:586191940 /diagnostics:caret \
          sample.cpp"
             .split(' ')
             .map(|x| x.to_string())
@@ -393,6 +394,7 @@ fn test_parse_argument() {
             Arg::flag(Scope::Compiler, "/", "FS"),
             Arg::flag(Scope::Compiler, "/", "d2pattern-opt-disable:-903736918"),
             Arg::flag(Scope::Compiler, "/", "d2pattern-opt-disable:586191940"),
+            Arg::flag(Scope::Shared, "/", "diagnostics:caret"),
             Arg::Input {
                 kind: InputKind::Source,
                 file: "sample.cpp".into(),
