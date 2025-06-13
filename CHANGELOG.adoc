@@ -1,6 +1,10 @@
 = Changelog
 :icons: font
 
+== 1.8.1
+
+- Add support for `-Xclang` for UE-5.6+ on macOS and Linux
+
 == 1.8.0
 
 * Add support for `cl.exe /diagnostics:caret` for UE-5.6 (https://github.com/octobuild/octobuild/issues/144[#144])

@@ -272,6 +272,11 @@ static DASH_PARAMS: &[CompilerArgument] = &[
     },
     CompilerArgument {
         scope: Scope::Shared,
+        name: "Xclang",
+        value_type: NONE,
+    },
+    CompilerArgument {
+        scope: Scope::Shared,
         name: "nostdinc++",
         value_type: NONE,
     },
@@ -481,6 +486,7 @@ fn parse_argument(iter: &mut IntoIter<String>) -> Option<Result<Arg, String>> {
 fn test_parse_argument_precompile() {
     let args: Vec<String> =
         "-x c++-header -pipe -Wall -Werror -funwind-tables -Wsequence-point -mmmx -msse -msse2 \
+         -Xclang \
          -fno-math-errno -fno-rtti -g -g3 -gdwarf-3 -O2 -D_LINUX64 -IEngine/Source \
          -IDeveloper/Public -I Runtime/Core/Private -D IS_PROGRAM=1 -D UNICODE \
          -MD -nostdinc++ --gcc-toolchain=/bla/bla -no-canonical-prefixes \
@@ -511,6 +517,7 @@ fn test_parse_argument_precompile() {
             Arg::param_ext(Scope::Shared, "-", "m", "mmx", ParamForm::Smushed),
             Arg::param_ext(Scope::Shared, "-", "m", "sse", ParamForm::Smushed),
             Arg::param_ext(Scope::Shared, "-", "m", "sse2", ParamForm::Smushed),
+            Arg::flag(Scope::Shared, "-", "Xclang"),
             Arg::param_ext(Scope::Shared, "-", "f", "no-math-errno", ParamForm::Smushed),
             Arg::param_ext(Scope::Shared, "-", "f", "no-rtti", ParamForm::Smushed),
             Arg::flag(Scope::Shared, "-", "g"),
