@@ -235,7 +235,7 @@ impl RemoteToolchain {
                 }
                 Err(e) => {
                     holder.cooldown = now + Duration::from_secs(1);
-                    warn!("Can't receive toolchains from coordinator: {}", e);
+                    warn!("Can't receive toolchains from coordinator: {e}");
                 }
             }
             holder.builders.clone()
@@ -293,7 +293,7 @@ impl Toolchain for RemoteToolchain {
                 CompileResponse::Err(err) => Err(err.into()),
             },
             Err(e) => {
-                trace!("Fallback to local build: {}", e);
+                trace!("Fallback to local build: {e}");
                 self.local.run_compile(state, task)
             }
         }

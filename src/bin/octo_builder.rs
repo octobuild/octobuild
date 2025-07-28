@@ -87,7 +87,7 @@ impl BuilderService {
 
         info!("Found toolchains:");
         for toolchain in &state.toolchain_names() {
-            info!("- {}", toolchain);
+            info!("- {toolchain}");
         }
 
         let done = Arc::new(AtomicBool::new(false));
@@ -126,7 +126,7 @@ impl BuilderService {
                 {
                     Ok(_) => {}
                     Err(e) => {
-                        info!("Builder: can't send info to coordinator: {}", e);
+                        info!("Builder: can't send info to coordinator: {e}");
                     }
                 }
                 thread::sleep(Duration::from_secs(1));

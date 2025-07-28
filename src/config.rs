@@ -76,8 +76,8 @@ impl Config {
     pub fn print_help(&self, executable: &str, out: &mut impl Write) -> crate::Result<()> {
         writeln!(out)?;
         writeln!(out, "Usage:")?;
-        writeln!(out, "  {} <file>", executable)?;
-        writeln!(out, "  {} /reset", executable)?;
+        writeln!(out, "  {executable} <file>")?;
+        writeln!(out, "  {executable} /reset")?;
         writeln!(out,)?;
         writeln!(out, "Octobuild configuration:")?;
         writeln!(
