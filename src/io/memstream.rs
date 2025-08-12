@@ -43,7 +43,7 @@ impl MemStream {
     }
 
     #[must_use]
-    pub fn reader(&self) -> MemReader {
+    pub fn reader(&self) -> MemReader<'_> {
         let mut iter = self.iter();
         let last = iter.next();
         MemReader {
@@ -54,7 +54,7 @@ impl MemStream {
     }
 
     #[must_use]
-    pub fn iter(&self) -> Iter {
+    pub fn iter(&self) -> Iter<'_> {
         Iter {
             size: self.size,
             iter: self.blocks.iter(),

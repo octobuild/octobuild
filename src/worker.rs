@@ -128,7 +128,7 @@ impl BuildAction {
     }
 
     #[must_use]
-    pub fn title(&self) -> Cow<str> {
+    pub fn title(&self) -> Cow<'_, str> {
         match &self {
             BuildAction::Empty => Cow::Borrowed(""),
             BuildAction::Exec(_, args) => Cow::Owned(format!("{args:?}")),

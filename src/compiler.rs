@@ -232,7 +232,7 @@ impl CommandEnv {
     }
 
     #[must_use]
-    pub fn iter(&self) -> hash_map::Iter<String, String> {
+    pub fn iter(&self) -> hash_map::Iter<'_, String, String> {
         self.map.iter()
     }
 
