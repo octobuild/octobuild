@@ -91,7 +91,7 @@ tempfile = "3"
 thiserror = "2"
 url = {version = "2", features = ["serde"]}
 uuid = { version = "1", features = ["v4"] }
-xml-rs = "0.8"
+xml-rs = "1.0"
 
 [target.'cfg(windows)'.build-dependencies]
 cc = "1"
