@@ -231,8 +231,6 @@ impl Toolchain for ClangToolchain {
 
         // Run compiler.
         state.wrap_slow(|| {
-            // TODO: response file
-
             let mut command = Command::new(&self.path);
             match &task.input {
                 Preprocessed(_) => {
