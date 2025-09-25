@@ -217,3 +217,24 @@ This project requires minor patching of Unreal Engine:
 Also, enable "{cpp} 2019 Redistributable MSMs" "C++ 2022 Redistributable MSMs" in individual components.
 . Clone octobuild Git repository
 . Run `cargo build` in repository root to compile octobuild
+
+[[uninstall]]
+== Uninstall
+
+[%autowidth]
+|===
+| Platform | Remove service | Delete app
+
+| Linux
+| TBD
+| TBD
+
+| Windows
+| Search -> Services -> remove `Octobuild Agent`
+| delete `%ProgramData%\octobuild`
+
+| macOS
+| TBD
+| TBD
+
+|===
