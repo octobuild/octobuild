@@ -78,7 +78,7 @@ fn decode_string(data: &[u8]) -> crate::Result<String> {
 
 fn decode_utf16<F: Fn(u16, u16) -> u16>(data: &[u8], endian: F) -> crate::Result<String> {
     let mut utf16 = Vec::new();
-    if data.len() % 2 != 0 {
+    if !data.len().is_multiple_of(2) {
         return Err(crate::Error::FromUtf16OddLength);
     }
     let mut i = 0;
