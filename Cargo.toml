@@ -98,4 +98,4 @@ cc = "1"
 
 [target.'cfg(windows)'.dependencies]
 winapi = { version = "0.3", features = ["winver"] }
-winreg = "0.55"
+winreg = "0.56"
