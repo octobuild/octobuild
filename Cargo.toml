@@ -77,7 +77,7 @@ log = "0.4"
 lz4 = "1"
 num_cpus = "1"
 os_str_bytes = { version = "7", features = ["conversions"] }
-path-absolutize = "3"
+path-absolutize = "4"
 petgraph = "0.8"
 rand = "0.10"
 regex = "1"
