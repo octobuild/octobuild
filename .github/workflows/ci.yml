@@ -91,15 +91,3 @@ jobs:
         env:
           # We cannot use GITHUB_TOKEN here because it doesn't have permission to work with winget-pkgs repository fork
           GH_PERSONAL_TOKEN: ${{ secrets.GH_PERSONAL_TOKEN }}
-  homebrew:
-    runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/')
-    steps:
-      - name: checkout
-        uses: actions/checkout@v7
-      - name: publish to Homebrew
-        uses: dawidd6/action-homebrew-bump-formula@v10
-        with:
-          # See https://github.com/marketplace/actions/homebrew-bump-formula#usage
-          token: ${{ secrets.GH_PERSONAL_TOKEN }}
-          formula: octobuild
