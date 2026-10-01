@@ -1,6 +1,10 @@
 = Changelog
 :icons: font
 
+== Unreleased
+
+- Add prebuilt package for Ubuntu 26.04
+
 == 1.9.2
 
 - Add support for `/dximplicitlyinstantiatevirtualfunction-` for UE-5.8+ on Windows (https://github.com/octobuild/octobuild/issues/173[#173])

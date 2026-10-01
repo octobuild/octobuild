@@ -43,6 +43,8 @@ jobs:
             distro_version: jammy
           - platform: ubuntu-24.04
             distro_version: noble
+          - platform: ubuntu-26.04
+            distro_version: resolute
     runs-on: ${{ matrix.platform }}
     steps:
       - name: checkout
